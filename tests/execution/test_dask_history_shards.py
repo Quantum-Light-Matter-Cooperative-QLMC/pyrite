@@ -39,6 +39,10 @@ def _assert_identical(got, ref, path=""):
             # Separate worker processes need not have the same cache warmth.
             assert got[key] in {"hit", "miss"}
             continue
+        if where == "._shard_scoring.grid_pass":
+            # Whether the plan read the shards or hit the speed cache (#1395).
+            assert got[key] is None or isinstance(got[key], dict)
+            continue
         if isinstance(value, dict):
             _assert_identical(got[key], value, where)
         elif isinstance(value, np.ndarray):
@@ -134,10 +138,11 @@ def test_device_scored_policy_marks_cases_and_routes_joins_to_gpu_workers(tmp_pa
     with pytest.raises(ValueError, match="scoring"):
         ShardPolicy(shard_electrons=4, scoring="tpu")
     executor = SimpleNamespace(sharding=ShardPolicy(shard_electrons=4, scoring="gpu"))
-    assert _task_resources(executor, None) == {"GPU": 1}
-    assert _task_resources(executor, 0) is None
+    for stage in ("join", "plan", "score"):
+        assert _task_resources(executor, stage) == {"GPU": 1}
+    assert _task_resources(executor, "transport") is None
     executor.sharding = ShardPolicy(shard_electrons=4)
-    assert _task_resources(executor, None) is None
+    assert _task_resources(executor, "join") is None
     device = _executor(tmp_path, None, shard_electrons=4, scoring="gpu")
     assert device.transport_realization == TransportRealization(scoring="gpu")
 
@@ -270,3 +275,61 @@ def test_staged_plan_rejects_legacy_format_or_unmarked_input(tmp_path):
     path.write_text(json.dumps(plan))
     with pytest.raises(ValueError, match="mismatch"):
         _staged(str(run_dir), 0)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("size", [4, 5])
+def test_shard_sum_dask_case_equals_the_in_process_run_and_resumes(tmp_path, client, size):
+    """#1395: shards transport, plan, score and merge on process workers.
+
+    The result equals the marked case's in-process run bit for bit (11 = 4+4+3
+    and 5+5+1); a rerun after an interruption reuses the published plan and
+    spectra; without ``keep_shards`` the merge removes every payload.
+    """
+    from pyrite.execution.shards import shard_plan_key, shard_spectrum_key
+    from pyrite.montecarlo.runner.shard_scoring import (
+        resolve_shard_plan,
+        score_history_shard,
+    )
+
+    plain = _case()
+    plain = {k: v for k, v in plain.items() if k != "transport_realization"}
+    realization = TransportRealization(reduction="shard-sum", shard_electrons=size)
+    marked = bind_realization(plain, realization)
+    ref = runner.run_case(marked)
+
+    # An interrupted run published every shard, the plan and the first spectrum.
+    ranges = shard_ranges(marked, size)
+    shards = HistoryShardStore(tmp_path)
+    rows = [transport_history_shard(marked, *span) for span in ranges]
+    for span, segments in zip(ranges, rows, strict=True):
+        shards.publish("hopg", shard_content_key(KEY, *span, "per-electron"), segments)
+    plan = resolve_shard_plan(marked, lambda: iter(rows))
+    shards.publish("hopg", shard_plan_key(KEY), {"plan": plan})
+    first = shard_spectrum_key(KEY, *ranges[0], plan.digest)
+    shards.publish("hopg", first, score_history_shard(marked, rows[0], plan))
+    stamp = _stamp(shards.path_for("hopg", first))
+
+    executor = _executor(
+        tmp_path, client, shard_electrons=size, reduction="shard-sum", keep_shards=True
+    )
+    assert executor.transport_realization == realization
+    got = executor.store.load(executor.execute([plain])[0])
+    _assert_identical(got, ref)
+    assert _stamp(shards.path_for("hopg", first)) == stamp  # resumed, not rescored
+
+    case_path = executor.store.path_for("hopg", KEY)
+    os.remove(case_path.with_suffix(".json"))
+    os.remove(case_path)
+    fresh = _executor(tmp_path, client, shard_electrons=size, reduction="shard-sum")
+    _assert_identical(fresh.store.load(fresh.execute([plain])[0]), ref)
+    leftover = list((tmp_path / "hopg" / ".history-shards").rglob("*.pkl"))
+    assert leftover == []
+
+
+def test_shard_sum_refuses_an_unscorable_case(tmp_path):
+    case = {**_case(), "coherent_emission": True}
+    case.pop("transport_realization")
+    executor = _executor(tmp_path, None, shard_electrons=4, reduction="shard-sum")
+    with pytest.raises(ValueError, match="shard by shard"):
+        executor.execute([case])

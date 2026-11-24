@@ -114,6 +114,8 @@ validation and scoped CPU scoring. Unmarked cases retain their historical
 serialization, keys and defaults. Canonical case hashing, independent artifact
 validation and checkpoint/CAS recovery use the same prepared case; manifests
 reject marked/unmarked mixing even without a supplied dataset identity.
+A `reduction="shard-sum"` record (#1395) also names `shard_electrons`; `run_case`
+routes such a case to `runner/shard_scoring.py`, and joined scoring refuses it.
 
 ### `scoring.py`, `campaign/trajectory_product.py`, `campaign/trajectory_io.py`
 

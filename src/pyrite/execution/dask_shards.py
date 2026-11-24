@@ -20,14 +20,20 @@ import uuid
 from collections import deque
 from collections.abc import Sequence
 from contextlib import closing
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
 from .artifacts import ArtifactIntegrityError, CaseArtifactStore
 from .dask import DaskExecutor
 from .inspection import run_provenance
-from .shards import HistoryShardStore, ShardPolicy, shard_content_key
+from .shards import (
+    HistoryShardStore,
+    ShardPolicy,
+    shard_content_key,
+    shard_plan_key,
+    shard_spectrum_key,
+)
 from .slurm import _atomic_json, _save_input
 
 _PLAN_FORMAT = "pyrite.dask.shards.v2"
@@ -51,7 +57,13 @@ class ShardedDaskExecutor(DaskExecutor):
     def transport_realization(self):
         from ..montecarlo.realization import TransportRealization
 
-        return TransportRealization(scoring=self.sharding.scoring)
+        policy = self.sharding
+        summed = policy.reduction == "shard-sum"
+        return TransportRealization(
+            scoring=policy.scoring,
+            reduction=policy.reduction,
+            shard_electrons=policy.shard_electrons if summed else None,
+        )
 
     def runtime_plan(self, cases: Sequence[Any], max_workers: int | None = None) -> dict[str, Any]:
         plan = super().runtime_plan(cases, max_workers)
@@ -119,6 +131,136 @@ def _publish_shard(plan, entry, shard_index):
     return asdict(store.publish(material, key, segments))
 
 
+def _published_case(plan, entry):
+    return CaseArtifactStore(plan["artifact_root"]).reference(
+        entry["case"]["crystal"], entry["content_key"]
+    )
+
+
+def _guarded(task):
+    """Run a shard-sum stage; a case a concurrent coordinator already published needs none."""
+
+    def run(run_dir: str, case_index: int, *args: Any) -> Any:
+        plan, entry = _staged(run_dir, case_index)
+        prior = _published_case(plan, entry)
+        if prior is not None:
+            return asdict(prior)
+        try:
+            return task(plan, entry, *args)
+        except (ArtifactIntegrityError, OSError):
+            # A concurrent merge publishes the case before removing its payloads.
+            prior = _published_case(plan, entry)
+            if prior is None:
+                raise
+            return asdict(prior)
+
+    # Dask pickles tasks by reference: keep the module attribute name.
+    run.__name__ = run.__qualname__ = task.__name__
+    return run
+
+
+def _load_one(store, material, key):
+    ref = store.reference(material, key)
+    if ref is None:
+        raise ArtifactIntegrityError(f"history-shard payload {key} is not published")
+    return store.load(ref, expected_content_key=key)
+
+
+def _frozen_plan(store, material, entry):
+    return _load_one(store, material, entry["plan_key"])["plan"]
+
+
+def _spectrum_keys(entry, digest):
+    return [shard_spectrum_key(entry["content_key"], *span, digest) for span in entry["ranges"]]
+
+
+@_guarded
+def _plan_stage(plan, entry):
+    """Dask task (#1395): freeze the case's line axis and reflection selection from its shards."""
+    store = HistoryShardStore(plan["artifact_root"])
+    case, material = entry["case"], entry["case"]["crystal"]
+    prior = store.reference(material, entry["plan_key"])
+    if prior is not None:
+        return asdict(prior)
+    from threadpoolctl import threadpool_limits
+
+    from ..montecarlo.runner.shard_scoring import resolve_shard_plan, scoring_scope
+
+    def shards():
+        for key in entry["shard_keys"]:
+            yield _load_one(store, material, key)
+
+    with threadpool_limits(limits=1), scoring_scope(case):
+        frozen = resolve_shard_plan(case, shards)
+    return asdict(store.publish(material, entry["plan_key"], {"plan": frozen}))
+
+
+@_guarded
+def _score_stage(plan, entry, shard_index):
+    """Dask task (#1395): score one shard's rows against the frozen plan and publish its spectra."""
+    store = HistoryShardStore(plan["artifact_root"])
+    case, material = entry["case"], entry["case"]["crystal"]
+    frozen = _frozen_plan(store, material, entry)
+    key = _spectrum_keys(entry, frozen.digest)[shard_index]
+    prior = store.reference(material, key)
+    if prior is not None:
+        return asdict(prior)
+    from threadpoolctl import threadpool_limits
+
+    from ..montecarlo.runner.shard_scoring import score_history_shard, scoring_scope
+
+    rows = _load_one(store, material, entry["shard_keys"][shard_index])
+    with threadpool_limits(limits=1), scoring_scope(case):
+        partial = score_history_shard(case, rows, frozen)
+    return asdict(store.publish(material, key, partial))
+
+
+def _merge_stage(run_dir: str, case_index: int) -> dict[str, Any]:
+    """Dask task (#1395): add the shard spectra in shard order and publish the case artifact."""
+    plan, entry = _staged(run_dir, case_index)
+    store = HistoryShardStore(plan["artifact_root"])
+    case, material = entry["case"], entry["case"]["crystal"]
+    prior = _published_case(plan, entry)
+    if prior is None:
+        try:
+            frozen = _frozen_plan(store, material, entry)
+            keys = _spectrum_keys(entry, frozen.digest)
+            partials = [_load_one(store, material, key) for key in keys]
+        except (ArtifactIntegrityError, OSError):
+            prior = _published_case(plan, entry)
+            if prior is None:
+                raise
+        if prior is None:
+            from threadpoolctl import threadpool_limits
+
+            from ..montecarlo.runner.shard_scoring import merge_shard_spectra, scoring_scope
+
+            with threadpool_limits(limits=1), scoring_scope(case):
+                out = merge_shard_spectra(case, frozen, partials)
+            prior = CaseArtifactStore(plan["artifact_root"]).publish(
+                material, entry["content_key"], out
+            )
+    if not plan["keep_shards"]:
+        _remove_payloads(store, material, entry)
+    return asdict(prior)
+
+
+def _remove_payloads(store, material, entry):
+    """Delete a merged case's rows, spectra and plan (the plan last: it names the spectra)."""
+    keys = list(entry["shard_keys"])
+    plan_ref = store.reference(material, entry["plan_key"])
+    if plan_ref is not None:
+        try:
+            digest = store.load(plan_ref, expected_content_key=entry["plan_key"])["plan"].digest
+        except (ArtifactIntegrityError, OSError):
+            digest = None  # a concurrent merge is removing it
+        keys += [] if digest is None else _spectrum_keys(entry, digest)
+    for key in [*keys, entry["plan_key"]]:
+        ref = store.reference(material, key)
+        if ref is not None:
+            store.remove(ref)
+
+
 def _worker_join_case(run_dir: str, case_index: int, *_shards: Any) -> dict[str, Any]:
     """Dask task: join a case's shards in electron order and publish the case artifact.
 
@@ -169,6 +311,7 @@ def _load_shards(store, material, keys):
 def _stage(executor, cases: Sequence[Any], keys: list[str]) -> tuple[Path, list[dict[str, Any]]]:
     """Write the case inputs and the shard plan; refuse unshardable cases first."""
     from ..montecarlo.runner.history_shards import refuse_unshardable, shard_ranges
+    from ..montecarlo.runner.shard_scoring import refuse_shard_scoring
 
     policy = executor.sharding
     entries = []
@@ -179,6 +322,8 @@ def _stage(executor, cases: Sequence[Any], keys: list[str]) -> tuple[Path, list[
         if keys[index] != executor.case_key(case):
             raise ValueError("staged case key does not include its transport_realization")
         core = refuse_unshardable(case, policy.transport_core)
+        if policy.reduction == "shard-sum":
+            refuse_shard_scoring(case)
         ranges = shard_ranges(case, policy.shard_electrons)
         executor.store.path_for(case["crystal"], keys[index])
         entries.append(
@@ -187,6 +332,7 @@ def _stage(executor, cases: Sequence[Any], keys: list[str]) -> tuple[Path, list[
                 "content_key": keys[index],
                 "ranges": [list(span) for span in ranges],
                 "shard_keys": [shard_content_key(keys[index], *span, core) for span in ranges],
+                "plan_key": shard_plan_key(keys[index]),
             }
         )
     run_dir = executor.store.root / ".execution-jobs" / f"dask-shards-{uuid.uuid4().hex}"
@@ -275,21 +421,40 @@ def _deliver(executor, index, case, key, results, callback, options) -> None:
 
 @dataclass
 class _PendingShards:
-    ready: deque[tuple[int, int | None]]
+    """Ready ``(case, stage, shard)`` tasks; a stage becomes ready when the one before finishes.
+
+    Joined: ``transport`` shards, then ``join``. Shard-sum (#1395): ``transport``
+    shards, ``plan``, ``score`` per shard, then ``join`` (the merge).
+    """
+
+    ready: deque[tuple[int, str, int | None]]
     remaining: dict[int, int]
     consumers: dict[int, list[int]]
+    summed: bool = False
+    shards: dict[int, int] = field(default_factory=dict)
 
-    def succeeded(self, index, shard_index):
-        if shard_index is not None:
+    def succeeded(self, index, stage, shard_index):
+        if stage == "plan":
+            self.scores(index, range(self.shards[index]))
+        elif stage in ("transport", "score"):
             self.remaining[index] -= 1
             if self.remaining[index] == 0:
-                self.ready.appendleft((index, None))
+                after = "plan" if stage == "transport" and self.summed else "join"
+                self.ready.appendleft((index, after, None))
+
+    def scores(self, index, shard_indices):
+        """Ready the score tasks of ``index`` ahead of other cases' work."""
+        missing = list(shard_indices)
+        self.remaining[index] = len(missing)
+        if not missing:
+            self.ready.appendleft((index, "join", None))
+        self.ready.extendleft((index, "score", shard) for shard in reversed(missing))
 
 
 def _submit(executor, cases, entries, results, callback, options) -> _PendingShards:
     """Plan missing tasks, sharing one shard set and join for identical cases."""
     shards = HistoryShardStore(executor.store.root)
-    pending = _PendingShards(deque(), {}, {})
+    pending = _PendingShards(deque(), {}, {}, executor.sharding.reduction == "shard-sum")
     seen = {}
     for entry, case in zip(entries, cases, strict=True):
         index, material = entry["index"], case["crystal"]
@@ -309,11 +474,27 @@ def _submit(executor, cases, entries, results, callback, options) -> _PendingSha
             continue
         seen[identity] = index
         pending.consumers[index] = [index]
+        pending.shards[index] = len(entry["shard_keys"])
         pending.remaining[index] = len(missing)
-        pending.ready.extend((index, shard) for shard in missing)
+        pending.ready.extend((index, "transport", shard) for shard in missing)
         if not missing:
-            pending.ready.append((index, None))
+            _resume_after_transport(pending, shards, material, entry, index)
     return pending
+
+
+def _resume_after_transport(pending, store, material, entry, index):
+    """Ready the first unfinished stage of a case whose shards are all published."""
+    if not pending.summed:
+        pending.ready.append((index, "join", None))
+        return
+    if store.reference(material, entry["plan_key"]) is None:
+        pending.ready.append((index, "plan", None))
+        return
+    digest = _frozen_plan(store, material, entry).digest
+    keys = _spectrum_keys(entry, digest)
+    pending.scores(
+        index, [i for i, key in enumerate(keys) if store.reference(material, key) is None]
+    )
 
 
 def _missing_shards(store, material, keys):
@@ -327,9 +508,15 @@ def _missing_shards(store, material, keys):
     return missing
 
 
-def _task_resources(executor, shard):
-    """A device-scored join needs a worker advertising ``GPU``; shards run anywhere."""
-    return {"GPU": 1} if shard is None and executor.sharding.scoring == "gpu" else None
+def _task_resources(executor, stage):
+    """Device-scored stages need a worker advertising ``GPU``; transport shards run anywhere."""
+    return {"GPU": 1} if stage != "transport" and executor.sharding.scoring == "gpu" else None
+
+
+def _stage_task(executor, stage):
+    if stage == "join":
+        return _merge_stage if executor.sharding.reduction == "shard-sum" else _worker_join_case
+    return {"transport": _worker_run_shard, "plan": _plan_stage, "score": _score_stage}[stage]
 
 
 def _completed_tasks(executor, run_dir, pending):
@@ -344,8 +531,8 @@ def _completed_tasks(executor, run_dir, pending):
     try:
         while pending.ready or active:
             while pending.ready and len(active) < limit and not executor._cancelled.is_set():
-                index, shard = pending.ready.popleft()
-                fn = _worker_join_case if shard is None else _worker_run_shard
+                index, stage, shard = pending.ready.popleft()
+                fn = _stage_task(executor, stage)
                 args = (str(run_dir), index) if shard is None else (str(run_dir), index, shard)
                 with executor._lock:
                     if executor._cancelled.is_set():
@@ -355,9 +542,9 @@ def _completed_tasks(executor, run_dir, pending):
                         *args,
                         pure=False,
                         retries=executor.retry_policy.max_attempts - 1,
-                        resources=_task_resources(executor, shard),
+                        resources=_task_resources(executor, stage),
                     )
-                    active[future] = (index, shard)
+                    active[future] = (index, stage, shard)
                     executor._futures.append(future)
                 completed.add(future)
             if executor._cancelled.is_set():
@@ -382,11 +569,11 @@ def _collect(executor, run_dir, pending, cases, keys, results, callback, options
     on_activity = options.get("on_activity")
     done = 0
     with closing(_completed_tasks(executor, run_dir, pending)) as completed:
-        for (index, shard), future in completed:
+        for (index, stage, shard), future in completed:
             try:
                 future.result()
-                pending.succeeded(index, shard)
-                if shard is None:
+                pending.succeeded(index, stage, shard)
+                if stage == "join":
                     for consumer in pending.consumers[index]:
                         _deliver(
                             executor,

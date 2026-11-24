@@ -58,8 +58,8 @@ class ShardScoringPlan:
     ``E_grid`` is the final line axis, ``grid_record``/``grid_pass`` the policy
     grid's provenance (``None`` for an explicit grid), ``selection`` the
     automatic reflection selection's ``(pruned_case, record)`` (``None`` when
-    the case selects nothing), and ``digest`` a SHA-256 over all three that
-    shard payloads carry.
+    the case selects nothing), and ``digest`` a SHA-256 over the axis and the
+    selection that shard payloads carry.
     """
 
     E_grid: np.ndarray
@@ -119,9 +119,7 @@ def resolve_shard_plan(
         inputs = _inputs(case, E_grid)
         held = _prefix_shards(shards(), _selection_prefix(case))
         selection = _select_on_blocks(case, inputs, held)
-    return ShardScoringPlan(
-        E_grid, record, grid_pass, selection, _plan_digest(E_grid, record, selection)
-    )
+    return ShardScoringPlan(E_grid, record, grid_pass, selection, _plan_digest(E_grid, selection))
 
 
 def score_history_shard(
@@ -213,7 +211,7 @@ def run_case_shard_scored(
     size = _shard_size(case, shard_electrons)
     refuse_shard_scoring(case)
     core = refuse_unshardable(case, transport_core)
-    with _scoring_scope(case):
+    with scoring_scope(case):
         if shards is None:
             shards = [
                 transport_history_shard(case, start, stop, transport_core=core)
@@ -267,7 +265,7 @@ def route_shard_sum(run_case):
     return routed
 
 
-def _scoring_scope(case):
+def scoring_scope(case):
     """The spectrum backend of a marked case's realization; CPU when unmarked."""
     from ..realization import case_realization, realization_context
     from .history_shards import _unmarked_cpu_scope
@@ -323,10 +321,14 @@ def _prefix_shards(shards: Iterable[Mapping[str, Any]], prefix: int) -> list:
     return held
 
 
-def _plan_digest(E_grid, record, selection) -> str:
+def _plan_digest(E_grid, selection) -> str:
+    """SHA-256 of what shards score against: the axis and the selected reflection set.
+
+    The grid record is provenance only, and carries operational telemetry (its
+    speed-cache ``hit``/``miss``) that differs between processes.
+    """
     digest = hashlib.sha256(_PLAN_SCHEMA)
     digest.update(np.ascontiguousarray(E_grid, dtype=np.float64).tobytes())
-    digest.update(_canonical(record).encode())
     if selection is not None:
         pruned, chosen = selection
         layers = pruned.get("layer_radiators") or []

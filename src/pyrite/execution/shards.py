@@ -1,7 +1,10 @@
 """Immutable history-shard artifacts: one case's electron ranges on shared disk (#1387).
 
 A shard is the raw, unfinalized transport of electrons ``[start, stop)`` of one
-fixed-count case (:mod:`pyrite.montecarlo.runner.history_shards`). Workers
+fixed-count case (:mod:`pyrite.montecarlo.runner.history_shards`). A
+shard-summed case (#1395) also stores its frozen scoring plan and one spectrum
+payload per shard (:mod:`pyrite.montecarlo.runner.shard_scoring`) here; every
+entry is a dict payload under its own key. Workers
 publish shards here; one join task per case reads them back in electron order
 and publishes the ordinary case artifact (:class:`.artifacts.CaseArtifactStore`).
 
@@ -45,7 +48,10 @@ class ShardPolicy:
     case artifact is published (default: delete them). ``scoring`` is the
     join's spectrum backend: ``"cpu"`` (default) or ``"gpu"``, which scores on
     a Dask worker advertising the ``GPU`` resource and gives the cases a
-    distinct, device-scored realization identity.
+    distinct, device-scored realization identity. ``reduction="shard-sum"``
+    (#1395) scores every shard on its own worker against one frozen plan and
+    adds the spectra in shard order instead of scoring the joined population;
+    its realization records ``shard_electrons``.
     """
 
     shard_electrons: int
@@ -53,6 +59,7 @@ class ShardPolicy:
     transport_core: str = "per-electron"
     keep_shards: bool = False
     scoring: str = "cpu"
+    reduction: str = "joined"
 
     def __post_init__(self) -> None:
         for field in ("shard_electrons", "block_electrons"):
@@ -65,6 +72,8 @@ class ShardPolicy:
             raise ValueError("history shards run on transport_core='per-electron' only")
         if self.scoring not in ("cpu", "gpu"):
             raise ValueError("ShardPolicy.scoring must be 'cpu' or 'gpu'")
+        if self.reduction not in ("joined", "shard-sum"):
+            raise ValueError("ShardPolicy.reduction must be 'joined' or 'shard-sum'")
 
 
 def shard_content_key(case_key: str, start: int, stop: int, transport_core: str) -> str:
@@ -78,6 +87,22 @@ def shard_content_key(case_key: str, start: int, stop: int, transport_core: str)
     digest.update(bytes.fromhex(_key(case_key)))
     digest.update(int(start).to_bytes(8, "big") + int(stop).to_bytes(8, "big"))
     digest.update(transport_core.encode())
+    return digest.hexdigest()
+
+
+def shard_plan_key(case_key: str) -> str:
+    """Key of the frozen scoring plan of the shard-summed case ``case_key`` (#1395)."""
+    digest = hashlib.sha256(b"pyrite.history-shard-plan.v1\x00")
+    digest.update(bytes.fromhex(_key(case_key)))
+    return digest.hexdigest()
+
+
+def shard_spectrum_key(case_key: str, start: int, stop: int, plan_digest: str) -> str:
+    """Key of electrons ``[start, stop)``'s spectrum payload scored against one plan (#1395)."""
+    digest = hashlib.sha256(b"pyrite.history-shard-spectrum.v1\x00")
+    digest.update(bytes.fromhex(_key(case_key)))
+    digest.update(int(start).to_bytes(8, "big") + int(stop).to_bytes(8, "big"))
+    digest.update(bytes.fromhex(_key(plan_digest)))
     return digest.hexdigest()
 
 

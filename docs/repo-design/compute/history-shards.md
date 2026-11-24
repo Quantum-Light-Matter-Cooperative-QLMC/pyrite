@@ -1,7 +1,8 @@
 # History shards
 
-Experimental (#1387). Transport shards run on CPU; the join scores on CPU, or
-on one GPU with `ShardPolicy(scoring="gpu")`. Every execution backend parallelizes across
+Experimental (#1387, #1395). Transport shards run on CPU; the join scores on CPU, or
+on one GPU with `ShardPolicy(scoring="gpu")`. With `ShardPolicy(reduction="shard-sum")`
+every shard also scores its own spectra (see [Shard-summed scoring](#shard-summed-scoring)). Every execution backend parallelizes across
 cases, so one expensive case gets no speedup from more hardware. History
 shards split one fixed-count case's electron histories into ranges that run on
 separate workers, then join them into the result a single run over
@@ -110,9 +111,73 @@ final cannot be distinguished from an ordinary final by its key alone; keep
 known mixed prototype stores separate from ordinary production stores rather
 than assuming their provenance can be recovered.
 
+## Shard-summed scoring
+
+Opt-in (#1395): `ShardPolicy(reduction="shard-sum")`. A joined case scores its
+whole population in one process, which is almost all of its wall time: in
+every case measured for #1387, transport was under 3 % of it. Once the
+population-wide choices are frozen, the line, characteristic and continuum
+estimators add over electrons, so each shard scores its own rows.
+`runner/shard_scoring.py` owns the three steps; the executor runs each as a
+Dask task.
+
+| Stage | Task | Reads | Publishes |
+|---|---|---|---|
+| transport | one per shard | case | raw rows (as above) |
+| plan | one per case, after every shard | rows of every shard for a `line_grid_policy` axis (streamed `BlockGridEvidence`); only the shards reaching the selection prefix for an automatic reflection selection | `ShardScoringPlan`: axis, grid record, selected set, digest |
+| score | one per shard, after the plan | the shard's rows and the plan | `BlockSpectrumScorer.partial()`: totals, audit sums, diffraction depth weights, fallback rows, coverage records, counts |
+| merge | one per case, after every score | the plan and every spectrum payload | the case artifact |
+
+The plan lives under `shard_plan_key(case)`, each spectrum under
+`shard_spectrum_key(case, start, stop, plan digest)`. The digest covers the
+axis and the selected set, not the grid record, whose speed-cache telemetry
+differs between processes. A rerun skips every published stage; the merge
+removes rows, spectra and plan unless `keep_shards=True`.
+
+**Exactness.** Each shard commits one block, and the merge absorbs the
+partials in shard order exactly as a block scorer commits blocks. The result
+therefore equals live streamed scoring (`run_case_streamed`) with
+`block_electrons = shard_electrons`, bit for bit, and is bitwise repeatable for
+a fixed shard size whatever order the shards were scored in. Against the joined
+reduction (`run_case` or the #1387 join) it carries the streamed contract, only
+FP64 summation order changes:
+
+- continuum and characteristic spectra are sums of non-negative per-segment
+  terms, so a reordering moves each bin by at most `2 γ(n−1)` of the bin (`n`
+  the terms in it, `γ(k) = k u / (1 − k u)`); the merge of `K` shard sums adds
+  `(K − 1) u`. Measured on the regression case (hopg 30 keV, N = 13, K = 2–5):
+  at most 8 `u` per bin;
+- line spectra pass through the windowed far-tail reduction (#1191), whose
+  rounding is a fraction of the peak, not of the bin: measured at most
+  2e-14 of the peak;
+- the tests hold both to the streamed tolerance, `rtol = 1e-11` plus
+  `atol = 1e-14` of the peak.
+
+The two population-wide transport steps the join redoes are skipped, as
+streaming skips them (no shard-summed estimator reads bunch timing or completed
+hard-photon directions).
+
+**Identity.** The executor binds
+`{"schema": ..., "core": "per-electron", "scoring": "cpu", "reduction": "shard-sum", "shard_electrons": K}`.
+The shard size fixes the summation order, so it is part of the identity:
+a shard-sum result never shares a key with a joined one or with another shard
+size. `run_case` of a marked case runs the same plan, score and merge in
+process (bit for bit the Dask result); joined spectrum scoring
+(`_spectrum_with_recovery`, the #1387 join) refuses it.
+
+**Supported cases** are those live streaming supports (`streaming_refusal(live=True)`)
+with a fixed count and no line roulette (its per-electron line state spans the
+population); others are refused before staging.
+
+**Open (#1395).** The plan stage is serial: an automatic selection scores
+every candidate shell over the prefix shards in one task (about 1400 s of the
+#1320 case at N = 8 on CPU), and a policy grid pass reads every shard. A
+refused default measured bandwidth is not extended and rescored as the joined
+route does (#1243); the merge raises the refusal.
+
 ## What crosses the network
 
-Raw rows, not per-shard spectra. Spectra of disjoint electron blocks add, but
+Joined reduction: raw rows, not per-shard spectra. Spectra of disjoint electron blocks add, but
 only to floating-point summation order (see
 [streamed scoring](streamed-scoring.md)), and several spectrum-phase steps read
 the whole population: automatic line grids, reflection selection, coherent
@@ -143,10 +208,10 @@ a read or publication, the worker reuses the completed case artifact.
   radiation, photon transport, GDF beams, and observation directions.
 - The equality is with the per-electron run, not the CPU default (lockstep),
   which is a different realization of the same distribution.
-- The spectrum phase is serial at the join, so the speedup is bounded by the
-  transport share of the case wall time. Sharding pays for transport-dominated
-  cases. For line-dominated ones (the #1320 thick-target case: transport about
-  3 s, spectrum phase hours on CPU and minutes on one GPU), `scoring="gpu"`
-  shortens the join, and parallel line scoring is #1395.
+- With the joined reduction the spectrum phase is serial at the join, so the
+  speedup is bounded by the transport share of the case wall time. For
+  line-dominated cases (the #1320 thick-target case: transport about 3 s,
+  spectrum phase hours on CPU and minutes on one GPU), `scoring="gpu"`
+  shortens the join, and `reduction="shard-sum"` scores the shards in parallel.
 - The join holds every row, as the unsharded run does.
 
