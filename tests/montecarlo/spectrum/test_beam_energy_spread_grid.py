@@ -13,11 +13,10 @@ import numpy as np
 import pytest
 
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
-from pyrite.energy_grid.bounds import coverage_energy, line_shift_fraction
+from pyrite.energy_grid.bounds import CoverageGridTooNarrow, coverage_energy, line_shift_fraction
 from pyrite.montecarlo.runner import run_case
 
-# Small on purpose: the peak bin is stable well below the count where the
-# spectrum shape is, so the whole module costs ~1 s.
+# Keep the slow peak-shift sibling at its established statistical gate.
 _NE = 200
 
 
@@ -38,14 +37,10 @@ def _line_spectrum(energy_keV, *, energy_spread_frac=None, n_electrons=_NE):
     # low-photon-energy emission can outrank the resonance at this electron
     # count. The resonance derivative is independent of the loss law.
     out = run_case(build_cases(sweep, inelastic_model="continuous", straggling=False)[0])
-    # This regression is specifically about the PXR resonance derivative. The
-    # new atomic characteristic component is beam-energy stationary over this
-    # step and can dominate the combined peak, so remove its auditable array.
-    pxr = np.asarray(out["spec"], dtype=float) - np.asarray(
-        out["spec_characteristic"],
-        dtype=float,
-    )
-    return np.asarray(out["E_grid"], dtype=float), pxr
+    # The runner's separate-component contract already excludes characteristic
+    # emission from spec. Subtracting spec_characteristic again makes the
+    # integral negative and turns coverage_energy into a first-bin no-op.
+    return np.asarray(out["E_grid"], dtype=float), np.asarray(out["spec"], dtype=float)
 
 
 @pytest.mark.slow
@@ -67,16 +62,32 @@ def test_simulated_line_moves_by_the_predicted_sensitivity():
     assert measured == pytest.approx(line_shift_fraction(30.0, 0.05), rel=0.1)
 
 
-def test_spread_line_stays_inside_the_catalog_window():
-    """The step H question itself: nothing is clipped at the grid ceiling.
+def _line_tail_edge(grid, spec, ceiling):
+    """Use the complete reference tail so a clipped grid cannot renormalize it."""
+    peak = int(np.argmax(spec))
+    assert 0 < peak < grid.size - 1, "reference line peak must be interior"
+    assert np.all(spec >= 0), "line component must be a nonnegative density"
+    assert np.trapezoid(spec[peak:], grid[peak:]) > 0, "reference tail must emit"
+    edge = coverage_energy(grid[peak:], spec[peak:], 0.9)
+    if edge >= ceiling:
+        raise CoverageGridTooNarrow()
+    return edge
 
-    A 1% RMS spread is already generous for a photoinjector, and the catalog
-    grid is cut with 15% headroom, so the 90% coverage energy has to resolve
-    without `coverage_energy` hitting its final bin.
+
+def test_spread_line_stays_inside_the_catalog_window():
+    """The upper 90% tail of a 1% RMS spread line clears the catalog ceiling.
+
+    Normalize above the line peak on the complete production grid. A candidate
+    ceiling inside that tail must fail against the same reference, rather than
+    normalizing away its missing emission on a shortened grid.
     """
-    # The coverage edge is unchanged from 200 electrons at 50, which keeps this
-    # default-tier check off the JIT-disabled budget (#1367).
     grid, spec = _line_spectrum(30.0, energy_spread_frac=0.01, n_electrons=50)
-    # Raises CoverageGridTooNarrow if coverage is only reached in the last bin.
-    covered_eV = coverage_energy(grid, spec, 0.9)
-    assert covered_eV < grid[-1]
+    edge = _line_tail_edge(grid, spec, grid[-1])
+    peak_eV = grid[int(np.argmax(spec))]
+    assert peak_eV < edge < grid[-1]
+
+    # Cut through the upper side of the broadened line. Reuse the full
+    # simulation: no extra transport or stochastic negative-control noise.
+    clipped_ceiling = peak_eV + 0.5 * (edge - peak_eV)
+    with pytest.raises(CoverageGridTooNarrow):
+        _line_tail_edge(grid, spec, clipped_ceiling)
