@@ -97,6 +97,30 @@ def test_kernel_nodes_reproduce_the_direct_shell(kernel):
     np.testing.assert_allclose(S, expected, rtol=1e-10)
 
 
+def test_kernel_rows_interpolate_alone():
+    # The share interpolates only the |g| nodes its shells bracket (#1281);
+    # each row must equal the full interpolation's, zero-mass rows included.
+    from pyrite.montecarlo.spectrum.brem_lattice_share import _kernel_at_T
+
+    rng = np.random.default_rng(1281)
+    mass = rng.random((5, 3, 2, 7))
+    mass[1, 0] = 0.0  # empty at the lower T node
+    mass[3, 2, 1] = 0.0  # empty at the upper T node
+    kernel = LatticeShareKernel(
+        np.geomspace(1.0, 9.0, 5),
+        np.array([10.0, 30.0, 90.0]),
+        np.array([30.0, 60.0]),
+        np.linspace(0.0, 1.05, 8),
+        mass,
+        1,
+        1,
+    )
+    rows = np.array([1, 3, 4])
+    for T in (10.0, 17.0, 30.0, 61.0, 90.0):
+        np.testing.assert_array_equal(_kernel_at_T(kernel, T, rows), _kernel_at_T(kernel, T)[rows])
+    assert _kernel_at_T(kernel, 5.0, rows) is None
+
+
 def test_out_of_range_energy_is_left_alone(kernel):
     g, w = _si_low_order()
     assert not lattice_share_density(kernel, g, w["Si"], 5.0, [1000.0]).any()

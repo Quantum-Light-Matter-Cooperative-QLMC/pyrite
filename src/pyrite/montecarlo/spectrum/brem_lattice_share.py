@@ -279,15 +279,23 @@ def reflection_shell_weights(crystal, hkls, B_ang2, composition):
     return g, {el: total * w / norm for el, w in incoherent.items()}
 
 
-def _kernel_at_T(kernel: LatticeShareKernel, T_keV: float) -> np.ndarray | None:
-    """``H(g_nodes, theta_nodes, x)`` at ``T``; ``None`` outside the kernel's ``T`` range."""
+def _kernel_at_T(
+    kernel: LatticeShareKernel, T_keV: float, rows: np.ndarray | None = None
+) -> np.ndarray | None:
+    """``H(g_nodes, theta_nodes, x)`` at ``T``; ``None`` outside the kernel's ``T`` range.
+
+    ``rows`` restricts the result to those ``|g|`` nodes. Each ``(g, theta)``
+    row is interpolated on its own, so a subset equals the same rows of the
+    full result.
+    """
     lt = np.log(kernel.T_keV)
     t = float(np.log(T_keV))
     if not lt[0] <= t <= lt[-1]:
         return None
     i = int(np.clip(np.searchsorted(lt, t) - 1, 0, lt.size - 2))
     w = (t - lt[i]) / (lt[i + 1] - lt[i])
-    a, b = kernel.mass[:, i], kernel.mass[:, i + 1]
+    g_nodes = slice(None) if rows is None else rows
+    a, b = kernel.mass[g_nodes, i], kernel.mass[g_nodes, i + 1]
     ta, tb = a.sum(-1, keepdims=True), b.sum(-1, keepdims=True)
     both = (ta > 0) & (tb > 0)
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -309,14 +317,20 @@ def lattice_share_density(kernel, g, weights, T_keV, k_eV):
     """
     k = np.atleast_1d(np.asarray(k_eV, dtype=float))
     out = np.zeros((kernel.theta_deg.size, k.size))
-    H = _kernel_at_T(kernel, T_keV)
     keep = (g >= kernel.g_invang[0]) & (g <= kernel.g_invang[-1]) & (weights > 0)
-    if H is None or not keep.any():
+    if not keep.any():
         return out
     g, weights = g[keep], weights[keep]
     lg = np.log(kernel.g_invang)
     ig = np.clip(np.searchsorted(lg, np.log(g)) - 1, 0, lg.size - 2)
     wg = (np.log(g) - lg[ig]) / (lg[ig + 1] - lg[ig])
+    # Interpolate in T only the |g| nodes the shells bracket (#1281): a
+    # selector shell spans a few of the kernel's |g| nodes.
+    nodes = np.unique(np.concatenate([ig, ig + 1]))
+    H = _kernel_at_T(kernel, T_keV, nodes)
+    if H is None:
+        return out
+    ig = np.searchsorted(nodes, ig)
     edges = kernel.x_edges
     centres = 0.5 * (edges[:-1] + edges[1:])
     rho = H / np.diff(edges)  # density per unit x
