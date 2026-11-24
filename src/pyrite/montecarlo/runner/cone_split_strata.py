@@ -162,6 +162,14 @@ class SplitTally:
         for weight, count in zip(weights.tolist(), counts.tolist(), strict=True):
             self.strata[weight] = self.strata.get(weight, 0) + int(count)
 
+    def snapshot(self) -> tuple[Any, ...]:
+        """State :meth:`restore` rolls a later :meth:`add` back to."""
+        return self.cone, self.primaries, self.killed, self.max_per_primary, dict(self.strata)
+
+    def restore(self, state: tuple[Any, ...]) -> None:
+        self.cone, self.primaries, self.killed, self.max_per_primary, strata = state
+        self.strata = dict(strata)
+
     def record(self) -> dict[str, Any]:
         return {
             **self.policy,

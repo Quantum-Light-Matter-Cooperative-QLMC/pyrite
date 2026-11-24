@@ -18,7 +18,8 @@ Supported: fixed-count cases on the per-electron CPU core. Refused before any
 work: the lockstep core (one generator across electrons), the CUDA core (GPU
 transport shards are out of scope; a ``scoring="gpu"`` realization scores the
 join on the device instead), adaptive electron counts, secondary cascades,
-channeling, transition radiation, photon transport and GDF beams.
+channeling, transition radiation, photon transport, GDF beams and
+detector-cone splitting.
 """
 
 from collections.abc import Sequence
@@ -56,6 +57,9 @@ def refuse_unshardable(case, transport_core: str = SHARD_TRANSPORT_CORE) -> str:
         raise ValueError("history shards do not support secondary cascades")
     if "gdf_source" in case:
         raise ValueError("history shards do not support GDF beams")
+    if case.get("cone_split") is not None:
+        # The join concatenates raw rows; the split copy record is not carried (#379).
+        raise ValueError("history shards do not support detector-cone splitting")
     core = case_transport_core(case, transport_core)
     if core != SHARD_TRANSPORT_CORE:
         raise ValueError(

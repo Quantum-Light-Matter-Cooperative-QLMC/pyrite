@@ -203,6 +203,7 @@ class BlockSpectrumScorer:
                     np.zeros(self.E_brem.shape),
                     np.zeros(self.E_grid.shape),
                 ),
+                segs,
                 rows,
             )
             return
@@ -256,9 +257,9 @@ class BlockSpectrumScorer:
                 electron_limit=self.Ne_brem,
             )
             brem = self.emission.continuum.evaluate(continuum, "brem_wide").values
-        self._commit((spec, characteristic, brem, self._transition(segs)), rows)
+        self._commit((spec, characteristic, brem, self._transition(segs)), segs, rows)
 
-    def _commit(self, parts, rows) -> None:
+    def _commit(self, parts, segs, rows) -> None:
         if self.totals is None:  # FP64 block sums, like the retained route (#1313)
             self.totals = tuple(np.asarray(part, dtype=np.float64) for part in parts)
         else:
@@ -304,17 +305,20 @@ class BlockSpectrumScorer:
                 diffracted.edges,
             ),
             self.fallbacks.snapshot(),
+            None if self.split is None else self.split.snapshot(),
         )
 
     def restore(self, state) -> None:
         """Undo every :meth:`add` since ``state`` (:meth:`snapshot`)."""
         from .electron_blocks import restore_audit
 
-        totals, segments, layers, audit, diffracted, fallbacks = state
+        totals, segments, layers, audit, diffracted, fallbacks, split = state
         self.totals, self.n_segments, self.n_layers = totals, segments, layers
         restore_audit(self.audit, audit)
         self.diffracted.dbr, self.diffracted.lines, self.diffracted.edges = diffracted
         self.fallbacks.restore(fallbacks)
+        if self.split is not None:
+            self.split.restore(split)
 
     def _renormalize(self, realized):
         """``x -> x * L / realized`` for the provisional count ``L`` (exact ``x * L``)."""

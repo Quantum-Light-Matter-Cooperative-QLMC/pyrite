@@ -119,6 +119,8 @@ def test_unsupported_cores_and_cases_fail_early(monkeypatch):
         refuse_unshardable({**case, "adaptive_precision": {}})
     with pytest.raises(ValueError, match="cascades"):
         refuse_unshardable({**case, "secondary_threshold_eV": 1e3})
+    with pytest.raises(ValueError, match="detector-cone splitting"):
+        refuse_unshardable({**case, "cone_split": {}})
     with pytest.raises(ValueError, match="within N"):
         transport_history_shard(case, 10, 14)
 
