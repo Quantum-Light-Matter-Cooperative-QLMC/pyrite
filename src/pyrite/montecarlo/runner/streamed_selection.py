@@ -126,7 +126,7 @@ class PrefixSelectingScorer:
         else:
             scorer = self.scorer if self.scorer is not None else self._select()
             out = scorer.result(population=population, **counts)
-        out["reflection_selection"] = self.record
+        out["reflection_selection"] = _realized_record(self.record, population)
         return out
 
     def snapshot(self):
@@ -139,6 +139,22 @@ class PrefixSelectingScorer:
         self._held, self.scorer, self.record = held, scorer, record
         if scorer is not None:
             scorer.restore(inner)
+
+
+def _realized_record(record, population):
+    """``record`` as the retained route writes it at the realized counts (#1368).
+
+    A row budget first met by the last kept electron under provisional
+    scoring (#1397) selects on the whole realized population; the retained
+    route at those counts takes no prefix and writes no
+    ``selection_histories``, so neither does this one.
+    """
+    prefix = (record or {}).get("selection_histories")
+    if population is None or prefix is None:
+        return record
+    if (prefix["lines"], prefix["continuum"]) != tuple(int(n) for n in population):
+        return record
+    return {key: value for key, value in record.items() if key != "selection_histories"}
 
 
 def _selection_inputs(inputs):

@@ -81,7 +81,7 @@ SELECTION_HISTORIES = 4096
 #: (1 mm mos2/mose2), so a fixed electron count made selection cost scale with
 #: thickness (~26 us per row on an RTX 5080). Measured (#1368, 4096 electrons):
 #: 500 nm cases leave <= 5.8e5 rows and 10/100 um <= 1.42e7, so the cap binds
-#: there; 1 mm cases select on ~900 electrons with the 4096-prefix set.
+#: there; 1 mm cases select on ~800-1200 electrons with the 4096-prefix set.
 SELECTION_ROWS = 1 << 24
 
 #: Shells after the first decaying pair before the tail estimate may stop.
