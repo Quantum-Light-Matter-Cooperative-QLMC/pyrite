@@ -144,6 +144,7 @@ def test_typed_case_content_key_matches_pre_case_golden(identity_pin):
     # #642: shell transport defaults to restricted soft-loss straggling.
     # #1301: measured-shell-cutoff-v7; fiber HOPG selects automatically.
     # #1326: measured-shell-cutoff-v8; exact band-mass decision yield, single pass.
+    # #1368: measured-shell-cutoff-v9; the selection prefix ends at a row budget.
     identity_pin("case/hopg/default-300x150/case_content_key", case_content_key(case))
 
 
@@ -721,6 +722,9 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     Issue #1326 re-minted every pin for ``measured-shell-cutoff-v8`` (exact
     band-mass decision yield; one scoring pass when the prefix covers the
     population).
+
+    Issue #1368 re-minted every pin for ``measured-shell-cutoff-v9`` (the
+    selection prefix ends at a segment-row budget).
 
     Issue #278 re-minted BremsLib pins for ``angle-f64-v1``: direction cosines
     retain binary64 precision through inverse cosine on every backend.

@@ -52,6 +52,7 @@ __all__ = [
     "select_case_reflections",
     "select_reflection_cutoff",
     "SELECTION_HISTORIES",
+    "SELECTION_ROWS",
     "selected_line_spectrum",
     "selection_call_sizes",
     "validate_reflection_selection",
@@ -73,6 +74,15 @@ REFLECTION_SELECTION_MODEL = CXR_REFLECTION_SELECTION_MODEL
 #: enter the stop only as ratios, so the decision needs far fewer histories
 #: than the spectrum; the selected set is then scored on every history.
 SELECTION_HISTORIES = 4096
+
+#: Segment rows the selection prefix reads (#1368): the prefix ends at the
+#: smallest electron count whose rows ``elec_id < k`` reach this budget, capped
+#: at :data:`SELECTION_HISTORIES`. Thick targets leave ~2e4 rows per electron
+#: (1 mm mos2/mose2), so a fixed electron count made selection cost scale with
+#: thickness (~26 us per row on an RTX 5080). Measured (#1368, 4096 electrons):
+#: 500 nm cases leave <= 5.8e5 rows and 10/100 um <= 1.42e7, so the cap binds
+#: there; 1 mm cases select on ~900 electrons with the 4096-prefix set.
+SELECTION_ROWS = 1 << 24
 
 #: Shells after the first decaying pair before the tail estimate may stop.
 _MIN_DECAYING_SHELLS = 2
@@ -758,16 +768,20 @@ def _line_selection(
     return pruned, record, spectrum, separate
 
 
-def selected_batch_spectrum(emission, batch, Ne_brem, histories: int | None = None):
+def selected_batch_spectrum(
+    emission, batch, Ne_brem, histories: int | None = None, rows: int | None = None
+):
     """Select on a reference batch, then audit and score the production batch.
 
-    The selection scores the first ``histories`` (default
-    :data:`SELECTION_HISTORIES`) line and continuum electrons (#1281); a
-    population no larger selects on every history, as before.
+    The selection scores the first ``k`` line and continuum electrons (#1281),
+    where ``k`` is the smallest electron count whose segment rows reach
+    ``rows`` (default :data:`SELECTION_ROWS`, #1368), at most ``histories``
+    (default :data:`SELECTION_HISTORIES`); a population no larger selects on
+    every history, as before.
 
     Validation: reflection-yield-tolerance-selector
     """
-    return selected_line_spectrum(**_batch_selection(emission, batch, Ne_brem, histories))
+    return selected_line_spectrum(**_batch_selection(emission, batch, Ne_brem, histories, rows))
 
 
 def select_batch_reflections(
@@ -776,6 +790,7 @@ def select_batch_reflections(
     Ne_brem,
     histories: int | None = None,
     parts: Callable[[], Iterable[dict]] | None = None,
+    rows: int | None = None,
 ):
     """The pruned case and record :func:`selected_batch_spectrum` would select.
 
@@ -789,7 +804,7 @@ def select_batch_reflections(
 
     Validation: reflection-yield-tolerance-selector
     """
-    args = _batch_selection(emission, batch, Ne_brem, histories, parts)
+    args = _batch_selection(emission, batch, Ne_brem, histories, rows, parts)
     pruned, record, _, _ = _line_selection(
         args["case"],
         args["evaluate"],
@@ -802,25 +817,28 @@ def select_batch_reflections(
     return pruned, record
 
 
-def _batch_selection(emission, batch, Ne_brem, histories, parts=None):
-    """:func:`selected_line_spectrum` arguments for an emission batch (#1281 prefix)."""
+def _batch_selection(emission, batch, Ne_brem, histories, rows=None, parts=None):
+    """:func:`selected_line_spectrum` arguments for an emission batch (#1281, #1368 prefix)."""
     from dataclasses import replace
 
-    from .electron_blocks import electron_prefix
+    from .electron_blocks import electron_prefix, row_budget_prefix
     from .lattice_share import selection_continuum
 
     lines = int(batch.segments["Ne"] if batch.electron_limit is None else batch.electron_limit)
     brem = lines if Ne_brem is None else int(Ne_brem)
     budget = int(SELECTION_HISTORIES if histories is None else histories)
-    if budget < 1:
-        raise ValueError("selection histories must be positive")
+    row_budget = int(SELECTION_ROWS if rows is None else rows)
+    if budget < 1 or row_budget < 1:
+        raise ValueError("selection histories and rows must be positive")
+    blocks = [batch.segments] if parts is None else parts()
+    budget, prefix_rows = row_budget_prefix(blocks, min(budget, max(lines, brem)), row_budget)
     n_lines, n_brem = min(lines, budget), min(brem, budget)
     sample, record, prefix = batch, None, None
     if (n_lines, n_brem) != (lines, brem):
         prefix = max(n_lines, n_brem)
         segments = batch.segments if parts is not None else electron_prefix(batch.segments, prefix)
         sample = replace(batch, segments=segments, electron_limit=n_lines)
-        record = dict(lines=n_lines, continuum=n_brem)
+        record = dict(lines=n_lines, continuum=n_brem, rows=prefix_rows, row_budget=row_budget)
     population = None if parts is None else partial(_staged_parts, parts, batch.segments, None)
     selected = None if parts is None else partial(_staged_parts, parts, batch.segments, prefix)
     return dict(

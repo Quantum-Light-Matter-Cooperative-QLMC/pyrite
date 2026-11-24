@@ -377,7 +377,15 @@ def test_selection_scores_an_electron_prefix_then_every_history(monkeypatch):
     monkeypatch.setattr(reflection_cutoff, "SELECTION_HISTORIES", 2)
     out = runner._spectrum_case(selected, tp)
     record = out["reflection_selection"]
-    assert record["selection_histories"] == {"lines": 2, "continuum": 2}
+    # The history cap binds (#1368): the row budget is far from reached.
+    rows = int(np.sum(np.asarray(tp["segs"]["elec_id"]) < 2))
+    assert rows < reflection_cutoff.SELECTION_ROWS
+    assert record["selection_histories"] == {
+        "lines": 2,
+        "continuum": 2,
+        "rows": rows,
+        "row_budget": reflection_cutoff.SELECTION_ROWS,
+    }
     # The selection equals a full selection on the two-history population alone.
     alone_tp = {**tp, "segs": electron_prefix(tp["segs"], 2), "Ne_lines": 2, "Ne_brem": 2}
     alone = runner._spectrum_case(dict(selected, Ne=2, Ne_brem=2), alone_tp)
@@ -395,6 +403,49 @@ def test_selection_scores_an_electron_prefix_then_every_history(monkeypatch):
     full = runner._spectrum_case(dict(case, hkl_list=hkls), tp)
     np.testing.assert_allclose(out["spec"], full["spec"], rtol=SELECTED_RTOL, atol=0)
     assert np.sum(full["spec"]) > 0
+
+
+def test_row_budget_binds_before_the_history_cap(monkeypatch):
+    """A population that reaches ``SELECTION_ROWS`` within fewer electrons than
+    the cap selects on that shorter prefix, exactly as the cap would (#1368)."""
+    from pyrite.montecarlo.runner import reflection_cutoff
+
+    case, tp = _transported()
+    selected = dict(case, reflection_selection=SELECTION)
+    counts = np.bincount(np.asarray(tp["segs"]["elec_id"]))
+    assert counts[0] > 0 and counts[1] > 0
+    budget = int(counts[:2].sum())  # electron 1's rows cross the budget: k = 2
+    monkeypatch.setattr(reflection_cutoff, "SELECTION_ROWS", budget)
+    out = runner._spectrum_case(selected, tp)
+    record = out["reflection_selection"]
+    assert record["selection_histories"] == {
+        "lines": 2,
+        "continuum": 2,
+        "rows": budget,
+        "row_budget": budget,
+    }
+    monkeypatch.setattr(reflection_cutoff, "SELECTION_ROWS", 1 << 62)
+    monkeypatch.setattr(reflection_cutoff, "SELECTION_HISTORIES", 2)
+    capped = runner._spectrum_case(selected, tp)
+    assert record["radiators"] == capped["reflection_selection"]["radiators"]
+    np.testing.assert_array_equal(out["spec"], capped["spec"])
+
+
+def test_row_budget_prefix_counts_whole_electrons():
+    from pyrite.montecarlo.runner.electron_blocks import row_budget_prefix
+
+    # Rows per electron 0..4: 3, 0, 2, 5, 1, split over unordered blocks.
+    blocks = [
+        {"elec_id": np.array([3, 3, 0, 3, 2])},
+        {"elec_id": np.array([0, 4, 3, 2, 0, 3])},
+    ]
+    assert row_budget_prefix(blocks, 5, 3) == (1, 3)
+    assert row_budget_prefix(blocks, 5, 4) == (3, 5)  # electron 1 has no row
+    assert row_budget_prefix(blocks, 5, 6) == (4, 10)
+    assert row_budget_prefix(blocks, 5, 11) == (5, 11)
+    assert row_budget_prefix(blocks, 5, 10**9) == (5, 11)  # budget unreached: the cap
+    assert row_budget_prefix(blocks, 2, 10**9) == (2, 3)  # rows past the cap ignored
+    assert row_budget_prefix([{"elec_id": np.zeros(0, dtype=np.int64)}], 4, 1) == (4, 0)
 
 
 def test_electron_prefix_keeps_whole_histories():
