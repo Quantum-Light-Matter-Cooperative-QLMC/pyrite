@@ -219,7 +219,7 @@ def _line_cutoff_keV(case: Mapping[str, Any]) -> float:
 
 def _corrected_tables(radiator, hkls, composition, tables, floor_keV):
     """``tables`` with the share of ``hkls`` removed, plus the per-element record."""
-    from ..spectrum.brem_lattice_share import lattice_share_table, reflection_shell_weights
+    from ..spectrum.brem_lattice_share import _lattice_share_tables, reflection_shell_weights
 
     kernel = _kernel()
     g, weights = reflection_shell_weights(
@@ -230,13 +230,14 @@ def _corrected_tables(radiator, hkls, composition, tables, floor_keV):
     untabled = [element for element, _ in composition if element not in tables]
     if untabled:
         _warn_untabled(untabled)
-    for element, n in composition:
+    # Elements share each node's kernel interpolation and resonance gathers.
+    tabled = [(tables[el], el, n, weights[el]) for el, n in composition if el in tables]
+    results = iter(_lattice_share_tables(tabled, kernel, g, T_floor_keV=floor_keV))
+    for element, _ in composition:
         if element not in tables:
             elements.append(dict(element=element, corrected=False, reason="no BremsLib table"))
             continue
-        out[element], info = lattice_share_table(
-            tables[element], kernel, element, n, g, weights[element], T_floor_keV=floor_keV
-        )
+        out[element], info = next(results)  # in composition order, one per entry
         elements.append(
             dict(
                 element=element,

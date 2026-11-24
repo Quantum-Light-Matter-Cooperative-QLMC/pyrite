@@ -541,7 +541,7 @@ one at a time, against the released kernel (`require_verified("brem-lattice-shar
 ### Findings
 
 1. **Floor edge is a ramp, not a step (minor; systematic, not a discrepancy).**
-   `lattice_share_table` floors at nodes (`brem_lattice_share.py:365–367`), but
+   `lattice_share_table` floors at nodes (`brem_lattice_share.py::_corrected_group`, the `lo` bound), but
    the scorer interpolates the DDCS linearly in $\ln T$ between staged nodes
    (`brem_bremslib.py`, `_incident_bracket`). The staged 5 keV node is
    `5.000000000000002`, so it is corrected. Continuum segments with

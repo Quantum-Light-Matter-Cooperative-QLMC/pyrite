@@ -97,6 +97,30 @@ def test_kernel_nodes_reproduce_the_direct_shell(kernel):
     np.testing.assert_allclose(S, expected, rtol=1e-10)
 
 
+def test_kernel_rows_interpolate_alone():
+    # The share interpolates only the |g| nodes its shells bracket (#1281);
+    # each row must equal the full interpolation's, zero-mass rows included.
+    from pyrite.montecarlo.spectrum.brem_lattice_share import _kernel_at_T
+
+    rng = np.random.default_rng(1281)
+    mass = rng.random((5, 3, 2, 7))
+    mass[1, 0] = 0.0  # empty at the lower T node
+    mass[3, 2, 1] = 0.0  # empty at the upper T node
+    kernel = LatticeShareKernel(
+        np.geomspace(1.0, 9.0, 5),
+        np.array([10.0, 30.0, 90.0]),
+        np.array([30.0, 60.0]),
+        np.linspace(0.0, 1.05, 8),
+        mass,
+        1,
+        1,
+    )
+    rows = np.array([1, 3, 4])
+    for T in (10.0, 17.0, 30.0, 61.0, 90.0):
+        np.testing.assert_array_equal(_kernel_at_T(kernel, T, rows), _kernel_at_T(kernel, T)[rows])
+    assert _kernel_at_T(kernel, 5.0, rows) is None
+
+
 def test_out_of_range_energy_is_left_alone(kernel):
     g, w = _si_low_order()
     assert not lattice_share_density(kernel, g, w["Si"], 5.0, [1000.0]).any()
@@ -136,6 +160,32 @@ def test_table_loses_exactly_k_S_over_n_Z2_and_stays_self_consistent(kernel):
     np.testing.assert_array_equal(
         corrected.scaled_ddcs_mb_sr[outside], table.scaled_ddcs_mb_sr[outside]
     )
+
+
+def test_elements_sharing_a_grid_match_their_own_tables(kernel):
+    # Elements on one node grid share the per-node profiles (#1281); each
+    # result must equal the element corrected alone, and uncorrected nodes
+    # keep their SDCS exactly.
+    from pyrite.montecarlo.spectrum.brem_lattice_share import _lattice_share_tables
+    from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables
+
+    tables = load_bremsstrahlung_tables(["Si", "C"])
+    g, _ = _si_low_order()
+    composition = [("Si", N_SI), ("C", 0.5 * N_SI)]
+    weights = reflection_shell_weights(
+        "silicon", [(1, 1, 1), (2, 2, 0), (3, 1, 1)], 0.46, composition
+    )[1]
+    weights["C"][0] = 0.0  # a reflection one element does not see
+    entries = [(tables[el], el, n, weights[el]) for el, n in composition]
+    together = _lattice_share_tables(entries, kernel, g, T_floor_keV=25.0)
+    for (table, el, n, w), (shared, info) in zip(entries, together, strict=True):
+        alone, alone_info = lattice_share_table(table, kernel, el, n, g, w, T_floor_keV=25.0)
+        np.testing.assert_array_equal(shared.scaled_ddcs_mb_sr, alone.scaled_ddcs_mb_sr)
+        np.testing.assert_array_equal(shared.scaled_sdcs_mb, alone.scaled_sdcs_mb)
+        assert info == alone_info and info.removed_fraction > 0.0
+        T = np.asarray(table.incident_energy_keV)
+        keep = (T < 25.0) | (T > 45.0)
+        np.testing.assert_array_equal(shared.scaled_sdcs_mb[keep], table.scaled_sdcs_mb[keep])
 
 
 def test_no_share_is_removed_below_the_line_electron_cutoff(kernel):

@@ -242,7 +242,7 @@ unmonitored on this route; see flag F3.
 
 | Item | Code | Result |
 |---|---|---|
-| $\Delta\sigma_j$ | `brem_lattice_share.py:439–442`: `lattice_share_density` on the kernel $\theta$ nodes; `solid_angle_integral(deg2rad(theta), S.T)`; `* 1e-16 / n` | **matches** §2. `solid_angle_integral` (`_bremslib_table.py:112–129`) is the exact integral of the linear interpolant; I re-derived its per-interval formula. The kernel $\theta$ nodes span 0–180° every 5°, so the full sphere is covered. |
+| $\Delta\sigma_j$ | `brem_lattice_share.py::isotropic_share_sigma`: `lattice_share_density` on the kernel $\theta$ nodes; `solid_angle_integral(deg2rad(theta), S.T)`; `* 1e-16 / n` | **matches** §2. `solid_angle_integral` (`_bremslib_table.py:112–129`) is the exact integral of the linear interpolant; I re-derived its per-interval formula. The kernel $\theta$ nodes span 0–180° every 5°, so the full sphere is covered. |
 | BremsLib identity | the same rule and nodes as `lattice_share_table` (`:350–402`) | **matches** §3; reproduced to $1.3\times10^{-14}$ (check 1) |
 | $T$ table | `:465–480`: nodes from `max(kernel T0, T_floor_keV)` through the inner kernel nodes to the kernel top, each interval split into 4 in $\ln T$; the first node is the floor itself | **matches**; exact step at the floor (§6) |
 | $T$ evaluation | `:518–532`: linear in $\ln T$, `inside` mask zero outside $[T_{\rm lo},T_{\rm hi}]$ | **matches** |
@@ -326,7 +326,7 @@ No term, factor, unit or sign diverges from the re-derivation. Flags:
   route steps it exactly. The Checks give the measured figures; the Claim text
   should carry the qualifier.
 - **F3. Clamping unrecorded (minor).** `without_isotropic_share`
-  (`brem_lattice_share.py:549`) clamps per cell, but the `continuum="isotropic"`
+  (`brem_lattice_share.py::without_isotropic_share`) clamps per cell, but the `continuum="isotropic"`
   record (`lattice_share.py:298–307`) has no clipped-cell count, unlike the
   BremsLib record's `clamped_nodes`. The clamp is inactive in the Si scenes
   checked (maximum 21 % of EEDL). A compound whose element split
