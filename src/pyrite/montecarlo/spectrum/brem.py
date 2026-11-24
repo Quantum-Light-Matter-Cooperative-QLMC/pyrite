@@ -1020,6 +1020,7 @@ def mc_brem_spectrum(
     # element without a table and for segments outside a table's energy range.
     bremslib_staged: dict = {}
     bremslib_covers: dict[str, bool] = {}
+    seg_cos_theta: Any = None  # BremsLib only
     if cross_section_model == "bremslib":
         bremslib_staged, bremslib_covers = stage_bremslib_elements(
             comp, supplied_bremslib, seg_E, strict=bool(plasma_eV)
@@ -1172,7 +1173,22 @@ def mc_brem_spectrum(
             return _to_cpu(electron_sum / (4.0 * np.pi))
         return _to_cpu(spec / (4.0 * xp.pi) / Ne)
 
-    M = seg_E.size
+    mu_by_layer = mu[None, :] if layers is None else xp.stack(layer_mu, axis=0)
+    from ._brem_cpu_fused import score_covered_bremslib
+
+    # Covered float64 CPU BremsLib scores fused (#1429), leaving no portable rows.
+    M = score_covered_bremslib(
+        comp,
+        seg_E,
+        enabled=_USE_JIT_BREM_REDUCTION,
+        model=cross_section_model,
+        isotropic_shares=isotropic_shares,
+        staged=bremslib_staged,
+        covers=bremslib_covers,
+        rows=(seg_L, seg_cos_theta, path_start, path_end),
+        photons=(mu_by_layer, E_grid, plasma_eV),
+        out=(spec, band_q, row_band),
+    )
     # FP32 BremsLib cells near the tip at backward angles fall below the
     # normal range in cm²; score them in millibarn and fold the unit into the
     # row weight (#979). Binary64 keeps cm² so CPU output is bit-for-bit.
@@ -1183,7 +1199,6 @@ def mc_brem_spectrum(
         chunk = max(1, min(int(chunk), _BREMSLIB_CHUNK_CELLS // max(int(E_grid.size), 1)))
     for j0 in range(0, M, chunk):
         sl = slice(j0, min(j0 + chunk, M))
-        mu_by_layer = mu[None, :] if layers is None else xp.stack(layer_mu, axis=0)
         T_abs = mean_transmission(
             _layer_depth(path_start[sl], mu_by_layer),
             _layer_depth(path_end[sl], mu_by_layer),
