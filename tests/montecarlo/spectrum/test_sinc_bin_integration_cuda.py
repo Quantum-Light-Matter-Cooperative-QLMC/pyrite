@@ -209,6 +209,27 @@ def test_line_chunked_reduction_matches_one_block_per_bin(monkeypatch, exact_wid
     assert cp.array_equal(again, chunked)
 
 
+@pytest.mark.parametrize("method", ["pairs", "sparse"])
+def test_bin_subset_matches_the_full_axis_on_those_bins(method):
+    """#1403: ``bins`` evaluates only the listed bins, each as on the full axis.
+
+    Validation: sinc-bin-near-far
+    """
+    a_width, E_res = (v.astype(np.float32) for v in _lines())
+    weight = np.ones_like(a_width)
+    edges, inv_width = _axis()
+    pick = np.array([3, 4, 60, 61, 62, 2000, inv_width.size - 1])
+    args = tuple(cp.asarray(x) for x in (E_res, a_width, weight, edges, inv_width))
+    full = cp.zeros(inv_width.size, dtype=cp.float64)
+    bq.run_bin_mean_reduction_kernel(*args, out=full, method=method)
+    sub = cp.zeros(pick.size, dtype=cp.float64)
+    bq.run_bin_mean_reduction_kernel(*args, out=sub, method=method, bins=pick)
+    # Pairs: one chunk on both grids (400 lines), so the subset is bitwise.
+    np.testing.assert_array_equal(cp.asnumpy(sub), cp.asnumpy(full)[pick])
+    with pytest.raises(ValueError, match="near/far"):
+        bq.run_bin_mean_reduction_kernel(*args, out=sub, method="fourier", bins=pick)
+
+
 def test_hybrid_matrix_kernel_matches_the_host_hybrid():
     """Far-field envelope bins agree to float32 rounding; near bins stay FP64-exact."""
     a_width, E_res = _lines()

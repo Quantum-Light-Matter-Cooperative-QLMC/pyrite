@@ -119,12 +119,15 @@ def test_auto_takes_the_sparse_route_from_the_pair_gate(monkeypatch, rows, exact
         sys.modules,
         "cupy",
         SimpleNamespace(
-            empty=lambda *a, **k: np.zeros(1),
+            empty=lambda shape, **k: np.zeros(shape),
+            arange=lambda n, **k: np.arange(n),
             float32=np.float32,
             float64=np.float64,
+            int64=np.int64,
             ascontiguousarray=lambda a, **k: a,
         ),
     )
+    monkeypatch.setattr(reducer, "_line_chunks", lambda bins, lines: (1, lines))
     monkeypatch.setattr(
         _bin_sparse, "run_sparse_reduction", lambda *a, out, **k: calls.append("sparse") or out
     )
@@ -137,7 +140,7 @@ def test_auto_takes_the_sparse_route_from_the_pair_gate(monkeypatch, rows, exact
         None,
         None,
         SimpleNamespace(shape=(60_000,)),
-        out=np.zeros(1),
+        out=np.zeros(60_000),
         exact_widths=exact_widths,
     )
     assert calls == [route]
