@@ -259,7 +259,13 @@ def run_adaptive_streamed(case, block_electrons, *, transport_core="auto", spill
             fixed, block_electrons, transport_core=sampling["transport_core"], spill=spill
         )
         grid_pass = out.get("_streamed_line_grid_pass") or {}
-        transports = sink.passes + 1 + bool(grid_pass.get("transported"))
+        transports = (
+            sink.passes
+            + 1
+            + bool(grid_pass.get("transported"))
+            # A refused default axis reruns its passes on the extension (#1243).
+            + grid_pass.get("fallback_transports", 0)
+        )
     out["adaptive_sampling"] = sampling
     out["_adaptive_route"] = {
         "route": "streamed",

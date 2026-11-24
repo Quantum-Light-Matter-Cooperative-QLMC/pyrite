@@ -479,13 +479,19 @@ def run_case_streamed(
 def score_fixed_streamed(case, block_electrons, *, transport_core, spill=None):
     """Stream a fixed-count ``case`` (the fixed route of :func:`run_case_streamed`).
 
-    Validation: adaptive-sample-size-stopping
+    A defaulted ``resonance-population`` axis that its audit refuses is
+    extended as on the retained route (#1243): the streamed pair of passes
+    reruns on the fallback axis, which is resolved from its own grid pass
+    because no transport is kept. Counter-addressed streams make each rerun
+    the same histories, so the result is the retained route's rescore up to
+    summation order. Each extension costs up to two transports, recorded as
+    ``_streamed_line_grid_pass["fallback_transports"]``.
+
+    Validation: adaptive-sample-size-stopping, line-grid-resonance-bandwidth
     """
-    from ..spectrum.cxr._coverage import collect_line_data_coverage
-    from . import _transport_case
+    from ..._cxr_grid_policy import CxrGridToleranceError
     from .artifacts import _case_geometry
     from .oom import _ensure_pool_limit
-    from .streamed_selection import block_scorer
 
     E_grid, E_brem, _, n_hat, groove = _case_geometry(case)
     grid_record = grid_pass = None
@@ -494,35 +500,69 @@ def score_fixed_streamed(case, block_electrons, *, transport_core, spill=None):
 
     sized = not isinstance(block_electrons, int)
     with block_electrons.pool_limit() if sized else nullcontext():
+        grid_options = dict(transport_core=transport_core, n_hat=n_hat, groove=groove, spill=spill)
         if case.get("line_grid_policy") is not None:
             from .streamed_line_grid import resolve_streamed_line_grid
 
             # Pass 1 of 2: the grid needs the whole line population (#1001).
             E_grid, grid_record, grid_pass = resolve_streamed_line_grid(
-                case,
-                block_electrons,
-                transport_core=transport_core,
+                case, block_electrons, **grid_options
+            )
+        fallback_transports = 0
+        while True:
+            inputs = dict(
+                E_grid=E_grid,
+                E_brem=E_brem,
                 n_hat=n_hat,
                 groove=groove,
-                spill=spill,
+                Ne_lines=case["Ne"],
+                Ne_brem=case["Ne_brem"],
             )
-        inputs = dict(
-            E_grid=E_grid,
-            E_brem=E_brem,
-            n_hat=n_hat,
-            groove=groove,
-            Ne_lines=case["Ne"],
-            Ne_brem=case["Ne_brem"],
+            try:
+                out, tp = _score_streamed_pass(
+                    case, inputs, block_electrons, transport_core, grid_record
+                )
+                break
+            except CxrGridToleranceError as refusal:
+                from .streamed_line_grid import streamed_fallback_grid
+
+                stop = float(E_grid[-1])
+                E_grid, grid_record, fallback_pass = streamed_fallback_grid(
+                    case, refusal, grid_record, block_electrons, **grid_options
+                )
+                if not float(E_grid[-1]) > stop:
+                    raise refusal from None
+                fallback_transports += 1 + bool(fallback_pass["transported"])
+    if grid_pass is not None:
+        out["_streamed_line_grid_pass"] = {
+            **grid_pass,
+            "fallback_transports": fallback_transports,
+        }
+    from .recovery import RECOVERY_KEYS
+
+    out.update({key: tp[key] for key in RECOVERY_KEYS if key in tp})
+    return out
+
+
+def _score_streamed_pass(case, inputs, block_electrons, transport_core, grid_record):
+    """One scoring transport on ``inputs["E_grid"]``: ``(out, tp)``.
+
+    Raises :class:`~pyrite._cxr_grid_policy.CxrGridToleranceError` when the
+    axis's truncation audit refuses it.
+    """
+    from ..spectrum.cxr._coverage import collect_line_data_coverage
+    from . import _transport_case
+    from .streamed_selection import block_scorer
+
+    scorer = block_scorer(case, inputs)
+    with collect_line_data_coverage() as line_coverage:
+        tp = _transport_case(
+            case,
+            transport_core=transport_core,
+            block_electrons=block_electrons,
+            block_consumer=scorer.add,
+            keep_segments_on_device=True,
         )
-        scorer = block_scorer(case, inputs)
-        with collect_line_data_coverage() as line_coverage:
-            tp = _transport_case(
-                case,
-                transport_core=transport_core,
-                block_electrons=block_electrons,
-                block_consumer=scorer.add,
-                keep_segments_on_device=True,
-            )
     counts = tp["segs"]
     out = scorer.result(
         Ne=int(counts["Ne"]),
@@ -531,9 +571,4 @@ def score_fixed_streamed(case, block_electrons, *, transport_core, spill=None):
         line_coverage=line_coverage,
         diagnostic_grid=grid_record,
     )
-    if grid_pass is not None:
-        out["_streamed_line_grid_pass"] = grid_pass
-    from .recovery import RECOVERY_KEYS
-
-    out.update({key: tp[key] for key in RECOVERY_KEYS if key in tp})
-    return out
+    return out, tp
