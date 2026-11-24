@@ -36,8 +36,21 @@ def _brem_wide_from_segments(
     :func:`_coupled_brem_from_segments`.
 
     ``electron_band_weights`` (internal, #361) returns each brem electron's
-    in-band integral instead, summed over layers; see ``mc_brem_spectrum``."""
+    in-band integral instead, summed over layers; see ``mc_brem_spectrum``.
+
+    Detector-cone copies (#379) fold here once, per weight stratum, outside
+    the electron blocks: every block scores primaries only."""
     from .. import runner
+
+    if electron_band_weights is None and segs_b.get("cone_split") is not None:
+        from .cone_split_strata import fold_copies
+
+        def brem(segments, n):
+            return _brem_wide_from_segments(segments, E_brem, case, n_hat, abs_layers, groove, n)
+
+        primaries = {k: v for k, v in segs_b.items() if k != "cone_split"}
+        n_norm = int(segs_b["Ne"] if Ne is None else Ne)
+        return brem(primaries, Ne) + fold_copies(segs_b, n_norm, brem)
 
     brem_chunk = runner._admit_chunk(
         case.get("brem_chunk")
@@ -417,6 +430,12 @@ def _brem_for_case(case, E_brem):
             case["groove_spacing_ang"], case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad
         )
 
+    from .transport_options import split_transport_kwargs
+
+    # A split case replays its copies on the only core with a split port (#379).
+    split_kw = split_transport_kwargs(case)
+    if split_kw:
+        split_kw["transport_core"] = "per-electron"
     Ne_brem = case["Ne_brem"]
     E_cut_brem = case.get("E_cut_brem_keV", 1.0)
     E_cut_by_electrons = np.full(Ne_brem, E_cut_brem, dtype=np.float64)
@@ -453,6 +472,7 @@ def _brem_for_case(case, E_brem):
             if case.get("inelastic_model") is not None or case.get("radiative_model") is not None
             else {"radiative_model": "uncoupled"}
         ),
+        **split_kw,
     )
     return runner._brem_wide_from_segments(
         segs_b,
@@ -481,4 +501,8 @@ def optional_line_components(case, tp) -> dict[str, Any]:
         from .transition_emission import case_transition_spectrum
 
         out["spec_transition"] = case_transition_spectrum(case, tp)
+    if case.get("cone_split") is not None:  # #379 provenance of the copies scored
+        from .cone_split_strata import split_outputs
+
+        out.update(split_outputs(case, tp["segs"]))
     return out

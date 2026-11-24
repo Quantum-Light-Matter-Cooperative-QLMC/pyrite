@@ -125,16 +125,20 @@ def case_diffracted_brem(case, segments, E_grid, n_hat, Ne) -> np.ndarray:
     reflections = bragg_reflections(case, n_hat, grid)
     if not reflections:
         return out
-    return diffracted_brem_spectrum(
+    return _with_copies(
         segments,
-        grid,
-        reflections,
-        n_hat,
-        case["composition"],
-        float(case["thickness_ang"]),
-        Ne=int(segments["Ne"] if Ne is None else Ne),
-        quadrature=case.get("line_quadrature", "node"),
-        **_dbr_options(case),
+        Ne,
+        lambda rows, n: diffracted_brem_spectrum(
+            rows,
+            grid,
+            reflections,
+            n_hat,
+            case["composition"],
+            float(case["thickness_ang"]),
+            Ne=n,
+            quadrature=case.get("line_quadrature", "node"),
+            **_dbr_options(case),
+        ),
     )
 
 
@@ -157,17 +161,32 @@ def case_diffracted_characteristic(case, segments, E_grid, n_hat, Ne) -> np.ndar
     reflections = _kossel_reflections(case, n_hat, grid)
     if not reflections:
         return np.zeros(grid.size)
-    return diffracted_characteristic_spectrum(
+    return _with_copies(
         segments,
-        grid,
-        reflections,
-        n_hat,
-        case["composition"],
-        float(case["thickness_ang"]),
-        Ne=int(segments["Ne"] if Ne is None else Ne),
-        quadrature=case.get("line_quadrature", "node"),
-        **_yield_options(case),
+        Ne,
+        lambda rows, n: diffracted_characteristic_spectrum(
+            rows,
+            grid,
+            reflections,
+            n_hat,
+            case["composition"],
+            float(case["thickness_ang"]),
+            Ne=n,
+            quadrature=case.get("line_quadrature", "node"),
+            **_yield_options(case),
+        ),
     )
+
+
+def _with_copies(segments, Ne, spectrum):
+    """``spectrum(segments, N)`` plus detector-cone copies' weight strata (#379).
+
+    Validation: detector-cone-variance-reduction
+    """
+    from .cone_split_strata import fold_copies
+
+    n = int(segments["Ne"] if Ne is None else Ne)
+    return spectrum(segments, n) + fold_copies(segments, n, spectrum)
 
 
 class DiffractedDepthAccumulator:
@@ -192,7 +211,17 @@ class DiffractedDepthAccumulator:
         self.edges = None
 
     def add(self, segments, Ne) -> None:
-        """Add one block's depth weights (``Ne`` electrons normalize every block)."""
+        """Add one block's depth weights (``Ne`` electrons normalize every block).
+
+        Detector-cone copies add per weight stratum, scaled (#379).
+        """
+        from .cone_split_strata import copy_strata
+
+        self._add(segments, Ne, 1.0)
+        for scale, rows, n_copies in copy_strata(segments, int(Ne)):
+            self._add(rows, n_copies, scale)
+
+    def _add(self, segments, Ne, scale) -> None:
         from ..spectrum.diffracted_brem import dbr_depth_weights
         from ..spectrum.diffracted_characteristic import line_depth_yields
 
@@ -209,11 +238,14 @@ class DiffractedDepthAccumulator:
             Ne=int(Ne),
             **_dbr_options(case),
         )
+        if scale != 1.0:
+            dbr = [part * scale for part in dbr]
         self.dbr = dbr if self.dbr is None else [a + b for a, b in zip(self.dbr, dbr, strict=True)]
         self.edges, lines = line_depth_yields(
             segments, composition, thickness, Ne=int(Ne), **_yield_options(case)
         )
         for energy, fwhm, weight, element in lines:
+            weight = weight * scale if scale != 1.0 else weight
             key = (element, energy)
             if key in self.lines:
                 self.lines[key][2] = self.lines[key][2] + weight

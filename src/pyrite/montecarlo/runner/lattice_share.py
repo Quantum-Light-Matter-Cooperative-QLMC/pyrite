@@ -459,13 +459,14 @@ class SelectionContinuum:
         import numpy as np
 
         from ..._backend import _to_cpu
+        from .cone_split_strata import fold_copies
         from .emission import _layer_brem_from_segments
 
         segments, n_hat, abs_layers, groove, Ne = self._scene
-        total = 0.0
-        for part in [segments] if self._parts is None else self._parts():
-            density = _layer_brem_from_segments(
-                part,
+
+        def density(rows, n):
+            return _layer_brem_from_segments(
+                rows,
                 self.grid,
                 self.case,
                 n_hat,
@@ -474,9 +475,18 @@ class SelectionContinuum:
                 tables=tables,
                 tabled_only=tabled_only,
                 groove=groove,
-                Ne=Ne,
+                Ne=n,
             )
-            total += float(np.asarray(_to_cpu(density), dtype=float) @ self.weights)
+
+        total = 0.0
+        for part in [segments] if self._parts is None else self._parts():
+            primaries = {k: v for k, v in part.items() if k != "cone_split"}
+            values = density(primaries, Ne)
+            if part.get("cone_split") is not None:
+                # The line yields this share nets against fold copies too (#379).
+                n_norm = int(part["Ne"] if Ne is None else Ne)
+                values = values + fold_copies(part, n_norm, density)
+            total += float(np.asarray(_to_cpu(values), dtype=float) @ self.weights)
         return total
 
     def background(self, layer: int | None) -> float:

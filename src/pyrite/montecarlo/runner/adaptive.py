@@ -704,7 +704,16 @@ def case_measure(case, settings: AdaptiveSettings) -> Measure:
     brem_q = band_weights(E_brem, start_eV, stop_eV) if "brem" in settings.observables else None
 
     def measure(start, stop, block):
-        n = stop - start
+        record = block.get("cone_split")
+        if record is None:
+            return measure_rows(stop - start, block)
+        # Primaries alone, then copies per history: the spectrum-side stratum
+        # fold must not also reach the monitor's line-mass audit.
+        primaries = {key: value for key, value in block.items() if key != "cone_split"}
+        values = measure_rows(stop - start, primaries)
+        return split_history_values(values, record, measure_rows, stop - start)
+
+    def measure_rows(n, block):
         values = {}
         if "cxr" in settings.observables:
             # Only ``electron_mass`` is read: skip the grid reduction, which was
@@ -752,6 +761,34 @@ def case_measure(case, settings: AdaptiveSettings) -> Measure:
     return measure
 
 
+def split_history_values(values, record, measure_rows, n: int) -> dict[str, Any]:
+    """Per-history samples of a split block: each primary plus its weighted copies (#379).
+
+    ``record`` is the block's ``cone_split`` record; its ``parent`` indexes the
+    block's own primaries. Copies are measured as their own population and
+    summed onto their parent, ``X_i = x_i + sum_c w_c x_c``; N counts primaries.
+
+    Validation: detector-cone-variance-reduction
+    """
+    from ..transport.cone_split import history_sums
+
+    parent = np.asarray(record["parent"], dtype=np.int64)
+    if parent.size == 0:
+        return values
+    copies = measure_rows(int(parent.size), record["copies"])
+    weight = np.asarray(record["weight"], dtype=np.float64)
+    return {
+        name: history_sums(
+            np.asarray(_to_cpu(value), dtype=np.float64),
+            np.asarray(_to_cpu(copies[name]), dtype=np.float64),
+            parent,
+            weight,
+            n,
+        )
+        for name, value in values.items()
+    }
+
+
 def _electron_rows(segments, start: int, stop: int):
     """Rows of electrons ``[start, stop)``; ids, scalars and per-electron fields kept."""
     key = "electron_id" if "electron_id" in segments else "elec_id"
@@ -764,6 +801,9 @@ def _electron_rows(segments, start: int, stop: int):
     for field in _SEG_ARRAYS:
         if field in view:
             view[field] = _take(view[field], rows)
+    if view.get("cone_split") is not None:
+        # Fold only this range's primaries' copies (#379).
+        view["cone_split"] = {**view["cone_split"], "parent_range": (start, stop)}
     return view
 
 
@@ -969,9 +1009,37 @@ def warn_statistics_limited(case, settings: Precision, statistics: Mapping[str, 
     warnings.warn(
         f"{case.get('name', 'case')} at {case['E0_keV']:g} keV: adaptive stopping {stop} "
         f"without converging. {limit_summary(statistics)}. Treat the result as "
-        "statistics-limited; the full per-observable record is in adaptive_sampling.",
+        "statistics-limited; the full per-observable record is in adaptive_sampling."
+        f"{_split_hint(case, statistics)}",
         CxrYieldStatisticsWarning,
         stacklevel=3,
+    )
+
+
+#: Guards a few dominant histories fail; detector-cone splitting targets that cause.
+_RARE_HISTORY_GUARDS = ("max_electron_share", "effective_sample_size")
+
+
+def _split_hint(case, statistics: Mapping[str, Any]) -> str:
+    """Name the experimental splitting option when rare dominant histories limit an analog run."""
+    if case.get("cone_split") is not None:
+        return ""
+    rare = any(
+        not record["passes"].get(guard, True)
+        for record in statistics["statistics"].values()
+        for guard in _RARE_HISTORY_GUARDS
+    )
+    if not rare:
+        return ""
+    from ..._cone_splitting import ConeSplitting
+
+    try:  # never point at an option the case would refuse
+        ConeSplitting().validate_case(case)
+    except ValueError:
+        return ""
+    return (
+        " A few histories dominate the sample; if they are detector-cone electrons, "
+        "the experimental Numerics(cone_split=ConeSplitting()) may help (#379)."
     )
 
 
@@ -1012,6 +1080,11 @@ def case_transport_core(case, requested="auto"):
     from ..transport import resolve_transport_core
 
     realization = case_realization(case)
+    if case.get("cone_split") is not None:
+        from ..._cone_splitting import split_transport_core
+
+        pinned = None if realization is None else required_core(requested, realization=realization)
+        return split_transport_core(pinned or requested)
     if realization is not None:
         return required_core(requested, realization=realization)
 
@@ -1031,7 +1104,7 @@ def case_transport_core(case, requested="auto"):
 
 
 def _adaptive_worker_call(function, case, *args, **kwargs):
-    """Replace only the pool's automatic lockstep pin for one adaptive case.
+    """Replace only the pool's automatic lockstep pin for one adaptive or split case.
 
     Explicit inherited CPU-core choices remain authoritative. Restore the pool
     default afterwards, so a fixed case in a mixed batch keeps its old draws.
@@ -1102,7 +1175,12 @@ def realized_case(case, transport):
 
 
 def validate_directions(case, directions) -> None:
-    """Reject directional scoring before starting an adaptive transport."""
+    """Reject directional scoring before starting an adaptive or split transport."""
+    if case.get("cone_split") is not None and directions is not None:
+        raise ValueError(
+            "detector-cone splitting biases one transport toward the case's single "
+            "detector direction; it does not support observation directions"
+        )
     if case.get("adaptive_precision") is not None and directions is not None:
         raise ValueError(
             "adaptive precision does not support observation directions; use fixed counts"

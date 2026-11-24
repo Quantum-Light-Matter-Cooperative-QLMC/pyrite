@@ -140,7 +140,7 @@ def _with_line_resolution(
 
 
 def _with_run_options(cases: list[Case], numerics: Numerics) -> list[Case]:
-    """Apply the explicit seed stream and opt-in line roulette to lowered cases.
+    """Apply the explicit seed stream and opt-in line roulette/cone splitting to cases.
 
     Replacing re-runs case validation, which refuses non-additive line routes.
     """
@@ -149,6 +149,9 @@ def _with_run_options(cases: list[Case], numerics: Numerics) -> list[Case]:
     if numerics.line_roulette is not None:
         record = numerics.line_roulette.to_dict()
         cases = [replace(case, line_roulette=record) for case in cases]
+    if numerics.cone_split is not None:
+        record = numerics.cone_split.to_dict()
+        cases = [replace(case, cone_split=record) for case in cases]
     return cases
 
 

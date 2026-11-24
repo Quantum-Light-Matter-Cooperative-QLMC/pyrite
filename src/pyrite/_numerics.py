@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal, Self, cast
 
 import numpy as np
 
+from ._cone_splitting import ConeSplitting
 from ._cxr_source import validate_cxr_source
 from ._cxr_vocabulary import catalog_key
 from ._energy_bins import EnergyBins
@@ -722,6 +723,9 @@ class Numerics:
     ``line_roulette`` opts an incoherent scalar-detector run into
     inverse-probability scoring of its CXR lines; ``None`` is analog scoring
     and adds nothing to case identity.
+    ``cone_split`` (experimental, #379) opts transport into detector-cone
+    splitting toward the case's detector direction; ``None`` is analog
+    transport and adds nothing to case identity.
     ``line_resolution`` selects ``"sinc-oversampled"`` (default, sinc-Nyquist
     step / 8; converges peak/FWHM) or ``"sinc-nyquist"`` (8x fewer nodes, area
     only; over-budget opt-out). ``None`` adds no identity key; explicit values
@@ -742,6 +746,8 @@ class Numerics:
     temporal_profile: bool = False
     # Opt-in estimator; None must not add a key to a Case identity.
     line_roulette: LineRoulette | None = None
+    # Opt-in transport estimator (#379); None must not add a key to a Case identity.
+    cone_split: ConeSplitting | None = None
     line_resolution: Literal["sinc-oversampled", "sinc-nyquist"] | None = None
     transport: "TransportNumerics | None" = None
     radiation: "RadiationNumerics | None" = None
@@ -777,6 +783,8 @@ class Numerics:
             raise TypeError("temporal_profile must be a bool")
         if self.line_roulette is not None and not isinstance(self.line_roulette, LineRoulette):
             raise TypeError("line_roulette must be a LineRoulette or None")
+        if self.cone_split is not None and not isinstance(self.cone_split, ConeSplitting):
+            raise TypeError("cone_split must be a ConeSplitting or None")
         if not isinstance(self.cxr_reflections, CxrReflections):
             raise TypeError("cxr_reflections must be a CxrReflections")
         if self.energy_bins is not None and not isinstance(self.energy_bins, EnergyBins):
@@ -908,7 +916,14 @@ class Numerics:
             "transport": {
                 "classification": "scientific",
                 "source": "typed" if self.transport is not None else "legacy",
-                "effective": asdict(self.resolved_transport),
+                "effective": {
+                    **asdict(self.resolved_transport),
+                    **(
+                        {"cone_split": self.cone_split.to_dict()}
+                        if self.cone_split is not None
+                        else {}
+                    ),
+                },
             },
             "radiation": {
                 "classification": "scientific",

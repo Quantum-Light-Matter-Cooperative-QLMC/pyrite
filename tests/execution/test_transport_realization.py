@@ -7,6 +7,7 @@ from dataclasses import FrozenInstanceError, fields
 
 import pytest
 
+from pyrite._cone_splitting import ConeSplitting
 from pyrite.campaign.profiles import _with_transport_realization, case_content_key
 from pyrite.campaign.realization import prepare_executor_case
 from pyrite.checkpoints import _checkpoint_io, _checkpoint_store
@@ -115,7 +116,9 @@ def test_case_old_slot_pickle_and_marked_io_round_trips(tmp_path, monkeypatch):
             Case,
             "__getstate__",
             lambda self: [
-                getattr(self, f.name) for f in fields(self) if f.name != "transport_realization"
+                getattr(self, f.name)
+                for f in fields(self)
+                if f.name not in ("transport_realization", "cone_split")
             ],
         )
         assert pickle.dumps(plain, protocol=5) == before
@@ -130,6 +133,19 @@ def test_case_old_slot_pickle_and_marked_io_round_trips(tmp_path, monkeypatch):
     loaded = _checkpoint_io.load(path)["case"]
     assert case_realization(loaded) == MARKER
     assert case_content_key(loaded) == case_content_key(marked)
+
+
+def test_cone_split_case_pickles_with_and_without_a_realization():
+    split = ConeSplitting(cone_factor=1.0).to_dict()  # 8/gamma0 is too wide at 30 keV
+    plain = Case(**_legacy_case(), cone_split=split)
+    # A split case keeps an absent realization slot before its own field.
+    assert len(plain.__getstate__()) == len(fields(Case))
+    assert pickle.loads(pickle.dumps(plain)) == plain
+    marked = bind_realization(plain, MARKER)
+    restored = pickle.loads(pickle.dumps(marked))
+    assert restored == marked
+    assert restored["cone_split"] == split
+    assert case_transport_core(restored, "auto") == "per-electron"
 
 
 @pytest.mark.parametrize("pin", ["", "auto", "per-electron"])

@@ -15,26 +15,9 @@ import argparse
 import json
 import time
 from pathlib import Path
-from unittest.mock import patch
 
 import numpy as np
-from detector_cone_variance_reduction import _host, _settings, _stats, build
-
-
-def transport(case, cone):
-    from pyrite.montecarlo import runner
-    from pyrite.montecarlo.runner import case_driver
-
-    original = case_driver.simulate_trajectories
-
-    def simulate(*a, **kw):
-        return original(*a, **kw, **({"_cone_split": cone} if cone is not None else {}))
-
-    with (
-        patch.object(case_driver, "simulate_trajectories", simulate),
-        patch.object(case_driver, "resolve_cxr_grid", lambda c, s, n, ne, grid, *a: (grid, None)),
-    ):
-        return runner._transport_case(case, transport_core="per-electron")
+from detector_cone_variance_reduction import _host, _settings, _stats, build, primaries, split_case
 
 
 def characteristic(case, segs, count, n_hat, grid, cache):
@@ -88,37 +71,38 @@ def arm(case, args, split):
     from pyrite._backend import BACKEND
     from pyrite.montecarlo import runner
     from pyrite.montecarlo.runner.adaptive import case_measure
-    from pyrite.montecarlo.transport.cone_split import ConeSplit, history_sums
+    from pyrite.montecarlo.transport.cone_split import history_sums
 
     n_hat = runner._case_geometry(case)[3]
-    gamma = 1.0 + args.energy_keV / 511.0
-    cone = None
     if split:
-        cone = ConeSplit(
-            tuple(n_hat),
-            args.cone_factor / gamma,
+        case = split_case(
+            case,
+            args.cone_factor,
             args.target_weight,
-            args.max_copies_per_electron,
-            min_energy_keV=args.min_energy_fraction * args.energy_keV,
+            min_energy_fraction=args.min_energy_fraction,
             angle_scale=args.angle_scale,
+            max_copies_per_electron=args.max_copies_per_electron,
         )
     grid = np.arange(args.char_window_eV[0], args.char_window_eV[1], args.char_step_eV)
     started = time.perf_counter()
-    tp = transport(case, cone)
+    tp = runner._transport_case(case, transport_core="per-electron")
     transport_s = time.perf_counter() - started
     try:
         record = tp["segs"].get("cone_split")
+        # Score primaries and copies separately, then fold per history here:
+        # production scorers would otherwise fold the copies a second time.
+        segs = primaries(tp["segs"])
         parent = np.zeros(0, dtype=int) if record is None else record["parent"]
         weight = np.zeros(0) if record is None else record["weight"]
         count = parent.size
         measure = case_measure(case, _settings(args.ne))
         started = time.perf_counter()
-        primary = {k: _host(v) for k, v in measure(0, args.ne, tp["segs"]).items()}
+        primary = {k: _host(v) for k, v in measure(0, args.ne, segs).items()}
         copy = {k: np.zeros(0) for k in primary}
         if count:
             copy = {k: _host(v) for k, v in measure(0, count, record["copies"]).items()}
         cache = {}
-        primary["char"] = characteristic(case, tp["segs"], args.ne, n_hat, grid, cache)
+        primary["char"] = characteristic(case, segs, args.ne, n_hat, grid, cache)
         copy["char"] = np.zeros(0)
         if count:
             copy["char"] = characteristic(case, record["copies"], count, n_hat, grid, cache)

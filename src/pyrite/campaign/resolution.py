@@ -83,6 +83,9 @@ def resolve_models(scene: Scene, numerics: Numerics) -> tuple[Physics, Numerics]
         _validate_cxr_off(numerics, channeling)
     if numerics.line_roulette is not None and isinstance(scene.detector, PlanarDetector):
         raise ValueError("line_roulette currently requires a scalar Detector")
+    if numerics.cone_split is not None and isinstance(scene.detector, PlanarDetector):
+        # One transport is biased toward one detector direction (#379).
+        raise ValueError("cone_split requires a scalar Detector (one detector direction)")
     return physics, numerics
 
 

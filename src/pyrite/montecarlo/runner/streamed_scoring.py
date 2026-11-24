@@ -147,6 +147,9 @@ class BlockSpectrumScorer:
         from .diffracted_brem import DiffractedDepthAccumulator
 
         self.diffracted = DiffractedDepthAccumulator(case, self.E_grid, self.n_hat)
+        from .cone_split_strata import SplitTally
+
+        self.split = SplitTally(case) if case.get("cone_split") is not None else None
         self.totals: tuple | None = None
         self.n_segments = 0
         self.n_layers = 1
@@ -200,6 +203,7 @@ class BlockSpectrumScorer:
                     np.zeros(self.E_brem.shape),
                     np.zeros(self.E_grid.shape),
                 ),
+                segs,
                 rows,
             )
             return
@@ -253,9 +257,9 @@ class BlockSpectrumScorer:
                 electron_limit=self.Ne_brem,
             )
             brem = self.emission.continuum.evaluate(continuum, "brem_wide").values
-        self._commit((spec, characteristic, brem, self._transition(segs)), rows)
+        self._commit((spec, characteristic, brem, self._transition(segs)), segs, rows)
 
-    def _commit(self, parts, rows) -> None:
+    def _commit(self, parts, segs, rows) -> None:
         if self.totals is None:  # FP64 block sums, like the retained route (#1313)
             self.totals = tuple(np.asarray(part, dtype=np.float64) for part in parts)
         else:
@@ -263,6 +267,8 @@ class BlockSpectrumScorer:
                 total + part for total, part in zip(self.totals, parts, strict=True)
             )
         self.n_segments += rows
+        if self.split is not None:  # after the block's totals: a retry never double-counts
+            self.split.add(segs)
 
     def _past_brem_freeze(self, segs) -> bool:
         """Whether every electron of a provisional block lies past the brem freeze.
@@ -299,17 +305,20 @@ class BlockSpectrumScorer:
                 diffracted.edges,
             ),
             self.fallbacks.snapshot(),
+            None if self.split is None else self.split.snapshot(),
         )
 
     def restore(self, state) -> None:
         """Undo every :meth:`add` since ``state`` (:meth:`snapshot`)."""
         from .electron_blocks import restore_audit
 
-        totals, segments, layers, audit, diffracted, fallbacks = state
+        totals, segments, layers, audit, diffracted, fallbacks, split = state
         self.totals, self.n_segments, self.n_layers = totals, segments, layers
         restore_audit(self.audit, audit)
         self.diffracted.dbr, self.diffracted.lines, self.diffracted.edges = diffracted
         self.fallbacks.restore(fallbacks)
+        if self.split is not None:
+            self.split.restore(split)
 
     def _renormalize(self, realized):
         """``x -> x * L / realized`` for the provisional count ``L`` (exact ``x * L``)."""
@@ -411,6 +420,8 @@ class BlockSpectrumScorer:
                 )
         if self.line_screen is not None:
             out["line_roulette"] = self.line_screen.record()
+        if self.split is not None:
+            out["cone_split"] = self.split.record()
         from .lattice_share import lattice_share_outputs
 
         out.update(lattice_share_outputs(self.brem_case, self.n_layers))

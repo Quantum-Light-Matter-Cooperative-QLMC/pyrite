@@ -484,6 +484,7 @@ def _case_result(
                 else {}
             ),
             **({"line_roulette": output["line_roulette"]} if "line_roulette" in output else {}),
+            **({"cone_split": output["cone_split"]} if "cone_split" in output else {}),
             **(
                 {"reflection_selection": output["reflection_selection"]}
                 if "reflection_selection" in output
