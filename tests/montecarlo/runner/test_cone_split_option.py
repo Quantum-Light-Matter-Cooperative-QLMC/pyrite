@@ -4,6 +4,7 @@ Validation: detector-cone-variance-reduction
 """
 
 import math
+import os
 import warnings
 
 import numpy as np
@@ -184,6 +185,33 @@ def test_copy_strata_fold_weights_copies_over_primaries():
     # scale = W n_c / N with n_c = N = 4; parent 5 (weight 0.25) is dropped.
     assert sorted(scale for scale, _, _ in copy_strata(segments, 4)) == [0.125, 0.25, 0.5]
     assert fold_copies({"Ne": 2}, 2, score) == 0.0
+
+
+def test_pool_workers_run_split_cases_on_the_per_electron_core(monkeypatch):
+    """The pool's automatic lockstep pin (``_worker_init``) yields to a split case."""
+    from pyrite.montecarlo.runner.scheduling import _pool_worker
+
+    case = {**_split(), "Ne": 24, "Ne_brem": 24}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ConeSplitLowGainWarning)
+        direct = runner._transport_case(case)["segs"]
+        assert direct["cone_split"]["weight"].size > 0
+        monkeypatch.setattr(runner, "_WORKER_INHERITED_CORE", "")
+        monkeypatch.setenv("PYRITE_MC_TRANSPORT_CORE", "lockstep")
+        pooled = _pool_worker(case, transport=True)(case)["segs"]
+    assert os.environ["PYRITE_MC_TRANSPORT_CORE"] == "lockstep"
+    np.testing.assert_array_equal(pooled["L_ang"], direct["L_ang"])
+    np.testing.assert_array_equal(pooled["cone_split"]["weight"], direct["cone_split"]["weight"])
+
+
+def test_brem_repair_replays_the_split_copies():
+    case = {**_split(), "Ne": 24, "Ne_brem": 24}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ConeSplitLowGainWarning)
+        live = runner.run_case(case)
+        repaired = runner._brem_for_case(case, live["E_grid_brem"])
+    assert live["cone_split"]["copies"] > 0
+    np.testing.assert_allclose(repaired, live["brem_wide"], rtol=1e-12)
 
 
 def test_split_spectrum_adds_weighted_copies():

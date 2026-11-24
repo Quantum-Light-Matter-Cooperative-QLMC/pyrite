@@ -513,6 +513,7 @@ def transport_cone_split(simulate, kw):
         Ne=int(parent.size),
         E_cut_by_electrons=np.asarray(primaries["initial_E_cut_keV"], dtype=float)[parent],
         transport_core="per-electron",
+        transport_progress=None,  # the bar counts primaries; copies are not more of them
         _electron_start=0,
         _energy_range_keV=table_range,
     )

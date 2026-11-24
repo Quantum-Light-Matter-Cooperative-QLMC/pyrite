@@ -199,7 +199,8 @@ def _copy_strata(adapter, batch: EmissionBatch, slot: str, native: bool) -> Any:
     ``W``, and its per-electron masses fold onto the parents
     (``m_i + sum_c W m_c``), so the line-yield statistics read weighted
     per-history samples. A line-collecting audit (grid resolution) is not
-    extended: the grid sees primaries only. Per-electron (monitor) batches
+    extended here: grid resolution collects copy lines itself
+    (:func:`.cone_split_strata.collect_copy_lines`). Per-electron (monitor) batches
     never reach here: they fold copies per history instead.
 
     Validation: detector-cone-variance-reduction

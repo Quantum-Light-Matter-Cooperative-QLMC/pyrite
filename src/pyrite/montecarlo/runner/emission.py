@@ -430,6 +430,12 @@ def _brem_for_case(case, E_brem):
             case["groove_spacing_ang"], case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad
         )
 
+    from .transport_options import split_transport_kwargs
+
+    # A split case replays its copies on the only core with a split port (#379).
+    split_kw = split_transport_kwargs(case)
+    if split_kw:
+        split_kw["transport_core"] = "per-electron"
     Ne_brem = case["Ne_brem"]
     E_cut_brem = case.get("E_cut_brem_keV", 1.0)
     E_cut_by_electrons = np.full(Ne_brem, E_cut_brem, dtype=np.float64)
@@ -466,6 +472,7 @@ def _brem_for_case(case, E_brem):
             if case.get("inelastic_model") is not None or case.get("radiative_model") is not None
             else {"radiative_model": "uncoupled"}
         ),
+        **split_kw,
     )
     return runner._brem_wide_from_segments(
         segs_b,

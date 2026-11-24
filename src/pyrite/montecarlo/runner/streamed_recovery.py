@@ -13,6 +13,8 @@ class RowScoringRecovery:
     and TR require complete histories and must never use this row splitter.
     Slices retain global electron IDs, fixed electron limits, geometry and
     scalar metadata; no transport or already successful slice is replayed.
+    Only the first slice carries a detector-cone split record, whose copies
+    the adapter scores whole.
     """
 
     def __init__(self):
@@ -31,6 +33,9 @@ class RowScoringRecovery:
             for key in _SEG_ARRAYS:
                 if segments.get(key) is not None:
                     segments[key] = segments[key][start:stop]
+            if start > 0:
+                # The adapter folds a split record's copies whole (#379): once.
+                segments.pop("cone_split", None)
             try:
                 values = adapter.evaluate(replace(batch, segments=segments), slot).values
             except Exception as error:

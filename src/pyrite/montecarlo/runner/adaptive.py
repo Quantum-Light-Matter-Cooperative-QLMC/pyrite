@@ -1098,7 +1098,7 @@ def case_transport_core(case, requested="auto"):
 
 
 def _adaptive_worker_call(function, case, *args, **kwargs):
-    """Replace only the pool's automatic lockstep pin for one adaptive case.
+    """Replace only the pool's automatic lockstep pin for one adaptive or split case.
 
     Explicit inherited CPU-core choices remain authoritative. Restore the pool
     default afterwards, so a fixed case in a mixed batch keeps its old draws.

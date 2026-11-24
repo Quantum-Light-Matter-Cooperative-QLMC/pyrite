@@ -1,6 +1,7 @@
 """Allocator-only row recovery without replaying committed scoring work (#915)."""
 
 import weakref
+from dataclasses import replace
 from types import SimpleNamespace
 
 import numpy as np
@@ -59,6 +60,21 @@ def test_retry_keeps_successful_slices_and_reuses_learned_limit(batch, monkeypat
     calls.clear()
     np.testing.assert_allclose(recovery.evaluate(adapter, batch, "spec_characteristic"), [3.5])
     assert max(map(len, calls)) == 2
+
+
+def test_sliced_rows_fold_a_split_record_once(batch):
+    # Three slices; the adapter adds a split record's copies whole (#379).
+    split = {**batch.segments, "cone_split": {"copies": {}}}
+
+    def evaluate(part, slot):
+        copies = 100.0 if part.segments.get("cone_split") is not None else 0.0
+        return EmissionOutput(slot, np.array([part.segments["L_ang"].size + copies]))
+
+    recovery = RowScoringRecovery()
+    recovery.row_limits["spec_characteristic"] = 3
+    adapter = SimpleNamespace(evaluate=evaluate)
+    sliced = recovery.evaluate(adapter, replace(batch, segments=split), "spec_characteristic")
+    np.testing.assert_allclose(sliced, [109.0])
 
 
 @pytest.mark.parametrize("error", [ValueError("bad input"), MemoryError("host OOM")])
