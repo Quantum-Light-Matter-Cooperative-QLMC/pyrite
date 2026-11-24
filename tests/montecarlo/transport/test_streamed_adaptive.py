@@ -236,6 +236,43 @@ def test_explicit_grid_scores_in_the_monitored_pass(monkeypatch, spread):
     _assert_spectra(streamed, two_pass)
 
 
+def test_explicit_grid_coalesces_kept_chunks_at_the_brem_freeze(monkeypatch):
+    """#1397: kept chunks join into blocks of ``block_electrons``; none straddles the freeze."""
+    from pyrite.montecarlo.runner import stream_sizing, streamed_scoring
+
+    case = _explicit(_requested())
+    reference = _retained(case)
+    # Chunks of 8 electrons (to the decision points) instead of one per side.
+    monkeypatch.setattr(stream_sizing, "HOST_MIN_CHUNK", 8)
+    real_add = streamed_scoring.BlockSpectrumScorer.add
+    added = []
+
+    def spy(self, segs):
+        ids = np.asarray(segs["elec_id"])
+        added.append((int(ids.min()), int(ids.max())))
+        return real_add(self, segs)
+
+    monkeypatch.setattr(streamed_scoring.BlockSpectrumScorer, "add", spy)
+    chunks = []
+    real_merge = block_transport.merge_electron_blocks
+
+    def merge(blocks):
+        chunks.append(len(blocks))
+        return real_merge(blocks)
+
+    monkeypatch.setattr(block_transport, "merge_electron_blocks", merge)
+    streamed = run_case_streamed(case, 10**9, transport_core="per-electron")
+
+    record = streamed["adaptive_sampling"]
+    frozen = record["realized_electrons_brem"]
+    assert frozen < record["realized_electrons"]
+    # One block before the freeze, one after: the whole run buffered at this span.
+    assert len(added) == 2 and max(chunks) > 1
+    assert added[0][1] < frozen <= added[1][0]
+    assert without_wall_clock(record) == without_wall_clock(reference["adaptive_sampling"])
+    _assert_spectra(streamed, reference)
+
+
 def test_provisional_count_is_the_next_power_of_two():
     assert [streamed_adaptive.provisional_count(n) for n in (1, 2, 3, 120, 128, 129)] == [
         1,

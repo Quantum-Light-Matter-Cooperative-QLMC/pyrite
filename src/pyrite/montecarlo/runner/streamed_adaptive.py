@@ -94,17 +94,31 @@ def _max_histories(case) -> int:
 
 
 class MonitoredScoringSink:
-    """Score the monitored pass's kept chunks at a provisional count (``single``)."""
+    """Score the monitored pass's kept chunks at a provisional count (``single``).
 
-    def __init__(self, case, limit):
+    Adaptive chunks are small (:class:`.stream_sizing.AdaptiveChunkPlan`), and
+    scoring each one alone cost more than the transport the single pass saves
+    (#1397, RTX 5080 job 15605). With an integer ``block_electrons`` the kept
+    chunks are therefore joined (:func:`.block_transport.merge_electron_blocks`,
+    the retained route's join) into blocks of at least that many electrons
+    before :meth:`add`. A joined block never straddles the brem freeze: the
+    buffer is scored first when the next chunk lies on the other side.
+    """
+
+    def __init__(self, case, limit, block_electrons=None):
         from .artifacts import _case_geometry
 
         self.count = provisional_count(limit)
         self.case = _fixed_template(case, self.count)
         E_grid, E_brem, _, n_hat, groove = _case_geometry(self.case)
         self.inputs = dict(E_grid=E_grid, E_brem=E_brem, n_hat=n_hat, groove=groove)
+        self.span = block_electrons if isinstance(block_electrons, int) else None
         self.scorer: Any = None
         self.passes = 0
+        self._monitor: Any = None
+        self._buffer: list = []
+        self._buffered = self._seen = 0
+        self._buffer_lines_only = False
 
     def begin_pass(self, monitor) -> None:
         from .streamed_selection import block_scorer
@@ -121,8 +135,33 @@ class MonitoredScoringSink:
         )
         self.scorer = block_scorer(self.case, inputs)
         self.passes += 1
+        self._monitor = monitor
+        self._buffer, self._buffered, self._seen = [], 0, 0
 
     def __call__(self, block) -> None:
+        if self.span is None:
+            commit_once(self.scorer.add, block, self.scorer)
+            return
+        start = self._seen
+        self._seen += int(block["Ne"])
+        frozen = getattr(self._monitor, "brem_count", None)
+        lines_only = frozen is not None and start >= frozen
+        if self._buffer and lines_only != self._buffer_lines_only:
+            self.finish()
+        self._buffer.append(block)
+        self._buffered += int(block["Ne"])
+        self._buffer_lines_only = lines_only
+        if self._buffered >= self.span:
+            self.finish()
+
+    def finish(self) -> None:
+        """Score the buffered chunks as one block (the pass's last, short one at the stop)."""
+        from .block_transport import merge_electron_blocks
+
+        if not self._buffer:
+            return
+        block = merge_electron_blocks(self._buffer)
+        self._buffer, self._buffered = [], 0
         commit_once(self.scorer.add, block, self.scorer)
 
     def result(self, realized, counts, line_coverage) -> dict[str, Any]:
@@ -191,9 +230,10 @@ def run_adaptive_streamed(case, block_electrons, *, transport_core="auto", spill
         from .oom import _ensure_pool_limit
 
         _ensure_pool_limit()
-        sink = MonitoredScoringSink(case, _max_histories(case))
+        sink = MonitoredScoringSink(case, _max_histories(case), block_electrons)
         with collect_line_data_coverage() as line_coverage:
             fixed, sampling, tp = _monitored_pass(case, transport_core, sink)
+            sink.finish()
         out = sink.result(fixed, tp["segs"], line_coverage)
         out.update({key: tp[key] for key in RECOVERY_KEYS if key in tp})
         transports = sink.passes
