@@ -27,6 +27,7 @@ jobs:
       pull-requests: read
     outputs:
       quantum: ${{ steps.filter.outputs.quantum || 'false' }}
+      python_next: ${{ steps.filter.outputs.python_next || 'false' }}
     steps:
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         if: github.event_name == 'pull_request'
@@ -49,6 +50,11 @@ jobs:
               - 'docs/research/physics/axial-*.md'
               - 'docs/validation/channeling/**'
               - 'docs/validation/ledger-channeling.md'
+            python_next:
+              - '.github/workflows/ci.yml'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'src/pyrite/devtools/package_smoke.py'
 
   format:
     if: >-
@@ -207,6 +213,97 @@ jobs:
         env:
           PYRITE_SLOW_TESTS: "1"
         run: pixi run -e ${{ matrix.environment }} pyrite-dev test-suite quantum --durations=30 --durations-min=0.5
+
+  # Provisional Python 3.15 probe (#1421). Nonblocking: 3.15 is not a
+  # supported version until pyproject classifiers and docs say so. h5py,
+  # gemmi and endf-parserpy publish no cp315 wheels yet, so they build from
+  # source: HDF5 headers for h5py, nanobind<3 for gemmi 0.7.5 (gemmi#442),
+  # and one endf-parserpy compile job (its default uses every core and
+  # exceeds runner memory). The oracle group is skipped: abtem needs pyFFTW,
+  # which has neither cp315 wheels nor FFTW headers here. Accelerator extras
+  # have no cp315 wheels; CPU success never implies GPU support.
+  python-next:
+    needs: changes
+    if: >-
+      github.event_name != 'pull_request' ||
+      needs.changes.outputs.python_next == 'true'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      UV_PYTHON: "3.15"
+      HDF5_INCLUDEDIR: /usr/include/hdf5/serial
+      HDF5_LIBDIR: /usr/lib/x86_64-linux-gnu/hdf5/serial
+      INSTALL_ENDF_PARSERPY_NUM_BUILD_JOBS: "1"
+      UV_CONCURRENT_BUILDS: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.15"
+
+      - name: Install source-build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libhdf5-dev
+
+      # `uv sync` ignores --build-constraint/UV_BUILD_CONSTRAINT; build the
+      # locked gemmi once with nanobind<3 so sync reuses the cached wheel
+      # without changing pyproject.toml or uv.lock.
+      - name: Prebuild gemmi
+        run: |
+          gemmi_version=$(uv export --locked --no-hashes --all-groups --no-group oracle \
+            | sed -n 's/^gemmi==\([^ ;]*\).*/\1/p')
+          echo 'nanobind<3' > "$RUNNER_TEMP/build-constraints.txt"
+          uv venv "$RUNNER_TEMP/prebuild"
+          uv pip install --python "$RUNNER_TEMP/prebuild" "gemmi==$gemmi_version" \
+            --build-constraint "$RUNNER_TEMP/build-constraints.txt"
+
+      - name: Install dependencies
+        run: uv sync --all-groups --no-group oracle --locked
+
+      - name: Cache pinned data
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/pyrite/datasets
+            ~/.local/share/pyrite/xsgen/tables
+            ~/.local/share/pyrite/xsgen/reference-data
+          key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
+
+      - name: Fetch pinned data
+        run: uv run pyrite tables fetch
+
+      - name: Interpreter and GIL state
+        run: >-
+          uv run python -c "import sys, numba, numpy, h5py, gemmi, pyrite;
+          print(sys.version, 'gil', sys._is_gil_enabled())"
+
+      - name: Packaging and identity pins
+        run: |
+          uv run pyrite-dev test-suite packaging
+          uv run pyrite-dev test-suite identity-pins
+
+      - name: RNG, baseline, checkpoint and bounded transport/radiation
+        run: >-
+          uv run pyrite-dev test
+          tests/montecarlo/runner/test_physics_baseline.py
+          tests/montecarlo/runner/test_block_transport.py
+          tests/montecarlo/collisions/test_straggling_rng_plumbing.py
+          tests/montecarlo/runner/test_cxr_source_run.py
+          tests/montecarlo/runner/test_case.py
+          tests/montecarlo/runner/test_stream_overlap.py
+          tests/montecarlo/runner/test_history_shards.py
+          tests/scan/test_run.py
+          tests/checkpoint/test_io.py
+          tests/checkpoint/test_selective_load.py
+          tests/test_jit_cache.py
+          tests/test_root_namespace.py
+          tests/test_paths.py
+
+      - name: Wheel and editable install smoke
+        run: uv run pyrite-dev package-smoke
 
   full:
     runs-on: ubuntu-latest
