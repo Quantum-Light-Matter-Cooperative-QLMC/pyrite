@@ -138,6 +138,7 @@ def test_typed_case_content_key_matches_pre_case_golden(identity_pin):
     # #278: angle-f64-v1 preserves forward emission angles on FP32 backends.
     # #1019: fp32-cell-mb-v1 forms FP32 BremsLib cells in millibarn.
     # #1305: fp64-segment-sum-v1 sums CUDA brem cells in FP64 (both brem markers).
+    # #1429: cpu-fused-f64-v1 scores covered CPU BremsLib with a fused reducer.
     # #1173: measured-shell-cutoff-v2 identifies the approved selection policy.
     # #1200: measured-shell-cutoff-v3 sizes selection calls from the table length.
     # #1243: the default line bandwidth is resonance-population (policy payload).
@@ -742,6 +743,9 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
 
     Issue #1305 re-minted every pin for ``fp64-segment-sum-v1`` on both brem
     markers: CUDA brem segment sums are FP64; binary64 output is unchanged.
+
+    Issue #1429 re-minted the BremsLib pins for ``cpu-fused-f64-v1``: covered
+    CPU BremsLib scoring sums in a fixed fused order (ulp-level change).
 
     Issue #100's derived photon-continuum floor deliberately did NOT move these:
     it raises a brem grid's ``start`` where the band meets the material, in

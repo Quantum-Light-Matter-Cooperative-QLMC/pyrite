@@ -206,6 +206,7 @@ def _real_itemsize() -> int:
 
 
 _SPECTRUM_BACKEND_MODULES = (
+    "_brem_cpu_fused",
     "_characteristic_fused",
     "_device_sizing",
     "brem",
