@@ -1131,7 +1131,7 @@
    "optimal_keep_probability_bound_free_screen": 1.0
   }
  ],
- "verdict": "negative at every energy: no arm gains (best 0.60/0.68 at 30 keV, <=0.39 at 300 keV-30 MeV); optimal per-history keep probabilities p_i \u221d m_i/sqrt(rows_i) with free exact masses gain <=1.02x. Per-history line mass is not concentrated (CV ~0.7 at 30 keV, lower at higher energy; top 10% of histories hold 11-27% of the mass) and rows track mass (corr ~0.85).",
+ "verdict": "negative at every energy: no arm gains (best 0.60/0.68 at 30 keV, <=0.39 at 300 keV-30 MeV); optimal per-history keep probabilities p_i ∝ m_i/sqrt(rows_i) with free exact masses gain <=1.02x. Per-history line mass is not concentrated (CV ~0.7 at 30 keV, lower at higher energy; top 10% of histories hold 11-27% of the mass) and rows track mass (corr ~0.85).",
  "thick_target_mass_only": {
   "job": 14521,
   "code_sha": "4674e995f1c41af7cc7d2d239e116b48128f5e7b",
@@ -1277,5 +1277,74 @@
    "case": "mos2 1 mm 1 MeV tilt 15, 45 deg aperture, ARM keep 0.25 floor 0.1, N=1024",
    "result": "no timing: hit the 9 h per-case limit (rc 124) in the scoring pass after transport; the analog production pass alone exceeds the limit at N=1024"
   }
+ },
+ "thick_target_scaling": {
+  "jobs": [
+   15924,
+   15925
+  ],
+  "code_sha": "2f74b0e65f613a84bf3fe15dc3d810be4fcbb72c",
+  "note": "main 2f74b0e65 plus the fixed-N brem-prefix hunk of 920509ce2 (#1430) in checks/reflection_selection_subsample_1281.py; full probe mode (analog pass timed, mass-only screen, then kept rows of one timed arm keep 0.25 / floor 0.1); default reduction",
+  "device": "RTX 5080 (qlmc gpu partition), CuPy, GPU not shared",
+  "profile": "thick_hiE_1295_45deg (remote private config)",
+  "case": "mos2 1 mm 1 MeV tilt 15, 45 deg aperture",
+  "seed_offset": 0,
+  "selected_reflections": 2518,
+  "selected_set_sha256": "ee7ae12322df589e1ca34422e21b987c2a81c657213fed3be6c1e50f1b5f6726",
+  "runs": [
+   {
+    "histories": 16,
+    "rows": 285197,
+    "production_s": 179.8,
+    "screen_s": 1.84,
+    "subset_s": 178.8,
+    "subset_row_share": 1.0,
+    "mass_cv": 1.518,
+    "optimal_bound_free_screen": 2.573,
+    "analog": {
+     "relative_se": 0.379,
+     "variance_of_variance": 0.2306,
+     "vov_gate_passes": false
+    },
+    "note": "N below the 128-history pilot: every row kept, no arm can gain"
+   },
+   {
+    "histories": 256,
+    "rows": 5155107,
+    "production_s": 6413.1,
+    "screen_s": 31.7,
+    "subset_s": 2277.3,
+    "subset_row_share": 0.6779,
+    "mass_cv": 1.654,
+    "rows_mass_correlation": 0.1596,
+    "mass_share_top": {
+     "0.001": 0.0356,
+     "0.01": 0.0657,
+     "0.1": 0.5175,
+     "0.5": 0.974
+    },
+    "optimal_bound_free_screen": 3.036,
+    "analog": {
+     "relative_se": 0.1034,
+     "variance_of_variance": 0.03196,
+     "vov_gate_passes": false,
+     "shift_over_se": 0.0774,
+     "effective_sample_size": 68.7
+    },
+    "timed_arm": {
+     "keep_fraction": 0.25,
+     "floor": 0.1,
+     "variance_ratio": 1.199,
+     "realized_estimate_ratio": 1.0425,
+     "time_ratio_measured": 0.36,
+     "time_ratio_linear_model": 0.689,
+     "fom_gain_measured_time": 2.32,
+     "fom_gain_realized_variance_measured_time": 2.5,
+     "rouletted_vov": 0.0237,
+     "rouletted_vov_gate_passes": false
+    }
+   }
+  ],
+  "finding": "Production time scales with histories on the post-#1390/#1392 code (180 s at N=16, 6413 s at N=256: 35.7x for 16x histories). The timed arm scored 67.8% of rows in 36% of the analog time (per-row cost is not uniform: kept rows ran at ~0.65 ms/row, the analog mean was 1.24 ms/row), so the measured FOM gain is 2.3-2.5x, above the 1.5x threshold. Analog and rouletted VOV gates fail at N=256; a pooled larger-N mass check (15931-15934, seeds 0-3 x N=1024, 1 and 5 MeV, mass-only) decides whether the concentration estimate holds."
  }
 }
