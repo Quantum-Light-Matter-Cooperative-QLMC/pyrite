@@ -1,8 +1,9 @@
 """Detector-cone splitting end to end through the production run path (#379).
 
-Remote only. Every arm is one production ``run_case`` of a ``resonance-population``
-case (``energy_grid.bandwidth_check.build_case``: the same sweep lowering a profile
-run uses) with the public option's case key ``cone_split = ConeSplitting(...).to_dict()``
+Remote only. Every arm is one production ``run_case`` of a case built by the
+default material sweep (``campaign.config.material_sweep`` + ``build_cases``: the
+same lowering a profile run uses, so a refused default line bandwidth falls back
+and rescores as in production; an explicit policy would re-raise) with the public option's case key ``cone_split = ConeSplitting(...).to_dict()``
 (exactly what ``Numerics(cone_split=...)`` lowers), so transport, the adaptive
 monitor, grid resolution, every spectrum tally, the line-yield audit and the
 provenance record all run as in a user's run.
@@ -33,6 +34,7 @@ Measurement only; no ledger verdict.
 """
 
 import argparse
+import dataclasses
 import json
 import math
 import time
@@ -57,15 +59,22 @@ def policy(args):
 
 
 def build(args, ne, seed, split, precision=None):
-    from pyrite.energy_grid.bandwidth_check import build_case
+    from pyrite.campaign.config import material_sweep
+    from pyrite.campaign.sweep import build_cases
 
-    config = {
-        "thickness_ang": float(args.thickness_ang),
-        "tilt_deg": float(args.tilt),
-        "tilt_azim_deg": float(args.azimuth),
-        "n_electrons": int(ne),
-    }
-    case = build_case(args.material, float(args.energy_keV), config, seed=int(seed))
+    sweep = material_sweep(
+        args.material,
+        thickness_ang=float(args.thickness_ang),
+        energy_keV=float(args.energy_keV),
+        tilt_deg=float(args.tilt),
+        tilt_azim_deg=float(args.azimuth),
+    )
+    if args.line_resolution is not None:
+        # As Numerics(line_resolution=...) lowers it: the bandwidth stays defaulted.
+        policy_ = {**(sweep.cxr_grid_policy or {}), "resolution": args.line_resolution}
+        sweep = dataclasses.replace(sweep, cxr_grid_policy=policy_)
+    case = dict(build_cases(sweep, n_electrons=int(ne), n_electrons_brem=int(ne))[0])
+    case["seed"] = int(seed)
     if split:
         option = policy(args)
         option.validate_case(case)
@@ -251,6 +260,12 @@ def parse_args():
     parser.add_argument("--angle-scale", type=float, default=1.0)
     parser.add_argument("--target-weight", type=float, default=1e-3)
     parser.add_argument("--max-copies-per-electron", type=int, default=1024)
+    parser.add_argument(
+        "--line-resolution",
+        choices=["sinc-oversampled", "sinc-nyquist"],
+        default=None,
+        help="Numerics.line_resolution; sinc-nyquist keeps line area (integrated yields)",
+    )
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
     references = {}
