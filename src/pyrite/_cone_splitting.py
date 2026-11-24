@@ -17,6 +17,7 @@ Validation: detector-cone-variance-reduction
 from __future__ import annotations
 
 import math
+import numbers
 import warnings
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
@@ -78,6 +79,14 @@ class ConeSplitting:
     def __post_init__(self) -> None:
         if self.model != CONE_SPLIT_MODEL:
             raise ValueError(f"unknown cone split model {self.model!r}")
+        # NumPy scalars are accepted and stored as Python numbers (JSON identity).
+        for name in ("cone_factor", "min_energy_fraction", "angle_scale", "target_weight"):
+            value = getattr(self, name)
+            if isinstance(value, numbers.Real) and not isinstance(value, bool | float):
+                object.__setattr__(self, name, float(value))
+        cap = self.max_copies_per_electron
+        if isinstance(cap, numbers.Integral) and not isinstance(cap, bool | int):
+            object.__setattr__(self, "max_copies_per_electron", int(cap))
         _positive_finite("cone_factor", self.cone_factor)
         _positive_finite("target_weight", self.target_weight)
         if self.angle_scale is not None:

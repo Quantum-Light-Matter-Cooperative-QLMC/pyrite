@@ -140,6 +140,8 @@ _RESOLUTION_INPUT_KEYS = (
     "seed",
     "E_cut_lines_keV",
     "E_cut_brem_keV",
+    # Split copies join the measured line population (#379); absent adds nothing.
+    "cone_split",
 )
 
 

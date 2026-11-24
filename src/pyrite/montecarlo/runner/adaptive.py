@@ -1031,6 +1031,12 @@ def _split_hint(case, statistics: Mapping[str, Any]) -> str:
     )
     if not rare:
         return ""
+    from ..._cone_splitting import ConeSplitting
+
+    try:  # never point at an option the case would refuse
+        ConeSplitting().validate_case(case)
+    except ValueError:
+        return ""
     return (
         " A few histories dominate the sample; if they are detector-cone electrons, "
         "the experimental Numerics(cone_split=ConeSplitting()) may help (#379)."

@@ -1122,6 +1122,24 @@ def test_replay_refuses_a_recorded_axis_short_of_todays_requirement():
     check_recorded_line_axis({"name": "fixed"}, np.linspace(1.0, 2.0, 3), side)
 
 
+def test_cache_key_separates_split_from_analog_cases():
+    """A detector-cone split case never reuses an analog grid, or the reverse (#379).
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    from pyrite._cone_splitting import ConeSplitting
+    from pyrite.montecarlo.runner import cxr_grid
+
+    analog = _silicon_case(100.0)
+    split = {**analog, "cone_split": ConeSplitting(cone_factor=1.0).to_dict()}
+    keys = [
+        cxr_grid._policy_cache_key(case["line_grid_policy"], case, (), observation=False)[0]
+        for case in (analog, split, {**analog, "cone_split": None})
+    ]
+    assert keys[0] != keys[1]
+    assert keys[0] == keys[2]
+
+
 def test_measured_cache_key_separates_mosaic_from_perfect_crystals():
     """A mosaic case's uncovered stop is never served to a perfect crystal (#1243).
 

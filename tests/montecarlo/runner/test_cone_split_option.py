@@ -214,6 +214,48 @@ def test_brem_repair_replays_the_split_copies():
     np.testing.assert_allclose(repaired, live["brem_wide"], rtol=1e-12)
 
 
+def test_selection_continuum_folds_the_split_copies():
+    """The selector's continuum share nets against copy-folded line yields (#379)."""
+    from pyrite.montecarlo.runner.lattice_share import SelectionContinuum
+
+    case = {**_split(), "Ne": 24, "Ne_brem": 24}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ConeSplitLowGainWarning)
+        segs = runner._transport_case(case)["segs"]
+    assert segs["cone_split"]["weight"].size > 0
+    primaries = {k: v for k, v in segs.items() if k != "cone_split"}
+    n_hat = np.array([0.0, 0.0, -1.0])
+
+    def background(segments):
+        return SelectionContinuum(case, segments, n_hat, None, (1e3, 2e4), Ne=24).background(None)
+
+    split, analog = background(segs), background(primaries)
+    assert split > analog > 0.0
+
+
+def test_case_stores_one_canonical_split_record():
+    """A partial record normalizes to its full policy, model included (#379)."""
+    from pyrite.campaign.profiles import case_content_key
+    from pyrite.montecarlo.case import Case
+
+    partial = {"cone_factor": 1.0, "min_energy_fraction": 0.0, "target_weight": 0.05}
+    sparse = Case(**{**_base(), "cone_split": partial})
+    full = Case(**{**_base(), "cone_split": POLICY.to_dict()})
+    assert sparse["cone_split"] == POLICY.to_dict()
+    assert sparse["cone_split"]["model"] == CONE_SPLIT_MODEL
+    assert case_content_key(sparse) == case_content_key(full)
+
+
+def test_policy_accepts_numpy_scalars_as_python_numbers():
+    policy = ConeSplitting(
+        cone_factor=np.float32(4.0),
+        target_weight=np.float64(1e-3),
+        max_copies_per_electron=np.int64(8),
+    )
+    assert type(policy.cone_factor) is float and type(policy.max_copies_per_electron) is int
+    assert policy == ConeSplitting(cone_factor=4.0, max_copies_per_electron=8)
+
+
 def test_split_spectrum_adds_weighted_copies():
     n = 24
     case = {**_split(), "Ne": n, "Ne_brem": n}
@@ -342,8 +384,12 @@ def test_statistics_limited_names_split_when_few_histories_dominate(guard, hinte
 
     passes = {"max_electron_share": True, "effective_sample_size": True, "stability": True}
     statistics = {"statistics": {"cxr": {"passes": {**passes, guard: False}}}}
-    assert bool(_split_hint(_base(), statistics)) is hinted
+    admissible = {**_base(), "E0_keV": 5000.0}  # the default 8/gamma0 cone fits
+    assert bool(_split_hint(admissible, statistics)) is hinted
     assert _split_hint(_split(), statistics) == ""
+    # Never named where the default option would refuse the case.
+    assert _split_hint({**admissible, "elastic_model": "mott"}, statistics) == ""
+    assert _split_hint(_base(), statistics) == ""  # 30 keV: half-angle past pi/2
 
 
 def test_weight_ladder_is_unbiased_and_lands_on_powers_of_two():

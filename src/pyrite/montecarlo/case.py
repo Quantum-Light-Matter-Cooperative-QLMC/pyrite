@@ -818,7 +818,10 @@ class Case(Mapping[str, Any]):
             return
         from .._cone_splitting import ConeSplitting
 
-        ConeSplitting.from_dict(self.cone_split).validate_case(self)
+        policy = ConeSplitting.from_dict(self.cone_split)
+        policy.validate_case(self)
+        # One identity per policy: a partial record stores its defaults and model.
+        object.__setattr__(self, "cone_split", policy.to_dict())
 
     def _validate_line_roulette(self) -> None:
         if isinstance(self.line_roulette, _Absent):
