@@ -583,3 +583,16 @@ meet the SB86 node, and CI run 44872144036 showed it moving. Its
 path +4.1e-5 relative, the leading flight samples ≤ 4e-9, converted photon
 energies ≤ 7e-4. Rows, event kinds, electron IDs and launch kinds are
 unchanged, and so is every tolerance.
+
+## Dechanneling margin 4.125 ψ_c generation (#522)
+
+The default dechanneling margin moved from a fixed 300 eV to
+`(a² − 1) D` with `a = 4.125` (`CHANNELING_MODEL` v11 → v12). Only the
+`channeling_demo`/`channeling` identity hashes were re-pinned
+(`pyrite-dev test-suite identity-pins --update-pins`), and
+`channeling.json` records the resolved margin (340.1898 eV). In
+`outputs.json` only `channeling` changes: total path +2.8e-6 relative, the
+free/overflow fates (the handoff moves with the cut) and the characteristic
+and bremsstrahlung spectra (≤ 9e-4 relative), regenerated on CPU/NumPy fp64
+with the synthetic Mott tables. Rows, other families and every tolerance are
+unchanged.
