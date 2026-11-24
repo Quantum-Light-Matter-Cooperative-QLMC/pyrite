@@ -31,6 +31,7 @@ _FIELDS = (
     "host_exec",
     "nice",
     "transfer_host",
+    "extras",
     "description",
 )
 

@@ -98,9 +98,12 @@ class ExecutionProfile:
             if (
                 self.backend == "dask"
                 and self.resources.gpu_count
-                and (self.dask is None or self.dask.cluster != "existing")
+                and (self.dask is None or self.dask.cluster == "local")
             ):
-                raise ValueError("Dask GPU requires a configured external scheduler")
+                raise ValueError(
+                    "Dask GPU requires an external scheduler or SLURM workers "
+                    "with a site GPU directive"
+                )
 
 
 def execution_profile_from_dict(name: str, document: dict[str, Any]) -> ExecutionProfile:

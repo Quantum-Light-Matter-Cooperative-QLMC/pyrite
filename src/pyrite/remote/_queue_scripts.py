@@ -217,13 +217,18 @@ def _uv_sync_block(once: bool = False) -> str:
     Delete ``$JOBDIR/.synced`` to force a re-sync (e.g. after a mid-chain
     dependency bump).
 
+    The target's ``extras`` (for example ``dask``) are synced beside the
+    vendor extra so the exact sync keeps them in a shared venv.
+
     AMD targets build CuPy from source against the node's ROCm toolchain, which
     ``CUPY_INSTALL_USE_HIP=1`` selects; NVIDIA installs the prebuilt wheel."""
     vendor = config.remote_gpu_vendor()
     build_env = "CUPY_INSTALL_USE_HIP=1 " if vendor == "amd" else ""
+    # An exact sync removes undeclared extras; the target's ``extras`` keep them.
+    extras = "".join(f" --extra {name}" for name in (vendor, *config.remote_extras()))
     sync = f"""uv_sync_start_ns=$(date +%s%N)
 uv_sync_rc=0
-{build_env}{config.shell_remote_uv()} sync --package pyrite-mc --no-default-groups --extra {vendor} >> "$JOBDIR/log" 2>&1 || uv_sync_rc=$?
+{build_env}{config.shell_remote_uv()} sync --package pyrite-mc --no-default-groups{extras} >> "$JOBDIR/log" 2>&1 || uv_sync_rc=$?
 uv_sync_elapsed_ms=$((($(date +%s%N) - uv_sync_start_ns) / 1000000))
 printf 'timing: uv sync %d.%03d s\\n' \
   "$((uv_sync_elapsed_ms / 1000))" "$((uv_sync_elapsed_ms % 1000))" >> "$JOBDIR/log"

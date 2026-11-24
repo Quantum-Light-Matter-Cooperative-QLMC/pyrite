@@ -16,8 +16,8 @@ cluster before relying on multi-node results or scaling estimates.
 | Normal local run | omit the flag, or `local` | One workstation/node; retains PyRITE's usual CPU/GPU scheduling |
 | Native SLURM | `slurm-cpu` or a custom SLURM profile | Independent cases as job-array tasks; no Dask required |
 | Local Dask | `dask-local` | Test Dask dispatch on one machine |
-| Dask on SLURM | custom Dask profile with `cluster = "slurm"` | Provision CPU Dask workers using `dask-jobqueue` |
-| Existing Dask scheduler | custom Dask profile with `cluster = "existing"` | Join an available CPU or properly isolated GPU cluster |
+| Dask on SLURM | custom Dask profile with `cluster = "slurm"` | Provision packed CPU or one-GPU Dask worker jobs with `dask-jobqueue` |
+| Existing Dask scheduler | custom Dask profile with `cluster = "existing"` | Join a scheduler you started, by address or scheduler file |
 
 The separately configured `pyrite run --remote` workflow synchronizes to an
 SSH host and submits jobs through that host's SLURM setup. **Do not combine
@@ -48,8 +48,8 @@ Distributed runs require:
   scheduler-to-worker TCP connectivity for Dask.
 - A Python executable importable on workers, available physics data and enough
   allocated RAM/VRAM for each work unit. The coordinating process must remain
-  running until work finishes; run it in an appropriate allocation when site
-  policy requires one.
+  running until work finishes; on an HPC site run it as a compute-node job
+  (see [Coordinator job](#coordinator-job)), never on a login node.
 
 ## Run and inspect a profile
 
@@ -102,71 +102,278 @@ For a native **GPU** array, use a separate profile with `gpu_count = 1`,
 `gres`, such as `gpu:1`. One GPU is supported per work unit. SLURM and the
 site's device settings must enforce real hardware isolation.
 
-### Dask with SLURM-provisioned CPU workers
+## Dask on an HPC cluster
 
-Dask can request CPU worker allocations through `dask-jobqueue`:
+The Dask backend moves whole work units, so it changes neither physics
+identity nor numerical output. Choose one of three deployment modes with
+`cluster` in the profile's `dask` table:
+
+| `cluster` | Scheduler | Workers | Use it when |
+| --- | --- | --- | --- |
+| `"local"` | Coordinator process | Local processes | Testing Dask dispatch on one node |
+| `"slurm"` | Coordinator process, run as a compute-node job | Worker jobs that dask-jobqueue submits with `sbatch` | Compute nodes may run `sbatch` |
+| `"existing"` | You start it, or the site does | You start them (for example with `srun`) | `sbatch` is not allowed from compute nodes, or workers need a custom launcher such as dask-cuda |
+
+A single-allocation batch runner (`SLURMRunner`, `dask-mpi`) is not supported.
+
+### Worker packing and profile fields
+
+With `cluster = "slurm"`, each worker **job** holds the profile's `resources`:
+`cpu_cores` cores and `memory_bytes` of memory (`4GiB` when unset and the site
+config gives none). A CPU job runs `cpu_cores` single-threaded Dask worker
+processes. Each process runs one work unit at a time, serially, with BLAS
+threads limited to one, so `workers` jobs run `workers × cpu_cores` work units
+at once. dask-jobqueue divides the job's memory evenly among its processes.
+`--execution-plan` reports `worker_processes_per_allocation`, and each run's
+`execution.json` records the same layout under `worker_topology`.
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `cluster` | `"local"` | `"local"`, `"slurm"`, or `"existing"` |
+| `workers` | `2` | `slurm`: SLURM worker jobs (the adaptive minimum); `local`: worker processes; `existing`: planning value only |
+| `max_workers` | `workers` | Adaptive maximum, in the same unit as `workers` |
+| `adaptive` | `false` | `slurm` only: scale between `workers` and `max_workers` jobs with load |
+| `cases_per_task` | `1` | Cases per work unit |
+| `max_in_flight` | 2 × worker processes | Bound on queued plus running Futures |
+| `partition` | site config | SLURM partition (dask-jobqueue `queue`) |
+| `walltime` | site config | Worker-job time limit, `[days-]HH:MM:SS` |
+| `config_name` | `"slurm"` | dask-jobqueue config section to read site settings from |
+| `jobqueue` | `{}` | `SLURMCluster` keyword arguments forwarded verbatim |
+| `scheduler_address` | none | `existing` only: `tcp://host:port` |
+| `scheduler_file` | none | `existing` only: path to a scheduler JSON file on shared disk |
+
+A fixed-size SLURM cluster keeps `workers` jobs: it adapts between equal
+bounds, so a job that leaves at its walltime is replaced. Profiles written
+before this layout still parse. A profile without `walltime` now uses the
+site config's walltime (dask-jobqueue's built-in default is 30 minutes)
+instead of one hour, so set `walltime` explicitly to keep the old limit.
+
+### Site settings
+
+Site details stay in dask-jobqueue's own configuration, not in new PyRITE
+fields. Each setting resolves in this order:
+
+1. PyRITE fields: `resources` (cores, processes, memory), `partition`, `walltime`.
+2. The profile's `jobqueue` table.
+3. The dask config section `jobqueue.<config_name>` from `~/.config/dask/*.yaml`
+   (user), `/etc/dask/*.yaml` (admin) or `$DASK_CONFIG`.
+4. dask-jobqueue's built-in defaults.
+
+`jobqueue` keys are `SLURMCluster` keyword names; hyphenated config spellings
+such as `job-extra-directives` work too. Before anything is staged, PyRITE
+checks the keys against the installed dask-jobqueue and refuses `cores`,
+`processes` and `config_name`, which PyRITE sets itself. A list given in
+`jobqueue` replaces the config section's list rather than extending it.
+
+A starter `~/.config/dask/jobqueue.yaml` overrides only the keys a site needs;
+dask merges it with the built-in `jobqueue.slurm` section:
+
+```yaml
+jobqueue:
+  slurm:
+    account: MY_ACCOUNT
+    walltime: "04:00:00"
+    python: /shared/pyrite/.venv/bin/python    # same path on every node
+    interface: null           # e.g. ib0 if the default route is not the cluster network
+    local-directory: /tmp     # node-local disk for worker spill files
+    log-directory: /shared/pyrite-output/dask-logs
+    death-timeout: 120
+    job-extra-directives:
+      - "--qos=MY_QOS"
+    job-script-prologue:
+      - "cd /shared/pyrite"
+      - "export PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1"
+```
+
+dask-jobqueue reads every key of a section named by `config_name`, so build
+a named section (for one of several partitions, say) from a full copy of the
+`jobqueue.slurm` section in dask-jobqueue's `jobqueue.yaml`.
 
 ```toml
-[execution.cpu-dask]
+[execution.site-dask]
 backend = "dask"
 max_attempts = 2
 
-[execution.cpu-dask.resources]
-cpu_cores = 8
-memory_bytes = "32GiB"
+[execution.site-dask.resources]
+cpu_cores = 32
+memory_bytes = "64GiB"
 accelerator = "cpu"
 
-[execution.cpu-dask.dask]
+[execution.site-dask.dask]
 cluster = "slurm"
-partition = "cpu"                  # adapt to your site
-walltime = "01:00:00"
-workers = 2
-max_workers = 6
-adaptive = true
-cases_per_task = 2
-max_in_flight = 12
+partition = "MY_PARTITION"
+walltime = "08:00:00"
+workers = 4
+cases_per_task = 1
+# config_name = "mysite"           # a named dask-jobqueue section
+# [execution.site-dask.dask.jobqueue]  # or per-profile keywords
+# job_extra_directives = ["--constraint=avx512"]
 ```
 
+### Worker lifetime
+
+Unless `worker_extra_args` (from `jobqueue` or the config section) already
+has `--lifetime`, PyRITE adds `--lifetime` and `--lifetime-stagger` from the
+worker walltime. The stagger is 5 % of walltime, at most 5 minutes. Workers
+retire 10 % of walltime (between 1 and 15 minutes) plus the stagger before
+SLURM's limit: an 8-hour job gets a 7 h 40 min lifetime and a 5-minute stagger.
+Walltimes under about 2 minutes get no lifetime. A retiring worker hands its
+running unit back to the scheduler, which runs it again elsewhere, and the
+cluster submits a replacement job. Cases a worker already published are kept.
+
+### Coordinator job
+
+With `cluster = "slurm"` the Dask scheduler runs inside the coordinating
+`pyrite run` process. Run it as a compute-node batch job, never on a login
+node; its walltime bounds the whole run. If it ends early, submit the same
+script again: `pyrite run` resumes, and published case artifacts are reused.
+
+<!-- verify: skip (sbatch batch script template, submitted with sbatch) -->
 ```bash
-pyrite run standard -m hopg --execution cpu-dask \
-  --execution-config execution.toml
+#!/bin/bash
+#SBATCH --job-name=pyrite-coordinator
+#SBATCH --account=MY_ACCOUNT
+#SBATCH --partition=MY_PARTITION
+#SBATCH --time=24:00:00
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=8G
+#SBATCH --output=coordinator-%j.log
+set -euo pipefail
+cd /shared/pyrite                       # same absolute path on every node
+export PYRITE_MC_BACKEND=cpu
+uv run --no-sync pyrite run standard -m hopg \
+  --execution site-dask --execution-config execution.toml
 ```
 
-This mode creates a Dask scheduler in the **coordinator process**, then
-launches SLURM CPU workers. The workers must be able to connect back to that
-scheduler; cluster network policies may require the coordinator to run on a
-compute node instead of a login node. Automatic GPU worker provisioning is
-**not supported** here.
+The coordinator needs 1-2 cores; the work runs in the worker jobs. Each
+worker job counts against the same per-user job and CPU limits as the
+coordinator.
 
-### Dask with an existing scheduler (CPU or GPU)
+### Existing scheduler
+
+Use `cluster = "existing"` when compute nodes may not call `sbatch`, or to
+start workers yourself. Start a scheduler that writes a scheduler file on
+shared disk, start workers against the same file, then point the profile at it:
+
+<!-- verify: skip (site-side dask scheduler/worker launch, not a pyrite CLI invocation) -->
+```bash
+# inside one allocation, e.g. sbatch --nodes=3 --ntasks-per-node=1 --cpus-per-task=32
+srun --ntasks=1 --nodes=1 dask scheduler --scheduler-file /shared/dask/scheduler.json &
+srun --ntasks=2 --nodes=2 dask worker --scheduler-file /shared/dask/scheduler.json \
+  --nworkers "$SLURM_CPUS_PER_TASK" --nthreads 1 --local-directory /tmp &
+```
 
 ```toml
-[execution.existing-dask]
+[execution.manual-dask]
 backend = "dask"
 max_attempts = 3
 
-[execution.existing-dask.resources]
-cpu_cores = 4
-memory_bytes = "8GiB"
+[execution.manual-dask.resources]
+cpu_cores = 1
 accelerator = "cpu"
 
-[execution.existing-dask.dask]
+[execution.manual-dask.dask]
 cluster = "existing"
-scheduler_address = "tcp://scheduler.internal:8786"  # site-specific
-workers = 2
-cases_per_task = 2
-max_in_flight = 4
+scheduler_file = "/shared/dask/scheduler.json"   # or scheduler_address = "tcp://host:8786"
+max_in_flight = 128
 ```
 
-Use the same CLI pattern with `--execution existing-dask`.
+Each existing worker should run one work unit at a time per thread; start
+them with `--nthreads 1`. `workers` is a planning value here, so set
+`max_in_flight` to about twice the worker processes actually available.
 
-GPU Dask requires a **preconfigured existing scheduler**. Change the resource
-request to `gpu_count = 1` and `accelerator = "cuda"` or `"rocm"`, configure
-workers with `GPU=1` Dask resources, and ensure each worker actually receives
-an isolated device (`CUDA_VISIBLE_DEVICES`, `ROCR_VISIBLE_DEVICES`, or
-`HIP_VISIBLE_DEVICES`). A Dask resource label alone does **not** isolate a GPU.
-PyRITE runs the existing single-GPU numerical path in each GPU task, without
-adding an outer multiprocessing pool.
+### GPU workers
+
+`cluster = "slurm"` provisions one-GPU worker jobs when the site's GPU
+directive is in `job_extra_directives`. PyRITE never writes GRES syntax,
+because sites spell it differently (`gpu:1`, `gpu:a100:1`, `--gpus-per-node`).
+Each GPU job runs one Dask worker labelled `GPU=1`, and SLURM sets its
+`CUDA_VISIBLE_DEVICES`:
+
+```toml
+[execution.gpu-dask.resources]
+cpu_cores = 8
+memory_bytes = "32GiB"
+gpu_count = 1
+accelerator = "cuda"        # or "rocm"
+
+[execution.gpu-dask.dask]
+cluster = "slurm"
+partition = "MY_GPU_PARTITION"
+walltime = "04:00:00"
+workers = 2
+
+[execution.gpu-dask.dask.jobqueue]
+job_extra_directives = ["--gres=gpu:1", "--constraint=A100|H200"]
+job_script_prologue = ["cd /shared/pyrite", "export PYRITE_MC_BACKEND=cuda"]
+```
+
+A GPU profile whose effective directives request no GPU (`--gres`, `--gpus*`)
+fails before staging. Every GPU worker also refuses to start work without
+explicit device visibility (`CUDA_VISIBLE_DEVICES`, `ROCR_VISIBLE_DEVICES`,
+or `HIP_VISIBLE_DEVICES`); a Dask resource label alone does not isolate a
+GPU. For several GPUs per node, start
+[dask-cuda](https://docs.rapids.ai/api/dask-cuda/stable/) workers yourself
+(`dask cuda worker --scheduler-file FILE --resources GPU=1`) and use the
+existing-scheduler mode. PyRITE runs the existing single-GPU numerical path
+in each GPU task, without an outer multiprocessing pool.
+
+### Site checklist
+
+- **Account and QoS limits:** `sacctmgr -nP show assoc user=$USER format=account,qos`,
+  then `sacctmgr show qos NAME` for running-job, CPU, GPU and walltime caps.
+  Keep `workers × cpu_cores` plus the coordinator within them.
+- **`sbatch` from compute nodes:** from a short allocation, run
+  `sbatch --test-only --wrap=true`. If refused, use the existing-scheduler mode.
+- **Network:** workers must reach the scheduler port on the coordinator's
+  node. Set `interface` when the default interface is not the cluster network.
+- **Local disk:** set `local-directory` to node-local storage, not shared home.
+- **Walltime:** match the partition's `MaxTime`; lifetimes derive from it.
+- **Shared paths and Python:** the checkout, `python`, physics tables and
+  output directory at the same absolute paths on every node. Build the venv
+  inside a compute-node job.
+
+### Worked example: Hoffman2
+
+On UCLA's Hoffman2 (2026-11), compute nodes may call `sbatch`, workers reach a
+compute-node scheduler over the default interface, and worker jobs connected
+about 65-75 s after submission. The per-user `campus24` QoS on the `campus`
+partition allows 1024 CPUs, 100 running jobs and 24 hours, so 30 jobs of 32
+cores plus a 2-core coordinator fit:
+
+```yaml
+# ~/.config/dask/jobqueue.yaml
+jobqueue:
+  slurm:
+    account: MY_ACCOUNT
+    python: /u/home/USER/pyrite/.venv/bin/python
+    local-directory: /tmp
+    job-script-prologue:
+      - ". /u/local/Modules/default/init/modules.sh"
+      - "cd /u/home/USER/pyrite"
+      - "export PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1"
+```
+
+```toml
+[execution.hoffman2.resources]
+cpu_cores = 32
+memory_bytes = "64GiB"
+accelerator = "cpu"
+
+[execution.hoffman2.dask]
+cluster = "slurm"
+partition = "campus"
+walltime = "23:00:00"
+workers = 30
+```
+
+Submit the coordinator script above with `--partition=campus` and
+`--time=24:00:00`. Hoffman2 login nodes are for editing and submission only:
+build the environment (`uv sync --extra dask`) inside a compute-node job, and
+copy data through the `hoffman2-dtn` transfer node. A `pyrite remote` target
+for the same checkout needs `--extras dask` (see
+[remote targets](../guides/running-on-a-cluster.md#set-up-a-new-remote-host)), or each
+remote job's exact `uv sync` removes Dask from the shared environment.
 
 ## Checkpoints, retries and outputs
 
