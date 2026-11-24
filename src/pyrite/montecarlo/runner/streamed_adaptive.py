@@ -27,6 +27,8 @@ rescores a host copy of the chunk (:func:`commit_once`).
 """
 
 from collections.abc import Mapping
+from contextlib import nullcontext
+from numbers import Integral
 from typing import Any
 
 #: Score explicit-grid cases in the monitored pass (#1397).
@@ -102,7 +104,13 @@ class MonitoredScoringSink:
     chunks are therefore joined (:func:`.block_transport.merge_electron_blocks`,
     the retained route's join) into blocks of at least that many electrons
     before :meth:`add`. A joined block never straddles the brem freeze: the
-    buffer is scored first when the next chunk lies on the other side.
+    buffer is scored first when the next chunk lies on the other side. A
+    memory-sized run (:class:`.stream_sizing.MemoryBlockSizer`) has no fixed
+    span and scores each chunk alone.
+
+    ``coverage`` (the run's line-data-coverage list, when set) is cleared at
+    each pass: an energy-range replay discards the earlier pass's scorer, so
+    its records must not count twice.
     """
 
     def __init__(self, case, limit, block_electrons=None):
@@ -112,7 +120,8 @@ class MonitoredScoringSink:
         self.case = _fixed_template(case, self.count)
         E_grid, E_brem, _, n_hat, groove = _case_geometry(self.case)
         self.inputs = dict(E_grid=E_grid, E_brem=E_brem, n_hat=n_hat, groove=groove)
-        self.span = block_electrons if isinstance(block_electrons, int) else None
+        self.span = int(block_electrons) if isinstance(block_electrons, Integral) else None
+        self.coverage: list | None = None
         self.scorer: Any = None
         self.passes = 0
         self._monitor: Any = None
@@ -137,6 +146,8 @@ class MonitoredScoringSink:
         self.passes += 1
         self._monitor = monitor
         self._buffer, self._buffered, self._seen = [], 0, 0
+        if self.coverage is not None:
+            self.coverage.clear()
 
     def __call__(self, block) -> None:
         if self.span is None:
@@ -231,9 +242,13 @@ def run_adaptive_streamed(case, block_electrons, *, transport_core="auto", spill
 
         _ensure_pool_limit()
         sink = MonitoredScoringSink(case, _max_histories(case), block_electrons)
-        with collect_line_data_coverage() as line_coverage:
-            fixed, sampling, tp = _monitored_pass(case, transport_core, sink)
-            sink.finish()
+        sized = not isinstance(block_electrons, Integral)
+        # Same scoped allocator cap as the fixed streamed route.
+        with block_electrons.pool_limit() if sized else nullcontext():
+            with collect_line_data_coverage() as line_coverage:
+                sink.coverage = line_coverage
+                fixed, sampling, tp = _monitored_pass(case, transport_core, sink)
+                sink.finish()
         out = sink.result(fixed, tp["segs"], line_coverage)
         out.update({key: tp[key] for key in RECOVERY_KEYS if key in tp})
         transports = sink.passes
