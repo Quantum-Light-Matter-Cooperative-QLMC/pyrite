@@ -11,6 +11,7 @@ from ...console import config as _cli_config
 from ...console import output as _cli_core
 from ...console.outputs import output_default, output_dir, output_label
 from ...runs import scan as _scan
+from ...runs._case_failures import DEFAULT_MAX_CASE_FAILURES
 from .. import _completion as _cli_completion
 from .. import _implicit_defaults
 from .._deprecations import RetiredOption, canonical_option
@@ -146,6 +147,19 @@ def _trajectories_dir(ctx, param, value):
     default=None,
     metavar="MINUTES",
     help="Soft wall-clock budget in minutes; exit 75 if resumable work remains.",
+)
+@click.option(
+    "--max-case-failures",
+    type=click.IntRange(min=0),
+    default=DEFAULT_MAX_CASE_FAILURES,
+    show_default=True,
+    metavar="N",
+    help=(
+        "Skip up to N failing cases per material and keep running the rest; the "
+        "next failure aborts. Skipped cases are listed at the end (exit 1) and "
+        "retried on resume. 0 aborts on the first failure. Local and remote runs "
+        "only; --execution backends ignore it."
+    ),
 )
 @click.option(
     "-p",
@@ -532,6 +546,13 @@ def _run_remote(ctx, options):
             trajectories=trajectories,
             overwrite_trajectories=options["overwrite_trajectories"],
             trajectory_storage=options["trajectory_storage"],
+            # Forwarded only when given, so the box-side scan default applies otherwise.
+            max_case_failures=(
+                options["max_case_failures"]
+                if ctx.get_parameter_source("max_case_failures")
+                is click.core.ParameterSource.COMMANDLINE
+                else None
+            ),
         )
 
 
@@ -592,6 +613,7 @@ _LOCAL_RUN_PARAMETER_NAMES = (
     "n_families",
     "checkpoint_dir",
     "max_minutes",
+    "max_case_failures",
     "performance_dir",
     "performance_interval",
     "progress_file",

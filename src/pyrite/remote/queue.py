@@ -225,6 +225,7 @@ def start_queue(
     overwrite_trajectories=False,
     trajectory_storage=None,
     allow_physics_fallback=False,
+    max_case_failures=None,
     _return_submission=False,
 ):
     """Submit a material queue to SLURM. Returns its job id.
@@ -254,6 +255,9 @@ def start_queue(
     bounded serial cProfile phase; ``cpu_only`` runs that phase alone.
     ``py_spy`` samples each material's uncached session with py-spy and stores a
     speedscope profile beside the performance NDJSON.
+
+    ``max_case_failures`` forwards ``--max-case-failures`` to each material's
+    scan; ``None`` (default) keeps the scan's own default.
     """
     transport._check_materials(materials)
     transport._check_shell_tokens(
@@ -321,6 +325,7 @@ def start_queue(
             recompute,
             **capture_options,
             allow_physics_fallback=allow_physics_fallback,
+            max_case_failures=max_case_failures,
             **physics_options,
         )
         time_limit = str(max(1, math.ceil(chunk_minutes * 3)))  # minutes: hard backstop
@@ -349,6 +354,7 @@ def start_queue(
             py_spy=py_spy,
             **capture_options,
             allow_physics_fallback=allow_physics_fallback,
+            max_case_failures=max_case_failures,
             **physics_options,
         )
         time_limit = config.SLURM_TIME

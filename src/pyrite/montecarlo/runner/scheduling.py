@@ -266,6 +266,7 @@ def run_cases(
     transport_only=False,
     trajectory_capture=None,
     observation_directions=None,
+    on_case_error=None,
 ):
     """
     Run typed cases or compatibility mappings through ``run_case``.
@@ -312,6 +313,14 @@ def run_cases(
         ``(N, 3)`` array of sample-frame physical-detector directions. A case
         with directions also returns ``out["directional"]`` evaluated on the
         same transport as its scalar arrays, on every scheduling branch.
+    on_case_error
+        Optional ``on_case_error(index, case, exc)`` called in the driver
+        process when one case's transport or spectrum raises an
+        :class:`Exception`. A true return skips that case (its slot stays
+        ``None``, the callback does not fire) and the run continues; a false
+        return or an exception it raises aborts the run. Callback errors, a
+        broken worker pool and :class:`BaseException` always abort. ``None``
+        (default) aborts on the first failure.
 
     Returns
     -------
@@ -432,6 +441,7 @@ def run_cases(
         trajectory_capture=trajectory_capture,
         observation_directions=observation_directions,
         fallback_reason=fallback_reason,
+        on_case_error=on_case_error,
     )
 
     # ---- GPU: pipeline CPU transport (worker pool) behind the serial GPU ------
@@ -571,6 +581,7 @@ class _CaseRun:
         trajectory_capture,
         observation_directions,
         fallback_reason,
+        on_case_error=None,
     ):
         self.cases = cases
         self.n = len(cases)
@@ -587,6 +598,7 @@ class _CaseRun:
         self.transport_only = transport_only
         self.observation_directions = observation_directions
         self.fallback_reason = fallback_reason
+        self.on_case_error = on_case_error
         # Passed only when requested so capture-free calls keep their exact shape.
         self.capture_kw = (
             {} if trajectory_capture is None else {"trajectory_capture": trajectory_capture}
@@ -636,6 +648,14 @@ class _CaseRun:
             self.callback(i, self.cases[i], out)
         if not self.keep_results:
             self.results[i] = None
+
+    def skip_failed(self, i, exc):
+        """Whether ``on_case_error`` absorbs case ``i``'s compute failure."""
+        from concurrent.futures.process import BrokenProcessPool
+
+        if self.on_case_error is None or isinstance(exc, BrokenProcessPool):
+            return False
+        return bool(self.on_case_error(i, self.cases[i], exc))
 
     def stop_requested(self):
         return self.should_stop is not None and self.should_stop()
@@ -689,8 +709,13 @@ class _CaseRun:
 
                 self.activity("serial_case", i, in_flight_case_count=1)
 
-                with self.transport_progress(i):
-                    out = self.serial_case(i, keep_segments_on_device)
+                try:
+                    with self.transport_progress(i):
+                        out = self.serial_case(i, keep_segments_on_device)
+                except Exception as exc:
+                    if not self.skip_failed(i, exc):
+                        raise
+                    continue
 
                 # Both run_case routes report timing; the device-resident one
                 # (CUDA transport) used to skip this and emitted none.
@@ -761,22 +786,26 @@ class _CaseRun:
                     transport_prefetch_count=prefetch,
                 )
                 tw0 = perf_counter() if self.timing is not None else 0.0
-                tp = inflight.pop(i).result()
-                wait_seconds = perf_counter() - tw0 if self.timing is not None else None
-
                 j = i + prefetch
-                if not bounded and j < n:
-                    inflight[j] = submit(j)
-                self.activity(
-                    "spectrum",
-                    i,
-                    in_flight_case_count=len(inflight),
-                    transport_prefetch_count=prefetch,
-                )
-                out = self._pipeline_spectrum(i, tp, learned_spec_chunk)
-                # The payload is dead here; holding it until the next iteration
-                # rebinds tp would put prefetch + 1 of them in the driver.
-                del tp
+                try:
+                    tp = inflight.pop(i).result()
+                    wait_seconds = perf_counter() - tw0 if self.timing is not None else None
+                    if not bounded and j < n:
+                        inflight[j] = submit(j)
+                    self.activity(
+                        "spectrum",
+                        i,
+                        in_flight_case_count=len(inflight),
+                        transport_prefetch_count=prefetch,
+                    )
+                    out = self._pipeline_spectrum(i, tp, learned_spec_chunk)
+                    # The payload is dead here; holding it until the next iteration
+                    # rebinds tp would put prefetch + 1 of them in the driver.
+                    del tp
+                except Exception as exc:
+                    tp = None  # noqa: F841 -- release a failed spectrum's payload now
+                    self._skip_pipeline_failure(i, exc, inflight, submit, j, bounded)
+                    continue
                 learned_spec_chunk = _learned_spec_chunk(learned_spec_chunk, out)
                 if learned_spec_chunk is not None:
                     out["_learned_spec_chunk"] = learned_spec_chunk
@@ -789,6 +818,18 @@ class _CaseRun:
         self.activity("idle", in_flight_case_count=0, transport_prefetch_count=prefetch)
         self.report_timing("GPU-pipeline", nw=nw)
         return self.results
+
+    def _skip_pipeline_failure(self, i, exc, inflight, submit, j, bounded):
+        """Absorb case ``i``'s failure or re-raise it; then refill the window.
+
+        The successful path submits case ``j`` after its spectrum; a skipped
+        case must too, so the window stays full (bounded: one case in flight
+        unless the deadline has passed).
+        """
+        if not self.skip_failed(i, exc):
+            raise exc
+        if j < self.n and j not in inflight and not (bounded and self.should_stop()):
+            inflight[j] = submit(j)
 
     def _submit_transport(self, ex, i):
         # Worker processes are pinned to the CPU core by _worker_init; none of
@@ -840,7 +881,12 @@ class _CaseRun:
                 if fut.cancelled():
                     continue
                 i = futures[fut]
-                out = fut.result()
+                try:
+                    out = fut.result()
+                except Exception as exc:
+                    if not self.skip_failed(i, exc):
+                        raise
+                    continue
                 self.collect_timing(i, out)
                 self.deliver(i, out)
                 if not stopped and self.stop_requested():

@@ -60,6 +60,32 @@ def test_run_click_forwards_allow_physics_fallback(monkeypatch):
     assert seen["allow_physics_fallback"] is True
 
 
+def test_run_click_forwards_max_case_failures(monkeypatch):
+    seen = _capture(monkeypatch, scan, "run")
+    result = invoke(scan_cli.command, ["standard", "-m", "hopg", "--max-case-failures", "0"])
+    assert_clean_result(result)
+    assert seen["max_case_failures"] == 0
+
+
+def test_run_click_rejects_negative_max_case_failures(monkeypatch):
+    _capture(monkeypatch, scan, "run")
+    result = invoke(scan_cli.command, ["standard", "-m", "hopg", "--max-case-failures", "-1"])
+    assert result.exit_code == 2
+    assert "--max-case-failures" in result.stderr
+
+
+def test_run_command_value_error_is_a_runtime_error_not_a_target_error(monkeypatch):
+    def refuse(_args):
+        raise ValueError("measured line bandwidth may truncate the line yield")
+
+    monkeypatch.setattr(scan, "run", refuse)
+    result = invoke(scan_cli.command, ["standard", "-m", "hopg"])
+    assert result.exit_code == 1
+    assert "--target" not in result.stderr
+    assert "Usage:" not in result.stderr
+    assert "measured line bandwidth may truncate" in result.stderr
+
+
 def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch, tmp_path):
     seen = _capture(monkeypatch, scan, "run")
     result = invoke(
@@ -78,6 +104,7 @@ def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch, tmp
         "beam_uvw": None,
         "checkpoint_dir": str(tmp_path / "pyrite-output" / "checkpoints"),
         "max_minutes": None,
+        "max_case_failures": 5,
         "performance_profile": None,
         "performance_interval": 5.0,
         "performance_dir": None,

@@ -153,3 +153,14 @@ def test_queue_fallback_policy_is_forwarded(chunked):
     assert "--allow-physics-fallback" in allowed
     assert "--require elsepa" in strict
     assert "--require elsepa" in allowed
+
+
+@pytest.mark.parametrize("chunked", [False, True])
+def test_queue_forwards_only_an_explicit_case_failure_budget(chunked):
+    def build(**kwargs):
+        if chunked:
+            return _queue_scripts._chunked_queue_script("j", ["hopg"], False, None, 10, **kwargs)
+        return _queue_scripts._queue_script("j", ["hopg"], False, None, **kwargs)
+
+    assert "--max-case-failures" not in build()
+    assert "--max-case-failures 0" in build(max_case_failures=0)
