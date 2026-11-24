@@ -495,38 +495,32 @@ class SelectionContinuum:
         return [(str(el), float(n)) for el, n in abs_layers[layer][2]]
 
     def _yield(self, layer, tables, tabled_only):
-        import numpy as np
+        from functools import partial
 
-        from ..._backend import _to_cpu
-        from .cone_split_strata import fold_copies
-        from .emission import _layer_brem_from_segments
+        from .part_map import map_parts
 
         segments, n_hat, abs_layers, groove, Ne = self._scene
-
-        def density(rows, n):
-            return _layer_brem_from_segments(
-                rows,
-                self.grid,
-                self.case,
-                n_hat,
-                abs_layers,
-                layer=layer,
-                tables=tables,
-                tabled_only=tabled_only,
-                groove=groove,
-                Ne=n,
-            )
-
+        # A module-level partial, not a closure over ``self``: on the Dask
+        # plan task (#1395) it is shipped once per held shard, and ``self``
+        # holds the staged parts, i.e. every held shard's rows.
+        score = partial(
+            _block_yield,
+            self.grid,
+            self.weights,
+            self.case,
+            n_hat,
+            abs_layers,
+            layer,
+            tables,
+            tabled_only,
+            groove,
+            Ne,
+        )
+        parts = (lambda: [segments]) if self._parts is None else self._parts
         total = 0.0
-        for part in [segments] if self._parts is None else self._parts():
-            primaries = {k: v for k, v in part.items() if k != "cone_split"}
-            values = density(primaries, Ne)
-            if part.get("cone_split") is not None:
-                # The line yields this share nets against fold copies too (#379).
-                n_norm = int(part["Ne"] if Ne is None else Ne)
-                values = values + fold_copies(part, n_norm, density)
-            total += float(np.asarray(_to_cpu(values), dtype=float) @ self.weights)
-            del part, primaries, values  # release staged rows before the next block
+        # In process, or on the workers holding the parts; summed in part order.
+        for value in map_parts(parts, score):
+            total += value
         return total
 
     def background(self, layer: int | None) -> float:
@@ -541,6 +535,39 @@ class SelectionContinuum:
             self.case, layer, self._composition(layer), self._tables, list(hkls)
         )
         return 0.0 if tables is None else self._yield(layer, tables, True)
+
+
+def _block_yield(
+    grid, weights, case, n_hat, abs_layers, layer, tables, tabled_only, groove, Ne, part
+) -> float:
+    """One staged block's in-band continuum yield for :meth:`SelectionContinuum._yield`."""
+    import numpy as np
+
+    from ..._backend import _to_cpu
+    from .cone_split_strata import fold_copies
+    from .emission import _layer_brem_from_segments
+
+    def density(rows, n):
+        return _layer_brem_from_segments(
+            rows,
+            grid,
+            case,
+            n_hat,
+            abs_layers,
+            layer=layer,
+            tables=tables,
+            tabled_only=tabled_only,
+            groove=groove,
+            Ne=n,
+        )
+
+    primaries = {k: v for k, v in part.items() if k != "cone_split"}
+    values = density(primaries, Ne)
+    if part.get("cone_split") is not None:
+        # The line yields this share nets against fold copies too (#379).
+        n_norm = int(part["Ne"] if Ne is None else Ne)
+        values = values + fold_copies(part, n_norm, density)
+    return float(np.asarray(_to_cpu(values), dtype=float) @ weights)
 
 
 def lattice_share_record(case: Mapping[str, Any], n_layers: int) -> dict | None:

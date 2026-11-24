@@ -13,6 +13,7 @@ selection) and their spectra add in shard order. The result must
 Seeds are fixed by the sweep.
 """
 
+import functools
 import pickle
 
 import numpy as np
@@ -25,7 +26,7 @@ from pyrite.montecarlo.realization import (
     bind_realization,
     normalize_realization,
 )
-from pyrite.montecarlo.runner import reflection_cutoff
+from pyrite.montecarlo.runner import lattice_share, reflection_cutoff
 from pyrite.montecarlo.runner.history_shards import (
     run_case_from_shards,
     shard_ranges,
@@ -216,6 +217,7 @@ def test_distributed_selection_pilots_give_the_same_plan(monkeypatch):
     import cloudpickle
 
     from pyrite.montecarlo.runner.part_map import (
+        StagedParts,
         ordered_values,
         part_mapper,
         staged_part_result,
@@ -227,11 +229,19 @@ def test_distributed_selection_pilots_give_the_same_plan(monkeypatch):
     case = {k: v for k, v in case.items() if k != "line_grid_policy"}
     case = {**case, "reflection_selection": {**SELECTION, "automatic": True}}
     shards = _shards(case, 2)
-    calls = []
+    calls, continuum = [], []
 
     def distribute(held):
         def mapper(parts, fn):
             calls.append(len(held))
+            if isinstance(fn, functools.partial) and fn.func is lattice_share._block_yield:
+                # The continuum share ships without the held rows (#1395).
+                carried = [*fn.args, *fn.keywords.values()]
+                continuum.append(
+                    not any(
+                        isinstance(a, StagedParts) or any(a is h for h in held) for a in carried
+                    )
+                )
             shipped = cloudpickle.loads(cloudpickle.dumps((fn, held, parts.header, parts.prefix)))
             remote_fn, blocks, header, prefix = shipped
             results = [staged_part_result(remote_fn, block, header, prefix) for block in blocks]
@@ -242,6 +252,7 @@ def test_distributed_selection_pilots_give_the_same_plan(monkeypatch):
     local = resolve_shard_plan(case, lambda: iter(shards))
     remote = resolve_shard_plan(case, lambda: iter(shards), distribute=distribute)
     assert calls and set(calls) == {2}  # prefix 3 is held in shards [0, 2) and [2, 4)
+    assert continuum and all(continuum)
     assert remote.digest == local.digest
     assert remote.selection[1] == local.selection[1]
 
