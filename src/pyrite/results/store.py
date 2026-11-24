@@ -16,6 +16,7 @@ from typing import Any, Literal, cast
 
 import numpy as np
 
+from .._cone_splitting import ConeSplitting
 from .._mixed_elastic_policy import validate_transport_mode
 from .._numerics import (
     CHANNELING_KEYS,
@@ -174,6 +175,10 @@ class Settings:
         Floating-point math mode, ``"fast"`` or ``"reproducible"`` (#1468);
         ``None`` resolves ``PYRITE_MATH``, then the ``numerics.math`` config
         key, then ``"reproducible"``. ``"fast"`` joins dataset identity.
+    cone_split
+        Opt-in experimental detector-cone splitting
+        (:class:`~pyrite._cone_splitting.ConeSplitting`, #379); ``None`` is
+        analog transport and adds nothing to dataset identity.
     """
 
     beam_current_na: float = DEFAULT_BEAM_CURRENT_NA
@@ -225,6 +230,7 @@ class Settings:
     emission: EmissionMode = "incoherent"
     # Opt-in line I(t) (#292). Divergence-only in dataset_identity, like emission.
     temporal_profile: bool = False
+    cone_split: ConeSplitting | None = None
     precision: Precision | None = None
     allow_fallback: bool = False
     # Floating-point math mode (#1468); None resolves PYRITE_MATH, then the
@@ -234,7 +240,7 @@ class Settings:
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         """Keep omitted historical model selectors on their original auto policies."""
-        self.__dict__.update({**HISTORICAL_SELECTOR_OMISSIONS, **state})
+        self.__dict__.update({**HISTORICAL_SELECTOR_OMISSIONS, "cone_split": None, **state})
 
     def __post_init__(self) -> None:
         # The stored record keeps "off" for these selectors (#1242), so a public
@@ -254,8 +260,9 @@ class Settings:
             from .._math_mode import validate_math_mode
 
             validate_math_mode(self.math)
-        if self.precision is not None and not isinstance(self.precision, Precision):
-            raise TypeError("precision must be a Precision or None")
+        for name, kind in (("precision", Precision), ("cone_split", ConeSplitting)):
+            if not isinstance(getattr(self, name), (kind, type(None))):
+                raise TypeError(f"{name} must be a {kind.__name__} or None")
         if not isinstance(self.temporal_profile, bool):
             raise TypeError("temporal_profile must be a bool")
         self.straggling = default_straggling(self.inelastic_model, self.straggling)

@@ -170,6 +170,7 @@ def numerics_from_legacy(old_sweep: Any, settings: Any) -> Numerics:
         **chunks,
         energy_model=getattr(settings, "energy_model", "frozen"),
         max_dE_frac=getattr(settings, "max_dE_frac", 0.0),
+        cone_split=getattr(settings, "cone_split", None),
         cxr_reflections=CxrReflections(
             # A fiber sweep's four basal DBR/Kossel families are not a public count.
             n_families=None if old_sweep.cxr_fiber is not None else old_sweep.n_families,

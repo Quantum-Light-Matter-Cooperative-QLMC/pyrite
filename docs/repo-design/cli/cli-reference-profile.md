@@ -692,7 +692,8 @@ Options:
 Usage: pyrite profile numerics [OPTIONS] COMMAND [ARGS]...
 
   Show and edit PROFILE's own numerics fields: history sampling (adaptive or fixed),
-  reflections/mosaic, integration, the channeling grid, and the CXR-grid policy.
+  reflections/mosaic, integration, the channeling grid, the CXR-grid policy and
+  detector-cone splitting.
 
   Profile fields override the attached named preset (pyrite numerics; attach with
   'pyrite profile set PROFILE --numerics NAME'). Physics fields live under 'pyrite
@@ -708,6 +709,7 @@ Commands:
   validate           Validate PROFILE without running a...
   adaptive-sampling  Adaptive sampling policy or fixed history counts on PROFILE.
   cxr-grid           PROFILE's automatic CXR photon-grid policy.
+  cone-split         Experimental detector-cone splitting on PROFILE (off by default).
 ```
 
 ## `pyrite profile numerics reset`
@@ -1171,6 +1173,132 @@ Options:
 Usage: pyrite profile numerics cxr-grid show [OPTIONS] NAME
 
   Show explicit and effective PROFILE cxr-grid selectors and the grid source.
+
+Options:
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
+```
+
+## `pyrite profile numerics cone-split`
+
+```text
+Usage: pyrite profile numerics cone-split [OPTIONS] COMMAND [ARGS]...
+
+  Opt PROFILE into experimental detector-cone splitting
+  (``[profiles.NAME.cone_split]``).
+
+  Splits elastic events toward the cone of half-angle cone-factor / gamma0 about the
+  detector direction and roulettes low-weight copies, so rare detector-cone histories
+  are sampled often at reduced weight. Off by default (analog transport). #203 measured
+  a large figure-of-merit gain at 5 MeV and near-unit gain below 3 MeV.
+
+  Splitting needs a scalar detector, the ELSEPA elastic model and the per-electron CPU
+  core. It refuses coherent emission, temporal profiles, channeling, particle cascades,
+  transition radiation, mixed transport, grooved faces and GDF beams. A refused
+  combination fails validation and writes nothing.
+
+  The record joins case and dataset identity: enabling or editing it gives new
+  checkpoints, and earlier results stay under their old identity.
+
+  Examples:
+    pyrite profile numerics cone-split enable lab-5mev
+    pyrite profile numerics cone-split set lab-5mev --cone-factor 6
+    pyrite profile numerics cone-split show lab-5mev
+    pyrite profile numerics cone-split reset lab-5mev cone-factor
+    pyrite profile numerics cone-split disable lab-5mev
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  disable  Turn splitting off for PROFILE (analog transport); removes the stored...
+  enable   Turn splitting on for PROFILE, with any supplied fields over the...
+  reset    Return selected FIELDS, or every field, to the measured defaults;...
+  set      Set fields on a PROFILE that already splits; unspecified fields are kept.
+  show     Show whether PROFILE splits, and each field's effective value and source.
+```
+
+## `pyrite profile numerics cone-split disable`
+
+```text
+Usage: pyrite profile numerics cone-split disable [OPTIONS] PROFILE
+
+  Turn splitting off for PROFILE (analog transport); removes the stored fields.
+
+Options:
+  -y, --yes   Skip the standard-profile confirmation.
+  --dry-run   Validate and preview; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite profile numerics cone-split enable`
+
+```text
+Usage: pyrite profile numerics cone-split enable [OPTIONS] PROFILE
+
+  Turn splitting on for PROFILE, with any supplied fields over the measured defaults.
+
+  On a profile that already splits, supplied fields are merged as by set.
+
+Options:
+  --cone-factor FACTOR            Cone half-angle FACTOR / gamma0 about the detector
+                                  direction; the half-angle must stay below pi/2 at
+                                  every beam energy. Default 8.  [x>0.0]
+  --min-energy-fraction FRACTION  Elastic events below FRACTION x E0 stay analog.
+                                  Default 0.4.  [0.0<=x<1.0]
+  --angle-scale none|U_REF        Angle-scaled roulette scale u_ref; none turns that
+                                  roulette off. Default 1.
+  --target-weight WEIGHT          Roulette target copy weight. Default 0.001.  [x>0.0]
+  --max-copies-per-electron N     Copy buffer per primary electron; a run that fills it
+                                  fails. Default 1024.  [x>=1]
+  -y, --yes                       Skip the standard-profile confirmation.
+  --dry-run                       Validate and preview; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile numerics cone-split reset`
+
+```text
+Usage: pyrite profile numerics cone-split reset [OPTIONS] PROFILE [FIELDS]...
+
+  Return selected FIELDS, or every field, to the measured defaults; splitting stays on.
+
+Options:
+  -y, --yes   Skip the standard-profile confirmation.
+  --dry-run   Validate and preview; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite profile numerics cone-split set`
+
+```text
+Usage: pyrite profile numerics cone-split set [OPTIONS] PROFILE
+
+  Set fields on a PROFILE that already splits; unspecified fields are kept.
+
+Options:
+  --cone-factor FACTOR            Cone half-angle FACTOR / gamma0 about the detector
+                                  direction; the half-angle must stay below pi/2 at
+                                  every beam energy. Default 8.  [x>0.0]
+  --min-energy-fraction FRACTION  Elastic events below FRACTION x E0 stay analog.
+                                  Default 0.4.  [0.0<=x<1.0]
+  --angle-scale none|U_REF        Angle-scaled roulette scale u_ref; none turns that
+                                  roulette off. Default 1.
+  --target-weight WEIGHT          Roulette target copy weight. Default 0.001.  [x>0.0]
+  --max-copies-per-electron N     Copy buffer per primary electron; a run that fills it
+                                  fails. Default 1024.  [x>=1]
+  -y, --yes                       Skip the standard-profile confirmation.
+  --dry-run                       Validate and preview; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile numerics cone-split show`
+
+```text
+Usage: pyrite profile numerics cone-split show [OPTIONS] PROFILE
+
+  Show whether PROFILE splits, and each field's effective value and source.
 
 Options:
   -o, --output [table|json]  Output format; only json is a stable automation contract.

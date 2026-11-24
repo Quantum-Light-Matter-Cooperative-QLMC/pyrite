@@ -46,6 +46,34 @@ Names do not enter scientific identity; runs record preset names and definition
 digests as provenance. Python uses `pyrite.config.load_physics` / `pyrite.config.load_numerics`
 to obtain frozen configurations. See [named presets ADR](../adr/0021-named-physics-numerics-presets.md).
 
+### Detector-cone splitting
+
+Detector-cone splitting is an experimental, opt-in transport estimator that
+targets rare elastic scatters into the detector direction. It is a
+profile key, not a preset field:
+
+```bash
+pyrite profile numerics cone-split enable lab-5mev
+pyrite profile numerics cone-split set lab-5mev --cone-factor 6
+pyrite profile numerics cone-split show lab-5mev
+```
+
+Without the key, transport is analog, and neither cases nor the dataset
+identity change. With it, every case carries the same `cone_split` record as
+`Numerics(cone_split=ConeSplitting(...))` in Python. The record joins the
+case and dataset identity, so a split run never resumes into an analog
+checkpoint.
+
+Catalog validation refuses these profiles and writes nothing: coherent or
+`both` emission, temporal profiles, channeling, secondary/pair/positron
+cascades, transition radiation, mixed transport, the Mott elastic model, a
+physical pixel detector, and a beam energy where `cone_factor / γ0` reaches
+π/2. GDF beams and grooved faces are refused when cases are built. Below
+3 MeV the commands warn that #203 measured near-unit gain. Splitting runs
+on the per-electron CPU core only. For the estimator and its
+evidence, see [detector-cone splitting](../computation/statistical-methods.md#detector-cone-splitting).
+Field names and defaults: [profile settings](../repo-design/profile-settings.md#detector-cone-splitting).
+
 ## Adaptive electron counts
 
 Eligible profiles without fixed counts or an `adaptive_sampling` table use adaptive

@@ -969,6 +969,7 @@ def profile_run_settings(
         settings = replace(settings, emission=emission)
     if catalog.profile_temporal_profile(catalog_profile):  # opt-in; absent keeps the preset
         settings = replace(settings, temporal_profile=True)
+    settings = replace(settings, cone_split=catalog.profile_cone_split(catalog_profile))
     numerics = resolve_numerics(catalog.profile_numerics(catalog_profile))
     settings = replace(settings, **{key: numerics.effective[key] for key in TRANSPORT_KEYS})
     if numerics.effective["math"] is not None:  # a profile or preset pin (#1468)
@@ -1019,6 +1020,7 @@ def canonical_settings(settings: Settings, *, resolved_bremsstrahlung: bool = Tr
     return (
         settings.emission == "incoherent"
         and not (settings.temporal_profile or settings.allow_fallback)
+        and settings.cone_split is None
         and settings.straggling == (settings.inelastic_model == "shell-soft-hard")
         and settings.precision is None
         and settings.energy_model == "midpoint"

@@ -98,6 +98,7 @@ class IdentityOptions:
     mixed_c2: Any = None
     mixed_max_step_um: Any = None
     math: str = "reproducible"
+    cone_split: Any = None
 
 
 def pop_identity_options(settings_payload: dict[str, Any]) -> IdentityOptions:
@@ -125,6 +126,7 @@ def pop_identity_options(settings_payload: dict[str, Any]) -> IdentityOptions:
         mixed_max_step_um=settings_payload.pop("mixed_max_step_um", None),
         # Absent before #1468: reproducible, as it ran. None resolves now.
         math=resolve_math_mode(settings_payload.pop("math", None)).mode,
+        cone_split=settings_payload.pop("cone_split", None),
     )
 
 
@@ -178,6 +180,10 @@ def transport_numerics_payload(
             options.transport_mode, options.mixed_c1, options.mixed_c2, options.mixed_max_step_um
         )
     )
+    # Opt-in detector-cone splitting (#379, #1384): divergence-only; the record
+    # carries its estimator model, so a new ladder version re-keys the run.
+    if options.cone_split is not None:
+        numerics["cone_split"] = dict(options.cone_split)
     return numerics
 
 

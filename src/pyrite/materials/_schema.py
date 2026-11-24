@@ -8,6 +8,7 @@ from typing import Literal, cast
 
 import numpy as np
 
+from .._cone_splitting import ConeSplitting
 from .._numerics import CONVERGENCE_KEYS, EXECUTION_KEYS, TRANSPORT_KEYS
 from .._precision import Precision
 from .._sampling import AdaptiveSampling
@@ -612,6 +613,8 @@ class MaterialCatalog:
     #: Validated ``[profiles.NAME.adaptive_sampling]`` policies, as stored-vocabulary
     #: mappings (``Precision.to_dict`` keys); absent means fixed history counts.
     profile_precisions: Mapping[str, Mapping[str, object]] = MappingProxyType({})
+    #: Validated ``profiles.NAME.cone_split`` opt-ins (#1384); absent is analog transport.
+    profile_cone_splits: Mapping[str, ConeSplitting] = MappingProxyType({})
     #: Explicit scalar result-affecting numerics, keyed by profile. Electron
     #: count grids remain on each resolved :class:`ScanSpec`.
     profile_transport_numerics: Mapping[str, Mapping[str, object]] = MappingProxyType({})
@@ -702,6 +705,10 @@ class MaterialCatalog:
             if payload is None
             else AdaptiveSampling.from_dict(payload, source=f"profile {name!r}")
         )
+
+    def profile_cone_split(self, name: str) -> ConeSplitting | None:
+        """Detector-cone splitting policy for ``name`` (#1384), or ``None`` for analog transport."""
+        return self.profile_cone_splits.get(name)
 
     def profile_numerics(self, name: str) -> Mapping[str, object] | None:
         """Explicit result-affecting transport numerics for ``name``."""

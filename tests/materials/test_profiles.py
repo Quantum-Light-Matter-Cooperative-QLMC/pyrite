@@ -862,6 +862,7 @@ def test_emission_mode_resolves_through_profile_to_settings(emission, coherent):
     catalog = mock.Mock()
     catalog.profile_emission.return_value = emission
     catalog.profile_temporal_profile.return_value = False
+    catalog.profile_cone_split.return_value = None
     catalog.profile_numerics.return_value = None
     catalog.profile_precision.return_value = None
     resolved = profiles.profile_run_settings(default_settings(), "probe", catalog)
