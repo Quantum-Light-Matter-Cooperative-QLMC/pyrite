@@ -405,7 +405,8 @@ def test_selection_scores_an_electron_prefix_then_every_history(monkeypatch):
     assert np.sum(full["spec"]) > 0
 
 
-def test_row_budget_binds_before_the_history_cap(monkeypatch):
+@pytest.mark.parametrize("k", [2, 4])
+def test_row_budget_binds_before_the_history_cap(monkeypatch, k):
     """A population that reaches ``SELECTION_ROWS`` within fewer electrons than
     the cap selects on that shorter prefix, exactly as the cap would (#1368)."""
     from pyrite.montecarlo.runner import reflection_cutoff
@@ -413,19 +414,19 @@ def test_row_budget_binds_before_the_history_cap(monkeypatch):
     case, tp = _transported()
     selected = dict(case, reflection_selection=SELECTION)
     counts = np.bincount(np.asarray(tp["segs"]["elec_id"]))
-    assert counts[0] > 0 and counts[1] > 0
-    budget = int(counts[:2].sum())  # electron 1's rows cross the budget: k = 2
+    assert counts.size > k and counts[k - 1] > 0
+    budget = int(counts[:k].sum())  # electron k-1's rows cross the budget
     monkeypatch.setattr(reflection_cutoff, "SELECTION_ROWS", budget)
     out = runner._spectrum_case(selected, tp)
     record = out["reflection_selection"]
     assert record["selection_histories"] == {
-        "lines": 2,
-        "continuum": 2,
+        "lines": k,
+        "continuum": min(k, 3),  # n_electrons_brem=3: unequal 4/3 prefixes at k=4
         "rows": budget,
         "row_budget": budget,
     }
     monkeypatch.setattr(reflection_cutoff, "SELECTION_ROWS", 1 << 62)
-    monkeypatch.setattr(reflection_cutoff, "SELECTION_HISTORIES", 2)
+    monkeypatch.setattr(reflection_cutoff, "SELECTION_HISTORIES", k)
     capped = runner._spectrum_case(selected, tp)
     assert record["radiators"] == capped["reflection_selection"]["radiators"]
     np.testing.assert_array_equal(out["spec"], capped["spec"])

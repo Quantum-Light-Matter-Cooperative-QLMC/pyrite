@@ -1550,7 +1550,8 @@ inherits the sampling noise of $n$ histories. The tail estimate was already a
 finite-sample extrapolation (v6). The stop reads shell-yield ratios, and each
 thick-target history already averages over its many rows. #1326 measured the
 same set on the 1 mm mos2 5 MeV case at $N=16$ (job 14428) and $N=4096$ (job
-14479). Set stability against the 4096-electron prefix is measured below.
+14479). Set stability against the 4096-electron prefix is measured
+[below](#row-budget-stability-evidence-and-choice-of-r-1368).
 
 **Streamed route.** `PrefixSelectingScorer` holds whole-electron blocks in
 electron order and selects once a row of electron $\ge\min(N_{\max},H)$
@@ -1565,12 +1566,69 @@ the largest held id, so the electron whose rows cross $R$ is complete, and
 `tests/montecarlo/runner/test_reflection_selection_spectrum.py::test_selection_scores_an_electron_prefix_then_every_history`
 (history cap binds: record rows below $R$, selection equals the v6 prefix
 selection);
-`::test_row_budget_binds_before_the_history_cap` (rows of the first two of
-six histories as the budget: the record carries $n=2$ and the selection and
-spectrum equal the $H=2$ selection exactly);
+`::test_row_budget_binds_before_the_history_cap` (rows of the first $k\in\{2,4\}$
+of six histories as the budget, three continuum histories: the record carries
+$n=k$ lines and $\min(k,3)$ continuum electrons, so $k=4$ exercises unequal
+prefixes, and the selection and spectrum equal the $H=k$ selection exactly);
 `::test_row_budget_prefix_counts_whole_electrons` ($k_R$ on unordered blocks,
 zero-row electrons, rows past the cap ignored);
 `tests/montecarlo/transport/test_streamed_selection.py::test_streamed_row_budget_prefix_matches_retained`
 (streamed blocks of 1 and 3 electrons select on the same $k_R$ prefix before
 the population is held; record equal to the retained route to summation
 order, spectra within $10^{-12}$).
+
+### Row-budget stability evidence and choice of R (#1368)
+
+Probe `checks/reflection_selection_subsample_1281.py` (arms `hN`: fixed
+$N$-electron prefix; `rN`: row budget $N$, cap 4096) on qlmc RTX 5080, $N=4096$
+histories, tilt 15°, code `0061fe98b` (jobs 14524–14528) and `0b64ee2fe`
+(15384, 15385). Each arm selects on the held streamed prefix of one
+transport, so arms differ only in the prefix. A set is "same" when its
+`selected_set_sha256` equals the `h4096` arm's (today's v8 rule).
+
+Rows left by the first 4096 electrons:
+
+| scenes | rows at 4096 electrons | rows per electron (max) |
+|---|---|---|
+| `cleo_sub_1281` 500 nm, 15 cases (14527) | 7.8e3 – 5.8e5 | ≤ 1,140 |
+| 10 µm mos2/mose2 1, 5, 30 MeV (14526) | 5.5e5 – 8.6e5 | |
+| 100 µm mos2/mose2 1, 5, 30 MeV (14525) | 5.5e6 – 1.42e7 | |
+| 1 mm mos2/mose2 1, 5, 30 MeV (14524, 14528, 15384) | 5.5e7 – 8.45e7 | 1.07e5 |
+
+Set agreement with `h4096` (seed 0 unless noted):
+
+| case | r1e6 | r4e6 | r1.6e7 | r6.4e7 |
+|---|---|---|---|---|
+| 500 nm, all 15 | cap binds | — | — | — |
+| 10 µm, all 6 | cap binds | cap binds | cap binds | cap binds |
+| 100 µm mos2 1 / 30 MeV, mose2 30 MeV | same | same | cap binds | cap binds |
+| 100 µm mos2 5 MeV | G24 vs G22 | same | cap binds | cap binds |
+| 100 µm mose2 1 MeV | G14 vs G16 | G14 vs G16 | cap binds | cap binds |
+| 100 µm mose2 5 MeV | G22 vs G20 | same | cap binds | cap binds |
+| 1 mm mos2 5 MeV, seeds 0–2 | same | same | same (882–914 e⁻) | same |
+| 1 mm mos2 / mose2 30 MeV | same | same | same (1182 / 879 e⁻) | same |
+
+Every flip is one 2 Å⁻¹ marginal shell with both tails inside the $10^{-3}$
+tolerance. 1 mm mos2 5 MeV selects set `00cb4b86` (G24, 20,698 reflections)
+on every arm and seed; tails at $R=1.6\times10^7$ are 7.18–7.53e-4 against
+7.32–7.37e-4 at 4096. Selection time is ≈ 26 µs per row + ~15 s.
+
+**Choice.** $R=2^{24}=1.68\times10^7$. It exceeds every 10 µm and 100 µm
+case's rows at 4096 electrons, so the cap binds there and no flip measured
+above occurs at this $R$; the 500 nm margin is ≥ 29×. On 1 mm targets it
+selects on ~800–1200 electrons with the 4096-prefix set on every case where
+the 4096 prefix completes.
+
+**1 mm, 1 MeV (15384).** The `h4096` arm ran out of device memory
+(15.1 GB) on mos2 and mose2 at 1 MeV (8.4e7 rows), so today's rule selects
+nothing there. The $R=2^{24}$ arm selects (mos2 G12, 2518 reflections, tail
+5.0e-4, 83 s; mose2 G16, 7022 reflections, tail 1.4e-4, 173 s) on ~815
+electrons. No 4096-prefix set exists to compare with. mose2 5 MeV fails
+host-memory admission in retained transport output before any selection
+(14.8 GiB required), independent of the prefix.
+
+**Acceptance timing (15385).** Default route (streamed), `0b64ee2fe`,
+1 mm mos2 5 MeV / 15°, $N=4096$, seed 0, uninstrumented: selection
+438.8 s (599 s wall to selection) against 1860–1988 s for the 4096
+prefix (14524); set `00cb4b86…`, cutoff 24 Å⁻¹, 20,698 reflections, tail
+7.2e-4, converged, model `measured-shell-cutoff-v9`.
