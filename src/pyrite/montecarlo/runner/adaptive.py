@@ -936,6 +936,7 @@ def transport_case_adaptive(
     record_timing: bool = False,
     keep_segments_on_device: bool = False,
     block_consumer: Callable[[dict[str, Any]], None] | None = None,
+    block_electrons=None,
 ) -> dict[str, Any]:
     """Transport an adaptive case and retain its realized sampling provenance.
 
@@ -947,6 +948,8 @@ def transport_case_adaptive(
     each chunk, no chunk is kept, and ``segs`` holds only the realized
     additive counts. Streamed adaptive scoring then runs the fixed case at
     the realized pair (:func:`.streamed_scoring.run_case_streamed`).
+    Its optional ``block_electrons`` bound also caps monitored chunks, before
+    any resident-to-host recovery can assemble an oversized chunk (#1417).
 
     Validation: adaptive-sample-size-stopping
     """
@@ -977,7 +980,9 @@ def transport_case_adaptive(
             record_timing,
             transport_core=core,
             keep_segments_on_device=keep_segments_on_device,
-            block_electrons=AdaptiveChunkPlan.for_core(core, settings.block_histories),
+            block_electrons=AdaptiveChunkPlan.for_core(
+                core, settings.block_histories, block_limit=block_electrons
+            ),
             block_monitor=monitor,
             block_consumer=block_consumer,
         )
@@ -1140,15 +1145,16 @@ def transport_requested_precision(case, record_timing=False, **options):
     """Validate runner-only options and dispatch a serialized precision policy."""
     if options.pop("trajectory_capture", None) is not None:
         raise ValueError("adaptive precision does not support trajectory capture; use fixed counts")
-    if (
-        options.pop("block_electrons", None) is not None
-        or options.pop("block_monitor", None) is not None
+    block_electrons = options.pop("block_electrons", None)
+    if options.pop("block_monitor", None) is not None or (
+        block_electrons is not None and options.get("block_consumer") is None
     ):
         raise ValueError("adaptive precision owns block_electrons and the stopping monitor")
     return transport_case_adaptive(
         case,
         Precision.from_dict(case["adaptive_precision"]),
         record_timing=record_timing,
+        block_electrons=block_electrons,
         **options,
     )
 

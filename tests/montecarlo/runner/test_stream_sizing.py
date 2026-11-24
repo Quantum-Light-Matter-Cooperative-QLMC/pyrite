@@ -7,7 +7,11 @@ import pytest
 
 from pyrite.config import TransportKernelTuning
 from pyrite.montecarlo.runner import stream_sizing, transport_options
-from pyrite.montecarlo.runner.stream_sizing import PROBE_ELECTRONS, MemoryBlockSizer
+from pyrite.montecarlo.runner.stream_sizing import (
+    PROBE_ELECTRONS,
+    AdaptiveChunkPlan,
+    MemoryBlockSizer,
+)
 
 
 def _rows(electrons, bytes_per_electron):
@@ -41,6 +45,23 @@ def test_block_is_at_least_one_electron_and_rowless_runs_finish():
     assert _walk(dense, 2048, lambda _start: 1 << 22)[1] == (PROBE_ELECTRONS, PROBE_ELECTRONS + 1)
     assert MemoryBlockSizer(1, TransportKernelTuning()).next_stop(0, 10) == 10
     assert _walk(MemoryBlockSizer(64, TransportKernelTuning()), 4096, lambda _: 0)[-1][1] == 4096
+
+
+def test_streamed_limit_overrides_adaptive_floor_and_growth():
+    plan = AdaptiveChunkPlan.for_core("cuda", 3000, block_limit=16)
+    assert plan.next_stop(0, 4096, 4096) == 16
+    plan.observe(0, 16, {"electron_id": np.zeros(16)})
+    assert plan.next_stop(16, 4096, 4096) == 32
+    assert plan.next_stop(4090, 4096, 4096) == 4096
+
+
+def test_adaptive_memory_limit_observes_rows_before_sizing_the_next_chunk():
+    sizer = MemoryBlockSizer(1, TransportKernelTuning())
+    plan = AdaptiveChunkPlan.for_core("cuda", 3000, block_limit=sizer)
+    assert plan.next_stop(0, 4096, 4096) == PROBE_ELECTRONS
+    plan.observe(0, PROBE_ELECTRONS, _rows(PROBE_ELECTRONS, 1024))
+    assert plan.next_stop(PROBE_ELECTRONS, 4096, 4096) == PROBE_ELECTRONS + 256
+    assert sizer.spans == [(0, PROBE_ELECTRONS), (PROBE_ELECTRONS, PROBE_ELECTRONS + 256)]
 
 
 @pytest.mark.parametrize(

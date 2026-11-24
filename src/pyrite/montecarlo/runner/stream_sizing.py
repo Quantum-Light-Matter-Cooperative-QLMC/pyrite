@@ -12,6 +12,7 @@ are counter-addressed, so block sizes do not change transport.
 from collections.abc import Generator, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import replace
+from numbers import Integral
 from typing import Any
 
 from ..._backend import BACKEND
@@ -136,24 +137,37 @@ class AdaptiveChunkPlan:
     electrons away, else it takes ``floor`` electrons, which may span several
     points. Above the floor it never exceeds ``budget / (rows per electron x
     bytes per row)``, with rows per electron the largest rate seen so far (the
-    first chunk is ``floor``); the floor wins when the cap is smaller. Chunk boundaries never change decisions, counts or output;
+    first chunk is ``floor``); the floor wins when the cap is smaller.
+    An optional streamed ``block_limit`` overrides that floor and memory cap.
+    Chunk boundaries never change decisions, counts or output;
     the stopping monitor folds values at decision points and the driver keeps
     exactly the realized prefix.
     """
 
-    def __init__(self, floor: int, budget_bytes: int = ADAPTIVE_CHUNK_BUDGET_BYTES):
+    def __init__(
+        self,
+        floor: int,
+        budget_bytes: int = ADAPTIVE_CHUNK_BUDGET_BYTES,
+        *,
+        block_limit: int | MemoryBlockSizer | None = None,
+    ):
         if type(floor) is not int or floor < 1:
             raise ValueError("chunk floor must be a positive integer")
         self.floor = floor
         self.budget_bytes = int(budget_bytes)
         self.rows_per_electron = 0.0
+        self.block_limit = block_limit
 
     @classmethod
-    def for_core(cls, core: str, hint: int | None = None) -> "AdaptiveChunkPlan":
+    def for_core(
+        cls, core: str, hint: int | None = None, *, block_limit=None
+    ) -> "AdaptiveChunkPlan":
         """The plan for a transport core; ``hint`` (deprecated ``block_histories``) sets the floor."""
         if hint is not None:
-            return cls(hint)
-        return cls(CUDA_FILL_HISTORIES if core == "cuda" else HOST_MIN_CHUNK)
+            return cls(hint, block_limit=block_limit)
+        return cls(
+            CUDA_FILL_HISTORIES if core == "cuda" else HOST_MIN_CHUNK, block_limit=block_limit
+        )
 
     def next_stop(self, start: int, next_point: int | None, limit: int) -> int:
         """End of the chunk starting at ``start``, within ``(start, limit]``."""
@@ -164,10 +178,19 @@ class AdaptiveChunkPlan:
         target = start + self.floor
         if next_point is not None and next_point - start >= self.floor:
             target = next_point
-        return max(start + 1, min(target, start + size, limit))
+        stop = max(start + 1, min(target, start + size, limit))
+        # A streamed route's bound wins even over a legacy chunk-floor hint.
+        if isinstance(self.block_limit, Integral):
+            stop = min(stop, start + max(1, int(self.block_limit)))
+        elif isinstance(self.block_limit, MemoryBlockSizer):
+            stop = self.block_limit.next_stop(start, stop)
+            self.block_limit.spans.append((start, stop))
+        return stop
 
     def observe(self, start: int, stop: int, block: Mapping[str, Any]) -> None:
         """Keep the largest rows per electron seen."""
         ids = block.get("electron_id")
         rows = 0 if ids is None else int(ids.shape[0])
         self.rows_per_electron = max(self.rows_per_electron, rows / max(stop - start, 1))
+        if isinstance(self.block_limit, MemoryBlockSizer):
+            self.block_limit.observe(start, stop, block)

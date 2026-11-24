@@ -151,6 +151,49 @@ def test_run_case_switches_to_streamed_when_retained_rows_exceed_headroom(monkey
         )
 
 
+@pytest.mark.parametrize("policy_grid", [False, True], ids=["single", "measure"])
+def test_streamed_route_bounds_the_monitored_transport(monkeypatch, policy_grid):
+    """#1417: the adaptive chunk floor must not override the streamed row budget."""
+    from dataclasses import replace
+
+    from pyrite.montecarlo.runner import case_driver, host_admission, recovery
+
+    case = _requested(brem=False)
+    settings = Precision.from_dict(case["adaptive_precision"])
+    case["adaptive_precision"] = replace(settings, min_histories=8, max_histories=8).to_dict()
+    case.update(Ne=8, Ne_brem=8)
+    if not policy_grid:
+        case = _explicit(case)
+    _no_headroom(monkeypatch)
+    # Every observed history exceeds this byte budget: the route must use one.
+    monkeypatch.setattr(host_admission, "STREAMED_BLOCK_BYTES", 1)
+    streamed = False
+    spans = []
+    original_route = recovery._streamed_adaptive
+    simulate = case_driver.simulate_trajectories
+
+    def switch(case, route, core):
+        nonlocal streamed
+        assert route.block_electrons == 1
+        streamed = True
+        return original_route(case, route, core)
+
+    def bounded(energy, count, *args, **kwargs):
+        if streamed:
+            spans.append(count)
+            assert count <= 1, "streamed route launched oversized retained transport"
+        return simulate(energy, count, *args, **kwargs)
+
+    monkeypatch.setattr(recovery, "_streamed_adaptive", switch)
+    monkeypatch.setattr(case_driver, "simulate_trajectories", bounded)
+    with pytest.warns(RuntimeWarning, match="streamed adaptive"):
+        out = runner.run_case(case, transport_core="per-electron")
+    assert spans
+    assert out["_adaptive_route"]["scoring"] == ("measure" if policy_grid else "single")
+    assert out["adaptive_sampling"]["realized_electrons"] == 8
+    assert np.all(np.isfinite(out["spec"]))
+
+
 @pytest.mark.parametrize(
     ("env", "policy"),
     [("off", {}), ("auto", {"batch_means_band_eV": (1000.0, 10000.0)})],
