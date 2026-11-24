@@ -145,7 +145,7 @@ def test_v1_1_amendment_derives_from_frozen_v1():
         assert new["id"] == old["id"]
         assert new["allowance"] == pytest.approx(2.5 * old["allowance"], rel=1e-14)
         if old["control"] == "elsepa_energy_density":
-            assert new["support"] == "available"
+            assert new["support"] == "unsupported" and "#1426" in new["reason"]
         else:
             assert new["support"] == old["support"]
     assert design["resources"]["confirmation_gpu_hours"] == 12.0
@@ -153,4 +153,4 @@ def test_v1_1_amendment_derives_from_frozen_v1():
     with pytest.raises(ValueError, match="extend"):
         AMEND["derive"](4.0)
     with pytest.raises(ValueError, match="original v1"):
-        AMEND["amend_v1_1"](design, "x", {"schema": "x"}, "y", 12.0)
+        AMEND["amend_v1_1"](design, "x", 12.0)

@@ -16,22 +16,26 @@ from pyrite._util.hashing import file_sha256
 
 HERE = Path(__file__).resolve().parent
 V1 = HERE / "convergence-design-v1.json"
-PLAN = HERE / "elsepa-refinement-plan-v1.json"
 
 V1_1_PAIRING = (
     "crn-paired only for (config, setting, observable) cells verified by "
     "audit_primary_pairing.py, with identical seeds and global primary offsets in both "
     "arms; otherwise independent"
 )
+ELSEPA_REASON = (
+    "Owner 2026-11-24: ELSEPA energy-grid convergence is a physics-data question split to "
+    "#1426; not qualified in #1041"
+)
 
 
-def amend_v1_1(frozen, frozen_sha256, plan, plan_sha256, gpu_hours):
+def amend_v1_1(frozen, frozen_sha256, gpu_hours):
     """Owner amendment of 2026-11-24, made before any confirmation run.
 
     Relaxes the per-observable target RSE from 2 % to 5 % (allowances are
-    recomputed as S*eps/3/4/k, never rescaled), marks the nested ELSEPA
-    energy-density ladder available now that every planned refinement is
-    generated and admitted, admits audited common-random-number pairing and
+    recomputed as S*eps/3/4/k, never rescaled), moves the ELSEPA
+    energy-density ladder out of scope (``unsupported``, owned by #1426; it
+    keeps its rows, multiplicity and family share like any unsupported
+    control), admits audited common-random-number pairing and
     raises the confirmation GPU-hour ceiling. Rows, multiplicity and alpha
     allocation are unchanged.
     """
@@ -39,8 +43,6 @@ def amend_v1_1(frozen, frozen_sha256, plan, plan_sha256, gpu_hours):
         raise ValueError("unsupported convergence design")
     if "amendment" in frozen or frozen["target_rse"] != 0.02:
         raise ValueError("v1.1 amends only the original v1 freeze")
-    if plan["schema"] != "pyrite.geant4-performance.elsepa-refinement-plan.v1":
-        raise ValueError("not the ELSEPA refinement plan")
     old_ceiling = frozen["resources"]["confirmation_gpu_hours"]
     if isinstance(gpu_hours, bool) or not isinstance(gpu_hours, (int, float)):
         raise ValueError("invalid GPU-hour ceiling")
@@ -56,11 +58,11 @@ def amend_v1_1(frozen, frozen_sha256, plan, plan_sha256, gpu_hours):
         row["total_allowance"] = total
         row["allowance"] = total / share
         if row["control"] == "elsepa_energy_density":
-            row["support"], row["reason"] = "available", None
+            row["support"], row["reason"] = "unsupported", ELSEPA_REASON
     for config in out["configurations"]:
         for control in config["controls"]:
             if control["id"] == "elsepa_energy_density":
-                control["support"], control["reason"] = "available", None
+                control["support"], control["reason"] = "unsupported", ELSEPA_REASON
     out["seed_policy"]["pairing"] = V1_1_PAIRING
     out["resources"]["confirmation_gpu_hours"] = gpu_hours
     out["amendment"] = dict(
@@ -72,14 +74,10 @@ def amend_v1_1(frozen, frozen_sha256, plan, plan_sha256, gpu_hours):
         before_confirmation=True,
         changes=[
             "target_rse 0.02 -> 0.05; allowances recomputed as S*0.05/3/4/k",
-            "elsepa_energy_density unresolved -> available",
+            "elsepa_energy_density unresolved -> unsupported (split to #1426)",
             "pairing: audited common-random-number pairs admitted",
             f"confirmation_gpu_hours {old_ceiling} -> {gpu_hours}",
         ],
-        elsepa_refinement_plan_sha256=plan_sha256,
-        elsepa_admitted_keys=sorted(r["key"] for r in plan["requests"]),
-        elsepa_generation_jobs=["qlmc 15608", "qlmc 15630", "qlmc 15873", "qlmc 15874"],
-        elsepa_raw_publication="pending; generator evidence retained on qlmc and locally",
     )
     return out
 
@@ -90,8 +88,7 @@ def derive(gpu_hours):
     frozen = json.loads(V1.read_text())
     if frozen != manifest["make_manifest"](frozen["pilot_files_sha256"]):
         raise ValueError("frozen v1 design no longer reproduces")
-    plan = json.loads(PLAN.read_text())
-    out = amend_v1_1(frozen, file_sha256(V1), plan, file_sha256(PLAN), gpu_hours)
+    out = amend_v1_1(frozen, file_sha256(V1), gpu_hours)
     out["amendment"]["amender_sha256"] = file_sha256(Path(__file__))
     return out
 

@@ -127,10 +127,11 @@ any confirmation run:
 
 - epsilon 2% → **5%**; every allowance is recomputed as `S*0.05/3/4/k` with
   the same family split, so allowances grow 2.5× and counts fall 6.25×;
-- `elsepa_energy_density` becomes `available`: all nine planned nested
-  refinements (L1–L3; Si free-atom and muffin-tin, W free-atom) were generated
-  and admitted. The amendment cites the refinement plan hash, the nine keys
-  and the generation jobs; durable raw publication remains open;
+- `elsepa_energy_density` becomes `unsupported`: whether the production
+  ELSEPA energy grid is converged is a physics-data question, split to #1426
+  with the nine generated refinements. Its rows keep their multiplicity and
+  family share, like every unsupported control, and are never reported as a
+  pass;
 - audited common-random-number pairing is admitted (next section);
 - the confirmation GPU-hour ceiling is extended to the recorded value.
 
