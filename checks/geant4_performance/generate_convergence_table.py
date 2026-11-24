@@ -1,8 +1,10 @@
-"""Evaluate one frozen free-atom ELSEPA refinement with retained raw evidence.
+"""Evaluate one frozen free-atom or muffin-tin ELSEPA refinement with retained raw evidence.
 
 Run remotely. Never alters catalogs or resolves an existing refined table as a
-substitute for fresh generator evaluations. Muffin-tin requests are unsupported
-by this runner; no convergence, angular-mesh or timing gate is produced.
+substitute for fresh generator evaluations. A muffin-tin request is rebuilt
+through the production elementary-solid path from the planned scene
+composition, so its material identity, radius and code pin must reproduce the
+frozen key. No convergence, angular-mesh or timing gate is produced.
 """
 
 import argparse
@@ -16,7 +18,9 @@ import numpy as np
 from pyrite._util.hashing import canonical_json_digest, file_sha256
 from pyrite.perf._benchmark_tables import nested_energy_grid, table_record
 from pyrite.xsgen._run import run_program
+from pyrite.xsgen.elsepa.catalog import elemental_solid_for_composition
 from pyrite.xsgen.elsepa.deck import ElsepaDeck
+from pyrite.xsgen.elsepa.generate import muffin_tin_request
 from pyrite.xsgen.elsepa.parse import check_transport_scaling, parse_dcs, table_arrays
 from pyrite.xsgen.sources import resolve_source, source_digest
 from pyrite.xsgen.store import ElementTarget, TableRequest, require, store
@@ -45,21 +49,47 @@ def admit(plan, key):
     expected = native | dict(model=model)
     if row["request"] != expected or canonical_json_digest(expected) != key:
         raise ValueError("refinement differs from exact pinned nested request")
-    if expected["target"]["kind"] != "element" or model["mode"] != "free_atom":
-        raise ValueError("runner supports free-atom requests only; muffin-tin remains pending")
     if expected["code"] != "elsepa" or expected["quantity"] != "elastic_dcs":
         raise ValueError("need an ELSEPA elastic request")
-    deck = ElsepaDeck(
-        z=expected["target"]["z"],
-        energies_ev=tuple(model["energies_eV"]),
-        **{k: v for k, v in model.items() if k not in ("mode", "energies_eV")},
-    )
-    request = TableRequest(
-        "elsepa", expected["code_version"], ElementTarget(deck.z), "elastic_dcs", model
-    )
+    if expected["target"]["kind"] == "element" and model["mode"] == "free_atom":
+        deck = ElsepaDeck(
+            z=expected["target"]["z"],
+            energies_ev=tuple(model["energies_eV"]),
+            **{k: v for k, v in model.items() if k not in ("mode", "energies_eV")},
+        )
+        request = TableRequest(
+            "elsepa", expected["code_version"], ElementTarget(deck.z), "elastic_dcs", model
+        )
+    elif expected["target"]["kind"] == "material" and model["mode"] == "muffin_tin":
+        request, deck = solid_request(plan, baseline["key"], model["energies_eV"])
+    else:
+        raise ValueError("need a free-atom element or muffin-tin material request")
     if request.record() != expected or deck.model_record() != model:
         raise ValueError("generator deck differs from frozen request")
     return request, deck, baseline
+
+
+def solid_request(plan, baseline_key, energies):
+    """Rebuild a muffin-tin request from the planned scenes that use its baseline."""
+    compositions = {
+        json.dumps(scene["composition"])
+        for scene in plan.get("scenes", ())
+        if baseline_key in scene["native_keys"]
+    }
+    if len(compositions) != 1:
+        raise ValueError("muffin-tin baseline needs exactly one planned scene composition")
+    solid = elemental_solid_for_composition(
+        [tuple(item) for item in json.loads(compositions.pop())]
+    )
+    if solid is None:
+        raise ValueError("planned composition is not a catalog elementary solid")
+    return muffin_tin_request(
+        solid.key,
+        solid.z,
+        energies,
+        radius_cm=solid.radius_cm,
+        density_g_cm3=solid.density_g_cm3,
+    )
 
 
 def generate(plan_path, key, output, *, max_bytes=256 * 1024**2):
@@ -130,7 +160,7 @@ def generate(plan_path, key, output, *, max_bytes=256 * 1024**2):
     arrays = table_arrays(panels, energies_ev=deck.energies_ev)
     if not np.array_equal(arrays["mu"], native_mu):
         raise ValueError("fresh generator changed the pinned native angular grid")
-    if deck.high_energy_factorization > 0:
+    if deck.high_energy_factorization > 0 and not deck.is_muffin_tin:
         check_transport_scaling(arrays["energy_eV"], arrays["transport1_cm2"], z=deck.z)
     table = store(
         request,
@@ -163,7 +193,7 @@ def generate(plan_path, key, output, *, max_bytes=256 * 1024**2):
         submission_ready=False,
         limitations=[
             "Native angular/inverse-CDF mesh remains unqualified",
-            "Muffin-tin refinements require separate retained generation",
+            "Si muffin-tin rows join free-atom rows above 1 MeV; refine both levels together",
             "Fresh evaluations are not a numerical-convergence verdict",
             "Native Fortran energy rendering/parser tolerance is unchanged",
         ],

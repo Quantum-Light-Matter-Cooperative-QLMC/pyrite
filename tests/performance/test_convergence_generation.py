@@ -66,14 +66,39 @@ def test_changed_plan_refused(tmp_path, damage):
         RUNNER["admit"](plan, key)
 
 
-def test_actual_frozen_free_atom_rows_admit_and_muffin_tin_stays_explicit():
+def test_actual_frozen_rows_admit_including_muffin_tin():
     plan = json.loads((HERE / "elsepa-refinement-plan-v1.json").read_text())
+    solids = 0
     for row in plan["requests"]:
-        if row["request"]["target"]["kind"] == "element":
-            assert RUNNER["admit"](plan, row["key"])[0].key == row["key"]
-        else:
-            with pytest.raises(ValueError, match="free-atom"):
-                RUNNER["admit"](plan, row["key"])
+        request, deck, _ = RUNNER["admit"](plan, row["key"])
+        assert request.key == row["key"]
+        assert deck.is_muffin_tin == (row["request"]["target"]["kind"] == "material")
+        solids += deck.is_muffin_tin
+    assert solids == 3
+
+
+def muffin_row(plan):
+    return next(r for r in plan["requests"] if r["request"]["model"]["mode"] == "muffin_tin")
+
+
+@pytest.mark.parametrize("damage", ["radius", "composition", "orphan", "mode"])
+def test_changed_muffin_tin_request_refused(damage):
+    plan = json.loads((HERE / "elsepa-refinement-plan-v1.json").read_text())
+    row = muffin_row(plan)
+    if damage == "radius":
+        for baseline in plan["baselines"]:
+            if baseline["key"] == row["baseline_key"]:
+                baseline["request"]["model"]["muffin_tin_radius_cm"] *= 1.01
+    elif damage == "composition":
+        for scene in plan["scenes"]:
+            scene["composition"][0][1] *= 1.01
+    elif damage == "orphan":
+        for scene in plan["scenes"]:
+            scene["native_keys"] = [k for k in scene["native_keys"] if k != row["baseline_key"]]
+    else:
+        row["request"]["model"]["mode"] = "free_atom"
+    with pytest.raises(ValueError):
+        RUNNER["admit"](plan, row["key"])
 
 
 def setup_run(tmp_path, monkeypatch):

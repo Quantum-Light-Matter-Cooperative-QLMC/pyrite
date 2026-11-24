@@ -522,10 +522,10 @@ pixi run python checks/geant4_performance/analyze.py evidence/run/JOB --output s
 unallocatable, so the host runs nothing else during measurement. Geant4 runs at
 1, 16 and 32 threads (16 cores, SMT 2).
 
-### Retained free-atom ELSEPA generation (#1041)
+### Retained ELSEPA refinement generation (#1041)
 
 `generate_convergence_table.py PLAN KEY --output NEW_DIRECTORY` evaluates one
-exact free-atom request from `elsepa-refinement-plan-v1.json`. Run remotely in a
+exact free-atom or muffin-tin request from `elsepa-refinement-plan-v1.json`. Run remotely in a
 bounded CPU allocation with the matching installed native tables and Fortran
 toolchain. The runner validates the nested grid, native manifest/payload pins,
 source digest and every deck model field before building a fresh binary. It
@@ -543,8 +543,12 @@ default retained-file ceiling is 256 MiB, each generator process times out after
 120 s, and the scheduler must bound aggregate runtime/memory. Compilation and
 intermediate parser allocations are not hard-limited by the retained-file cap.
 
-Muffin-tin requests are explicitly refused by this runner. Fresh free-atom
-evaluations do not resolve the native angular/inverse-CDF limitation or qualify
+A muffin-tin request is rebuilt through the production elementary-solid path
+(`elemental_solid_for_composition` and `muffin_tin_request`) from the one planned
+scene composition that uses its baseline; the derived radius, density identity
+and code pin must reproduce the frozen key. Si scenes join muffin-tin rows up to
+1 MeV with free-atom rows above it, so admitting level N needs both the
+free-atom and muffin-tin level-N tables. Fresh evaluations do not resolve the native angular/inverse-CDF limitation or qualify
 numerical convergence. Admit the resulting explicit table pairs through
 `pyrite_bench.py --elsepa-level N --elsepa-table FILE.npz` before transport.
 Copy and checksum-verify the complete evidence directory into durable storage;
