@@ -75,7 +75,7 @@ $$
 
 using the Cephes fits in $z=1/t^2$, with separate coefficient sets for $4<t<8$ and $8\le t<48$. The coefficients come from [SciPy xsf `sici.h`](https://github.com/scipy/xsf/blob/55c14c958e42b7457071978f5b8ab8097174c172/include/xsf/cephes/sici.h); `_sine_integral.py` owns them and generates the device Horner expressions from the same tuples consumed by the host mirror. The complement is computed directly, avoiding cancellation against $\pi/2$. The midpoint-series window, near/far classification, bin-mass equation and far envelope are unchanged. This replaces the modified-Lentz continued fraction of $E_1(it)$; `CXR_BIN_REDUCTION_MODEL` advances to `fourier-auto-v12`.
 
-The original continued-fraction implementation was measured against 40-digit `mpmath` on 1,500 points in $[0,10^{12}]$: absolute error $\le 10^{-15}$ for $t\le4$, and $t|\mathrm{error}|\le2.1\times10^{-15}$ for $t>4$. The rational replacement retains those bounds in the 60-digit `mpmath` regression `test_sine_integral.py` and its device counterpart in `test_sinc_bin_integration_cuda.py`, covering a uniform mesh plus both one-ulp neighbours and the exact values of 4, 8 and 48. These are implementation accuracy checks; fresh-context validation of the replacement is required separately. The original independent derivation below remains the record for the unchanged integral and tail equations.
+The original continued-fraction implementation was measured against 40-digit `mpmath` on 1,500 points in $[0,10^{12}]$: absolute error $\le 10^{-15}$ for $t\le4$, and $t|\mathrm{error}|\le2.1\times10^{-15}$ for $t>4$. The rational replacement retains those bounds in the 60-digit `mpmath` regression `test_sine_integral.py` and its device counterpart in `test_sinc_bin_integration_cuda.py`, covering a uniform mesh plus both one-ulp neighbours and the exact values of 4, 8 and 48. These implementation accuracy checks are complemented by the [fresh-context verification](#independent-verification-of-the-rational-si-complement-1407) below. The original independent derivation below remains the record for the unchanged integral and tail equations.
 
 ## Routes and measurements
 
@@ -222,3 +222,123 @@ The float32 hazard the issue names is real and is avoided. On a 3 eV grid with $
 * Recovery of the node sample as the bin width shrinks is limited near 8 keV by FP64 cancellation in the edge coordinate $E - E_{\mathrm{res}}$, not by the quadrature; the limiting case holds exactly once that cancellation is removed from the test coordinates.
 
 Human sign-off remains open, as does the fixed-transport 300 keV yield and backend/precision measurement prepared in `checks/sinc_bin_integration.py`.
+
+### Independent verification of the rational Si complement (#1407)
+
+Fresh-context, read-only verification of candidate `827919145`, 2026-11-23.
+The ledger claim, intended quantity, function signature and pinned Cephes
+source were read first. The following derivation preceded inspection of the
+implementation body and main-branch diff.
+
+For real $t>0$, define the dimensionless complement
+
+$$
+C(t)=\operatorname{Si}(t)-\frac{\pi}{2}
+=-\int_t^\infty\frac{\sin u}{u}\,\mathrm{d}u.
+$$
+
+Substituting $u=t+v$ separates the phase:
+
+$$
+C(t)=-f(t)\cos t-g(t)\sin t,
+$$
+
+where, with oscillatory integrals interpreted by their convergent improper
+limits,
+
+$$
+f(t)=\int_0^\infty\frac{\sin v}{t+v}\,\mathrm{d}v
+=\int_0^\infty\frac{e^{-ts}}{1+s^2}\,\mathrm{d}s,
+$$
+
+$$
+g(t)=\int_0^\infty\frac{\cos v}{t+v}\,\mathrm{d}v
+=\int_0^\infty\frac{s e^{-ts}}{1+s^2}\,\mathrm{d}s.
+$$
+
+The Laplace representations follow by inserting
+$(t+v)^{-1}=\int_0^\infty e^{-(t+v)s}\,\mathrm{d}s$, with Abel
+regularization when interchanging the oscillatory integrals. Expansion about
+$s=0$ gives
+
+$$
+f(t)\sim\frac1t\left(1-\frac{2!}{t^2}+\frac{4!}{t^4}-\cdots\right),
+\qquad
+g(t)\sim\frac1{t^2}\left(1-\frac{3!}{t^2}+\frac{5!}{t^4}-\cdots\right).
+$$
+
+Thus $C(t)=-\cos(t)/t+O(t^{-2})$. Its sign oscillates; positivity is
+required of the integrated sinc-squared mass, not of this complement.
+
+The pinned SciPy xsf Cephes `sici.h` represents these auxiliary functions
+using $z=t^{-2}$:
+
+$$
+f(t)\approx\frac{P_f(z)}{tQ_f(z)},\qquad
+g(t)\approx z\frac{P_g(z)}{Q_g(z)}.
+$$
+
+Its coefficient sets apply on $4<t<8$ and $t\ge8$. All eight coefficient
+tuples in `_sine_integral.py` match the pinned source exactly as decimal
+numbers. Cephes evaluates each denominator with `p1evl`, whose leading
+coefficient is implicitly one. The implementation explicitly prepends that
+one and uses ordinary Horner evaluation, preserving each denominator's
+degree. The Numba evaluator and generated C preamble both compute
+$-f\cos t-g\sin t$ directly.
+
+For normalized sinc, the existing antiderivative is
+
+$$
+F(x)=\frac{\operatorname{Si}(2\pi x)}{\pi}
+-\frac{\sin^2(\pi x)}{\pi^2x}.
+$$
+
+For $x>0$, its signed tail is
+
+$$
+R(x)=F(x)-\frac12
+=\frac{C(2\pi x)}{\pi}
+-\frac{\sin^2(\pi x)}{\pi^2x}
+\sim-\frac{1}{2\pi^2x}.
+$$
+
+Extend with $R(-x)=-R(x)$ away from zero and retain the convention
+$R(0)=-1/2$. Then the bin mass remains
+
+$$
+F(x_{\mathrm{hi}})-F(x_{\mathrm{lo}})
+=R(x_{\mathrm{hi}})-R(x_{\mathrm{lo}})
++\mathbf{1}_{x_{\mathrm{lo}}<0\le x_{\mathrm{hi}}}.
+$$
+
+The energy-coordinate Jacobian is $\pi/a$; division by the energy-bin width
+therefore leaves a dimensionless profile mean. Whole-line energy mass remains
+$\pi/a$. The changed complement introduces no normalization or unit change.
+
+The main-branch diff leaves the outer power-series and asymptotic formulas,
+the joins at 4 and 48, the midpoint-series window, the near/far classification,
+and the far-envelope expression unchanged. The rational split at 8 agrees
+with the pinned source.
+
+Independent numerical probes used 70-digit `mpmath`, comparing errors before
+rounding the reference to binary64. Across 8,808 arguments, including exact
+and adjacent representable arguments at 4, 8 and 48, actual Numba and
+host-compiled generated C++ both satisfied the existing bounds:
+$|\mathrm{error}|\le10^{-15}$ for $t\le4$ and
+$t|\mathrm{error}|\le2.1\times10^{-15}$ for $t>4$. The maximum scaled error
+on the changed interval was $5.578\times10^{-16}$. The C++ probes used
+`-O2` with floating-point contraction both off and fast.
+
+On 1,659 signed tail arguments, including join neighborhoods and far-tail
+points, the maximum absolute and relative errors were
+$2.096\times10^{-16}$ and $2.858\times10^{-15}$. For 107 bins spanning
+the resonance and join neighborhoods, the generated preamble with midpoint
+evaluation disabled agreed with independent high-precision quadrature to
+$8.336\times10^{-16}$ absolute in the bin mean.
+
+Verdict: `rederived`. No source-to-code discrepancy found. These probes ran
+on CPU; they do not establish device compiler or hardware parity.
+Separately, King job 15626 at the same candidate passed the CUDA integration,
+near/far and Fourier tests, including the new 60-digit branch-boundary
+regression (83 passed, one existing slow skip). The claim remains `anchored`
+through these named host/device regressions. Human sign-off remains pending.
