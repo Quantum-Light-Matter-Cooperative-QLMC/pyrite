@@ -1,6 +1,8 @@
 """Conservative #1041 confirmation forecasts from pilot summaries, never run admission.
 
-Variance is per incident primary: Var(D) for saved-history paired scoring, or
+Variance is per incident primary: Var(D) for saved-history paired scoring (one
+replay population), Var(Y_right - Y_left) for common-random-number pairs whose
+summary cites a primary pairing audit (both arms charged), or
 Var(Y_left) + Var(Y_right) for independent equal-size arms. Summaries must be
 independently audited against raw evidence before any job can be authorized.
 """
@@ -69,11 +71,13 @@ def _validate_pilots(pilots, ids):
             raise ValueError("unknown or duplicate pilot row")
         _positive(pilot["variance"], "pilot variance", zero=True)
         sampling = pilot["sampling"]
-        if sampling not in ("paired", "independent"):
+        if sampling not in ("paired", "crn-paired", "independent"):
             raise ValueError("unknown sampling model")
+        if sampling == "crn-paired" and not pilots.get("pairing_audit_sha256"):
+            raise ValueError("common-random-number pairs need a cited pairing audit")
         if len(pilot["arms"]) != (1 if sampling == "paired" else 2):
             raise ValueError(
-                "paired forecasts need one replay population; independent need two arms"
+                "paired forecasts need one replay population; other sampling needs two arms"
             )
         result[key] = pilot
     return result
@@ -194,6 +198,7 @@ def resource_plan(design, pilots):
         multiplicity=design["multiplicity"],
         row_alpha=design["row_alpha"],
         pilot_seeds=pilots["seeds"],
+        pairing_audit_sha256=pilots.get("pairing_audit_sha256"),
         rows=rows,
         forecast_cpu_core_hours=cpu,
         forecast_gpu_hours=gpu,

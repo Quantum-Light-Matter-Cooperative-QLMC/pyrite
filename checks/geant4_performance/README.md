@@ -118,6 +118,28 @@ half-allowance CI-width target, three equal repeats and 20k-per-repeat minimum.
 It rejects zero/nonfinite variance; counts still require eligible pilot
 evidence and forecasts under the frozen CPU/GPU ceilings.
 
+### Owner amendment v1.1
+
+`amend_convergence_design.py` derives `convergence-design-v1.1.json` from the
+committed v1 file (checked to reproduce, cited by SHA-256); it never edits v1,
+whose freeze hashes its own compiler. The owner decided on 2026-11-24, before
+any confirmation run:
+
+- epsilon 2% → **5%**; every allowance is recomputed as `S*0.05/3/4/k` with
+  the same family split, so allowances grow 2.5× and counts fall 6.25×;
+- `elsepa_energy_density` becomes `available`: all nine planned nested
+  refinements (L1–L3; Si free-atom and muffin-tin, W free-atom) were generated
+  and admitted. The amendment cites the refinement plan hash, the nine keys
+  and the generation jobs; durable raw publication remains open;
+- audited common-random-number pairing is admitted (next section);
+- the confirmation GPU-hour ceiling is extended to the recorded value.
+
+Rows, row IDs, the multiplicity of 7,074 and the row alpha are unchanged.
+
+```bash
+uv run python checks/geant4_performance/amend_convergence_design.py --check
+```
+
 ## PyRITE numerical and table controls (#1041)
 
 `pyrite_bench.py` accepts invocation-local `--electron-cutoff-kev`,
@@ -207,11 +229,14 @@ The pilot-summary JSON uses schema
 | `rows` | Summaries keyed by an expected comparison's `id`; omitted rows remain missing |
 
 Each row supplies `id`, `sampling`, `variance`, `evidence_files` and `arms`.
-`variance` is per incident primary: `Var(D)` for `sampling="paired"`, or the
-**sum** `Var(Y_left)+Var(Y_right)` for `sampling="independent"`. Paired scoring
-uses one costed replay population; independent transport uses two costed arms,
-each with the full calculated confirmation count. Pairing requires the issue's
-saved-history/substream audit; the summary label alone does not establish it.
+`variance` is per incident primary: `Var(D)` for `sampling="paired"`,
+`Var(Y_right-Y_left)` over primaries aligned by seed and global index for
+`sampling="crn-paired"`, or the **sum** `Var(Y_left)+Var(Y_right)` for
+`sampling="independent"`. Paired scoring uses one costed replay population;
+common-random-number pairs and independent transport use two costed arms,
+each with the full calculated confirmation count. `crn-paired` rows are refused
+unless the summary cites a pairing audit (`pairing_audit_sha256`); the label
+alone does not establish pairing.
 `evidence_files` is a nonempty subset of the top-level hashed paths. Hashes
 verify retention integrity; the planner does not parse raw scores to certify
 summary statistics, seed provenance, diagnostics or scientific identity.
@@ -250,14 +275,38 @@ PyRITE CUDA bench records on pilot seeds 301–303. Scene, arm, workload and
 the level of every design control are derived from each record's effective
 settings, not file names; a record refining two primitives, an off-ladder
 value or another seed fails. Raw NPZ hashes are verified before pooling.
-Different levels are independent populations, so `variance` is the sum of
-both arms' per-primary variances. Only `available` per-control contrasts
+Without `--pairing-audit`, different levels are independent populations, so
+`variance` is the sum of both arms' per-primary variances. With an audit that
+verifies both arms' (config, setting, observable) cells and matching seeds and
+histories, the row is `crn-paired` and also keeps `independent_variance`. Only `available` per-control contrasts
 (`nominal:L3`, `L1:L2`, `L2:L3`) with both arms present become rows;
 unavailable controls and all-fine corners stay missing. Rate is summed warm
 request time over pooled histories; per-shard overhead is the largest
 `process_total - warm_request`. Peak VRAM comes from the bench's sampled
 `cudaMemGetInfo` telemetry, a device-wide upper bound including the CUDA
 context. Summaries are planning evidence, never convergence verdicts.
+
+### Primary pairing audit
+
+`audit_primary_pairing.py RECORD.json... --root DIR --output DIR/audit.json`
+checks, from bench records only, that a PyRITE CUDA configuration's
+per-primary score depends on `(seed, global primary index, configuration)`
+alone. That is the design's precondition for paired variances (a common seed
+is not enough):
+
+- **Replay invariance:** the same configuration, seed and histories rerun
+  with a different `--block`, `--rows-per-round` and `--seg-capacity` must
+  give bitwise-identical arrays for every design transport observable.
+- **Alignment:** one finite score per primary in index order, and exactly
+  one terminal fate per primary, so zero scores are retained.
+- **Seed separation:** nominal scores for different pilot seeds must not be
+  identical, and `|r|·sqrt(N)` must stay under a Bonferroni normal bound.
+
+A cell is `verified` only when its replay is bitwise equal and its
+configuration's seed separation passes. The structural basis is the counter
+addressing in `docs/computation/random-streams.md`. Confirmation shards must
+still give both arms the same seed and global primary offsets; the per-shard
+map is audited separately.
 
 ## Whole-primary scorer capture/replay (#1041)
 
