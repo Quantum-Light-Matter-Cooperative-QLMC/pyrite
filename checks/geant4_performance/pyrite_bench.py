@@ -78,6 +78,44 @@ def cone_axis(cone):
     return np.array([math.sin(c), 0.0, math.cos(c)])
 
 
+class DevicePeakSampler:
+    """Sample device-wide used VRAM (total minus free) on a background thread.
+
+    An upper bound on this process's peak: it includes the CUDA context and any
+    other process on the card, and misses spikes shorter than the interval.
+    """
+
+    def __init__(self, cp, interval_s=0.05):
+        import threading
+
+        self.cp, self.interval_s, self.peak, self.samples = cp, interval_s, 0, 0
+        self.stop_event = threading.Event()
+        self.thread = threading.Thread(target=self.run, daemon=True)
+        self.sample()
+        self.thread.start()
+
+    def sample(self):
+        free, total = self.cp.cuda.runtime.memGetInfo()
+        self.peak = max(self.peak, int(total - free))
+        self.samples += 1
+
+    def run(self):
+        while not self.stop_event.wait(self.interval_s):
+            self.sample()
+
+    def finish(self):
+        self.stop_event.set()
+        self.thread.join()
+        self.sample()
+        return dict(
+            peak_device_used_bytes=self.peak,
+            samples=self.samples,
+            interval_s=self.interval_s,
+            method="cudaMemGetInfo total-free, sampled; device-wide upper bound incl. "
+            "CUDA context and other processes; misses sub-interval spikes",
+        )
+
+
 def discrete_cone_scores(r, n, cone):
     """Sampled hard photons >= 10 keV entering the cone at creation, per primary."""
     import numpy as np
@@ -704,6 +742,7 @@ def main():
         _jit_launch._SPECIALIZE_TRANSPORT_KERNEL = args.kernel == "specialized"
     pool = cp.get_default_memory_pool()
     pool.set_limit(fraction=args.pool_fraction)
+    vram = DevicePeakSampler(cp)
     import numpy as np
 
     from pyrite.montecarlo.transport import TransportLUTConfig
@@ -1067,6 +1106,7 @@ def main():
         ),
         device=dev["name"].decode(),
         peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+        vram_telemetry=vram.finish(),
         environment={
             k: os.environ.get(k) for k in ("PYRITE_MC_BACKEND", "PYRITE_MC_TRANSPORT_SCHEDULE")
         },

@@ -260,7 +260,10 @@ def test_harness_captures_only_warm_request_with_global_block_ids(tmp_path, monk
     pool = SimpleNamespace(set_limit=no_op, free_all_blocks=no_op)
     cuda = SimpleNamespace(
         Device=lambda: SimpleNamespace(synchronize=no_op),
-        runtime=SimpleNamespace(getDeviceProperties=lambda _: dict(name=b"fake-test-device")),
+        runtime=SimpleNamespace(
+            getDeviceProperties=lambda _: dict(name=b"fake-test-device"),
+            memGetInfo=lambda: (3, 4),
+        ),
     )
     monkeypatch.setitem(
         sys.modules, "cupy", SimpleNamespace(cuda=cuda, get_default_memory_pool=lambda: pool)

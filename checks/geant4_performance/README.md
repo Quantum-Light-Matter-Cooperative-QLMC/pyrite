@@ -242,6 +242,23 @@ seed/substream maps, runtime/table identities and memory qualification remain
 required; `submission_ready=false`, `numerical_gate="unmeasured"` and
 `headline=false` are unconditional.
 
+### Pilot summaries from bench records
+
+`summarize_convergence_pilot.py RECORD.json... --root DIR --cpus N --hardware H
+--runtime R --output DIR/summary.json` builds the planner input above from
+PyRITE CUDA bench records on pilot seeds 301–303. Scene, arm, workload and
+the level of every design control are derived from each record's effective
+settings, not file names; a record refining two primitives, an off-ladder
+value or another seed fails. Raw NPZ hashes are verified before pooling.
+Different levels are independent populations, so `variance` is the sum of
+both arms' per-primary variances. Only `available` per-control contrasts
+(`nominal:L3`, `L1:L2`, `L2:L3`) with both arms present become rows;
+unavailable controls and all-fine corners stay missing. Rate is summed warm
+request time over pooled histories; per-shard overhead is the largest
+`process_total - warm_request`. Peak VRAM comes from the bench's sampled
+`cudaMemGetInfo` telemetry, a device-wide upper bound including the CUDA
+context. Summaries are planning evidence, never convergence verdicts.
+
 ## Whole-primary scorer capture/replay (#1041)
 
 `pyrite_bench.py --estimator continuous --capture-tracks NEW_DIRECTORY`
