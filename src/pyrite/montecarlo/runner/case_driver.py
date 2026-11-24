@@ -335,7 +335,7 @@ def _transport_case(
     # Passed only when a caller asked, so progress-free calls keep their shape.
     transport_progress = _TRANSPORT_PROGRESS.get()
     progress_kw = {} if transport_progress is None else {"transport_progress": transport_progress}
-    schedule_kw = tuned_transport_kwargs()  # KernelTuning override (#776)
+    schedule_kw = {**tuned_transport_kwargs(), **split_kw}  # KernelTuning (#776), split
 
     if block_electrons is not None and core == "lockstep":
         raise ValueError(
@@ -390,7 +390,6 @@ def _transport_case(
                 else {}
             ),
             **call_kw,
-            **split_kw,
         )
 
     transport = _transport
