@@ -561,9 +561,10 @@ _REDUCE_THREADS = 256
 
 _BIN_REDUCE_SOURCE = r"""
 /* One block per (bin, line chunk); lines of the chunk stride across its
-   threads a tile at a time. Block row x evaluates bin bin_index[x]. A single chunk (gridDim.y == 1) covers every line;
-   more chunks fill the device when bins are few, and each writes its own
-   partial, summed in chunk order by the caller.
+   threads a tile at a time. Block row x evaluates bin bin_index[x]. A single
+   chunk (gridDim.y == 1) covers every line; more chunks fill the device when
+   bins are few, and each writes its own partial, summed by the caller with a
+   fixed device reduction.
    Far pairs add to a compensated float32 sum on the spot. Near pairs, which
    need the FP64 sine integral, are compacted into a shared queue in lane
    order (warp ballot + prefix) and evaluated together once the queue fills,
@@ -694,7 +695,9 @@ def _line_chunks(n_bins: int, n_lines: int) -> tuple[int, int]:
     ``_REDUCE_BLOCKS_PER_SM`` blocks per SM. One chunk keeps the single-block
     summation order. More only regroup the sums: each chunk keeps its own FP64
     near sum and compensated float32 far sum, and the chunk totals add in FP64
-    in chunk order, so the result stays deterministic for a fixed device.
+    with a fixed CuPy reduction, so the result is repeatable for a fixed device
+    and CuPy version. The chunk count follows the SM count, so it can differ
+    between devices (hence ``CXR_BIN_REDUCTION_MODEL``).
     """
     import cupy
 
@@ -812,7 +815,7 @@ def sincsq_bin_lineshape(
 #: v10 (#1392): the uniform runs of a ``"segmented"`` axis share one line
 #: transform at the largest run period and broad threshold, each run
 #: evaluated at its centres by an ES type-2 transform (``_fourier_runs``).
-CXR_BIN_REDUCTION_MODEL = "fourier-auto-v10"
+CXR_BIN_REDUCTION_MODEL = "fourier-auto-v11"
 #: Lines per Fourier-route flush: amortises the per-call FFT and planning.
 FOURIER_FLUSH_LINES = 10_000_000
 
@@ -1020,6 +1023,19 @@ def _bin_reduction_markers(resolved):
     return {"line_reduction_model": CXR_BIN_REDUCTION_MODEL} if quadrature == "bin-mean" else {}
 
 
+def _check_bins(bins, n_axis: int, out, method: str) -> None:
+    """Reject a ``bins`` subset the kernel would read out of bounds or misplace."""
+    if method in ("segmented", "fourier"):
+        raise ValueError("bins applies to the near/far methods only")
+    host_bins = np.asarray(_to_cpu(bins))
+    if host_bins.ndim != 1 or host_bins.dtype.kind not in "iu":
+        raise ValueError("bins must be a 1-D integer index array")
+    if host_bins.size and (host_bins.min() < 0 or host_bins.max() >= n_axis):
+        raise ValueError("bins must index inv_width")
+    if host_bins.size != int(np.prod(out.shape)):
+        raise ValueError("out must hold one value per listed bin")
+
+
 def run_bin_mean_reduction_kernel(
     E_r,
     aw,
@@ -1065,8 +1081,8 @@ def run_bin_mean_reduction_kernel(
         return out
     if method not in _REDUCTION_METHODS:
         raise ValueError(f"method must be one of {_REDUCTION_METHODS}")
-    if bins is not None and method in ("segmented", "fourier"):
-        raise ValueError("bins applies to the near/far methods only")
+    if bins is not None:
+        _check_bins(bins, inv_width.shape[0], out, method)
     if method == "segmented":
         return _run_segmented_reduction(
             E_r, aw, w, edges, inv_width, out=out, exact_widths=exact_widths, runs=fourier_axis

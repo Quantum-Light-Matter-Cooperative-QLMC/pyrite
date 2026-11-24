@@ -228,6 +228,32 @@ def test_bin_subset_matches_the_full_axis_on_those_bins(method):
     np.testing.assert_array_equal(cp.asnumpy(sub), cp.asnumpy(full)[pick])
     with pytest.raises(ValueError, match="near/far"):
         bq.run_bin_mean_reduction_kernel(*args, out=sub, method="fourier", bins=pick)
+    for bad in (np.array([-1]), np.array([inv_width.size]), np.array([0.0])):
+        with pytest.raises(ValueError, match="bins must"):
+            bq.run_bin_mean_reduction_kernel(
+                *args, out=cp.zeros(1, dtype=cp.float64), method=method, bins=bad
+            )
+    with pytest.raises(ValueError, match="one value per listed bin"):
+        bq.run_bin_mean_reduction_kernel(*args, out=full, method=method, bins=pick)
+
+
+def test_bin_subset_with_line_chunks_matches_the_full_axis(monkeypatch):
+    """#1403: a subset and several line chunks together: chunk partials per listed bin.
+
+    Validation: sinc-bin-near-far
+    """
+    a_width, E_res = (v.astype(np.float32) for v in _lines(count=4000, seed=1404))
+    weight = np.random.default_rng(1404).uniform(0.0, 2.0, a_width.size).astype(np.float32)
+    edges, inv_width = _axis()
+    pick = np.array([3, 40, 41, 60, 2000, inv_width.size - 1])
+    args = tuple(cp.asarray(x) for x in (E_res, a_width, weight, edges, inv_width))
+    monkeypatch.setattr(bq, "_REDUCE_MIN_CHUNK_LINES", 300)
+    assert bq._line_chunks(pick.size, a_width.size)[0] > 1
+    full = cp.zeros(inv_width.size, dtype=cp.float64)
+    bq.run_bin_mean_reduction_kernel(*args, out=full, method="pairs")
+    sub = cp.zeros(pick.size, dtype=cp.float64)
+    bq.run_bin_mean_reduction_kernel(*args, out=sub, method="pairs", bins=pick)
+    np.testing.assert_allclose(cp.asnumpy(sub), cp.asnumpy(full)[pick], rtol=1e-6, atol=1e-10)
 
 
 def test_hybrid_matrix_kernel_matches_the_host_hybrid():
