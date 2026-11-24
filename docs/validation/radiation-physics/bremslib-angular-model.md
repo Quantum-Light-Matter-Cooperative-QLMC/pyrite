@@ -95,6 +95,13 @@ thread, shared tree and output spectrum). FP32 sums made the continuum depend
 on how segments were split between calls: retained and streamed adaptive
 scoring of hopg 300 keV/20M differed by 2.4e-5 of peak. Binary64 output is
 unchanged.
+The `cpu-fused-f64-v1` suffix (#1429) records that covered float64 CPU
+scoring runs through the fused Numba reducer `spectrum._brem_cpu_fused`. Its
+cells repeat the portable expressions; only the summation order changes
+(sequential per photon bin over rows, per row over photon bins), so default
+CPU BremsLib output moves by at most a few ulps (4.5 eps observed on the
+synthetic-table agreement tests, which assert 1e-12 relative). FP32 CUDA output
+is unchanged.
 
 `mc_brem_spectrum` evaluates the angle per segment, preserves EEDL as the warned isotropic fallback for a missing element table or uncovered incident energy, applies attenuation, and divides by the incident-electron count. The portable path and the fused CUDA mirror use the same staged rows, interpolation fractions, tip rule, unit conversion, fallback state, and $4\pi$ cancellation. This derivation is a static source-to-code comparison. Separately, the hardware-gated CUDA comparison passed on an RTX 5080 on 2026-09-22; the full neighboring CUDA spectrum regression file passed (7 tests, SLURM job 1796).
 

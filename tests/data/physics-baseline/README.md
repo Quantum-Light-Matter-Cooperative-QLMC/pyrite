@@ -605,3 +605,12 @@ free/overflow fates (the handoff moves with the cut) and the characteristic
 and bremsstrahlung spectra (≤ 9e-4 relative), regenerated on CPU/NumPy fp64
 with the synthetic Mott tables. Rows, other families and every tolerance are
 unchanged.
+
+## Fused CPU BremsLib reducer (#1429)
+
+Covered float64 CPU BremsLib scoring runs through the fused Numba reducer, so
+`BREMSSTRAHLUNG_BREMSLIB_MODEL` gains `/cpu-fused-f64-v1`. Cells are the
+portable expressions; only the summation order changes (a few ulps). Re-pinned
+with `pyrite-dev test-suite identity-pins --update-pins`: the BremsLib
+`case_content_key` and `parameter_sha256` hashes in `resolved.json`. Every
+recorded output keeps its expectation and tolerance.

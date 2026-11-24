@@ -128,6 +128,7 @@ def test_fixed_n_identity_matches_the_pre_precision_baseline(identity_pin):
     # payload); the dataset identity, which hashes no case policy, did not.
     # #1301 adds the fiber-texture domain to hopg's dataset crystallography.
     # #1305: fp64-segment-sum-v1 brem markers.
+    # #1429: cpu-fused-f64-v1 BremsLib marker.
     identity = dataset_identity("hopg", Settings(), sweep, bremsstrahlung_model="eedl")
     identity_pin("dataset/hopg/30keV-fixed-n-eedl/parameter_sha256", identity["parameter_sha256"])
     case = build_cases(
