@@ -177,6 +177,38 @@ def test_fused_reduction_is_independent_of_its_thread_count(monkeypatch, threads
     np.testing.assert_allclose(cp.asnumpy(out), host, rtol=1e-9, atol=1e-10)
 
 
+@pytest.mark.parametrize("exact_widths", [None, bq.BIN_MEAN_EXACT_WIDTHS])
+def test_line_chunked_reduction_matches_one_block_per_bin(monkeypatch, exact_widths):
+    """#1403: few bins split lines across chunks; only per-chunk sums regroup.
+
+    Validation: sinc-bin-near-far
+    """
+    a_width, E_res = (v.astype(np.float32) for v in _lines(count=4000, seed=1403))
+    weight = np.random.default_rng(1403).uniform(0.0, 2.0, a_width.size).astype(np.float32)
+    edges, inv_width = _axis()
+    edges, inv_width = edges[40:53], inv_width[40:52]  # 12 bins: far fewer than the device holds
+    host = weight.astype(np.float64) @ bq._host_bin_mean(
+        a_width, E_res, edges, inv_width, exact_widths=exact_widths
+    )
+    args = tuple(cp.asarray(x) for x in (E_res, a_width, weight, edges, inv_width))
+    kw = {} if exact_widths is not None else {"exact_widths": None}
+    monkeypatch.setattr(bq, "_REDUCE_MIN_CHUNK_LINES", 1 << 40)
+    assert bq._line_chunks(inv_width.size, a_width.size)[0] == 1
+    single = cp.zeros(inv_width.size, dtype=cp.float64)
+    bq.run_bin_mean_reduction_kernel(*args, out=single, **kw)
+    monkeypatch.setattr(bq, "_REDUCE_MIN_CHUNK_LINES", 300)  # not a tile multiple
+    chunks, chunk_lines = bq._line_chunks(inv_width.size, a_width.size)
+    assert chunks > 1 and (chunks - 1) * chunk_lines < a_width.size <= chunks * chunk_lines
+    chunked = cp.zeros(inv_width.size, dtype=cp.float64)
+    bq.run_bin_mean_reduction_kernel(*args, out=chunked, **kw)
+    rtol = 1e-9 if exact_widths is None else 1e-6
+    np.testing.assert_allclose(cp.asnumpy(chunked), host, rtol=rtol, atol=1e-10)
+    np.testing.assert_allclose(cp.asnumpy(chunked), cp.asnumpy(single), rtol=rtol, atol=1e-10)
+    again = cp.zeros(inv_width.size, dtype=cp.float64)
+    bq.run_bin_mean_reduction_kernel(*args, out=again, **kw)
+    assert cp.array_equal(again, chunked)
+
+
 def test_hybrid_matrix_kernel_matches_the_host_hybrid():
     """Far-field envelope bins agree to float32 rounding; near bins stay FP64-exact."""
     a_width, E_res = _lines()

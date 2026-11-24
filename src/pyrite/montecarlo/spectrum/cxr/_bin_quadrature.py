@@ -59,6 +59,7 @@ Validation: sinc-bin-far-envelope
 
 from contextlib import contextmanager
 from contextvars import ContextVar
+from functools import cache
 
 import numpy as np
 
@@ -559,7 +560,10 @@ def _bin_mean_kernel():
 _REDUCE_THREADS = 256
 
 _BIN_REDUCE_SOURCE = r"""
-/* One block per bin; lines stride across its threads a tile at a time.
+/* One block per (bin, line chunk); lines of the chunk stride across its
+   threads a tile at a time. A single chunk (gridDim.y == 1) covers every line;
+   more chunks fill the device when bins are few, and each writes its own
+   partial, summed in chunk order by the caller.
    Far pairs add to a compensated float32 sum on the spot. Near pairs, which
    need the FP64 sine integral, are compacted into a shared queue in lane
    order (warp ballot + prefix) and evaluated together once the queue fills,
@@ -568,7 +572,8 @@ _BIN_REDUCE_SOURCE = r"""
    deterministic. */
 extern "C" __global__ void pyrite_sincsq_bin_mean_reduce(
     const float *e_r, const float *aw, const float *w, const double *edges,
-    const double *inv_width, double *out, const long long n_lines, const float far_widths
+    const double *inv_width, double *out, const long long n_lines, const float far_widths,
+    const long long chunk_lines
 ) {
     extern __shared__ double shared[];
     const unsigned int tid = threadIdx.x;
@@ -582,6 +587,8 @@ extern "C" __global__ void pyrite_sincsq_bin_mean_reduce(
     int *queue_count = warp_offset + 32;
 
     const long long bin = blockIdx.x;
+    const long long first = (long long)blockIdx.y * chunk_lines;
+    const long long last = min(n_lines, first + chunk_lines);
     const double lo = edges[bin];
     const double hi = edges[bin + 1];
     const double iw = inv_width[bin];
@@ -592,10 +599,10 @@ extern "C" __global__ void pyrite_sincsq_bin_mean_reduce(
     }
     double near = 0.0;
     float far_sum = 0.0f, far_carry = 0.0f;
-    for (long long base = 0; base < n_lines; base += threads) {
+    for (long long base = first; base < last; base += threads) {
         const long long line = base + tid;
         bool is_near = false;
-        if (line < n_lines) {
+        if (line < last) {
             const float wt = w[line];
             if (wt != 0.0f) {
                 float mean;
@@ -636,7 +643,7 @@ extern "C" __global__ void pyrite_sincsq_bin_mean_reduce(
         }
         __syncthreads();
         const int pending = *queue_count;
-        if (pending >= (int)threads || base + threads >= n_lines) {
+        if (pending >= (int)threads || base + threads >= last) {
             for (int k = tid; k < pending; k += threads) {
                 const long long q = queue[k];
                 near += (double)w[q] * pyrite_sincsq_bin_mean(
@@ -658,10 +665,44 @@ extern "C" __global__ void pyrite_sincsq_bin_mean_reduce(
         __syncthreads();
     }
     if (tid == 0) {
-        out[bin] = partial[0];
+        out[bin * gridDim.y + blockIdx.y] = partial[0];
     }
 }
 """
+
+
+#: Resident blocks per SM the all-pairs launch aims for before splitting lines.
+_REDUCE_BLOCKS_PER_SM = 8
+#: Fewest lines per chunk: four 256-thread tiles keep the queue and the final
+#: block reduction a small share of a chunk.
+_REDUCE_MIN_CHUNK_LINES = 4 * 256
+
+
+@cache
+def _sm_count(device: int) -> int:
+    import cupy
+
+    return int(cupy.cuda.runtime.getDeviceProperties(device)["multiProcessorCount"])
+
+
+def _line_chunks(n_bins: int, n_lines: int) -> tuple[int, int]:
+    """``(chunks, lines per chunk)`` for the all-pairs kernel grid ``(n_bins, chunks)``.
+
+    One block per bin leaves most of the device idle when bins are few (the
+    ~50 leftover bins of a ``"segmented"`` flush ran ~50 blocks over every
+    line, #1403). Lines are then split into chunks until the grid reaches
+    ``_REDUCE_BLOCKS_PER_SM`` blocks per SM. One chunk keeps the single-block
+    summation order. More only regroup the sums: each chunk keeps its own FP64
+    near sum and compensated float32 far sum, and the chunk totals add in FP64
+    in chunk order, so the result stays deterministic for a fixed device.
+    """
+    import cupy
+
+    target = _REDUCE_BLOCKS_PER_SM * _sm_count(cupy.cuda.Device().id)
+    chunks = min(-(-target // n_bins), max(1, n_lines // _REDUCE_MIN_CHUNK_LINES))
+    chunks = max(1, chunks)
+    chunk_lines = -(-n_lines // chunks)
+    return -(-n_lines // chunk_lines), chunk_lines
 
 
 def _bin_reduce_kernel():
@@ -1007,10 +1048,11 @@ def run_bin_mean_reduction_kernel(
         from ._bin_tree import run_tree_reduction
 
         return run_tree_reduction(E_r, aw, w, edges, inv_width, out=out, exact_widths=exact_widths)
-    per_bin = cupy.empty(n_bins, dtype=cupy.float64)
     threads = int(_REDUCE_THREADS)
+    chunks, chunk_lines = _line_chunks(n_bins, n_cxr_rows)
+    per_chunk = cupy.empty((n_bins, chunks), dtype=cupy.float64)
     _bin_reduce_kernel()(
-        (n_bins,),
+        (n_bins, chunks),
         (threads,),
         (
             cupy.ascontiguousarray(E_r, dtype=cupy.float32),
@@ -1018,12 +1060,14 @@ def run_bin_mean_reduction_kernel(
             cupy.ascontiguousarray(w, dtype=cupy.float32),
             cupy.ascontiguousarray(edges, dtype=cupy.float64),
             cupy.ascontiguousarray(inv_width, dtype=cupy.float64),
-            per_bin,
+            per_chunk,
             np.int64(n_cxr_rows),
             np.float32(np.inf if exact_widths is None else float(exact_widths)),
+            np.int64(chunk_lines),
         ),
         # partial sums, a two-tile line queue, warp offsets, the queue count
         shared_mem=threads * 8 + 2 * threads * 8 + 33 * 4,
     )
+    per_bin = per_chunk[:, 0] if chunks == 1 else per_chunk.sum(axis=1)
     out += per_bin.astype(out.dtype)
     return out
