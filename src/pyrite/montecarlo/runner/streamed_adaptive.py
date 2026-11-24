@@ -204,7 +204,7 @@ class _MeasureOnly:
         del block
 
 
-def _monitored_pass(case, transport_core, sink):
+def _monitored_pass(case, transport_core, sink, block_electrons):
     """Run the monitored adaptive transport into ``sink``; the realized fixed case and record.
 
     Validation: adaptive-sample-size-stopping
@@ -216,6 +216,7 @@ def _monitored_pass(case, transport_core, sink):
         transport_core=transport_core,
         keep_segments_on_device=True,
         block_consumer=sink,
+        block_electrons=block_electrons,
     )
     sampling = dict(tp["adaptive_sampling"])
     fixed = {key: value for key, value in case.items() if key != "adaptive_precision"}
@@ -247,14 +248,14 @@ def run_adaptive_streamed(case, block_electrons, *, transport_core="auto", spill
         with block_electrons.pool_limit() if sized else nullcontext():
             with collect_line_data_coverage() as line_coverage:
                 sink.coverage = line_coverage
-                fixed, sampling, tp = _monitored_pass(case, transport_core, sink)
+                fixed, sampling, tp = _monitored_pass(case, transport_core, sink, block_electrons)
                 sink.finish()
         out = sink.result(fixed, tp["segs"], line_coverage)
         out.update({key: tp[key] for key in RECOVERY_KEYS if key in tp})
         transports = sink.passes
     else:
         sink = _MeasureOnly()
-        fixed, sampling, tp = _monitored_pass(case, transport_core, sink)
+        fixed, sampling, tp = _monitored_pass(case, transport_core, sink, block_electrons)
         out = score_fixed_streamed(
             fixed, block_electrons, transport_core=sampling["transport_core"], spill=spill
         )
