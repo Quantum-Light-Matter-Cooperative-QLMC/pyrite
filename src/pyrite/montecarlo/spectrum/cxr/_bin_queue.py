@@ -4,6 +4,10 @@ The per-hkl route visits one (reflection, orientation) row at a time. When
 a Fourier reduction applies (the device route, or on the NumPy backend the
 host route of ``_fourier_host``), each row's lines are queued per output
 target and reduced together, so the cost scales with lines rather than rows.
+On the NumPy backend a non-uniform axis queues into
+:class:`HostSegmentedLineQueues` (#1390): uniform runs take the shared-mode
+Fourier route and the other bins the numba near/far evaluator, never the
+dense ``(line, bin)`` matrix.
 """
 
 from __future__ import annotations
