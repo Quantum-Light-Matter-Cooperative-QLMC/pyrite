@@ -487,6 +487,7 @@ class SelectionContinuum:
                 n_norm = int(part["Ne"] if Ne is None else Ne)
                 values = values + fold_copies(part, n_norm, density)
             total += float(np.asarray(_to_cpu(values), dtype=float) @ self.weights)
+            del part, primaries, values  # release staged rows before the next block
         return total
 
     def background(self, layer: int | None) -> float:
