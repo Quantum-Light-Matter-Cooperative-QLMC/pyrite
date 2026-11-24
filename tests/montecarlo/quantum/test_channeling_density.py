@@ -9,7 +9,9 @@ from scipy.linalg import expm
 from pyrite.materials.channeling import planar_profile
 from pyrite.materials.crystal import HBARC_EV_ANG, M_E_EV
 from pyrite.montecarlo.channeling import (
+    DECHANNELING_CRITICAL_ANGLE_MULTIPLE,
     DensityMatrixSolver,
+    dechanneling_margin_eV,
     electronic_kernel,
     entry_populations,
     tds_kernel,
@@ -139,6 +141,26 @@ def test_dephasing_dominated_limit_is_the_rate_equation(si110, kernel):
         errors.append(np.abs(got - expected).max() / expected.max())
     assert errors[0] < 1e-3
     assert errors[1] < errors[0]
+
+
+def test_default_margin_is_a_critical_angle_multiple(si110, kernel):
+    """The default cut sits at ``a psi_c``: margin ``(a^2 - 1) D``, energy independent (#522)."""
+    low, barrier = si110.extrema()
+    depth = barrier - low
+    assert DECHANNELING_CRITICAL_ANGLE_MULTIPLE == 4.125
+    assert dechanneling_margin_eV(si110) == pytest.approx((4.125**2 - 1.0) * depth, rel=1e-12)
+    assert dechanneling_margin_eV(si110, 1.0 + 1e-9) == pytest.approx(0.0, abs=1e-6)
+    shallow = planar_profile("silicon", (1, 0, 0), 293.15)
+    ratio = dechanneling_margin_eV(shallow) / dechanneling_margin_eV(si110)
+    assert ratio == pytest.approx(np.ptp(shallow.extrema()) / depth, rel=1e-12)
+    solver = DensityMatrixSolver(si110, ENERGY_EV, kernel)
+    assert solver.margin_eV == pytest.approx(dechanneling_margin_eV(si110), rel=1e-12)
+    # The cut angle measured from the well bottom is a psi_c.
+    psi_ratio = np.sqrt((solver.cutoff_eV - low) / depth)
+    assert psi_ratio == pytest.approx(DECHANNELING_CRITICAL_ANGLE_MULTIPLE, rel=1e-12)
+    for bad in (1.0, 0.5, float("nan")):
+        with pytest.raises(ValueError):
+            dechanneling_margin_eV(si110, bad)
 
 
 def test_cutoff_margin_moves_flux_between_sink_and_subspace(si110, kernel):

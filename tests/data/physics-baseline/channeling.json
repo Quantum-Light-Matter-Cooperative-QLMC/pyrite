@@ -294,7 +294,7 @@
         0
       ],
       "temperature_K": 293.15,
-      "margin_eV": 300.0,
+      "margin_eV": 340.1898221860249,
       "basis_size": 16,
       "bloch_cells": 16,
       "dz_ang": 250.0,
@@ -323,5 +323,5 @@
     "dtheta_obs_rad": 0.0351963661580141,
     "domega_sr": 0.0012390399999999998
   },
-  "case_content_key": "f43abede01d9f8d8c615d5171d1c1f3a8de787dab037ab2b3069b441fcfb1238"
+  "case_content_key": "547c429e8dc98a2eab31f6877bcdb99919a94b4d0dc4b735425931fe7659270d"
 }

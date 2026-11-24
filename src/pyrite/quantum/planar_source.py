@@ -234,7 +234,8 @@ def project_planar_source(
     energy = _positive("kinetic_energy_eV", kinetic_energy_eV)
     temperature = _positive("temperature_K", temperature_K)
     density = import_module("pyrite.montecarlo.channeling.density")
-    DECHANNELING_MARGIN_EV = density.DECHANNELING_MARGIN_EV
+    plane = channeling.plane
+    assert plane is not None
 
     margin = (
         _positive(
@@ -247,7 +248,13 @@ def project_planar_source(
             ),
         )
         if margin_eV is not None
-        else float(DECHANNELING_MARGIN_EV)
+        else float(
+            density.dechanneling_margin_eV(
+                import_module("pyrite.materials.channeling").planar_profile(
+                    crystal, plane, temperature
+                )
+            )
+        )
     )
     if (
         isinstance(incidence_rad, bool)
@@ -262,8 +269,6 @@ def project_planar_source(
     states = import_module("pyrite.montecarlo.channeling.states")
     planar_entry_density = states.planar_entry_density
 
-    plane = channeling.plane
-    assert plane is not None
     metadata = PlanarStateProjection(
         state_digest=state.digest,
         crystal=crystal,

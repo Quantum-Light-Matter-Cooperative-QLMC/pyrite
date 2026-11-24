@@ -10,8 +10,9 @@ extrapolated, and callers cannot extend the table.
 ``epsilon`` bounds the relative error of the band-weighted on-axis line source
 (the forward-detector ``1->0``, ``2->1``, ``3->2`` lines) per incident electron
 at crystal thickness, at ``joint_confidence``. It is measured on the fibre
-reference with the production 300 eV margin; the production density-matrix
-zone matched that reference to within 7% at 17 MeV (#1056). It bounds the band
+reference at the production margin (``dechanneling_margin_eV``, ``4.125 psi_c``
+since #522; earlier entries used 300 eV); the production density-matrix zone
+matched that reference to within 7% at 17 MeV (#1056). It bounds the band
 integral only, not individual spectral bins.
 
 Admission is a curated maintainer decision, not a threshold on ``epsilon``:
@@ -71,7 +72,7 @@ class AdmittedPlanarCase:
     particle: str = "electron"
 
 
-_RECORDS = "docs/validation/check-records/planar_fiber_runs/budget"
+_RECORDS = "docs/validation/check-records/planar_fiber_runs/budget-v12-a4.125"
 
 ADMITTED_PLANAR_CASES: Mapping[str, AdmittedPlanarCase] = MappingProxyType(
     {
@@ -85,12 +86,13 @@ ADMITTED_PLANAR_CASES: Mapping[str, AdmittedPlanarCase] = MappingProxyType(
             thickness_ang=(20000.0, 20000.0),
             incidence_rad=0.0,
             temperature_K=293.15,
-            margin_eV=300.0,
+            # dechanneling_margin_eV of Si (110) at 293.15 K (4.125 psi_c, #522).
+            margin_eV=340.1898221860249,
             numerics=PlanarZoneNumerics(),
-            epsilon=0.04862891554506509,
+            epsilon=0.06035991567691875,
             joint_confidence=0.95,
             observable="line-source:((1, 0), (2, 1), (3, 2)):forward-detector",
-            evidence_id="1056/demo_17@ce8ea207f",
+            evidence_id="522/demo_17@15631",
             evidence_record=f"{_RECORDS}/report-demo_17.json",
         ),
     }

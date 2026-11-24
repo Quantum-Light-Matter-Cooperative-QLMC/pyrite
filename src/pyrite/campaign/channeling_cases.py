@@ -175,23 +175,13 @@ def _planar_admission(case: Case, zone: dict[str, object], channeling: Channelin
 def _resolve_planar(cases: list[Case], channeling: Channeling) -> list[Case]:
     from ..materials.channeling import planar_profile
     from ..montecarlo.channeling import (
-        DECHANNELING_MARGIN_EV,
+        dechanneling_margin_eV,
         longitudinal_kinematics,
         transverse_states,
     )
 
     assert channeling.plane is not None  # Channeling validated the pair
     numerics = channeling.numerics
-    zone = channeling_case_record(
-        channeling.plane,
-        temperature_K=CHANNELING_TEMPERATURE_K,
-        margin_eV=DECHANNELING_MARGIN_EV,
-        basis_size=numerics.basis_size,
-        bloch_cells=numerics.bloch_cells,
-        dz_ang=numerics.step_ang,
-        zone_max_ang=numerics.zone_max_ang,
-        admission={},
-    )
     out = []
     for case in cases:
         energy_keV = float(case["E0_keV"])
@@ -207,12 +197,23 @@ def _resolve_planar(cases: list[Case], channeling: Channeling) -> list[Case]:
                 UserWarning,
                 stacklevel=4,
             )
-        profile = planar_profile(case["crystal"], zone["plane_hkl"], CHANNELING_TEMPERATURE_K)
+        profile = planar_profile(case["crystal"], channeling.plane, CHANNELING_TEMPERATURE_K)
+        # The margin scales with each crystal's well depth (dechanneling_margin_eV).
+        case_zone = channeling_case_record(
+            channeling.plane,
+            temperature_K=CHANNELING_TEMPERATURE_K,
+            margin_eV=float(dechanneling_margin_eV(profile)),
+            basis_size=numerics.basis_size,
+            bloch_cells=numerics.bloch_cells,
+            dz_ang=numerics.step_ang,
+            zone_max_ang=numerics.zone_max_ang,
+            admission={},
+        )
         gamma, _ = longitudinal_kinematics(energy_keV * 1e3)
         n_bound = transverse_states(profile, gamma).n_bound
         if n_bound < 1:
             raise ValueError(
-                f"case {case['name']!r}: plane {zone['plane_hkl']} of {case['crystal']!r} "
+                f"case {case['name']!r}: plane {case_zone['plane_hkl']} of {case['crystal']!r} "
                 f"has no bound transverse state at {energy_keV:g} keV"
             )
         nearest = _axis_proximity(case)
@@ -225,6 +226,6 @@ def _resolve_planar(cases: list[Case], channeling: Channeling) -> list[Case]:
                 UserWarning,
                 stacklevel=4,
             )
-        admission = _planar_admission(case, zone, channeling)
-        out.append(replace(case, channeling={**zone, "admission": admission}))
+        admission = _planar_admission(case, case_zone, channeling)
+        out.append(replace(case, channeling={**case_zone, "admission": admission}))
     return out

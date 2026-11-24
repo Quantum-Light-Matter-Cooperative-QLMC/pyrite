@@ -346,7 +346,9 @@ def test_channeling_demo_lowers_to_one_planar_case():
     assert case["channeling"]["basis_size"] == 16
     # The demo is the admitted planar entry and carries its measured budget (#1105).
     assert case["channeling"]["admission"]["case_key"] == "si110-17MeV-2um"
-    assert case["channeling"]["admission"]["epsilon"] < 0.05
+    assert (
+        case["channeling"]["admission"]["epsilon"] < 0.07
+    )  # 6.04% at the 4.125 psi_c default margin (#522)
     assert settings.channeling_admission == "admitted"
 
 

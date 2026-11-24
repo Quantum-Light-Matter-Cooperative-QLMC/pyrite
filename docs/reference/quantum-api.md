@@ -222,7 +222,7 @@ fields and the opt-in.
 
 | Model | Table | Entries | Matched fields |
 | --- | --- | --- | --- |
-| Planar | `pyrite.quantum._planar_envelope.ADMITTED_PLANAR_CASES` | `si110-17MeV-2um` (`channeling_demo`, ε = 4.86% at 95%) | crystal, plane (up to sign), kinetic energy, thickness range, plane incidence (beam in the planes), temperature, margin, zone numerics, plane-wave beam |
+| Planar | `pyrite.quantum._planar_envelope.ADMITTED_PLANAR_CASES` | `si110-17MeV-2um` (`channeling_demo`, ε = 6.04% at 95%) | crystal, plane (up to sign), kinetic energy, thickness range, plane incidence (beam in the planes), temperature, margin, zone numerics, plane-wave beam |
 | Axial | `pyrite.quantum._axial_envelope.ADMITTED_AXIAL_CASES` | `si-fibre/A`, `si-fibre/B` | crystal, axis, kinetic energy, thickness, tilt and azimuth, temperature, observable |
 
 Admitted planar cases record `Case.channeling["admission"]` =

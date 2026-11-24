@@ -14,9 +14,10 @@ import pytest
 import pyrite as pr
 from pyrite import api
 from pyrite.campaign.profiles import case_content_key
+from pyrite.materials.channeling import planar_profile
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.case import Case, channeling_case_record
-from pyrite.montecarlo.channeling import CHANNELING_MODEL, DECHANNELING_MARGIN_EV
+from pyrite.montecarlo.channeling import CHANNELING_MODEL, dechanneling_margin_eV
 from pyrite.montecarlo.transport import SegmentEvent, check_segment_event_contract
 from pyrite.quantum import Channeling, ChannelingNumerics
 
@@ -64,7 +65,7 @@ def test_planar_adds_one_record_and_the_marker(planar_case):
     assert record == channeling_case_record(
         (1, -1, 0),
         temperature_K=293.15,
-        margin_eV=DECHANNELING_MARGIN_EV,
+        margin_eV=dechanneling_margin_eV(planar_profile("silicon", (1, -1, 0), 293.15)),
         basis_size=16,
         bloch_cells=16,
         dz_ang=250.0,

@@ -149,7 +149,7 @@ combined = result.combined_cxr()  # includes CR
 ```
 
 Only measured cases run by default. `channeling_demo` is the one admitted
-planar case, and its results carry a relative error budget ε = 4.9%. A change
+planar case, and its results carry a relative error budget ε = 6.0%. A change
 to the crystal, plane, energy, thickness, incidence, beam spread or zone
 numerics moves the case outside the
 [admission table](../reference/quantum-api.md#admission-and-the-unadmitted-opt-in).

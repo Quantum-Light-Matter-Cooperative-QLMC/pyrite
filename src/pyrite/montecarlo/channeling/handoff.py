@@ -18,7 +18,7 @@ renormalized by ``1 + balance_defect``):
 - *free*: dechanneled into in-basis states above ``barrier + margin``
   (free and reprojection flux), at depth ``z`` with transverse energy
   ``E_perp`` from the binned flux;
-- *overflow*: dechanneled by a jump beyond the plane-wave band, at depth ``z``;
+- *overflow*: unresolved loss from the finite plane-wave or kernel band, at depth ``z``;
 - *bound*: still in the evolving subspace at the exit face; the zone row ends
   there with the exit event and no native transport follows.
 
@@ -27,7 +27,8 @@ electron, keyed on ``(seed, electron)`` under their own salt, pick the fate,
 the depth from that fate's cumulative depth flux, ``E_perp`` and the sign.
 The handoff angle to the plane is ``psi = sqrt(2 E_perp / (p v))`` with
 ``E_perp`` measured from the cell-mean potential ``U_0 = 0``; overflow uses the
-band-edge angle ``psi_edge = (H + 1/2) g hbar / p`` (a lower bound). The new
+declared band-edge angle ``psi_edge = (H + 1/2) g hbar / p``. This is an
+assignment, not a lower bound on all unresolved overflow. The new
 direction keeps the electron's own in-plane component and tilts it toward
 ``+/- n`` (equal signs). Energy ``E0 - S z`` and clock ``t + z / beta(E_mid)``
 continue; position is ``r0 + z v0``.
@@ -37,9 +38,9 @@ straight mean segment along the entry direction; ``E_perp`` is independent of
 the handoff depth (separable sampling); the sign is symmetric; overflow leaves
 at the band edge; ``S`` is constant at ``S(E0)`` in both the solve and the row;
 rechanneling is omitted; divergence below the Bloch-grid resolution is
-snapped to the nearest grid momentum. The 300 eV declared margin sets where
-the free flux lands, so it sets the handoff angles (about ``3.7 psi_c`` at
-5 MeV Si(110)).
+snapped to the nearest grid momentum. The declared margin (``4.125 psi_c`` from the well bottom,
+``dechanneling_margin_eV``) sets where the free flux lands, so it sets the
+handoff angles.
 
 Validation: cr-zone-handoff-accounting
 """
@@ -54,8 +55,9 @@ import numpy as np
 
 #: Physics-generation marker of the planar zone and its handoff. It joins
 #: ``case_content_key`` and run provenance only for cases with a ``channeling``
-#: record, so channeling-off identities are unchanged.
-CHANNELING_MODEL = "planar-density-matrix-emission-v11"
+#: record, so channeling-off identities are unchanged. v12 (#522): default
+#: dechanneling margin ``4.125 psi_c`` (``(a^2 - 1) D``) instead of a fixed 300 eV.
+CHANNELING_MODEL = "planar-density-matrix-emission-v12"
 
 #: Per-electron fates, in sampling order.
 FATE_ENTRY, FATE_FREE, FATE_OVERFLOW, FATE_BOUND = 0, 1, 2, 3
@@ -427,9 +429,9 @@ def warn_overflow(ensemble: ZoneEnsemble, name: str) -> None:
     share = float(ensemble.probabilities[FATE_OVERFLOW])
     if share > OVERFLOW_WARN_FRACTION:
         warnings.warn(
-            f"case {name!r}: {share:.0%} of electrons dechannel beyond the plane-wave band "
-            "and are handed off at its edge angle (a lower bound); raise "
-            "ChannelingNumerics.basis_size",
+            f"case {name!r}: {share:.0%} of electrons have unresolved overflow "
+            "and are handed off at the declared band-edge angle; raise "
+            "ChannelingNumerics.basis_size and check kernel truncation",
             UserWarning,
             stacklevel=3,
         )

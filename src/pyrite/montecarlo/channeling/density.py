@@ -57,18 +57,52 @@ from .metrics import EnsembleMetrics, density_metrics
 from .operators import ScatteringKernel
 from .spatial import spatial_density
 
-#: Declared calibration of the dechanneling cutoff: states more than this far
-#: above the planar barrier [eV] are a sink (``cr-dechanneling-collapse``).
-DECHANNELING_MARGIN_EV = 300.0
-#: Provenance of :data:`DECHANNELING_MARGIN_EV`; carried into run identity once
-#: channeling output is persisted (#507).
+#: Declared calibration of the dechanneling cutoff: the sink sits at a fixed
+#: multiple ``a`` of the planar critical angle ``psi_c = sqrt(2 D / pv)``, i.e.
+#: ``margin = (a^2 - 1) D`` above the barrier, ``D`` the planar well depth
+#: (``cr-dechanneling-collapse``). The margin scales with the well and does not
+#: depend on energy. Calibrated on Si {110} and {100} at 16.92-54.5 MeV only; other
+#: crystals, planes and energies inherit the scaling unchecked.
+DECHANNELING_CRITICAL_ANGLE_MULTIPLE = 4.125
+#: Provenance of :data:`DECHANNELING_CRITICAL_ANGLE_MULTIPLE`; carried into run
+#: identity through ``CHANNELING_MODEL``.
 DECHANNELING_MARGIN_PROVENANCE = (
-    "Calibrated on Kephart et al., Phys. Rev. B 40, 4249 (1989): Si(110) and Si(100) "
-    "occupation lengths at 16.92 MeV, compared through the forward-detector observable with "
-    "bound-weighted y-spreading (checks/kephart_occupation.py). With 300 eV, 5 of 6 Table I "
-    "values including 54.5 MeV are within +-20%; Si(100) 54.5 MeV is 1.35x. Maintainer-declared "
-    "2026-10-15 (#504)."
+    "Calibrated on Kephart et al., Phys. Rev. B 40, 4249 (1989), Table I: Si(110) and Si(100) "
+    "occupation lengths at 16.92 and 54.5 MeV through the forward-detector observable with "
+    "bound-state rate weights (checks/kephart_occupation.py; checks/planar_fiber_study.py). A cut "
+    "at 4.125 psi_c, measured from the well bottom, puts all six detector-weighted lengths within "
+    "+-20% on both the production density-matrix solver (H64, 32 cells, dz 15.625 A; the zone "
+    "defaults were not calibrated) and the carrier-fibred reference, with 54.5 MeV plane ratios "
+    "0.74 (production) and 0.71 (fibre) against 0.67 measured; the fixed 300 eV margin gives 0.96. "
+    "Unweighted population lengths at 54.5 MeV are about 1.3x Kephart. Production fails at a = 4 "
+    "and the fibre at a = 4.23, so the passing interval is about 4.09-4.21 with thin margins "
+    "(docs/research/physics/dechanneling-boundary.md, #522). Still a one-parameter calibration "
+    "fitted to the same six lengths, not a derived escape law; rechanneling is omitted. "
+    "Maintainer-declared 2026-11-23 (#522)."
 )
+#: Previous fixed margin [eV] (#504), kept for reproducing pre-#522 runs: pass it
+#: explicitly as ``margin_eV``.
+DECHANNELING_MARGIN_EV = 300.0
+
+
+def dechanneling_margin_eV(
+    profile: PlanarProfile, critical_angle_multiple: float = DECHANNELING_CRITICAL_ANGLE_MULTIPLE
+) -> float:
+    """Return the default dechanneling margin ``(a^2 - 1) D`` [eV] of a planar profile.
+
+    ``D = max U - min U`` is the well depth; a cut at ``a psi_c`` measured from the
+    well bottom sits ``(a^2 - 1) D`` above the barrier. Invariant to the
+    potential zero and independent of energy.
+
+    Validation: cr-dechanneling-collapse
+    """
+    a = float(critical_angle_multiple)
+    if not np.isfinite(a) or a <= 1.0:
+        raise ValueError("critical_angle_multiple must be finite and > 1")
+    low, barrier = profile.extrema()
+    if not barrier > low:
+        raise ValueError("the planar profile has no potential well (D <= 0); pass margin_eV")
+    return (a * a - 1.0) * (barrier - low)
 
 
 def _adjoint(matrices: np.ndarray) -> np.ndarray:
@@ -233,7 +267,8 @@ class DensityMatrixSolver:
     margin_eV
         Subspace cutoff above the barrier [eV]; states below
         ``barrier + margin`` evolve, the rest are a sink. Defaults to the
-        declared calibration :data:`DECHANNELING_MARGIN_EV` (300 eV).
+        declared calibration :func:`dechanneling_margin_eV` (``4.125 psi_c``);
+        pass :data:`DECHANNELING_MARGIN_EV` to reproduce pre-#522 runs.
     n_grid
         Cell grid for the jump product; defaults to the smallest alias-free
         even size ``>= 3 H + 2``.
@@ -247,7 +282,7 @@ class DensityMatrixSolver:
         kinetic_energy_eV: float,
         kernel: ScatteringKernel,
         *,
-        margin_eV: float = DECHANNELING_MARGIN_EV,
+        margin_eV: float | None = None,
         n_grid: int | None = None,
     ) -> None:
         if not np.isclose(kernel.period_ang, profile.period_ang):
@@ -261,7 +296,7 @@ class DensityMatrixSolver:
         self.n_grid = int(n_grid) if n_grid is not None else minimum + minimum % 2
         if self.n_grid < minimum:
             raise ValueError(f"n_grid must be >= 3 * max_order + 2 = {minimum}")
-        self.margin_eV = float(margin_eV)
+        self.margin_eV = float(dechanneling_margin_eV(profile) if margin_eV is None else margin_eV)
         _, self.barrier_eV = profile.extrema()
         self.cutoff_eV = self.barrier_eV + self.margin_eV
         self.energy_eV = float(kinetic_energy_eV)
