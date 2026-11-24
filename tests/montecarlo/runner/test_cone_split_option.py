@@ -129,8 +129,9 @@ def test_case_guardrails_refuse(key, value):
 
 def test_case_guardrails_need_elsepa():
     case = {k: v for k, v in _base().items() if k != "elastic_model"}
+    POLICY.validate_case(case)  # Live omission is the ELSEPA production default.
     with pytest.raises(ValueError, match="elsepa"):
-        POLICY.validate_case(case)
+        POLICY.validate_case({**case, "elastic_model": "mott"})
 
 
 def test_only_the_per_electron_core_has_a_split_port():
@@ -358,7 +359,7 @@ def test_split_refuses_observation_directions():
 def test_numerics_lowers_cone_split_into_case_identity():
     from pyrite.campaign.lowering import _with_run_options
     from pyrite.config import Numerics
-    from pyrite.montecarlo.case import _ABSENT, Case
+    from pyrite.montecarlo.case import Case
 
     case = Case(**_base())
     assert "cone_split" not in case
@@ -368,11 +369,13 @@ def test_numerics_lowers_cone_split_into_case_identity():
     assert dict(unchanged) == dict(case)
     with pytest.raises(TypeError, match="ConeSplitting"):
         Numerics(cone_split=POLICY.to_dict())
-    # Case validation runs the guardrails on replace().
+    omitted = {k: v for k, v in _base().items() if k != "elastic_model"}
+    (lowered_default,) = _with_run_options([Case(**omitted)], Numerics(cone_split=POLICY))
+    assert lowered_default["elastic_model"] == "elsepa"
+    # Case validation runs the cone guardrail on replace().
+    mott = {k: v for k, v in _base().items() if k != "atomic_electron_deflection"}
     with pytest.raises(ValueError, match="elsepa"):
-        _with_run_options(
-            [Case(**{**_base(), "elastic_model": _ABSENT})], Numerics(cone_split=POLICY)
-        )
+        _with_run_options([Case(**{**mott, "elastic_model": "mott"})], Numerics(cone_split=POLICY))
 
 
 @pytest.mark.parametrize(
