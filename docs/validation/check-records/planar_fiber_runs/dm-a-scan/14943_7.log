@@ -1,0 +1,24 @@
+critical_angle=4.25 margin=362.427 H=64 cells=32 dz=15.625: si110_54 L=48.3 um (x1.34) det 36.5/39.7 [defect -3.6e-03, 38362 s]
+	Command being timed: "uv run --no-sync python checks/kephart_occupation.py --cases si110_54 --margins --critical-angle-multiples 4.25 --orders 64 --cells 32 --dz 15.625 --out scratch/dm/run-si110_54-a4.25.json"
+	User time (seconds): 38515.52
+	System time (seconds): 12.38
+	Percent of CPU this job got: 99%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 10:42:17
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 438816
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 53632
+	Voluntary context switches: 9092
+	Involuntary context switches: 113437
+	Swaps: 0
+	File system inputs: 7560
+	File system outputs: 192
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

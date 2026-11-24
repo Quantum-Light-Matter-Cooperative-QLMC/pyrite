@@ -1,0 +1,108 @@
+{
+  "info": {
+    "case": {
+      "key": "si110_17",
+      "hkl": [
+        1,
+        1,
+        0
+      ],
+      "kinetic_energy_eV": 16920000.0,
+      "divergence_rad": 0.0022,
+      "thickness_um": 120.0,
+      "order_max": 32
+    },
+    "arm": "absorbing",
+    "seed": 0,
+    "start": 0,
+    "count": 100,
+    "margin_eV": 168.3205368188541,
+    "order_max": 32,
+    "outgoing_order_max": 32,
+    "kick_half": null,
+    "search_step_ang": 200.0,
+    "probe": null,
+    "cutoff_eV": 175.04647376310956,
+    "barrier_eV": 6.725936944255477,
+    "well_bottom_eV": -14.515183660530466,
+    "k_inv_ang": 8829.764283904733,
+    "gamma": 34.11161402582138,
+    "g_inv_ang": 3.2722995732997227,
+    "seconds": 6.59510809648782,
+    "source_sha": "453dd745e7b7466c6051d043907e898b71674b1c"
+  },
+  "cpu_seconds": 145.63734889775515,
+  "handoff": {
+    "psi_c_rad": 0.0015618138453743807,
+    "incidents": 2000,
+    "retained_fraction": 0.000520962933949201,
+    "outgoing_fraction": 0.9432143489921293,
+    "outgoing_abs_psi_over_psi_c": {
+      "mean": 3.6873653509140323,
+      "sem": 0.02091606640699627,
+      "quantiles_10_50_90": [
+        2.923268432325104,
+        3.384170590580916,
+        4.9415112246980755
+      ]
+    },
+    "unresolved_fraction": 0.004689265124581568,
+    "tail_fraction": 0.051575422949339915,
+    "tail_abs_psi_over_psi_c": {
+      "mean": 13.00195590803504,
+      "sem": 0.6176282546262982,
+      "quantiles_10_50_90": [
+        8.224037156021454,
+        11.04784451159244,
+        19.869835295907677
+      ]
+    },
+    "cut_angle_over_psi_c": 2.9873529468052755,
+    "band_edge_over_psi_c": 7.71184049162,
+    "depth_um_terminal_mean": 14.515427442554337
+  },
+  "occupation": {
+    "si110_17_n1": {
+      "mean": {
+        "length_um": 13.637430027352082,
+        "length_sem_um": 0.3849533110120136,
+        "ratio": 0.6818715013676041,
+        "fit_rms_relative": 0.0033410276738946366
+      },
+      "detector": {
+        "length_um": 13.094424537374142,
+        "length_sem_um": 0.39409772035395485,
+        "ratio": 0.654721226868707,
+        "fit_rms_relative": 0.0039027840529259105
+      }
+    },
+    "si110_17_n2": {
+      "mean": {
+        "length_um": 13.80567411075459,
+        "length_sem_um": 0.37328656639330987,
+        "ratio": 0.8120984771032111,
+        "fit_rms_relative": 0.0033112883509785014
+      },
+      "detector": {
+        "length_um": 13.258859954978611,
+        "length_sem_um": 0.3670467362205992,
+        "ratio": 0.7799329385281536,
+        "fit_rms_relative": 0.003552104204914005
+      }
+    },
+    "si110_17_n3": {
+      "mean": {
+        "length_um": 13.248025904113591,
+        "length_sem_um": 0.2714164220243216,
+        "ratio": 0.7792956414184465,
+        "fit_rms_relative": 0.00454352093927114
+      },
+      "detector": {
+        "length_um": 12.716215142472631,
+        "length_sem_um": 0.26994093038054273,
+        "ratio": 0.7480126554395665,
+        "fit_rms_relative": 0.004848923049361098
+      }
+    }
+  }
+}

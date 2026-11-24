@@ -69,8 +69,9 @@ zone row, and zone caps shorter than the path are refused. The primaries'
 entrance states come from the same seed-pure draws as amorphous transport and
 relaunch with their own stream keys. Mosaic crystals, coupled radiative
 transport, secondaries, coherent emission, stacks and grooves are refused.
-CUDA native continuation is described under Run surfaces below. The 300 eV margin sets the dechanneled angular distribution (mean
-4.7 `ψ_c` at 5 MeV Si(110)); see `cr-zone-handoff-accounting`.
+CUDA native continuation is described under Run surfaces below. The declared dechanneling margin (`4.125 ψ_c` since #522; 300 eV
+before) sets the dechanneled angular distribution; see
+`cr-zone-handoff-accounting`.
 
 *Scope correction (#522, 2026-10-20):* the original description of the
 overflow angle as a lower bound is withdrawn. The legacy residual includes
@@ -78,8 +79,9 @@ omitted transfer-kernel weight that can land inside the particle band, so
 the band-edge angle is an assignment, not a bound for that entire channel.
 The independent [handoff review](../validation/channeling/cr-zone-handoff-accounting.md#scope-correction-the-legacy-overflow-angle-is-an-assignment)
 records the counterexample. The [boundary investigation](../research/physics/dechanneling-boundary.md#recommendation-after-boundary-and-tail-prototypes)
-retains the 300 eV model after negative boundary and tail-window tests;
-the assignment and production output are unchanged.
+found no replacement from its boundary and tail-window tests; the
+assignment is unchanged. The later critical-angle-multiple scan (see the
+#522 revision under the calibration outcome) moves only the cutoff.
 
 ### Evolution backends
 
@@ -179,6 +181,18 @@ PXR/CBS is recorded as an omission.
   observable. Five of six Table I occupation lengths fall within ±20%, and
   Si(100) at 54.5 MeV is a documented 1.35× outlier. Persisted output (#507)
   must carry the cutoff in its identity.
+  *Revision (#522, maintainer decision 2026-11-23):* the default cutoff is a
+  fixed multiple of the planar critical angle, `4.125 ψ_c`, i.e. a margin
+  `(a² − 1) D` that scales with the well depth `D`
+  (`dechanneling_margin_eV`, `DECHANNELING_CRITICAL_ANGLE_MULTIPLE`; 340.2 eV
+  for Si(110), 188.3 eV for Si(100) at 293.15 K). All six Table I lengths are
+  within ±20% on the production solver (H64, 32 cells, dz 15.625 Å) and on the
+  carrier-fibred reference, and the 54.5 MeV plane dependence is reproduced
+  (production 0.74, fibre 0.71, measured 0.67; 300 eV gives 0.96 on the fibre).
+  The pass is for the detector-weighted length; the interpolated passing
+  interval is only about 4.09 < a < 4.21 and `a` is still one declared
+  parameter fitted to the same six lengths, not a derived escape law. Rechanneling remains an omission. `CHANNELING_MODEL` v12 carries the
+  change; 300 eV stays available as an explicit `margin_eV`.
 
 ## Run surfaces (#521)
 
@@ -257,7 +271,7 @@ is not in a repository admission table with a measured error budget. The axial
 table is the #994 lookup above. The planar table
 (`pyrite.quantum._planar_envelope`) holds one entry: the `channeling_demo` case
 (Si (1-10), 17 MeV, 2 µm, beam in the planes, default zone numerics,
-293.15 K, 300 eV margin). Its ε = 4.9% (95%) bounds the band-weighted
+293.15 K, 4.125 ψc margin, 340.2 eV; 300 eV before #522, ε = 4.9% there). Its ε = 6.0% (95%) bounds the band-weighted
 on-axis `spec_channeling` line source only. It does not bound native PXR/CBS,
 incoherent bremsstrahlung or characteristic emission at a physical detector.
 It was measured with the #993 paired-arm method on the

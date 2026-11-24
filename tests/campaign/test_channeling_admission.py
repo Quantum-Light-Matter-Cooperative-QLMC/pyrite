@@ -61,7 +61,7 @@ def test_demo_case_is_admitted_and_carries_its_epsilon():
     case = _planar_case(PLANAR)
     admission = case["channeling"]["admission"]
     assert admission == planar_admission_record(DEMO)
-    assert admission["epsilon"] == pytest.approx(0.0486, abs=5e-5)
+    assert admission["epsilon"] == pytest.approx(0.0604, abs=5e-5)  # #522 v12 margin (4.125 psi_c)
     assert require_planar_admission(case) is DEMO
 
 

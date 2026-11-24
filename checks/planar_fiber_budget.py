@@ -4,17 +4,19 @@ Arms (all chunk-paired: same seed, incident IDs and entrance draws as the
 ``control``; ``checks/planar_fiber_study.py`` runs each one):
 
 ==================  ==========================================================
-control             absorbing cut ``barrier + 300 eV``, window ``M``, box
+control             absorbing cut ``barrier + margin``, window ``M``, box
                     ``B = M``, kick harmonics ``B + M``, search step 200 Å
 return_flux         ``P = R`` (whole window retained; tails still terminate)
 unresolved          box ``B = M + dM``
-matching_surface    cut ``barrier + 600 eV``
+matching_surface    cut ``barrier + 2 margin``
 grid_supercell      window ``M + dM``, search step 100 Å
 source_model        kick harmonics ``1.5 (B + M)``
 all_on              all of the above
 ==================  ==========================================================
 
-``dM = max(4, M // 4)``. The planar fibre has no supercell or transverse
+``dM = max(4, M // 4)``. ``margin`` defaults to the production
+``dechanneling_margin_eV`` of the configuration's plane (``4.125 psi_c``, #522);
+``--margin 300`` reproduces the #1056 records (300 and 600 eV). The planar fibre has no supercell or transverse
 position grid; its discretisation is the order window and the event search
 step, so ``grid_supercell`` probes those.
 
@@ -99,8 +101,17 @@ BUDGET_UM = {
 CHUNK = 100
 
 
-def probe_settings(key: str, probe: str) -> dict:
+def production_margin(key: str) -> float:
+    """Production default margin [eV] of a configuration's plane at 293.15 K."""
+    from pyrite.materials.channeling import planar_profile
+    from pyrite.montecarlo.channeling import dechanneling_margin_eV
+
+    return float(dechanneling_margin_eV(planar_profile("silicon", CASES[key].hkl, 293.15)))
+
+
+def probe_settings(key: str, probe: str, margin: float | None = None) -> dict:
     """``run_arm`` keyword arguments of one budget arm."""
+    margin = production_margin(key) if margin is None else float(margin)
     m = CASES[key].order_max
     dm = max(4, m // 4)
     on = {name: probe in (name, "all_on") for name in ARMS[1:6]}
@@ -108,7 +119,7 @@ def probe_settings(key: str, probe: str) -> dict:
     box = order + dm if on["unresolved"] else order
     return {
         "arm": "reference" if on["return_flux"] else "absorbing",
-        "margin_eV": 600.0 if on["matching_surface"] else 300.0,
+        "margin_eV": 2.0 * margin if on["matching_surface"] else margin,
         "order_max": order,
         "outgoing_order_max": box,
         "kick_half": int(np.ceil(1.5 * (box + order))) if on["source_model"] else None,
@@ -153,7 +164,7 @@ def _chunk_paths(directory: Path, key: str, probe: str) -> list[Path]:
     return sorted(directory.glob(f"{key}-{probe}-*.npz"))
 
 
-def analyze(key: str, directory: Path) -> dict:
+def analyze(key: str, directory: Path, margin: float | None = None) -> dict:
     """#993 calibration of one configuration from its seven arms' chunks."""
     from pyrite.montecarlo.channeling.axial_depth_calibration import (
         ArmBatches,
@@ -168,7 +179,7 @@ def analyze(key: str, directory: Path) -> dict:
         if not paths:
             raise FileNotFoundError(f"no chunks for {key} {probe} in {directory}")
         arm = load(paths)
-        expected = probe_settings(key, probe)
+        expected = probe_settings(key, probe, margin)
         if arm["info"].get("probe") != probe or arm["info"]["margin_eV"] != expected["margin_eV"]:
             raise ValueError(f"{probe} chunks do not carry the probe's settings")
         y = line_source(arm, weights)
@@ -198,11 +209,11 @@ def analyze(key: str, directory: Path) -> dict:
         ]
 
     case = CASES[key]
-    settings = probe_settings(key, "control")
+    settings = probe_settings(key, "control", margin)
     case_key = (
         f"planar-fiber:silicon{case.hkl}:{case.kinetic_energy_eV:g}eV:"
         f"div{case.divergence_rad:g}:M{settings['order_max']}:B{settings['outgoing_order_max']}:"
-        "cut300eV:293.15K"
+        f"cut{settings['margin_eV']:g}eV:293.15K"
     )
     observable_key = f"line-source:{LINES[key]}:forward-detector"
     evidence, report = calibrate_axial_depth(
@@ -225,7 +236,7 @@ def analyze(key: str, directory: Path) -> dict:
         "incidents": int(loaded["control"]["ids"].size),
         "chunks": len(arms["control"].starts),
         "source_shas": sorted({s for arm in loaded.values() for s in arm["source_shas"]}),
-        "settings": {probe: probe_settings(key, probe) for probe in ARMS},
+        "settings": {probe: probe_settings(key, probe, margin) for probe in ARMS},
         "cpu_seconds": {probe: arm["seconds"] for probe, arm in loaded.items()},
         "budget_um": list(BUDGET_UM[key]),
         "epsilon": [i.relative_error_upper for i in evidence.intervals],
@@ -242,24 +253,26 @@ def main(argv=None) -> int:
     run.add_argument("count", type=int, default=CHUNK, nargs="?")
     run.add_argument("--arms", nargs="*", default=list(ARMS), choices=ARMS)
     run.add_argument("--out-dir", type=Path, required=True)
+    run.add_argument("--margin", type=float, help="control cut above the barrier [eV]")
     an = sub.add_parser("analyze")
     an.add_argument("case", choices=sorted(LINES))
     an.add_argument("directory", type=Path)
     an.add_argument("--out", type=Path)
+    an.add_argument("--margin", type=float, help="control cut above the barrier [eV]")
     args = parser.parse_args(argv)
     if args.command == "run":
         if args.start % CHUNK or args.count != CHUNK:
             raise SystemExit(f"chunks are {CHUNK} incidents starting at multiples of {CHUNK}")
         args.out_dir.mkdir(parents=True, exist_ok=True)
         for probe in args.arms:
-            settings = probe_settings(args.case, probe)
+            settings = probe_settings(args.case, probe, args.margin)
             arm = settings.pop("arm")
             result = run_arm(args.case, arm, args.start, args.count, **settings)
             out = args.out_dir / f"{args.case}-{probe}-{args.start}.npz"
             np.savez_compressed(out, **result)
             print(json.dumps({"out": str(out), "seconds": json.loads(result["info"])["seconds"]}))
         return 0
-    report = analyze(args.case, args.directory)
+    report = analyze(args.case, args.directory, args.margin)
     text = json.dumps(report, indent=2)
     if args.out:
         args.out.write_text(text + "\n", encoding="utf-8")

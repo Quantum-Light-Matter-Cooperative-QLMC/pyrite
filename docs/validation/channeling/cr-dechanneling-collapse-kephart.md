@@ -188,3 +188,41 @@ nor establishes its first-principles validity.
 1.2049266651 failure, finite overflow, and unresolved convergence. Do not
 extend `anchored` to the candidate or describe all six cases as passing.
 No human sign-off is implied.
+
+## Independent assessment of the critical-angle candidate (2026-11-23)
+
+Fresh-context verifier: did not implement the candidate. The cutoff conversion
+was derived before implementation inspection from the transverse invariant:
+
+$$
+E_\perp = U(x) + \frac{pv\psi^2}{2},\qquad
+D = U_b-U_l,\qquad \psi_c^2 = \frac{2D}{pv}.
+$$
+
+A cut measured from the well minimum at $a\psi_c$ has
+$E_{\mathrm{cut}}=U_l+a^2D=U_b+(a^2-1)D$. Units, signs and limiting cases
+pass: adding a constant to $U$ changes neither margin nor critical angle;
+$a\to1$ gives the barrier, and $a\to\infty$ removes the explicit sink.
+This matches the candidate conversion. It supplies neither $a=4$ nor a law
+for irreversible escape. Launch angles continue to use the separate declared
+cell-mean potential zero, not the well minimum.
+
+**Verdict:** `rederived` for the conversion and projected accounting;
+`discrepancy` for the proposed six-case production calibration at $a=4$.
+The verifier inspected all eight array-14943 outputs at source `453dd745e`,
+H64, 32 cells, dz15.625 Å. Si(100), 17 MeV gives
+$12.506366961160241/16=0.7816479350725151$, below the 0.8 bound.
+At $a=4.25$ production passes all six point estimates, while the fibre
+Si(100), 54.5 MeV central estimate is 1.206 (SEM about 0.02): a marginal,
+statistically unresolved exceedance, not a joint pass. Earlier fibre margins
+also used independent-atom well depths, unlike production's bonding-charge
+profile. The pending $a=4.125$ comparison resolves margins on the same profile.
+
+The provisional default is withdrawn. The existing 300 eV declared-calibration
+scope and its documented outlier remain; this assessment does not establish
+300 eV as a physical escape boundary. The candidate's negative result must
+not be promoted to an experimental anchor. Full output and provenance:
+[production scan record](../check-records/planar_fiber_runs/README.md#production-critical-angle-cuts-dm-a-scan-522).
+The public Kephart abstract confirms the 16/20/24/36 µm references; full
+Table I, its uncertainty and detector details remain the existing source
+transcription dependency because the full paper was inaccessible to this verifier.

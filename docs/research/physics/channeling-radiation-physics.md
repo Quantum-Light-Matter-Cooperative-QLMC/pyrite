@@ -101,7 +101,7 @@ $$
   = E_\perp^{(n)}(k)\, u_k^{(n)}(x).
 $$
 
-This is the Andersen–Bonderup–Pantell master equation: a Schrödinger problem with relativistic mass $\gamma m$. All relativistic kinematics enters through that single $\gamma$ (plus the Doppler map of §4). In working units the kinetic prefactor is $3.810 / \gamma\ \mathrm{eV\,Å^2}$ — nothing else in the solve knows about relativity.
+This is the Andersen–Bonderup–Pantell master equation: a Schrödinger problem with relativistic mass $\gamma m$. Its planar form, with the rest-frame argument that energies scale as $\gamma E_\perp$ and the forward dipole yield, is set out in Andersen, Eriksen & Lægsgaard, Phys. Scr. 24, 588 (1981), Eqs. 1–13; the quantal transverse picture itself goes back to Lervig, Lindhard & Nielsen, Nucl. Phys. A 96, 481 (1967). All relativistic kinematics enters through that single $\gamma$ (plus the Doppler map of §4). In working units the kinetic prefactor is $3.810 / \gamma\ \mathrm{eV\,Å^2}$ — nothing else in the solve knows about relativity.
 
 ### 2.2 Bloch structure
 

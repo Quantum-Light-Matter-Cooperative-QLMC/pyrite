@@ -334,8 +334,8 @@ no-cutoff windows overpredict all six lengths without a resolved window
 limit, and the adjustable a=4.5 sink fails Si(100), 54 MeV on the jointly
 refined grid. Thus these prototypes supply no demonstrated replacement for
 the declared 300 eV model. This is a negative result for the tested choices,
-not a proof that every critical-angle multiple fails: no converged scan
-between a=4 and a=4.5 has been performed. Selecting another multiple from
+not a proof that every critical-angle multiple fails. The later scan on the
+continuous engine (below) finds an $a$ window that passes all six. Selecting another multiple from
 these measurements would remain calibration rather than a derivation of
 irreversible escape.
 
@@ -439,6 +439,19 @@ The latter remains a validity limit as specified below; no quantitative
 thickness or energy threshold for negligible rechanneling has been derived.
 
 ## Rechanneling integration assessment
+
+Literature context. Beloshitsky, Komarov and Kumakhov,
+[Phys. Rep. **139**, 293 (1986)](https://doi.org/10.1016/0370-1573(86)90174-2),
+Sec. 7, state the reversibility rule: in kinetic equations without
+energy-loss damping, rechanneling is the reverse process of dechanneling.
+For electrons it occurs even below the critical incidence angle, through
+the diffusion flow at transverse energies near the barrier. Their Sec. 8
+treats the few-level quantum regime with the Pauli equation
+$dp_n/dt=\sum_{n'}W_{nn'}(p_{n'}-p_n)$, which has no absorbing boundary.
+Bound populations equalize as in a random walk (Andersen et al. 1983,
+Figs. 13 and 15, show the same "feeding" in 4 MeV Ni). An irreversible cut
+is therefore a modelling choice, consistent with the `P = R` return deficit
+measured above.
 
 The angle-only hook in candidate 3 is a no-go for production in this slice.
 This is an implementation/design assessment against ADR-0018 and the existing
@@ -733,6 +746,168 @@ Scope: the comparison isolates the emission model at fixed energy, on
 axis, without absorption or divergence. It does not test the secular
 model's divergence or aperture quadrature, stopping, or post-handoff
 emission (absent from both).
+
+## Critical-angle-multiple cut on the continuous engine
+
+The density-matrix screening above could not separate the boundary from
+the solver's window and overflow. The fibre engine removes that confound,
+so approach 1 was repeated on it: absorbing arm, cut at $a\,\psi_c$, that
+is margin $(a^2-1)D$. This margin is independent of energy and proportional
+to the well depth, so it is 0.554 times lower for Si(100) than for Si(110).
+Evidence: [check record](../../validation/check-records/planar_fiber_runs/README.md),
+remote arrays 14532 and 14933, paired by seed with array 10928.
+
+Fibre detector-observable length / Kephart (batch-means SEM about 0.015–0.03;
+2000 incidents, 4000 at $a=4$ and $4.25$):
+
+| Case | $a=2.5$ | $3$ | $3.5$ | $4$ | $4.25$ | $4.5$ | 300 eV |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Si(110), 17 MeV, n=1 | 0.517 | 0.655 | 0.779 | 0.916 | 0.960 | 1.053 | 0.945 |
+| Si(110), 17 MeV, n=2 | 0.596 | 0.780 | 0.917 | 1.059 | 1.115 | **1.213** | 1.097 |
+| Si(110), 17 MeV, n=3 | 0.587 | 0.748 | 0.899 | 1.028 | 1.099 | **1.201** | 1.042 |
+| Si(100), 17 MeV | 0.482 | 0.594 | 0.674 | 0.846 | 0.922 | 0.917 | 1.049 |
+| Si(100), 54.5 MeV | 0.640 | 0.789 | 0.963 | 1.128 | **1.206** | **1.231** | **1.538** |
+| Si(110), 54.5 MeV | 0.575 | 0.761 | 0.899 | 1.053 | 1.170 | **1.212** | 1.071 |
+
+Bold entries fail ±20%. At $a=4$ all six pass: the margins are 315.6 eV
+for (110), close to the declared 300 eV, and 174.9 eV for (100). These
+explicit margins used independent-atom depths; against the actual bonding-charge
+wells their effective multiples are 3.9822 and 3.9835, respectively. The
+54.5 MeV lengths are 27.1 µm for (100) and 37.9 µm for (110), a plane
+ratio of 0.71 against the measured 0.67. With the 300 eV cut the plane
+ratio is 0.96. The plane dependence follows from scaling the boundary
+with the well depth, which a fixed energy margin cannot do. The pass
+window on this engine is roughly $3.9 \lesssim a \lesssim 4.2$. Si(100),
+17 MeV bounds it from below and Si(100), 54.5 MeV from above.
+As with 300 eV, outgoing angles cluster 0.5–1.0 ψc above the cut
+(4.5–5.0 ψc at $a=4$).
+
+The density-matrix solver gives lengths 2–12% shorter than the fibre in
+every case at the same $a$ (its $a=4$ depth-refined and $a=4.5$ joint-grid
+results above). The differences include window/overflow treatment
+(see the 300 eV comparison above) and the small explicit-margin mismatch;
+they do not isolate a single numerical cause. At $a=4$ it leaves
+Si(100), 17 MeV at 0.778 on H48/16 cells/dz31.25 Å; at $a=4.5$ it leaves
+Si(100), 54 MeV at 1.205 on the joint grid. A production check at
+$a=4$ and $4.25$ on the joint grid completed as array 14943.
+The selected bound-weighted ratios are:
+
+| Case | $a=4$ | $a=4.25$ |
+|---|---:|---:|
+| Si(110), 17 MeV, n=1 | 0.843993 | 0.899633 |
+| Si(110), 17 MeV, n=2 | 0.984787 | 1.047612 |
+| Si(110), 17 MeV, n=3 | 0.979901 | 1.040600 |
+| Si(100), 17 MeV | **0.781648** | 0.837409 |
+| Si(100), 54.5 MeV | 1.057675 | 1.133811 |
+| Si(110), 54.5 MeV | 0.950285 | 1.014178 |
+
+Thus $a=4$ fails production at Si(100), 17 MeV, despite passing the fibre
+reference. At $a=4.25$ production passes, while the fibre Si(100), 54.5 MeV
+central estimate fails (1.206). This is a bounded negative result for the
+tested cuts, not proof that no common cut exists. Full outputs, original-byte
+hashes, logs and recipes are in the check record. The provisional $a=4$
+production default was withdrawn; 300 eV and `CHANNELING_MODEL` v11 are restored.
+
+An intermediate $a=4.125$ was then run on both engines (arrays 15397 and
+15398). Both derive the margin from the same bonding-charge profile
+(340.190 eV Si(110), 188.349 eV Si(100)); the earlier fibre scan used
+independent-atom depths. Selected observable: fibre `detector.ratio`
+(± batch-means SEM, 4000 incidents) and production `detector_ratio.bound`
+(H64, 32 cells, dz 15.625 Å). Acceptance range 0.8–1.2.
+
+| Case | Fibre ratio ± SEM | Production ratio |
+|---|---:|---:|
+| Si(110), 17 MeV, n=1 | 0.9424 ± 0.0153 | 0.8712 |
+| Si(110), 17 MeV, n=2 | 1.0979 ± 0.0190 | 1.0156 |
+| Si(110), 17 MeV, n=3 | 1.0878 ± 0.0193 | 1.0097 |
+| Si(100), 17 MeV | 0.8832 ± 0.0168 | 0.8082 |
+| Si(100), 54.5 MeV | 1.1748 ± 0.0313 | 1.0958 |
+| Si(110), 54.5 MeV | 1.0983 ± 0.0214 | 0.9829 |
+
+All twelve central estimates pass. The margins are thin at both ends:
+production Si(100), 17 MeV is 12.93 µm against a 12.8 µm lower edge, and
+fibre Si(100), 54.5 MeV is 28.20 ± 0.75 µm against a 28.8 µm upper edge (the
+upper one-SEM estimate exceeds it). Production balance defects are
+−0.0007 to −0.0034 and final overflow flux 0.9% to 7.1% (Si(110), 54.5 MeV
+largest). The 54.5 MeV plane ratio L(100)/L(110) is 0.713 (fibre) and 0.743
+(production) against a measured 0.667.
+
+Production fails at $a=4$ (Si(100), 17 MeV, 0.782) and the fibre at
+$a\approx4.23$ (Si(100), 54.5 MeV, 1.206 ± 0.022), so the central-estimate
+passing interval is about $4.09 < a < 4.21$ by linear interpolation, with
+roughly ±0.1 statistical uncertainty on the fibre edge. Its width is about
+that of the 7–10% by which production lengths fall below the fibre at equal
+margin. The two engines share kernels, potential, cut and observable, so a
+joint pass is not independent confirmation. $a=4.125$ sits inside the
+interval with no margin to spare. The agreement holds for the declared
+detector-weighted length; unweighted band-population lengths at 54.5 MeV are
+about 1.3× Kephart's on both engines. The calibrated numerics (H64, 32 cells,
+dz 15.625 Å) are not the zone defaults. This does not make the cut a derived
+boundary: $a$ is fitted to the same six lengths.
+
+The maintainer adopted $a=4.125$ as the production default on 2026-11-23
+(`CHANNELING_MODEL` v12; 300 eV stays available as an explicit `margin_eV`).
+A fresh-context verifier rederived the margin conversion; the six-case
+agreement is a declared-calibration comparison, not an anchor of the
+physics. Doubling the fibre Si(100), 54.5 MeV statistics (array 15632, 8000
+incidents) gives 1.180 ± 0.019 (28.32 ± 0.46 µm against the 28.8 µm edge,
+1.05 SEM), so that case passes on its central estimate but not robustly.
+The production Si(100), 17 MeV sensitivity (array 15633) shows the lower
+edge is numerically converged: dz halved gives 0.8086 and H = 80 gives
+0.8082, against 0.8082 at H64/dz 15.625 Å. It remains only 1% above the
+0.8 limit, a margin of the calibration, not a numerical artefact.
+
+This remains a one-parameter calibration, not a derived escape law: $a$
+is fitted to the same six lengths, and the `P = R` arm shows that return
+from above $a\psi_c$ is not negligible beyond about one occupation length.
+What changes is the scaling. A cut that scales with $\psi_c$ reproduces the
+plane dependence that the fixed 300 eV margin misses on the continuous
+engine, with the same number of parameters.
+
+## Interband rates against Andersen et al. (1983)
+
+The `P = R` arms give lengths 1.7–2.8 times Kephart's, and the absorbing
+cut makes up the difference. If the TDS interband rates were too weak, the
+cut would be compensating for a deficient kernel rather than for an
+unresolved return flow. Andersen, Bonderup, Lægsgaard and Sørensen,
+[Phys. Scr. **28**, 308 (1983)](https://doi.org/10.1088/0031-8949/28/3/008),
+give an independent calculation of the same golden-rule rates. Their
+calculation is the Pauli limit of our model, Einstein vibrations with
+Doyle–Turner potentials, validated on measured 4 MeV Ni line widths and on
+the incidence-angle dependence of the n=1 population. Their electronic
+contribution is about 10% of interband scattering (Sec. 5.5).
+
+`checks/andersen1983_interband.py` evaluates `DensityMatrixSolver.rate_matrix`
+with `tds_kernel` only, on Ni {111} and {100} at 4 MeV, κ = g/4, 31 plane
+waves. It uses Andersen's vibration amplitudes (ρ = 0.049/0.074/0.095 Å;
+Ni has no packaged channeling thermal data). Their figures were transcribed
+by eye at 300 dpi (about 5% in rates, 20 eV in widths). Record:
+[`andersen1983_interband.json`](../../validation/check-records/andersen1983_interband.json).
+
+- **Fig. 12, ground-state rates $W^T_{0n'}$** (Ni {111}, 300 K). The median
+  ratio over n′ = 0–28 is 1.02, within 0.92–1.22 for n′ ≤ 24. The intraband
+  rate is 7.90 against 7.8 µm⁻¹, and the interband total over n′ = 1–28 is
+  9.37 against 9.19 µm⁻¹. The share going to n′ ≥ 8 is 0.430 against 0.429.
+  Our free-state labels sum destination Bloch blocks by energy order, so
+  each of Andersen's direction-resolved free-state bars equals an adjacent
+  pair of ours.
+- **Fig. 8, 1→0 line energies.** {100}: 4.25/3.92/3.64 against measured
+  4.25/3.95/3.65 keV. {111}: 4.81/4.42/4.08 against 4.75/4.45/4.15 keV.
+- **Fig. 9, interband-only 1→0 widths.** Our $(1+\beta)\gamma^2\hbar v\,(W_0+W_1)$
+  at κ = g/4 is 5–15% below their short-dashed curves, more so at large ρ.
+  Their curves average over κ, include a vibration-correlation correction
+  at φ = 4.5° and the coherence factor of their Eq. (4.19); this estimate
+  has none of those.
+
+The thermal interband rates are therefore not weak by anything near a
+factor of two at 4 MeV. Our Einstein kernel omits correlated vibrations,
+which Andersen find raise thermal scattering near a major axis (about 40%
+in width at small φ, fading with angle), and Ni electronic scattering was
+not evaluated. Neither accounts for the `P = R` excess. The remaining
+candidates are the unconverged `P = R` window (the deficit grows with M,
+see above), the observable and beam assumptions (Table II divergences are
+inferred), and energy-dependent effects between 4 and 54.5 MeV that this
+anchor does not test.
 
 ## Reproduction
 

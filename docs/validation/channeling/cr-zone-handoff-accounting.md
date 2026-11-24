@@ -83,7 +83,7 @@ Free share 0.685, overflow 0.167, trace 0.148.
 
 ## Physics flag: the margin sets the handoff angles
 
-The declared calibration `DECHANNELING_MARGIN_EV = 300` (`cr-dechanneling-collapse`) places the sink 300 eV above the barrier, so free flux lands just above `barrier + 300 eV`. At 5 MeV Si(110):
+The legacy declared calibration `DECHANNELING_MARGIN_EV = 300` (the default before #522; now `4.125 ψ_c`, see `cr-dechanneling-collapse`) places the sink 300 eV above the barrier, so free flux lands just above `barrier + 300 eV`. At 5 MeV Si(110):
 
 - $\psi_c=\sqrt{2U_{\rm depth}/(pv)}$ = 2.78 mrad;
 - the cutoff angle is 10.7 mrad = 3.8 $\psi_c$;
@@ -347,3 +347,33 @@ identify each legacy event with a resolved momentum. The accounting verdict
 remains `rederived`: partition and continuity still match their declared
 model. The physical lower-bound interpretation must be withdrawn unless
 separate closure and outgoing-support evidence establish it.
+
+## Independent scope review (2026-11-23)
+
+Fresh-context verdict: `rederived` for the declared accounting and launch
+construction. Exclusive entry, free, reprojection, overflow and retained weights
+are normalized by their total; channel-specific cumulative measures set depth.
+Separable energy sampling reproduces the declared product of marginals.
+The tangent/normal construction preserves a unit direction. Units, limits and
+sign conventions pass within these closures. Existing accounting tests retain
+their scope; they do not determine a physical overflow-angle distribution.
+
+Scalar overflow includes missing transfer-kernel gain that may land inside
+the particle band. Consequently the assigned band-edge angle is not a lower
+bound on every unresolved contribution. The warning now says unresolved
+overflow is assigned the declared edge angle and calls out kernel truncation
+as well as particle-basis size. This changes wording, not sampled directions.
+
+Omitted classical rechanneling remains a declared approximation. A
+$P=R$ minus absorbing-arm difference includes returning amplitude and
+sign-indefinite coherence/interference changes; it is not a measured classical
+capture fraction or a universal physical-error bound. The #1056 paired source
+budgets show resolved thick-target shifts of about 12–28%; their finite-window
+budgets do not establish useful accuracy over the Kephart fitting windows.
+The measured demo admission applies only to its configuration. The angle-only
+hook remains a no-go: no validated returning state and repeated native
+stop/resume coupling exists. This bounds the omission's supported use without
+claiming negligible return at large thickness. See the
+[paired-budget assessment](../../research/physics/dechanneling-boundary.md)
+for configurations and evidence. No new rechanneling implementation or
+physical capture claim follows from this review.

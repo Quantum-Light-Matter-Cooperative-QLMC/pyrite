@@ -60,6 +60,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/abtem_channeling_oracle.py": ("cr-density-matrix-split-operator",),
     "checks/dans_diffraction_oracle.py": ("dans-diffraction-oracle",),
     "checks/kephart_occupation.py": ("cr-dechanneling-collapse",),
+    # #522 transcribed Andersen et al. (1983) interband rates: comparison, no gate.
+    "checks/andersen1983_interband.py": ("cr-lindblad-jump-operators",),
     # #1056 planar fibre research studies: model diagnostics, not exit-code gates.
     "checks/planar_fiber_study.py": ("cr-planar-fiber-unraveling", "cr-axial-fiber-return-deficit"),
     "checks/planar_fiber_budget.py": ("cr-planar-fiber-unraveling", "cr-axial-depth-calibration"),

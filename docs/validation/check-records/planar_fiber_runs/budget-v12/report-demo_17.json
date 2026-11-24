@@ -1,0 +1,224 @@
+{
+  "case": "demo_17",
+  "case_key": "planar-fiber:silicon(1, 1, 0):1.7e+07eV:div0:M32:B32:cut318.617eV:293.15K",
+  "observable_key": "line-source:((1, 0), (2, 1), (3, 2)):forward-detector",
+  "band_weights": {
+    "1": 0.5060181829809811,
+    "2": 0.30224570471979584,
+    "3": 0.19173611229922302
+  },
+  "incidents": 20000,
+  "chunks": 200,
+  "source_shas": [
+    "2875a227c3f043d25b031e8ffd4287c430947b2c"
+  ],
+  "settings": {
+    "control": {
+      "arm": "absorbing",
+      "margin_eV": 318.6168090717892,
+      "order_max": 32,
+      "outgoing_order_max": 32,
+      "kick_half": null,
+      "search_step_ang": 200.0,
+      "probe": "control"
+    },
+    "return_flux": {
+      "arm": "reference",
+      "margin_eV": 318.6168090717892,
+      "order_max": 32,
+      "outgoing_order_max": 32,
+      "kick_half": null,
+      "search_step_ang": 200.0,
+      "probe": "return_flux"
+    },
+    "unresolved": {
+      "arm": "absorbing",
+      "margin_eV": 318.6168090717892,
+      "order_max": 32,
+      "outgoing_order_max": 40,
+      "kick_half": null,
+      "search_step_ang": 200.0,
+      "probe": "unresolved"
+    },
+    "matching_surface": {
+      "arm": "absorbing",
+      "margin_eV": 637.2336181435784,
+      "order_max": 32,
+      "outgoing_order_max": 32,
+      "kick_half": null,
+      "search_step_ang": 200.0,
+      "probe": "matching_surface"
+    },
+    "grid_supercell": {
+      "arm": "absorbing",
+      "margin_eV": 318.6168090717892,
+      "order_max": 40,
+      "outgoing_order_max": 40,
+      "kick_half": null,
+      "search_step_ang": 100.0,
+      "probe": "grid_supercell"
+    },
+    "source_model": {
+      "arm": "absorbing",
+      "margin_eV": 318.6168090717892,
+      "order_max": 32,
+      "outgoing_order_max": 32,
+      "kick_half": 96,
+      "search_step_ang": 200.0,
+      "probe": "source_model"
+    },
+    "all_on": {
+      "arm": "reference",
+      "margin_eV": 637.2336181435784,
+      "order_max": 40,
+      "outgoing_order_max": 48,
+      "kick_half": 132,
+      "search_step_ang": 100.0,
+      "probe": "all_on"
+    }
+  },
+  "cpu_seconds": {
+    "control": 308.33927439991385,
+    "return_flux": 792.2895864238963,
+    "unresolved": 321.2901586536318,
+    "matching_surface": 474.21581516508013,
+    "grid_supercell": 399.29381896276027,
+    "source_model": 316.3597339289263,
+    "all_on": 1383.4738476267084
+  },
+  "budget_um": [
+    2.0
+  ],
+  "epsilon": [
+    0.0538095491020872
+  ],
+  "intervals": [
+    {
+      "start_ang": 19916.666666666668,
+      "stop_ang": 20000.0,
+      "reference_lower": 2465.192710814141,
+      "return_upper": 73.32970647836547,
+      "unresolved_upper": 33.79470214478599,
+      "grid_supercell_upper": 13.15783313759368,
+      "source_model_upper": 12.368666457915818,
+      "relative_error_upper": 0.0538095491020872,
+      "audit": {
+        "shifts_ang": [
+          19916.666667
+        ],
+        "t_quantile": 3.416407471582983,
+        "bounds": 78,
+        "return_flux": {
+          "difference": [
+            -0.5699058687332086,
+            0.5720348131187919,
+            -0.1716115364041049
+          ],
+          "se": [
+            1.992625787831642,
+            0.5723733264998103,
+            0.27623265956411397
+          ]
+        },
+        "unresolved": {
+          "difference": [
+            0.17636950878541596,
+            0.02982383092728014,
+            0.07495276202629368
+          ],
+          "se": [
+            0.2664073977609459,
+            0.10176570000103545,
+            0.04961986233596063
+          ]
+        },
+        "matching_surface": {
+          "difference": [
+            -1.8140454421149,
+            0.8590699612060125,
+            -0.06243579132399011
+          ],
+          "se": [
+            1.6958026686718572,
+            0.5294730387320631,
+            0.2555798211993239
+          ]
+        },
+        "grid_supercell": {
+          "difference": [
+            0.17636950108461238,
+            0.029823834809629943,
+            0.07495276428722947
+          ],
+          "se": [
+            0.2664073996445738,
+            0.10176569972156435,
+            0.049619862197838746
+          ]
+        },
+        "source_model": {
+          "difference": [
+            1.298303686780855e-12,
+            8.030838216654956e-12,
+            -6.890843451401452e-13
+          ],
+          "se": [
+            3.172333833136299e-12,
+            9.80349451249499e-13,
+            5.264759132799514e-13
+          ]
+        },
+        "interaction_upper": [
+          7.686859390175579,
+          3.3899979376407146,
+          1.2918091300721157
+        ],
+        "reference": {
+          "mean": [
+            776.0680865568881,
+            1476.6799521691896,
+            276.2207595553771
+          ],
+          "se": [
+            5.652210581372199,
+            5.9007990703082145,
+            2.1087998795879517
+          ]
+        }
+      }
+    }
+  ],
+  "simultaneous_confidence": 0.95,
+  "caps": {
+    "outgoing": [
+      777.6770416837861,
+      233.55298843736426,
+      129.09521370043
+    ],
+    "unresolved": [
+      841.6492126263389,
+      1585.066652674635,
+      299.89047881110247
+    ],
+    "fractions": [
+      {
+        "checkpoint_ang": 20000.0,
+        "control": {
+          "outgoing": 0.04295,
+          "unresolved": 0.00025,
+          "retained": 0.9568
+        },
+        "all_on": {
+          "outgoing": 0.00615,
+          "unresolved": 0.00015,
+          "retained": 0.9937
+        }
+      }
+    ],
+    "hoeffding": [
+      0.013313599096202434,
+      0.013313599096202434
+    ],
+    "t_quantile": 3.187513916559966
+  }
+}

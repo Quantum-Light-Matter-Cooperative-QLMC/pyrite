@@ -34,10 +34,12 @@ from .bloch import (
     transverse_states,
 )
 from .density import (
+    DECHANNELING_CRITICAL_ANGLE_MULTIPLE,
     DECHANNELING_MARGIN_EV,
     DECHANNELING_MARGIN_PROVENANCE,
     DensityMatrixResult,
     DensityMatrixSolver,
+    dechanneling_margin_eV,
 )
 from .dipole import (
     FirstOrderTransition,
@@ -130,6 +132,7 @@ __all__ = [
     "realspace",
     "states",
     "CHANNELING_MODEL",
+    "DECHANNELING_CRITICAL_ANGLE_MULTIPLE",
     "DECHANNELING_MARGIN_EV",
     "DECHANNELING_MARGIN_PROVENANCE",
     "KIND_CAPTURE",
@@ -170,6 +173,7 @@ __all__ = [
     "classical_exit_angles",
     "coherent_exit_distribution",
     "coherent_exit_sweep",
+    "dechanneling_margin_eV",
     "decoherence_rate",
     "density_exit_distribution",
     "divergence_sweep_nodes",

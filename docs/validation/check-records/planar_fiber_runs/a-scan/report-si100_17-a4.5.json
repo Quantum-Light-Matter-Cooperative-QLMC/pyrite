@@ -1,0 +1,80 @@
+{
+  "info": {
+    "case": {
+      "key": "si100_17",
+      "hkl": [
+        1,
+        0,
+        0
+      ],
+      "kinetic_energy_eV": 16920000.0,
+      "divergence_rad": 0.0022,
+      "thickness_um": 120.0,
+      "order_max": 24
+    },
+    "arm": "absorbing",
+    "seed": 0,
+    "start": 0,
+    "count": 100,
+    "margin_eV": 224.4037009580715,
+    "order_max": 24,
+    "outgoing_order_max": 24,
+    "kick_half": null,
+    "search_step_ang": 200.0,
+    "probe": null,
+    "cutoff_eV": 228.4268488554378,
+    "barrier_eV": 4.0231478973662975,
+    "well_bottom_eV": -7.7371888638283925,
+    "k_inv_ang": 8829.764283904733,
+    "gamma": 34.11161402582138,
+    "g_inv_ang": 4.62773043670816,
+    "seconds": 6.288302588276565,
+    "source_sha": "453dd745e7b7466c6051d043907e898b71674b1c"
+  },
+  "cpu_seconds": 126.0882658297196,
+  "handoff": {
+    "psi_c_rad": 0.0011621185542407349,
+    "incidents": 2000,
+    "retained_fraction": 0.0,
+    "outgoing_fraction": 0.9433118998410251,
+    "outgoing_abs_psi_over_psi_c": {
+      "mean": 5.55384902252415,
+      "sem": 0.03093681634647214,
+      "quantiles_10_50_90": [
+        4.4716812656848175,
+        5.052267201905618,
+        7.440168896768671
+      ]
+    },
+    "unresolved_fraction": 0.00357513061793581,
+    "tail_fraction": 0.053112969541038973,
+    "tail_abs_psi_over_psi_c": {
+      "mean": 24.51962769518962,
+      "sem": 4.18358705048836,
+      "quantiles_10_50_90": [
+        11.489724828003858,
+        15.45421776336441,
+        33.710650099580754
+      ]
+    },
+    "cut_angle_over_psi_c": 4.481227615554239,
+    "band_edge_over_psi_c": 11.04929561205861,
+    "depth_um_terminal_mean": 17.75427465330163
+  },
+  "occupation": {
+    "si100_17": {
+      "mean": {
+        "length_um": 15.417989326012714,
+        "length_sem_um": 0.4823906656565845,
+        "ratio": 0.9636243328757946,
+        "fit_rms_relative": 0.009131178871888107
+      },
+      "detector": {
+        "length_um": 14.671564909924099,
+        "length_sem_um": 0.43290501363142975,
+        "ratio": 0.9169728068702562,
+        "fit_rms_relative": 0.00940396195043759
+      }
+    }
+  }
+}

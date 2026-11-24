@@ -201,7 +201,9 @@ def planar_fiber_inputs(
 
     ``order_max`` = M sets the window ``-M..M``, ``outgoing_order_max`` = B
     (default M) the outgoing box. The retained cut is ``barrier + margin_eV``,
-    as :class:`.density.DensityMatrixSolver`. ``kick_half`` (default
+    as :class:`.density.DensityMatrixSolver`, but the default here stays the
+    legacy fixed 300 eV: pass ``dechanneling_margin_eV(profile)`` to match the
+    solver's production default (#522). ``kick_half`` (default
     ``B + M``) bounds the kick harmonics; it must cover the electron-density
     harmonics that matter. ``incidence_rad`` tilts the entrance plane wave
     (paraxial ``k_x = k psi``), folded into the zone.

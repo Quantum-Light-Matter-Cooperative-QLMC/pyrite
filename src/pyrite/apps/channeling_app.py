@@ -95,9 +95,10 @@ def _():
     from pyrite.materials.channeling import planar_profile
     from pyrite.materials.crystal import HBAR2_2M_EV_ANG2, M_E_EV
     from pyrite.montecarlo.channeling import (
-        DECHANNELING_MARGIN_EV,
+        DECHANNELING_CRITICAL_ANGLE_MULTIPLE,
         DensityMatrixSolver,
         channeling_spectrum,
+        dechanneling_margin_eV,
         electronic_kernel,
         entry_populations,
         longitudinal_kinematics,
@@ -106,12 +107,13 @@ def _():
     )
 
     return (
-        DECHANNELING_MARGIN_EV,
+        DECHANNELING_CRITICAL_ANGLE_MULTIPLE,
         DensityMatrixSolver,
         HBAR2_2M_EV_ANG2,
         M_E_EV,
         channeling_spectrum,
         critical_angle_rad,
+        dechanneling_margin_eV,
         electronic_kernel,
         entry_populations,
         longitudinal_kinematics,
@@ -136,10 +138,10 @@ def planar_states(
 
 @app.cell
 def _(
-    DECHANNELING_MARGIN_EV,
     DensityMatrixSolver,
     HBAR2_2M_EV_ANG2,
     depth_ang,
+    dechanneling_margin_eV,
     divergence_rad,
     electronic_kernel,
     energy_eV,
@@ -155,7 +157,7 @@ def _(
     basis_order = (
         int(
             np.ceil(
-                np.sqrt((barrier_eV + DECHANNELING_MARGIN_EV) * gamma / HBAR2_2M_EV_ANG2)
+                np.sqrt((barrier_eV + dechanneling_margin_eV(profile)) * gamma / HBAR2_2M_EV_ANG2)
                 / profile.g_inv_ang
             )
         )
@@ -215,6 +217,7 @@ def _(channeling_spectrum, depth_ang, divergence_rad, incidence_rad, np, solver)
 
 @app.cell
 def _(
+    DECHANNELING_CRITICAL_ANGLE_MULTIPLE,
     M_E_EV,
     angles,
     basis_order,
@@ -335,7 +338,7 @@ def _(
     )
     explanation = mo.md(
         f"**Critical angle:** {psi_c * 1e3:.2f} mrad. "
-        f"**Plane-wave order:** ±{basis_order} (chosen to cover the 300 eV tracking margin). "
+        f"**Plane-wave order:** ±{basis_order} (chosen to cover the {DECHANNELING_CRITICAL_ANGLE_MULTIPLE:g} ψc dechanneling margin). "
         f"**Free handoff flux:** {handoff_total:.3g} of incident electrons. "
         f"**Probability balance defect:** {result.balance_defect[-1]:.2e}.\n\n"
         "**Reading the panels.** In the potential panel, the dashed line is the "

@@ -108,7 +108,7 @@ lower estimate.
 | Item | Production zone (`handoff._solve`) | Check | Result |
 | --- | --- | --- | --- |
 | Kernel | `tds_kernel + electronic_kernel`, `n_cells=bloch_cells`, `max_order=basis_size` | `out_of_plane_kernel(η=0)`, same options | cell kernels identical (max abs diff 0) |
-| Retained subspace | `margin_eV` 300 | same | identical |
+| Retained subspace | `margin_eV` 300 (explicit legacy value) | same | identical |
 | Entry | `propagate(incidence=effective_rad, divergence)` | `entry_state(effective_rad, divergence)` | `effective_rad` $\approx -5\times10^{-17}$; no case divergence, so both are snapped to 0 |
 | Retained trace at 250 / 3000 / 8750 / 20000 Å | 0.99873 / 0.98750 / 0.96697 / 0.92947 | 0.99874 / 0.98753 / 0.96703 / 0.92961 | agree to $\le2\times10^{-4}$ (production grid step 250.34 Å vs 250 Å) |
 | Stopping | case value | none | `_solve` with $0$ and $0.04\,\mathrm{eV/Å}$ gives identical traces; $\Delta p/p\approx4\times10^{-5}$ |

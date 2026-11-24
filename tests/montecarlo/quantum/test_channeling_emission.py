@@ -92,6 +92,26 @@ def test_path_rate_is_rest_rate_over_gamma_beta_c():
     )
 
 
+@pytest.mark.parametrize("kinetic_eV", [4.0e6, 17.0e6, 54.5e6])
+def test_forward_yield_is_andersen_1981_eq_13(kinetic_eV):
+    """Andersen, Eriksen & Laegsgaard, Phys. Scr. 24, 588 (1981), Eq. 13.
+
+    ``N = 4 alpha omega^L (l/c) (m0 c)^-2 |<f|p_x|i>|^2 dOmega/4pi`` forward, with
+    ``p_x = m0 omega' x_fi`` and ``omega^L = (1 + beta) gamma omega'`` (Eq. 11).
+    Their ``beta -> 1`` form leaves exactly ``(1 + beta)/(2 beta)``.
+    """
+    alpha = 1 / 137.035999084
+    gamma = _gamma(kinetic_eV)
+    beta = np.sqrt(1 - gamma**-2)
+    delta_eV, dipole_ang = 5.0, 0.3
+    ours = dipole_rate_per_ang(delta_eV, dipole_ang, gamma) * boosted_dipole_pattern(
+        0.0, 0.0, gamma
+    )
+    rest = gamma * delta_eV / 1973.269804  # omega'/c [1/angstrom]
+    andersen = alpha * (1 + beta) * gamma * rest * (rest * dipole_ang) ** 2 / np.pi
+    assert ours / andersen == pytest.approx((1 + beta) / (2 * beta), rel=1e-9)
+
+
 @pytest.mark.parametrize(("theta_gamma", "phi"), [(0.3, 0.0), (0.5, 0.7), (1.5, 0.0), (2.0, 1.2)])
 def test_generic_operator_reduces_to_boosted_dipole(si110, theta_gamma, phi):
     gamma = _gamma(ENERGY_EV)
@@ -588,7 +608,7 @@ def test_transition_radiation_is_bounded_below_strong_cr_lines(si110):
 
 @pytest.fixture(scope="module")
 def wide_solver(si110, kernel):
-    # The 300 eV production margin tracks a 2.2 mrad beam (E_perp ~ 43 eV).
+    # The legacy 300 eV margin (pre-#522 default) tracks a 2.2 mrad beam (E_perp ~ 43 eV).
     return DensityMatrixSolver(si110, ENERGY_EV, kernel, margin_eV=300.0)
 
 
