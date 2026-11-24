@@ -333,3 +333,27 @@ def test_shard_sum_refuses_an_unscorable_case(tmp_path):
     executor = _executor(tmp_path, None, shard_electrons=4, reduction="shard-sum")
     with pytest.raises(ValueError, match="shard by shard"):
         executor.execute([case])
+
+
+@pytest.mark.slow
+def test_shard_sum_selection_runs_on_the_workers(tmp_path, client):
+    """#1395: an automatic selection's pilots run as per-shard subtasks of the plan
+    task, and the result still equals the in-process marked run bit for bit."""
+    from tests.montecarlo.runner.test_reflection_selection_spectrum import SELECTION, _transported
+
+    plain, _ = _transported()
+    plain = {
+        k: v for k, v in plain.items() if k not in ("line_grid_policy", "transport_realization")
+    }
+    plain = {**plain, "reflection_selection": {**SELECTION, "automatic": True}}
+    marked = bind_realization(plain, TransportRealization(reduction="shard-sum", shard_electrons=3))
+    ref = runner.run_case(marked)
+    client.get_task_stream()  # start recording
+    executor = _executor(tmp_path, client, shard_electrons=3, reduction="shard-sum")
+    got = executor.store.load(executor.execute([plain])[0])
+    _assert_identical(got, ref)
+    names = {
+        task["key"][0] if isinstance(task["key"], tuple) else task["key"]
+        for task in client.get_task_stream()
+    }
+    assert any(str(name).startswith("_selection_part") for name in names)

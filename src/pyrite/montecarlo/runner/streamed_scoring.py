@@ -273,8 +273,8 @@ class BlockSpectrumScorer:
                 total + part for total, part in zip(self.totals, parts, strict=True)
             )
         self.n_segments += rows
-        if self.split is not None:  # after the block's totals: a retry never double-counts
-            self.split.add(segs)
+        if self.split is not None and segs is not None:
+            self.split.add(segs)  # after the block's totals: a retry never double-counts
 
     def _past_brem_freeze(self, segs) -> bool:
         """Whether every electron of a provisional block lies past the brem freeze.
@@ -346,6 +346,7 @@ class BlockSpectrumScorer:
                 diffracted.edges,
             ),
             fallbacks=self.fallbacks.snapshot(),
+            split=None if self.split is None else self.split.snapshot(),
         )
 
     def absorb(self, partial: Mapping[str, Any]) -> None:
@@ -357,11 +358,13 @@ class BlockSpectrumScorer:
         from .electron_blocks import merge_audit
 
         if partial["totals"] is not None:
-            self._commit(partial["totals"], int(partial["n_segments"]))
+            self._commit(partial["totals"], None, int(partial["n_segments"]))
             self.n_layers = int(partial["n_layers"])
         merge_audit(self.audit, partial["audit"])
         self.diffracted.absorb(*partial["diffracted"])
         self.fallbacks.absorb(partial["fallbacks"])
+        if self.split is not None and partial.get("split") is not None:
+            self.split.absorb(partial["split"])
 
     def _renormalize(self, realized):
         """``x -> x * L / realized`` for the provisional count ``L`` (exact ``x * L``)."""

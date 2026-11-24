@@ -262,7 +262,10 @@ class DaskExecutor:
                 return Client(scheduler_file=str(Path(cfg.scheduler_file).expanduser())), None
             return Client(cfg.scheduler_address), None
         if cfg.cluster == "local":
-            cluster = LocalCluster(n_workers=cfg.workers, threads_per_worker=1, processes=True)
+            import dask
+
+            with dask.config.set(_dask_slurm.worker_malloc_override()):
+                cluster = LocalCluster(n_workers=cfg.workers, threads_per_worker=1, processes=True)
             return Client(cluster), cluster
         from dask_jobqueue import SLURMCluster
 

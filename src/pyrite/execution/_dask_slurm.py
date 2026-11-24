@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import inspect
 import re
+import shlex
 from collections.abc import Mapping
 from typing import Any
 
@@ -31,6 +32,14 @@ RESERVED_KEYS = frozenset(
         "asynchronous",
     }
 )
+#: Dask's nanny spawns workers with ``MALLOC_TRIM_THRESHOLD_=65536``
+#: (``distributed.nanny.pre-spawn-environ``). Setting any glibc ``M_*`` threshold
+#: freezes its mmap threshold at 128 KiB, so every multi-MiB NumPy temporary of
+#: spectrum scoring is a fresh mapping, faulted and zeroed on each pass: one
+#: process scored a shard 3.5x slower with 400x the kernel time (#1395).
+_TRIM_KEY = "distributed.nanny.pre-spawn-environ.MALLOC_TRIM_THRESHOLD_"
+_DASK_TRIM_DEFAULT = "65536"
+_INHERIT = "DASK_INTERNAL_INHERIT_CONFIG"
 _KEY = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,63}\Z")
 _WALLTIME = re.compile(r"(?:(\d+)-)?(\d+)(?::(\d+))?(?::(\d+))?\Z")
 _GPU_DIRECTIVE = re.compile(r"(?:^|\s)(?:--gres|--gpus(?:-per-[a-z]+)?|-G)(?:[=\s]|$)")
@@ -128,6 +137,33 @@ def _accepted_keywords() -> set[str]:
     return names - RESERVED_KEYS
 
 
+def worker_malloc_override() -> dict[str, Any]:
+    """Dask config that spawns nanny workers without Dask's stock malloc trim (#1395).
+
+    Empty when the value is not Dask's default, so a deliberate site or user
+    setting is kept. ``None`` drops the variable; glibc then keeps its dynamic
+    mmap threshold.
+    """
+    import dask
+
+    value = dask.config.get(_TRIM_KEY, None)
+    return {_TRIM_KEY: None} if str(value) == _DASK_TRIM_DEFAULT else {}
+
+
+def worker_malloc_prologue() -> list[str]:
+    """Job-script lines applying :func:`worker_malloc_override` to remote nannies.
+
+    A SLURM worker reads its own node's Dask config, so the override travels as
+    inherited config, which keeps the variable's case (``DASK_*`` keys do not).
+    """
+    import dask
+
+    if not worker_malloc_override():
+        return []
+    nested = {"distributed": {"nanny": {"pre-spawn-environ": {"MALLOC_TRIM_THRESHOLD_": None}}}}
+    return [f"export {_INHERIT}={shlex.quote(dask.config.serialize(nested))}"]
+
+
 def _flag_present(args: list[Any], flag: str) -> bool:
     return any(str(arg) == flag or str(arg).startswith(f"{flag}=") for arg in args)
 
@@ -177,4 +213,16 @@ def cluster_kwargs(config: Any, resources: Any) -> dict[str, Any]:
     if not _flag_present(worker_args, "--lifetime"):
         worker_args += lifetime_args(kwargs.get("walltime") or effective("walltime"))
     kwargs["worker_extra_args"] = worker_args
+    _add_malloc_prologue(kwargs, effective)
     return kwargs
+
+
+def _add_malloc_prologue(kwargs: dict[str, Any], effective) -> None:
+    """Append :func:`worker_malloc_prologue` to the site prologue, unless it sets its own."""
+    key = "env_extra" if effective("env_extra") is not None else "job_script_prologue"
+    site = list(effective(key) or [])
+    if any(_INHERIT in str(line) for line in site):
+        return
+    extra = worker_malloc_prologue()
+    if extra:
+        kwargs[key] = [*site, *extra]

@@ -146,11 +146,14 @@ def test_measured_policy_grid_is_frozen_from_the_shards():
 
 
 @pytest.mark.slow
-def test_automatic_selection_reads_only_the_prefix_shards(monkeypatch):
+@pytest.mark.parametrize("rows", [None, 1])
+def test_automatic_selection_reads_only_the_prefix_shards(monkeypatch, rows):
     from tests.montecarlo.runner.test_reflection_selection_spectrum import SELECTION, _transported
     from tests.montecarlo.transport.test_streamed_selection import assert_same_selection
 
     monkeypatch.setattr(reflection_cutoff, "SELECTION_HISTORIES", 2)
+    if rows is not None:  # #1368 row budget: met by the first electron's rows
+        monkeypatch.setattr(reflection_cutoff, "SELECTION_ROWS", rows)
     case, _ = _transported()
     case = {k: v for k, v in case.items() if k != "line_grid_policy"}
     case = {**case, "reflection_selection": {**SELECTION, "automatic": True}}
@@ -163,8 +166,9 @@ def test_automatic_selection_reads_only_the_prefix_shards(monkeypatch):
             yield rows
 
     plan = resolve_shard_plan(case, tracked)
-    # The streamed scorer holds blocks until one reaches electron 2.
-    assert read == [0, 1, 2]
+    # The streamed scorer holds blocks until one reaches electron 2, or until
+    # the held rows reach the row budget.
+    assert read == ([0, 1, 2] if rows is None else [0])
     got = merge_shard_spectra(
         case, plan, [score_history_shard(case, rows, plan) for rows in shards]
     )
@@ -203,3 +207,69 @@ def test_marked_case_routes_run_case_and_refuses_joined_scoring(plain):
         run_case_shard_scored(marked, 4)
     with pytest.raises(ValueError, match="shard-sum realization scores"):
         run_case_from_shards(marked, _shards(case, 13))
+
+
+@pytest.mark.slow
+def test_distributed_selection_pilots_give_the_same_plan(monkeypatch):
+    """Pilots shipped part by part (cloudpickle round trip, as Dask does) and summed
+    in shard order select the same set and freeze the same plan bit for bit."""
+    import cloudpickle
+
+    from pyrite.montecarlo.runner.part_map import (
+        ordered_values,
+        part_mapper,
+        staged_part_result,
+    )
+    from tests.montecarlo.runner.test_reflection_selection_spectrum import SELECTION, _transported
+
+    monkeypatch.setattr(reflection_cutoff, "SELECTION_HISTORIES", 3)
+    case, _ = _transported()
+    case = {k: v for k, v in case.items() if k != "line_grid_policy"}
+    case = {**case, "reflection_selection": {**SELECTION, "automatic": True}}
+    shards = _shards(case, 2)
+    calls = []
+
+    def distribute(held):
+        def mapper(parts, fn):
+            calls.append(len(held))
+            shipped = cloudpickle.loads(cloudpickle.dumps((fn, held, parts.header, parts.prefix)))
+            remote_fn, blocks, header, prefix = shipped
+            results = [staged_part_result(remote_fn, block, header, prefix) for block in blocks]
+            return ordered_values(parts, fn, results)
+
+        return part_mapper(mapper)
+
+    local = resolve_shard_plan(case, lambda: iter(shards))
+    remote = resolve_shard_plan(case, lambda: iter(shards), distribute=distribute)
+    assert calls and set(calls) == {2}  # prefix 3 is held in shards [0, 2) and [2, 4)
+    assert remote.digest == local.digest
+    assert remote.selection[1] == local.selection[1]
+
+
+def test_cone_split_tally_absorbs_shard_snapshots():
+    """Shard tallies absorbed in order equal one tally over both ranges (#379, #1395)."""
+    from pyrite.montecarlo.runner.cone_split_strata import SplitTally
+
+    def block(parents, weights, killed):
+        return dict(
+            cone_split=dict(
+                n_hat=[0.0, 0.0, 1.0],
+                half_angle_rad=0.1,
+                target_weight=0.25,
+                parent=np.asarray(parents),
+                weight=np.asarray(weights),
+                killed=np.asarray(killed),
+            )
+        )
+
+    case = {"cone_split": {"policy": "detector-cone"}}
+    first = block([0, 0, 1], [0.5, 0.25, 0.25], [False, True])
+    second = block([0, 0, 0], [0.25, 0.25, 0.25], [False])
+    whole, shards = SplitTally(case), [SplitTally(case), SplitTally(case)]
+    for tally, segments in zip(shards, (first, second), strict=True):
+        whole.add(segments)
+        tally.add(segments)
+    merged = SplitTally(case)
+    for tally in shards:
+        merged.absorb(tally.snapshot())
+    assert merged.record() == whole.record()

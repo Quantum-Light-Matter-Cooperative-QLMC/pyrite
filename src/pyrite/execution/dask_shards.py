@@ -19,7 +19,7 @@ import json
 import uuid
 from collections import deque
 from collections.abc import Sequence
-from contextlib import closing
+from contextlib import closing, contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -190,9 +190,55 @@ def _plan_stage(plan, entry):
         for key in entry["shard_keys"]:
             yield _load_one(store, material, key)
 
+    # A device-scored plan keeps the selection in process: its seceded task
+    # would hold the GPU resource its subtasks wait for.
+    distribute = (
+        None
+        if plan["transport_realization"].get("scoring", "cpu") == "gpu"
+        else (lambda held: _scattered_selection(case, held))
+    )
     with threadpool_limits(limits=1), scoring_scope(case):
-        frozen = resolve_shard_plan(case, shards)
+        frozen = resolve_shard_plan(case, shards, distribute=distribute)
     return asdict(store.publish(material, entry["plan_key"], {"plan": frozen}))
+
+
+@contextmanager
+def _scattered_selection(case, held):
+    """Score the selection's pilots on the workers, one subtask per held shard (#1395).
+
+    The held shards are scattered once; each pilot submits one task per shard
+    and gathers the results in shard order (:mod:`...runner.part_map`).
+    """
+    from distributed import worker_client
+
+    from ..montecarlo.runner.part_map import ordered_values, part_mapper
+
+    with worker_client() as client:
+        futures = client.scatter(list(held))
+
+        def mapper(parts, fn):
+            raw = list(parts.parts())
+            if len(raw) != len(held) or any(a is not b for a, b in zip(raw, held, strict=True)):
+                return [fn(part) for part in parts()]  # not the held shards
+            tasks = [
+                client.submit(_selection_part, case, fn, f, parts.header, parts.prefix, pure=False)
+                for f in futures
+            ]
+            return ordered_values(parts, fn, client.gather(tasks))
+
+        with part_mapper(mapper):
+            yield
+
+
+def _selection_part(case, fn, part, header, prefix):
+    """Dask subtask: one held shard's share of one selection pilot."""
+    from threadpoolctl import threadpool_limits
+
+    from ..montecarlo.runner.part_map import staged_part_result
+    from ..montecarlo.runner.shard_scoring import scoring_scope
+
+    with threadpool_limits(limits=1), scoring_scope(case):
+        return staged_part_result(fn, part, header, prefix)
 
 
 @_guarded

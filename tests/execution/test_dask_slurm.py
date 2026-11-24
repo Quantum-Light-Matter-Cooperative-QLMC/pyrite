@@ -276,3 +276,49 @@ def test_existing_profiles_still_parse():
     )
     assert profile.dask.walltime == "01:00:00" and profile.dask.jobqueue == {}
     assert ResourceRequest(cpu_cores=8) != profile.resources
+
+
+_TRIM = "distributed.nanny.pre-spawn-environ.MALLOC_TRIM_THRESHOLD_"
+
+
+def _inherited_trim(script):
+    """The nanny environment a worker would build from the job script's inherited config."""
+    line = next(row for row in script.splitlines() if "DASK_INTERNAL_INHERIT_CONFIG=" in row)
+    import shlex
+
+    value = shlex.split(line.removeprefix("export "))[0].split("=", 1)[1]
+    return dask.config.deserialize(value)["distributed"]["nanny"]["pre-spawn-environ"]
+
+
+def test_workers_spawn_without_dask_malloc_trim(tmp_path):
+    """Dask's stock MALLOC_TRIM_THRESHOLD_ makes scoring page-fault every temporary (#1395)."""
+    script = _job_script(_executor(tmp_path, {"cluster": "slurm", "jobqueue": SITE}))
+    _assert_site(script)
+    assert script.index("source /shared/venv/bin/activate") < script.index("DASK_INTERNAL")
+    assert _inherited_trim(script) == {"MALLOC_TRIM_THRESHOLD_": None}
+
+
+def test_a_deliberate_malloc_trim_is_kept(tmp_path):
+    with dask.config.set({_TRIM: 1 << 20}):
+        script = _job_script(_executor(tmp_path, {"cluster": "slurm", "jobqueue": SITE}))
+    assert "DASK_INTERNAL_INHERIT_CONFIG" not in script
+    own = {**SITE, "job_script_prologue": ["export DASK_INTERNAL_INHERIT_CONFIG=site"]}
+    script = _job_script(_executor(tmp_path, {"cluster": "slurm", "jobqueue": own}))
+    assert script.count("DASK_INTERNAL_INHERIT_CONFIG") == 1
+
+
+def test_local_cluster_spawns_without_dask_malloc_trim(tmp_path, monkeypatch):
+    seen = {}
+
+    class LocalCluster:
+        def __init__(self, **kwargs):
+            seen["trim"] = dask.config.get(_TRIM, "unset")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "distributed",
+        types.SimpleNamespace(Client=lambda cluster: None, LocalCluster=LocalCluster),
+    )
+    _executor(tmp_path, {"cluster": "local", "workers": 2})._open_client()
+    assert seen["trim"] is None
+    assert str(dask.config.get(_TRIM)) == "65536"  # only while the cluster is built

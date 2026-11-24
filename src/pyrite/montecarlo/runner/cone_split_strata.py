@@ -173,6 +173,16 @@ class SplitTally:
         self.cone, self.primaries, self.killed, self.max_per_primary, strata = state
         self.strata = dict(strata)
 
+    def absorb(self, state: tuple[Any, ...]) -> None:
+        """Add the :meth:`snapshot` of a disjoint electron range (a history shard, #1395)."""
+        cone, primaries, killed, max_per_primary, strata = state
+        self.cone = self.cone if self.cone is not None else cone
+        self.primaries += int(primaries)
+        self.killed += int(killed)
+        self.max_per_primary = max(self.max_per_primary, int(max_per_primary))
+        for weight, count in strata.items():
+            self.strata[weight] = self.strata.get(weight, 0) + int(count)
+
     def record(self) -> dict[str, Any]:
         return {
             **self.policy,

@@ -174,6 +174,13 @@ at once. dask-jobqueue divides the job's memory evenly among its processes.
 `--execution-plan` reports `worker_processes_per_allocation`, and each run's
 `execution.json` records the same layout under `worker_topology`.
 
+Workers that PyRITE starts (`local` and `slurm`) do not inherit Dask's stock
+`MALLOC_TRIM_THRESHOLD_=65536` (`distributed.nanny.pre-spawn-environ`). That
+setting freezes glibc's mmap threshold, so spectrum scoring maps, faults and
+zeroes every multi-MiB array temporary. One worker scored 3.5× slower, with
+most of its time in the kernel (#1395). A value other than Dask's default is
+left as set.
+
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `cluster` | `"local"` | `"local"`, `"slurm"`, or `"existing"` |
@@ -326,7 +333,15 @@ max_in_flight = 128
 ```
 
 Each existing worker should run one work unit at a time per thread; start
-them with `--nthreads 1`. `workers` is a planning value here, so set
+them with `--nthreads 1`. PyRITE does not start these workers, so drop Dask's
+malloc trim yourself before launching them (see
+[Worker packing](#worker-packing-and-profile-fields)):
+
+<!-- verify: skip (site-side dask worker environment, not a pyrite CLI invocation) -->
+```bash
+export DASK_INTERNAL_INHERIT_CONFIG=$(python -c 'import dask.config as c; print(c.serialize({"distributed": {"nanny": {"pre-spawn-environ": {"MALLOC_TRIM_THRESHOLD_": None}}}}))')
+```
+ `workers` is a planning value here, so set
 `max_in_flight` to about twice the worker processes actually available.
 
 ### GPU workers

@@ -169,11 +169,20 @@ process (bit for bit the Dask result); joined spectrum scoring
 with a fixed count and no line roulette (its per-electron line state spans the
 population); others are refused before staging.
 
-**Open (#1395).** The plan stage is serial: an automatic selection scores
-every candidate shell over the prefix shards in one task (about 1400 s of the
-#1320 case at N = 8 on CPU), and a policy grid pass reads every shard. A
-refused default measured bandwidth is not extended and rescored as the joined
-route does (#1243); the merge raises the refusal.
+**Distributed selection.** An automatic selection scores its shell pilots in
+order and stops at the first converged shell, so it cannot be precomputed per
+shard. Each pilot's yield is a sum over the held prefix shards, so the plan
+task scatters those shards to the workers once and, for every pilot, submits
+one `_selection_part` subtask per shard (`distributed.worker_client`,
+`runner/part_map.py`). It adds the results in shard order: the selected set
+and the plan are the in-process ones bit for bit. The continuum share of the
+net metric stays in the plan task, since shipping its BremsLib tables per call
+would cost more than it saves. A device-scored plan keeps the whole selection in
+process, because its seceded task would hold the `GPU` resource its subtasks wait for.
+
+**Open (#1395).** The grid pass of a `line_grid_policy` axis still reads every
+shard in the plan task. A refused default measured bandwidth is not extended and
+rescored as the joined route does (#1243); the merge raises the refusal.
 
 ## What crosses the network
 

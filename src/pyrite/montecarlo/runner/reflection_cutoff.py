@@ -23,7 +23,6 @@ integrated yield is exact at any bin width.
 
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from functools import partial
 
 import numpy as np
 
@@ -34,6 +33,7 @@ from ...materials.crystal import (
     dominant_reflections,
     reciprocal_g_vector,
 )
+from .part_map import StagedParts, map_parts
 
 __all__ = [
     "DEFAULT_SHELL_WIDTH_INVANG",
@@ -839,8 +839,8 @@ def _batch_selection(emission, batch, Ne_brem, histories, rows=None, parts=None)
         segments = batch.segments if parts is not None else electron_prefix(batch.segments, prefix)
         sample = replace(batch, segments=segments, electron_limit=n_lines)
         record = dict(lines=n_lines, continuum=n_brem, rows=prefix_rows, row_budget=row_budget)
-    population = None if parts is None else partial(_staged_parts, parts, batch.segments, None)
-    selected = None if parts is None else partial(_staged_parts, parts, batch.segments, prefix)
+    population = None if parts is None else StagedParts(parts, batch.segments, None)
+    selected = None if parts is None else StagedParts(parts, batch.segments, prefix)
     return dict(
         case=batch.case,
         evaluate=lambda pilot: _summed_parts(
@@ -865,43 +865,6 @@ def _batch_selection(emission, batch, Ne_brem, histories, rows=None, parts=None)
     )
 
 
-def _staged_parts(parts, header, prefix):
-    """Device copies of ``parts()`` cut to ``elec_id < prefix``, one block at a time.
-
-    Each block carries ``header``'s population ``Ne`` (as the merged population
-    would) before the prefix cut, and blocks the cut leaves empty are skipped;
-    a population with no prefix row yields one empty block, so a sum is never
-    empty. Oversized held blocks are subdivided on the host using the scorer's
-    device-headroom budget before staging (#1416). Consumers must release each
-    yielded device block before requesting the next one.
-    """
-    from . import _segments_on_device
-    from .electron_blocks import (
-        device_headroom_bytes,
-        electron_block_count,
-        electron_prefix,
-        iter_electron_blocks,
-    )
-
-    staged = 0
-    empty = None
-    for part in parts():
-        segments = {**part, "Ne": header["Ne"]}
-        if prefix is not None:
-            segments = electron_prefix(segments, prefix)
-        if int(segments["L_ang"].shape[0]) == 0:
-            empty = segments if empty is None else empty
-            continue
-        staged += 1
-        # A transport block (or the whole short population) need not fit a
-        # selection scorer's row setup. Partition on the host before uploading.
-        count = electron_block_count(int(segments["L_ang"].shape[0]), device_headroom_bytes())
-        for block in iter_electron_blocks(segments, count):
-            yield _segments_on_device(block)
-    if not staged:
-        yield _segments_on_device({**header, **(empty or {})})
-
-
 def _summed_parts(score, batch, parts):
     """``score(batch).values``, or its sum over the staged ``parts()`` blocks."""
     from dataclasses import replace
@@ -909,10 +872,11 @@ def _summed_parts(score, batch, parts):
     if parts is None:
         return score(batch).values
     total = None
-    for segments in parts():
-        values = score(replace(batch, segments=segments)).values
+    # In process, or on the workers holding the parts (#1395); summed in part order.
+    for values in map_parts(
+        parts, lambda segments: score(replace(batch, segments=segments)).values
+    ):
         total = values if total is None else total + values
-        del segments  # release device rows before the generator uploads its next block
     return total
 
 
@@ -938,11 +902,11 @@ def _band_evaluator(emission, source, norm, *, parts=None):
         if parts is None:
             return score_one(source, pilot, axis, band)
         values, mass = None, 0.0
-        for segments in parts():
-            v, m = score_one(replace(source, segments=segments), pilot, axis, band)
+        for v, m in map_parts(
+            parts, lambda segments: score_one(replace(source, segments=segments), pilot, axis, band)
+        ):
             values = v if values is None else values + v
             mass += m
-            del segments
         return values, mass
 
     def score_one(source, pilot, axis, band):

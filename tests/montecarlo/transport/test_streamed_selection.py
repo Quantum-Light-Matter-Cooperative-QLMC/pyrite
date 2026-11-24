@@ -42,7 +42,7 @@ def test_selection_releases_each_staged_block_before_uploading_next(monkeypatch,
     blocks = [dict(L_ang=np.ones(4), elec_id=np.full(4, i), Ne=64) for i in range(64)]
 
     def parts():
-        return reflection_cutoff._staged_parts(lambda: iter(blocks), {"Ne": 64}, None)
+        return reflection_cutoff.StagedParts(lambda: iter(blocks), {"Ne": 64}, None)()
 
     batch = EmissionBatch({}, np.array([1000.0, 2000.0]), {}, None, None, None)
 
@@ -87,7 +87,7 @@ def test_selection_splits_held_blocks_before_device_upload(monkeypatch):
 
     monkeypatch.setattr(runner, "_segments_on_device", upload)
     block = dict(L_ang=np.ones(64), elec_id=np.arange(64), Ne=64)
-    parts = reflection_cutoff._staged_parts(lambda: iter([block]), {"Ne": 64}, 48)
+    parts = reflection_cutoff.StagedParts(lambda: iter([block]), {"Ne": 64}, 48)()
     assert sum(part["L_ang"].size for part in parts) == 48
     assert len(uploaded) == 3
 

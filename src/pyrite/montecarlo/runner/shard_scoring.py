@@ -39,6 +39,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from typing import Any
 
@@ -88,13 +89,21 @@ def refuse_shard_scoring(case: Mapping[str, Any]) -> None:
 
 
 def resolve_shard_plan(
-    case: Mapping[str, Any], shards: Callable[[], Iterable[Mapping[str, Any]]]
+    case: Mapping[str, Any],
+    shards: Callable[[], Iterable[Mapping[str, Any]]],
+    *,
+    distribute: Callable[[list], AbstractContextManager] | None = None,
 ) -> ShardScoringPlan:
     """Freeze ``case``'s line axis and reflection selection from its shard rows.
 
     ``shards()`` yields the stored shard rows in electron order; it is called
     once per population pass (the grid pass reads every shard, the selection
     only those that start inside its prefix), so it may load lazily.
+
+    ``distribute(held)``, when given, returns a context in which the
+    selection's per-shard pilot scoring runs elsewhere
+    (:func:`.part_map.part_mapper`); its results come back in shard order, so
+    the plan is the in-process one bit for bit.
 
     Validation: reflection-yield-tolerance-selector
     """
@@ -117,8 +126,11 @@ def resolve_shard_plan(
     selection = None
     if automatic_selection(case):
         inputs = _inputs(case, E_grid)
-        held = _prefix_shards(shards(), _selection_prefix(case))
-        selection = _select_on_blocks(case, inputs, held)
+        from .reflection_cutoff import SELECTION_ROWS
+
+        held = _prefix_shards(shards(), _selection_prefix(case), SELECTION_ROWS)
+        with nullcontext() if distribute is None else distribute(held):
+            selection = _select_on_blocks(case, inputs, held, SELECTION_ROWS)
     return ShardScoringPlan(E_grid, record, grid_pass, selection, _plan_digest(E_grid, selection))
 
 
@@ -296,27 +308,29 @@ def _scorer(case, plan: ShardScoringPlan):
 
 
 def _selection_prefix(case) -> int:
-    """Electrons the automatic selection reads (``PrefixSelectingScorer.prefix``)."""
+    """Electrons the automatic selection reads at most (``PrefixSelectingScorer.prefix``)."""
     from .reflection_cutoff import SELECTION_HISTORIES
 
     return min(max(int(case["Ne"]), int(case["Ne_brem"])), SELECTION_HISTORIES)
 
 
-def _prefix_shards(shards: Iterable[Mapping[str, Any]], prefix: int) -> list:
+def _prefix_shards(shards: Iterable[Mapping[str, Any]], prefix: int, rows: int) -> list:
     """The leading shards :class:`.streamed_selection.PrefixSelectingScorer` would hold.
 
-    It holds blocks until one reaches an electron at or past ``prefix`` and
+    It holds blocks until one reaches an electron at or past the history cap
+    ``prefix``, or the held rows reach the row budget ``rows`` (#1368), and
     selects on all of them (their summed ``Ne`` is the selection header's).
     """
     from .electron_blocks import _electron_ids
 
-    held = []
-    for rows in shards:
-        ids = _electron_ids(rows)
+    held, count = [], 0
+    for block in shards:
+        ids = _electron_ids(block)
         if ids.size == 0:
             continue
-        held.append(rows)
-        if int(ids.max()) >= prefix:
+        held.append(block)
+        count += int(block["L_ang"].shape[0])
+        if int(ids.max()) >= prefix or count >= rows:
             break
     return held
 
