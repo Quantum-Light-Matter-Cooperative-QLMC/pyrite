@@ -463,7 +463,9 @@ def transport_case_blocks(
     :func:`transport_electron_blocks`. With a ``monitor`` every monitored pass
     is measure-only (#1280): kept chunks go to ``consume`` and are released,
     and only the realized additive counts return. An energy-range replay
-    restarts at electron 0, so ``consume`` must not keep state across passes.
+    restarts at electron 0, so ``consume`` must not keep state across passes:
+    a sink with ``begin_pass(monitor)`` (#1397) is told before every pass and
+    reads the monitor (its brem freeze) as each kept chunk arrives.
 
     A cascade (#1240) never joins blocks: the monitor reads streamed blocks
     (each primary's whole lineage-addressed cascade, descendants keyed to their
@@ -547,6 +549,10 @@ def transport_case_blocks(
 
     def monitored(n, recheck=False):
         sink = consume
+        begin = getattr(consume, "begin_pass", None)
+        if begin is not None:
+            # Every pass restarts at electron 0: a stateful sink starts afresh (#1397).
+            begin(monitor)
         if cascade:
             # Measure-only streamed pass on a fresh run-wide track budget (#1240).
             budgets.append(_TrackBudget(n_electrons))

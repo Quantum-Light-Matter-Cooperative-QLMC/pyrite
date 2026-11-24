@@ -17,6 +17,15 @@ through ``run_cases`` (production serial path). ROUTE:
 - ``streamed``: the production streamed route forced at the first admission
   check, in blocks of ``PROBE_STREAM_BLOCK_MIB`` (default 2048, the
   production ``STREAMED_BLOCK_BYTES``) of observed rows.
+- ``measure``: ``auto`` on the #1280 measure-only streamed route
+  (``streamed_adaptive.MONITORED_PASS = False``): the same-revision arm of the
+  #1397 single-pass comparison against ``auto``.
+
+``PROBE_FRESH_GRID=1`` removes the line-grid speed cache (``cache_dir() /
+"line-grids"``; point ``PYRITE_CACHE_DIR`` at a scratch directory) before the
+arm, so its policy grid misses the cache. ``PROBE_EXPLICIT_GRID=1`` drops the
+profile's ``line_grid_policy``, so the case scores on its explicit grid (the
+#1397 single-pass route under ``auto``).
 
 One arm per process, so ``ru_maxrss`` is that arm's host peak; device peaks
 use the #1252 sampler (``adaptive_block_size_1252.py``); phase splits are
@@ -50,7 +59,7 @@ import numpy as np
 os.environ.setdefault("PROFILE", "cleo_sub")
 PROFILE = os.environ["PROFILE"]
 HELPER = runpy.run_path(str(Path(__file__).with_name("adaptive_block_size_1252.py")))
-ROUTES = ("retained", "auto", "streamed")
+ROUTES = ("retained", "auto", "streamed", "measure")
 
 
 def _json_default(value):
@@ -70,7 +79,10 @@ def _override_max(n):
 
     def capped(args, material):
         settings, sweep, identity, stem = resolved(args, material)
-        precision = dataclasses.replace(settings.precision, max_histories=int(n))
+        overrides = {"max_histories": int(n)}
+        if settings.precision.brem_max_histories is not None:
+            overrides["brem_max_histories"] = min(int(n), settings.precision.brem_max_histories)
+        precision = dataclasses.replace(settings.precision, **overrides)
         return dataclasses.replace(settings, precision=precision), sweep, identity, stem
 
     scan._resolved_run = capped
@@ -116,8 +128,20 @@ def run(route, material, e0_kev, tilt_deg, max_histories, out_prefix):
         os.environ["PYRITE_STREAMED_ADAPTIVE"] = "off"
     elif route == "streamed":
         _force_stream(int(float(os.environ.get("PROBE_STREAM_BLOCK_MIB", "2048")) * 1024**2))
+    elif route == "measure":
+        from pyrite.montecarlo.runner import streamed_adaptive
+
+        streamed_adaptive.MONITORED_PASS = False
+    if os.environ.get("PROBE_FRESH_GRID") == "1":
+        import shutil
+
+        from pyrite.paths import cache_dir
+
+        shutil.rmtree(cache_dir() / "line-grids", ignore_errors=True)
     _override_max(max_histories)
     case, _, _ = HELPER["profile_case"](material, float(e0_kev), float(tilt_deg), "auto")
+    if os.environ.get("PROBE_EXPLICIT_GRID") == "1":
+        case = {key: value for key, value in case.items() if key != "line_grid_policy"}
     record = {
         "issue": 1281,
         "stub": True,
@@ -130,6 +154,7 @@ def run(route, material, e0_kev, tilt_deg, max_histories, out_prefix):
         "max_histories": int(max_histories),
         "backend": os.environ.get("PYRITE_MC_BACKEND"),
         "stream_block_MiB": os.environ.get("PROBE_STREAM_BLOCK_MIB"),
+        "explicit_grid": os.environ.get("PROBE_EXPLICIT_GRID") == "1",
     }
     Path(f"{out_prefix}.json").write_text(json.dumps(record, default=_json_default))
     memory = HELPER["Memory"]()
@@ -156,13 +181,15 @@ def run(route, material, e0_kev, tilt_deg, max_histories, out_prefix):
         host_peak_MiB=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024,
         route_taken=((out or {}).get("_adaptive_route") or {"route": "retained"}),
         realized_electrons=sampling.get("realized_electrons"),
-        realized_brem=sampling.get("realized_brem_electrons"),
+        realized_brem=sampling.get("realized_electrons_brem"),
         stop_reason=sampling.get("stop_reason"),
         relative_se={
             k: v.get("relative_se") for k, v in (sampling.get("statistics") or {}).items()
         },
         n_segments=None if out is None else out.get("n_segments"),
         selection=_selection(out),
+        grid_pass=(out or {}).get("_streamed_line_grid_pass"),
+        grid_record=(out or {}).get("line_grid_resolved"),
         warnings=[str(w.message)[:400] for w in caught],
         output_meta={} if out is None else HELPER["_scalar_meta"](out),
     )
@@ -180,6 +207,12 @@ def run(route, material, e0_kev, tilt_deg, max_histories, out_prefix):
         json.dumps({k: v for k, v in record.items() if k != "output_meta"}, default=_json_default)
     )
     return 1 if error else 0
+
+
+def _grid_record(record):
+    """The resolved-grid record without its cache provenance."""
+    grid = record.get("grid_record") or {}
+    return {k: v for k, v in grid.items() if k not in ("cache", "truncation_audit")}
 
 
 def compare(ref_prefix, other_prefix):
@@ -203,6 +236,7 @@ def compare(ref_prefix, other_prefix):
         "realized": [ref.get("realized_electrons"), other.get("realized_electrons")],
         "n_segments": [ref.get("n_segments"), other.get("n_segments")],
         "selection_equal": ref.get("selection") == other.get("selection"),
+        "grid_record_equal": _grid_record(ref) == _grid_record(other),
         "selection": [ref.get("selection"), other.get("selection")],
         "only_in": [sorted(set(a.files) - set(b.files)), sorted(set(b.files) - set(a.files))],
         "max_rel_diff": arrays,

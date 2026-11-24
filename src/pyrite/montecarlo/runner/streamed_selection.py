@@ -83,13 +83,15 @@ class PrefixSelectingScorer:
         if int(ids.max()) >= self.prefix:
             self._select()
 
-    def _select(self):
+    def _select(self, case=None, inputs=None):
         """Select on the held prefix, score the held blocks, and return the scorer."""
         from .streamed_scoring import BlockSpectrumScorer
 
+        case = self.case if case is None else case
+        inputs = self.inputs if inputs is None else inputs
         blocks = [self._held[key] for key in sorted(self._held)]
-        pruned, record = _select_on_blocks(self.case, self.inputs, blocks)
-        scorer = BlockSpectrumScorer(self.case, self.inputs, selection=(pruned, record))
+        pruned, record = _select_on_blocks(case, _selection_inputs(inputs), blocks)
+        scorer = BlockSpectrumScorer(case, inputs, selection=(pruned, record))
         for block in blocks:
             scorer.add(block)
         # Commit only after every held block scored (a raised OOM retries all).
@@ -97,12 +99,53 @@ class PrefixSelectingScorer:
         self._held.clear()
         return scorer
 
-    def result(self, **counts) -> dict[str, Any]:
-        """The scorer's output plus the selection record."""
-        scorer = self.scorer if self.scorer is not None else self._select()
-        out = scorer.result(**counts)
+    def result(self, population=None, realized_case=None, **counts) -> dict[str, Any]:
+        """The scorer's output plus the selection record.
+
+        Under provisional scoring (#1397) ``population`` is the realized
+        ``(Ne_lines, Ne_brem)``. A prefix still held here is the whole
+        population (``Ne <= SELECTION_HISTORIES``): it is selected and scored
+        at the realized counts, as the fixed case would be.
+        """
+        if self.scorer is None and population is not None:
+            lines, brem = (int(n) for n in population)
+            inputs = {
+                key: value
+                for key, value in self.inputs.items()
+                if key not in ("provisional", "brem_stop")
+            }
+            inputs.update(Ne_lines=lines, Ne_brem=brem)
+            scorer = self._select(realized_case, inputs)
+            out = scorer.result(**counts)
+        else:
+            scorer = self.scorer if self.scorer is not None else self._select()
+            out = scorer.result(population=population, **counts)
         out["reflection_selection"] = self.record
         return out
+
+    def snapshot(self):
+        """State :meth:`restore` rolls a failed :meth:`add` back to (#1397)."""
+        inner = None if self.scorer is None else self.scorer.snapshot()
+        return dict(self._held), self.scorer, self.record, inner
+
+    def restore(self, state) -> None:
+        held, scorer, record, inner = state
+        self._held, self.scorer, self.record = held, scorer, record
+        if scorer is not None:
+            scorer.restore(inner)
+
+
+def _selection_inputs(inputs):
+    """The counts the prefix selection reads (#1397 provisional scoring).
+
+    The selection reads ``min(Ne_brem, SELECTION_HISTORIES)``. When this runs
+    before the stop the brem population is either frozen (``brem_stop()``)
+    or larger than every electron held, hence than the prefix, so the
+    provisional count stands in for it exactly.
+    """
+    stop = inputs.get("brem_stop")
+    frozen = None if stop is None else stop()
+    return inputs if frozen is None else {**inputs, "Ne_brem": int(frozen)}
 
 
 def _select_on_blocks(case, inputs, blocks):

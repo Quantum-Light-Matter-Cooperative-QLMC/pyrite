@@ -395,8 +395,8 @@ def _streamed_adaptive(case, route, transport_core):
 
     The retained transport stopped at its first over-headroom projection and
     kept nothing; :func:`.streamed_scoring.run_case_streamed` reruns the case
-    as a measure-only monitored pass plus the fixed streamed case at the
-    realized pair, in blocks sized from the observed bytes per history.
+    streamed from its monitored pass (#1397), in blocks sized from the
+    observed bytes per history.
     """
     from .streamed_scoring import run_case_streamed
 
@@ -408,5 +408,5 @@ def _streamed_adaptive(case, route, transport_core):
         stacklevel=3,
     )
     out = run_case_streamed(case, route.block_electrons, transport_core=transport_core)
-    out["_adaptive_route"] = {"route": "streamed", "reason": str(route)}
+    out["_adaptive_route"] = {**out.get("_adaptive_route", {}), "reason": str(route)}
     return out

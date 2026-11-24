@@ -1557,3 +1557,53 @@ with log-SD 0.3, 1, 2 or 3, plus $0.3L$. They ran in chunks of 997 with bounds
   as in finding 3.
 
 Human sign-off pending (#277).
+
+## Streamed adaptive routes (#1397)
+
+Runner plumbing only; no estimator, stopping rule or record changes. The
+monitored adaptive transport passes each chunk it keeps to a block consumer
+after the monitor has visited every decision point inside it; a chunk holding
+a stop or brem freeze is replaced by its replayed prefix first. The kept
+chunks are therefore the realized population, electron for electron
+(counter-addressed streams), and a consumer that starts afresh on every pass
+(`begin_pass`, for the energy-range replay) sees what the fixed case at the
+realized `(Ne, Ne_brem)` transports.
+
+**Normalization.** Every streamed estimator is `S / N` with `S` a sum over
+rows of electrons `e < N` (its `electron_limit`). The single pass scores with
+`N = L`, the smallest power of two at or above `n_max`; every kept electron
+is below `L`, so the filter keeps every row, and `S / L` is exact in binary
+floating point. At the stop the totals are multiplied by `L / Ne` (lines) or
+`L / Ne_brem` (continuum, characteristic, diffracted brem, Kossel), giving
+`S / N` up to the final rounding. A chunk wholly past the brem freeze has no
+brem-population row (`e >= Ne_brem`) and is scored for lines only; no kept
+chunk straddles the freeze. Limiting case: a run that reaches `n_max = L`
+rescales by exactly 1.
+
+**Selection.** The prefix selection reads `n_lines = min(Ne, H)` and
+`n_brem = min(Ne_brem, H)` (`H = SELECTION_HISTORIES`). When the prefix
+completes before the stop, `Ne > H`; the brem population is then frozen
+(known) or larger than the electrons kept so far, hence than `H`, so
+`min(L, H)` equals `min(Ne_brem, H)`. A prefix still held at the stop is the
+whole population and is selected at the realized counts.
+
+**Policy grids.** The grid needs the whole population and its speed-cache
+key reads the realized counts, so a `line_grid_policy` case keeps the #1280
+route: a measure-only monitored pass, then the fixed case at the realized
+pair with its own grid pass. Folding the evidence into the monitored pass was
+measured slower on the target GPU and was dropped (engineering evidence in
+`docs/repo-design/compute/streamed-scoring.md`).
+
+**Anchors.** `tests/montecarlo/transport/test_streamed_adaptive.py`:
+`test_explicit_grid_scores_in_the_monitored_pass` (stop inside a chunk, brem
+freeze, with and without the energy-range replay; one monitored pass per
+pass and no fixed pass), `test_explicit_grid_selection_in_the_monitored_pass`
+(selection at the stop, before and after the freeze),
+`test_policy_grid_keeps_the_measure_route` (resonance-population grid, cache
+miss and hit: three and two passes; records and spectra equal the retained
+route) and
+`test_a_scoring_oom_rolls_back_and_commits_the_chunk_once`. Spectra match the
+retained route at CPU fp64 `rtol = 1e-12` and the `adaptive_sampling`
+records are equal without wall-clock fields. Status of the extension:
+`anchored`; no fresh-context verification yet.
+
