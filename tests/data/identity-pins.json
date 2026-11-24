@@ -3,7 +3,7 @@
   "case/hopg/30keV-fixed-n-eedl/case_content_key": "a5c2597080c7a245544271b7109314b14fbfe7b935d13b6646e6eb189aa1a334",
   "case/hopg/default-300x150-no-deflection-no-straggling/case_content_key": "83f52d29e05c0678b27888a2674b5716e713eac8562257601c9c37d1bb1e507d",
   "case/hopg/default-300x150/case_content_key": "0ef504129431bc930b197e927515424384531cb62a0aeb9d5c931057262d81ea",
-  "case/silicon/channeling_demo/case_content_key": "13f62c80448285f84d6336b36f71a9a2673d34bd897aeae0f7c8150f1db3e48d",
+  "case/silicon/channeling_demo/case_content_key": "a13e56c30b686a12dee21174ee3944aebc46caf4b80d11cdaf18e4017c80c698",
   "dataset/hbn/hopg_hbn_compressed_microbunch/parameter_sha256": "afbd2f6636dbb67aa2eaa52cb58b0d225cc0f73e550a810861c77a7cf36e36d7",
   "dataset/hbn/hopg_hbn_gaussian_200fs/parameter_sha256": "3fc0a005000a415dd8e28a3fcca3d9b338f0c67b28614def9f28fc4ad59bd1ed",
   "dataset/hbn/hopg_hbn_microtrain_200fs/parameter_sha256": "551337a1c51bbc3021559e3c60c88fda35544ec2046bbd814058224321ca0edd",
@@ -17,8 +17,8 @@
   "dataset/hopg/legacy-sweep-detector/parameter_sha256": "6befb9ca60bda0a6a7a0e9b5e02caf5b2507d0d30c6682e33b191f98084c0d84",
   "dataset/hopg/promising_low_ne/parameter_sha256": "9a1a33d2625fa2f8a345585848cb8e0fb6e17d85eae813906155420b8891372a",
   "dataset/hopg/standard/parameter_sha256": "d7483bb63db33303cd8f4189df538a9f00e132237118d84c4757df6672b9eafb",
-  "dataset/silicon/channeling_demo/parameter_sha256": "645d5eacd33dd05635fd08b8a3c0e0528a9a083571191587fdce028419456ffb",
+  "dataset/silicon/channeling_demo/parameter_sha256": "9e176519cc964362dec46ceb817de1c2067ffc41e32b247f7fa0d07900a6f3ae",
   "stem/hopg/standard": "hopg@full-d7483bb63db3",
   "stem/mose2/standard": "mose2@full-146e415272e3",
-  "stem/silicon/channeling_demo": "silicon@channeling_demo-bad3e90c27b2"
+  "stem/silicon/channeling_demo": "silicon@channeling_demo-f5486191b642"
 }

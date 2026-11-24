@@ -59,6 +59,7 @@ Validation: sinc-bin-far-envelope
 
 from contextlib import contextmanager
 from contextvars import ContextVar
+from functools import cache
 
 import numpy as np
 
@@ -559,7 +560,11 @@ def _bin_mean_kernel():
 _REDUCE_THREADS = 256
 
 _BIN_REDUCE_SOURCE = r"""
-/* One block per bin; lines stride across its threads a tile at a time.
+/* One block per (bin, line chunk); lines of the chunk stride across its
+   threads a tile at a time. Block row x evaluates bin bin_index[x]. A single
+   chunk (gridDim.y == 1) covers every line; more chunks fill the device when
+   bins are few, and each writes its own partial, summed by the caller with a
+   fixed device reduction.
    Far pairs add to a compensated float32 sum on the spot. Near pairs, which
    need the FP64 sine integral, are compacted into a shared queue in lane
    order (warp ballot + prefix) and evaluated together once the queue fills,
@@ -568,7 +573,8 @@ _BIN_REDUCE_SOURCE = r"""
    deterministic. */
 extern "C" __global__ void pyrite_sincsq_bin_mean_reduce(
     const float *e_r, const float *aw, const float *w, const double *edges,
-    const double *inv_width, double *out, const long long n_lines, const float far_widths
+    const double *inv_width, double *out, const long long n_lines, const float far_widths,
+    const long long chunk_lines, const long long *bin_index
 ) {
     extern __shared__ double shared[];
     const unsigned int tid = threadIdx.x;
@@ -581,7 +587,9 @@ extern "C" __global__ void pyrite_sincsq_bin_mean_reduce(
     int *warp_offset = (int *)(queue + 2 * threads);
     int *queue_count = warp_offset + 32;
 
-    const long long bin = blockIdx.x;
+    const long long bin = bin_index[blockIdx.x];
+    const long long first = (long long)blockIdx.y * chunk_lines;
+    const long long last = min(n_lines, first + chunk_lines);
     const double lo = edges[bin];
     const double hi = edges[bin + 1];
     const double iw = inv_width[bin];
@@ -592,10 +600,10 @@ extern "C" __global__ void pyrite_sincsq_bin_mean_reduce(
     }
     double near = 0.0;
     float far_sum = 0.0f, far_carry = 0.0f;
-    for (long long base = 0; base < n_lines; base += threads) {
+    for (long long base = first; base < last; base += threads) {
         const long long line = base + tid;
         bool is_near = false;
-        if (line < n_lines) {
+        if (line < last) {
             const float wt = w[line];
             if (wt != 0.0f) {
                 float mean;
@@ -636,7 +644,7 @@ extern "C" __global__ void pyrite_sincsq_bin_mean_reduce(
         }
         __syncthreads();
         const int pending = *queue_count;
-        if (pending >= (int)threads || base + threads >= n_lines) {
+        if (pending >= (int)threads || base + threads >= last) {
             for (int k = tid; k < pending; k += threads) {
                 const long long q = queue[k];
                 near += (double)w[q] * pyrite_sincsq_bin_mean(
@@ -658,10 +666,46 @@ extern "C" __global__ void pyrite_sincsq_bin_mean_reduce(
         __syncthreads();
     }
     if (tid == 0) {
-        out[bin] = partial[0];
+        out[(long long)blockIdx.x * gridDim.y + blockIdx.y] = partial[0];
     }
 }
 """
+
+
+#: Resident blocks per SM the all-pairs launch aims for before splitting lines.
+_REDUCE_BLOCKS_PER_SM = 8
+#: Fewest lines per chunk: four 256-thread tiles keep the queue and the final
+#: block reduction a small share of a chunk.
+_REDUCE_MIN_CHUNK_LINES = 4 * 256
+
+
+@cache
+def _sm_count(device: int) -> int:
+    import cupy
+
+    return int(cupy.cuda.runtime.getDeviceProperties(device)["multiProcessorCount"])
+
+
+def _line_chunks(n_bins: int, n_lines: int) -> tuple[int, int]:
+    """``(chunks, lines per chunk)`` for the all-pairs kernel grid ``(n_bins, chunks)``.
+
+    One block per bin leaves most of the device idle when bins are few (the
+    ~50 leftover bins of a ``"segmented"`` flush ran ~50 blocks over every
+    line, #1403). Lines are then split into chunks until the grid reaches
+    ``_REDUCE_BLOCKS_PER_SM`` blocks per SM. One chunk keeps the single-block
+    summation order. More only regroup the sums: each chunk keeps its own FP64
+    near sum and compensated float32 far sum, and the chunk totals add in FP64
+    with a fixed CuPy reduction, so the result is repeatable for a fixed device
+    and CuPy version. The chunk count follows the SM count, so it can differ
+    between devices (hence ``CXR_BIN_REDUCTION_MODEL``).
+    """
+    import cupy
+
+    target = _REDUCE_BLOCKS_PER_SM * _sm_count(cupy.cuda.Device().id)
+    chunks = min(-(-target // n_bins), max(1, n_lines // _REDUCE_MIN_CHUNK_LINES))
+    chunks = max(1, chunks)
+    chunk_lines = -(-n_lines // chunks)
+    return -(-n_lines // chunk_lines), chunk_lines
 
 
 def _bin_reduce_kernel():
@@ -771,7 +815,7 @@ def sincsq_bin_lineshape(
 #: v10 (#1392): the uniform runs of a ``"segmented"`` axis share one line
 #: transform at the largest run period and broad threshold, each run
 #: evaluated at its centres by an ES type-2 transform (``_fourier_runs``).
-CXR_BIN_REDUCTION_MODEL = "fourier-auto-v10"
+CXR_BIN_REDUCTION_MODEL = "fourier-auto-v11"
 #: Lines per Fourier-route flush: amortises the per-call FFT and planning.
 FOURIER_FLUSH_LINES = 10_000_000
 
@@ -916,9 +960,11 @@ def _run_segmented_reduction(E_r, aw, w, edges, inv_width, *, out, exact_widths,
     if leftover is not None:
         # One launch over every leftover bin: a launch per single bin ran one
         # block over all lines (~0.6 s each on the #1320 flush, nsys 15404).
+        # Only the real bins run: the gaps between Fourier runs are wide bins
+        # whose near pairs took most of the FP64 Si work (#1403).
         sub_edges, sub_bins, bins = leftover
         sub_inv = leftover_inv_width(sub_edges, sub_bins, bins, _to_cpu(inv_width))
-        sub_out = cupy.zeros(sub_edges.size - 1, dtype=cupy.float64)
+        sub_out = cupy.zeros(sub_bins.size, dtype=cupy.float64)
         run_bin_mean_reduction_kernel(
             E_r,
             aw,
@@ -927,8 +973,46 @@ def _run_segmented_reduction(E_r, aw, w, edges, inv_width, *, out, exact_widths,
             cupy.asarray(sub_inv),
             out=sub_out,
             exact_widths=exact_widths,
+            bins=sub_bins,
         )
-        out[cupy.asarray(bins)] += sub_out[cupy.asarray(sub_bins)].astype(out.dtype)
+        out[cupy.asarray(bins)] += sub_out.astype(out.dtype)
+    return out
+
+
+def _run_pairs_reduction(E_r, aw, w, edges, inv_width, out, exact_widths, bins):
+    """All-pairs near/far launch: grid ``(bins, line chunks)``, see :func:`_line_chunks`.
+
+    Validation: sinc-bin-near-far
+    """
+    import cupy
+
+    n_bins = int(inv_width.shape[0]) if bins is None else int(len(bins))
+    n_cxr_rows = int(E_r.size)
+    threads = int(_REDUCE_THREADS)
+    chunks, chunk_lines = _line_chunks(n_bins, n_cxr_rows)
+    per_chunk = cupy.empty((n_bins, chunks), dtype=cupy.float64)
+    _bin_reduce_kernel()(
+        (n_bins, chunks),
+        (threads,),
+        (
+            cupy.ascontiguousarray(E_r, dtype=cupy.float32),
+            cupy.ascontiguousarray(aw, dtype=cupy.float32),
+            cupy.ascontiguousarray(w, dtype=cupy.float32),
+            cupy.ascontiguousarray(edges, dtype=cupy.float64),
+            cupy.ascontiguousarray(inv_width, dtype=cupy.float64),
+            per_chunk,
+            np.int64(n_cxr_rows),
+            np.float32(np.inf if exact_widths is None else float(exact_widths)),
+            np.int64(chunk_lines),
+            cupy.arange(n_bins, dtype=cupy.int64)
+            if bins is None
+            else cupy.asarray(bins, dtype=cupy.int64),
+        ),
+        # partial sums, a two-tile line queue, warp offsets, the queue count
+        shared_mem=threads * 8 + 2 * threads * 8 + 33 * 4,
+    )
+    per_bin = per_chunk[:, 0] if chunks == 1 else per_chunk.sum(axis=1)
+    out += per_bin.astype(out.dtype)
     return out
 
 
@@ -937,6 +1021,19 @@ def _bin_reduction_markers(resolved):
     policy = resolved.get("line_grid_policy") or {}
     quadrature = resolved.get("line_quadrature", policy.get("quadrature", "node"))
     return {"line_reduction_model": CXR_BIN_REDUCTION_MODEL} if quadrature == "bin-mean" else {}
+
+
+def _check_bins(bins, n_axis: int, out, method: str) -> None:
+    """Reject a ``bins`` subset the kernel would read out of bounds or misplace."""
+    if method in ("segmented", "fourier"):
+        raise ValueError("bins applies to the near/far methods only")
+    host_bins = np.asarray(_to_cpu(bins))
+    if host_bins.ndim != 1 or host_bins.dtype.kind not in "iu":
+        raise ValueError("bins must be a 1-D integer index array")
+    if host_bins.size and (host_bins.min() < 0 or host_bins.max() >= n_axis):
+        raise ValueError("bins must index inv_width")
+    if host_bins.size != int(np.prod(out.shape)):
+        raise ValueError("out must hold one value per listed bin")
 
 
 def run_bin_mean_reduction_kernel(
@@ -950,11 +1047,13 @@ def run_bin_mean_reduction_kernel(
     exact_widths: float | None = BIN_MEAN_EXACT_WIDTHS,
     method: str = "auto",
     fourier_axis=None,
+    bins=None,
 ):
     """Fused CUDA bin-mean line reduction: ``out[k] += sum_l w_l * mean_k(line l)``.
 
     The bin-mean counterpart of ``cxr_jit_kernel.run_reduction_kernel``: no
-    ``(line, bin)`` matrix, one launch per flush with one block per bin, FP64
+    ``(line, bin)`` matrix, one launch per flush with one block per bin (and
+    per line chunk when bins are few, :func:`_line_chunks`), FP64
     accumulation of near pairs, compensated float32 far pairs, and one cast to
     the spectrum dtype. Bins beyond
     ``exact_widths`` first-zero widths take the far-field envelope.
@@ -965,7 +1064,9 @@ def run_bin_mean_reduction_kernel(
     :func:`uniform_runs` list of a non-uniform axis: each uniform run takes the
     device Fourier route on its sub-axis and the other bins ``"auto"`` near/far
     with ``exact_widths`` (#1390); a bin mean depends only on its own edges.
-    Callers pick the method with :func:`resolve_bin_reduction`.
+    Callers pick the method with :func:`resolve_bin_reduction`. Near/far
+    methods take optional ``bins``, indices into ``inv_width``: only those bins
+    are evaluated and ``out[i]`` accumulates bin ``bins[i]`` (#1403).
 
     Validation: sinc-bin-integration
     Validation: sinc-bin-far-envelope
@@ -974,12 +1075,14 @@ def run_bin_mean_reduction_kernel(
     """
     import cupy
 
-    n_bins = int(inv_width.shape[0])
+    n_bins = int(inv_width.shape[0]) if bins is None else int(len(bins))
     n_cxr_rows = int(E_r.size)
     if n_bins == 0 or n_cxr_rows == 0:
         return out
     if method not in _REDUCTION_METHODS:
         raise ValueError(f"method must be one of {_REDUCTION_METHODS}")
+    if bins is not None:
+        _check_bins(bins, inv_width.shape[0], out, method)
     if method == "segmented":
         return _run_segmented_reduction(
             E_r, aw, w, edges, inv_width, out=out, exact_widths=exact_widths, runs=fourier_axis
@@ -997,33 +1100,22 @@ def run_bin_mean_reduction_kernel(
     # An infinite exact window has no far nodes, so it stays on all pairs.
     if method == "auto" and exact_widths is not None and n_bins * n_cxr_rows >= 1_000_000_000:
         method = "sparse"
-    if method == "sparse" and exact_widths is not None:
-        from ._bin_sparse import run_sparse_reduction
-
-        return run_sparse_reduction(
-            E_r, aw, w, edges, inv_width, out=out, exact_widths=exact_widths
+    if method in ("sparse", "tree") and exact_widths is not None:
+        if method == "sparse":
+            from ._bin_sparse import run_sparse_reduction as run
+        else:
+            from ._bin_tree import run_tree_reduction as run
+        if bins is None:
+            return run(E_r, aw, w, edges, inv_width, out=out, exact_widths=exact_widths)
+        full = run(
+            E_r,
+            aw,
+            w,
+            edges,
+            inv_width,
+            out=cupy.zeros(inv_width.shape[0], dtype=cupy.float64),
+            exact_widths=exact_widths,
         )
-    if method == "tree" and exact_widths is not None:
-        from ._bin_tree import run_tree_reduction
-
-        return run_tree_reduction(E_r, aw, w, edges, inv_width, out=out, exact_widths=exact_widths)
-    per_bin = cupy.empty(n_bins, dtype=cupy.float64)
-    threads = int(_REDUCE_THREADS)
-    _bin_reduce_kernel()(
-        (n_bins,),
-        (threads,),
-        (
-            cupy.ascontiguousarray(E_r, dtype=cupy.float32),
-            cupy.ascontiguousarray(aw, dtype=cupy.float32),
-            cupy.ascontiguousarray(w, dtype=cupy.float32),
-            cupy.ascontiguousarray(edges, dtype=cupy.float64),
-            cupy.ascontiguousarray(inv_width, dtype=cupy.float64),
-            per_bin,
-            np.int64(n_cxr_rows),
-            np.float32(np.inf if exact_widths is None else float(exact_widths)),
-        ),
-        # partial sums, a two-tile line queue, warp offsets, the queue count
-        shared_mem=threads * 8 + 2 * threads * 8 + 33 * 4,
-    )
-    out += per_bin.astype(out.dtype)
-    return out
+        out += full[cupy.asarray(bins)].astype(out.dtype)
+        return out
+    return _run_pairs_reduction(E_r, aw, w, edges, inv_width, out, exact_widths, bins)
