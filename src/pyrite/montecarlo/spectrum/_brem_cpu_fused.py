@@ -33,6 +33,8 @@ Validation: bremslib-angular-model, segment-escape-average, dielectric-suppressi
 import numpy as np
 from numba import njit, prange
 
+from ..._backend import REAL, xp
+
 #: Rows per tile: their node values stay cache-resident while every thread
 #: sweeps its photon bins over them.
 _ROW_TILE = 256
@@ -266,8 +268,6 @@ def score_covered_bremslib(
 
     Validation: bremslib-angular-model
     """
-    from ..._backend import REAL, xp
-
     applies = (
         enabled
         and model == "bremslib"
