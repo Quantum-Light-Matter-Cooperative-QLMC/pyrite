@@ -306,21 +306,20 @@ def _kernel_at_T(
     return total * shape
 
 
-def lattice_share_density(kernel, g, weights, T_keV, k_eV):
-    """Share density ``S(theta_node, k)`` [photons/(eV sr Angstrom)] per unit path.
+def _share_profiles(kernel, g, T_keV, k):
+    """Per-reflection share density at unit weight, ``(rows, D)``, or ``None``.
 
-    ``g`` and ``weights`` from :func:`reflection_shell_weights` (one element's
-    weights, or their sum); rows are the kernel's ``theta`` nodes. Zero
-    outside the kernel's ``T`` range and for ``|g|`` above its last node.
-
-    Validation: brem-lattice-coherent-fraction
+    ``rows`` indexes the ``g`` inside the kernel's ``|g|`` range and ``D`` is
+    their ``(S, theta_node, K)`` density per unit ``|U_g|^2``. Weights enter
+    only through :func:`_share_from_profiles`, so elements sharing a node
+    reuse one profile. Every ``g`` row is computed on its own: a row equals
+    the one a smaller set of ``g`` would give. ``None`` outside the kernel's
+    ``T`` range or with no ``g`` in range.
     """
-    k = np.atleast_1d(np.asarray(k_eV, dtype=float))
-    out = np.zeros((kernel.theta_deg.size, k.size))
-    keep = (g >= kernel.g_invang[0]) & (g <= kernel.g_invang[-1]) & (weights > 0)
-    if not keep.any():
-        return out
-    g, weights = g[keep], weights[keep]
+    rows = np.flatnonzero((g >= kernel.g_invang[0]) & (g <= kernel.g_invang[-1]))
+    if rows.size == 0:
+        return None
+    g = g[rows]
     lg = np.log(kernel.g_invang)
     ig = np.clip(np.searchsorted(lg, np.log(g)) - 1, 0, lg.size - 2)
     wg = (np.log(g) - lg[ig]) / (lg[ig + 1] - lg[ig])
@@ -329,7 +328,7 @@ def lattice_share_density(kernel, g, weights, T_keV, k_eV):
     nodes = np.unique(np.concatenate([ig, ig + 1]))
     H = _kernel_at_T(kernel, T_keV, nodes)
     if H is None:
-        return out
+        return None
     ig = np.searchsorted(nodes, ig)
     edges = kernel.x_edges
     centres = 0.5 * (edges[:-1] + edges[1:])
@@ -343,12 +342,42 @@ def lattice_share_density(kernel, g, weights, T_keV, k_eV):
     inside = x <= edges[-1]
     t_idx = np.arange(th.size)[None, :, None]
 
-    def at(rows):
-        r = rows[:, None, None]
+    def at(nodes_):
+        r = nodes_[:, None, None]
         return (1 - f) * rho[r, t_idx, j] + f * rho[r, t_idx, j + 1]
 
     dens = ((1 - wg)[:, None, None] * at(ig) + wg[:, None, None] * at(ig + 1)) * inside
-    return np.einsum("s,stk->tk", weights, dens / scale[..., None])
+    return rows, dens / scale[..., None]
+
+
+def _share_from_profiles(profiles, weights, shape):
+    """``S(theta_node, k)`` of one weight set from :func:`_share_profiles`."""
+    if profiles is None:
+        return np.zeros(shape)
+    rows, D = profiles
+    w = weights[rows]
+    use = w > 0
+    if not use.any():
+        return np.zeros(shape)
+    if not use.all():
+        w, D = w[use], D[use]
+    return np.einsum("s,stk->tk", w, D)
+
+
+def lattice_share_density(kernel, g, weights, T_keV, k_eV):
+    """Share density ``S(theta_node, k)`` [photons/(eV sr Angstrom)] per unit path.
+
+    ``g`` and ``weights`` from :func:`reflection_shell_weights` (one element's
+    weights, or their sum); rows are the kernel's ``theta`` nodes. Zero
+    outside the kernel's ``T`` range and for ``|g|`` above its last node.
+
+    Validation: brem-lattice-coherent-fraction
+    """
+    k = np.atleast_1d(np.asarray(k_eV, dtype=float))
+    g = np.asarray(g, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    profiles = _share_profiles(kernel, g, T_keV, k) if (weights > 0).any() else None
+    return _share_from_profiles(profiles, weights, (kernel.theta_deg.size, k.size))
 
 
 @dataclass(frozen=True)
@@ -378,34 +407,100 @@ def lattice_share_table(
 
     Validation: brem-lattice-coherent-fraction
     """
-    from ..._bremslib_table import solid_angle_integral
+    entry = (table, element, n_atoms_per_ang3, weights)
+    return _lattice_share_tables([entry], kernel, g, T_floor_keV=T_floor_keV)[0]
 
-    T = np.asarray(table.incident_energy_keV, dtype=float)
-    kap = np.asarray(table.nominal_reduced_energy, dtype=float)
-    theta_deg = np.rad2deg(np.asarray(table.theta_rad, dtype=float))
-    base = np.asarray(table.scaled_ddcs_mb_sr, dtype=float)
-    ddcs = base.copy()
-    z2 = float(table.atomic_number) ** 2
-    lo, hi = max(float(kernel.T_keV[0]), float(T_floor_keV)), float(kernel.T_keV[-1])
+
+def _grid_signature(table) -> tuple[bytes, ...]:
+    return tuple(
+        np.ascontiguousarray(np.asarray(a, dtype=float)).tobytes()
+        for a in (
+            table.incident_energy_keV,
+            table.nominal_reduced_energy,
+            table.top_reduced_energy,
+            table.theta_rad,
+        )
+    )
+
+
+def _lattice_share_tables(entries, kernel, g, *, T_floor_keV: float = 0.0):
+    """:func:`lattice_share_table` of several ``(table, element, n, weights)`` entries.
+
+    Entries on one node grid share each node's :func:`_share_profiles` (the
+    kernel interpolation and resonance gathers); only the weight contraction
+    is per element. Each result equals the entry's own
+    :func:`lattice_share_table`.
+
+    Validation: brem-lattice-coherent-fraction
+    """
+    g = np.asarray(g, dtype=float)
+    groups: dict[tuple[bytes, ...], list[int]] = {}
+    for index, (table, *_) in enumerate(entries):
+        groups.setdefault(_grid_signature(table), []).append(index)
+    out: list = [None] * len(entries)
+    for members in groups.values():
+        for index, result in zip(
+            members,
+            _corrected_group([entries[i] for i in members], kernel, g, float(T_floor_keV)),
+            strict=True,
+        ):
+            out[index] = result
+    return out
+
+
+def _corrected_group(entries, kernel, g, T_floor_keV):
+    """Corrected tables of entries sharing one node grid (see :func:`_lattice_share_tables`)."""
+    first = entries[0][0]
+    T = np.asarray(first.incident_energy_keV, dtype=float)
+    kap = np.asarray(first.nominal_reduced_energy, dtype=float)
+    theta_deg = np.rad2deg(np.asarray(first.theta_rad, dtype=float))
+    lo, hi = max(float(kernel.T_keV[0]), T_floor_keV), float(kernel.T_keV[-1])
+    ddcs = [np.asarray(table.scaled_ddcs_mb_sr, dtype=float).copy() for table, *_ in entries]
+    weights = [np.asarray(w, dtype=float) for *_, w in entries]
+    norms = [float(n) * float(table.atomic_number) ** 2 for table, _, n, _ in entries]
+    shape = (kernel.theta_deg.size, kap.size)
+    wanted = any((w > 0).any() for w in weights)
     for i, Ti in enumerate(T):
         if not lo <= Ti <= hi:
             continue
         kr = kap.copy()
-        kr[-1] = float(table.top_reduced_energy[i])
+        kr[-1] = float(first.top_reduced_energy[i])
         k = kr * Ti * 1e3
-        S = lattice_share_density(kernel, g, weights, Ti, k)  # (Th_kernel, K)
-        delta = _MB_PER_ANG2 * k[None, :] * S / (float(n_atoms_per_ang3) * z2)
-        ddcs[i] -= np.array(
-            [np.interp(theta_deg, kernel.theta_deg, delta[:, m]) for m in range(k.size)]
-        )
+        profiles = _share_profiles(kernel, g, Ti, k) if wanted else None
+        for d, w, norm in zip(ddcs, weights, norms, strict=True):
+            S = _share_from_profiles(profiles, w, shape)  # (Th_kernel, K)
+            delta = _MB_PER_ANG2 * k[None, :] * S / norm
+            d[i] -= np.array(
+                [np.interp(theta_deg, kernel.theta_deg, delta[:, m]) for m in range(k.size)]
+            )
+    in_range = (T >= lo) & (T <= hi)
+    return [
+        _finish_table(table, element, d, in_range)
+        for (table, element, _, _), d in zip(entries, ddcs, strict=True)
+    ]
+
+
+def _finish_table(table, element, ddcs, in_range):
+    """Clamp ``ddcs``, rescale the SDCS by the solid-angle ratio, and record it.
+
+    Only rows the correction or the clamp can change are integrated: any other
+    row keeps its DDCS, so its ratio is exactly one.
+    """
+    from ..._bremslib_table import solid_angle_integral
+
+    T = np.asarray(table.incident_energy_keV, dtype=float)
+    base = np.asarray(table.scaled_ddcs_mb_sr, dtype=float)
     clamped = int((ddcs < 0).sum())
     ddcs = np.maximum(ddcs, 0.0)
-    old = solid_angle_integral(table.theta_rad, base)
-    new = solid_angle_integral(table.theta_rad, ddcs)
+    touched = in_range | (base < 0).any(axis=(1, 2))
+    old = np.zeros(base.shape[:-1])
+    new = np.zeros(base.shape[:-1])
+    old[touched] = solid_angle_integral(table.theta_rad, base[touched])
+    new[touched] = solid_angle_integral(table.theta_rad, ddcs[touched])
+    ratio = np.ones(base.shape[:-1])
     with np.errstate(divide="ignore", invalid="ignore"):
-        ratio = np.where(old > 0, new / old, 1.0)
+        ratio[touched] = np.where(old[touched] > 0, new[touched] / old[touched], 1.0)
     sdcs = np.asarray(table.scaled_sdcs_mb, dtype=float) * ratio
-    in_range = (T >= lo) & (T <= hi)
     removed = 1.0 - float(new[in_range].sum() / old[in_range].sum()) if in_range.any() else 0.0
     outside = None if in_range.all() else (float(T[~in_range].min()), float(T[~in_range].max()))
     corrected = replace(
