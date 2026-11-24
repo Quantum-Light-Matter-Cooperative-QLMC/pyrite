@@ -17,6 +17,7 @@ straggled-transport-integration
 physics-preparation-adapters
 emission-batch-adapters
 streamed-scoring
+history-shards
 extending-physics
 photon-aperture
 ```

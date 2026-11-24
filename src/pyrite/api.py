@@ -320,7 +320,9 @@ def simulate(
         for the historical in-process path. Requires automatic transport-core
         selection; distributed executors may write their configured worker
         artifacts, but never simulation checkpoints. Scheduler selection is
-        recorded separately from scientific identity.
+        recorded separately from scientific identity. An executor that pins an
+        admitted numerical realization adds its versioned case marker before
+        computing identity; ordinary executors leave case identity unchanged.
     progress
         Optional experimental callback receiving
         :class:`~pyrite.phases.SimulationProgress` after each transport batch
@@ -521,6 +523,9 @@ _RECOVERY_KEYS = (
 def _source_case(request: ResolvedSimulation) -> tuple[Case, dict[str, str]]:
     """Lower a resolved request and prepare its cross-section table markers."""
     case = lower_simulation(request)
+    from .campaign.realization import prepare_executor_case
+
+    case = prepare_executor_case(request.executor, case)
     return case, case_table_markers(case)
 
 

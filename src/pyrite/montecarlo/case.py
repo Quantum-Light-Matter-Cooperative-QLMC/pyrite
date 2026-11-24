@@ -13,6 +13,7 @@ from ..quantum._admission import AxialAdmissionError as AxialAdmissionError
 from ..quantum._admission import refuse_axial_channeling as refuse_axial_channeling
 from ..quantum._admission import refuse_axial_channeling_cases as refuse_axial_channeling_cases
 from ..quantum._admission import refuse_axial_directions as refuse_axial_directions
+from .realization import TransportRealization, normalize_realization
 
 type Composition = list[tuple[str, float]]
 type MillerIndex = tuple[int, int, int]
@@ -152,6 +153,7 @@ _CASE_KEY_ORDER = (
     "node_support_cutoff",
     "reflection_selection",
     "cxr_source",
+    "transport_realization",
 )
 
 
@@ -164,6 +166,8 @@ class Case(Mapping[str, Any]):
     compositions use atoms/angstrom^3, and detector acceptance uses steradian.
     Optional divergence-only fields retain an internal absence sentinel so
     :meth:`to_dict` exactly reproduces the historical mapping payload.
+    ``transport_realization`` optionally identifies the per-electron CPU core;
+    its immutable, versioned record participates in numerical identity.
 
     Parameters
     ----------
@@ -415,6 +419,13 @@ class Case(Mapping[str, Any]):
     reflection_selection: dict[str, object] | _Absent = _ABSENT
     # Opt-out of line scoring (#1327), appended for pickle offsets.
     cxr_source: Literal["none"] | _Absent = _ABSENT
+    # Append for frozen-slot pickle compatibility; absent preserves legacy keys.
+    transport_realization: TransportRealization | Mapping[str, str] | _Absent = _ABSENT
+
+    def __getstate__(self) -> list[Any]:
+        """Keep the historical frozen-slot pickle when the marker is absent."""
+        state = [getattr(self, field.name) for field in fields(self)]
+        return state[:-1] if self.transport_realization is _ABSENT else state
 
     def __setstate__(self, state: list[Any]) -> None:
         """Restore frozen-slot pickles, filling newly appended optional fields."""
@@ -429,6 +440,7 @@ class Case(Mapping[str, Any]):
 
     def __post_init__(self) -> None:
         """Reject malformed values before they reach transport or identity."""
+        self._validate_transport_realization()
         if not self.name or not isinstance(self.name, str):
             raise ValueError("name must be a non-empty string")
         if not self.crystal or not isinstance(self.crystal, str):
@@ -876,6 +888,12 @@ class Case(Mapping[str, Any]):
         if float(cast(float, self.radiative_cutoff_eV)) > E_cut_brem * 1e3:
             raise ValueError("radiative_cutoff_eV must not exceed the continuum electron cutoff")
 
+    def _validate_transport_realization(self) -> None:
+        if self.transport_realization is not _ABSENT:
+            object.__setattr__(
+                self, "transport_realization", normalize_realization(self.transport_realization)
+            )
+
     def to_dict(self) -> dict[str, Any]:
         """Return the exact legacy mapping shape and insertion order.
 
@@ -889,7 +907,7 @@ class Case(Mapping[str, Any]):
         for key in _CASE_KEY_ORDER:
             value = getattr(self, key)
             if value is not _ABSENT:
-                payload[key] = value
+                payload[key] = dict(value) if isinstance(value, TransportRealization) else value
         return payload
 
     def __eq__(self, other: object) -> bool:

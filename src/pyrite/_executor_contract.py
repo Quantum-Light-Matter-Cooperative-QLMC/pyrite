@@ -52,6 +52,9 @@ def execution_provenance(executor: Executor) -> dict[str, Any]:
         value = getattr(executor, attribute, None)
         if is_dataclass(value) and not isinstance(value, type):
             record[key] = asdict(value)
+    realization = getattr(executor, "transport_realization", None)
+    if realization is not None:
+        record["transport_realization"] = dict(realization)
     return record
 
 

@@ -34,6 +34,7 @@ from ..case import (
     admit_axial_channeling,
     refuse_axial_directions,
 )
+from ..realization import with_realization
 from ..spectrum import _segments_in_layer, _segments_on_device, mc_cxr_spectrum
 from ..spectrum.coherent_population import physical_bunch_electrons
 from ..spectrum.cxr import _setup as _cxr_setup
@@ -90,6 +91,7 @@ def _spectrum_stage_done(stage):
         sink(stage, SPECTRUM_STAGES.index(stage) + 1, len(SPECTRUM_STAGES))
 
 
+@with_realization
 def run_case(
     case: Case | Mapping[str, Any],
     record_timing: bool = False,
@@ -100,18 +102,13 @@ def run_case(
 ) -> dict[str, Any]:
     """Run transport, line emission, and bremsstrahlung for one case.
 
-    :class:`~pyrite.montecarlo.case.Case` owns the input schema and units;
-    arbitrary mappings remain accepted for one compatibility window. Electron
-    energies and cutoffs are in keV, photon grids in eV, lengths in angstrom
-    unless suffixed ``_mm``, angles follow their suffix, and solid angle is sr.
+    :class:`~pyrite.montecarlo.case.Case` owns schema and units; mappings retain compatibility.
 
-    ``transport_core="auto"`` lets the electron count and backend select the
-    core. ``keep_segments_on_device`` avoids a host round trip only when CUDA
-    transport and spectrum execute in one process; an allocation failure falls
-    back to downloaded segments after host-memory admission. Spectrum allocation
-    failures retry smaller chunks on these same trajectories. With automatic
-    backend selection, exhausted retries may run the spectra on admitted host
-    memory; explicit backend choices remain binding.
+    Automatic cores follow electron count and backend; marked realizations pin
+    CPU transport and scoring. Resident CUDA segments avoid host transfers for
+    same-process spectra; allocation failures download to admitted host memory.
+    Spectrum failures retry smaller chunks on the same trajectories; only
+    automatic backend selection may fall back to CPU scoring.
 
     Parameters
     ----------
@@ -163,6 +160,7 @@ def _directional_outputs(case, transport, n_hats, spectrum=None) -> dict[str, An
     )
 
 
+@with_realization
 def run_case_directions(
     case: Case | Mapping[str, Any],
     n_hats,
@@ -217,6 +215,7 @@ def _resident_transport(case, core, channeling):
     return core == "cuda" and not channeling and not ("radiative_model" in case and cascade)
 
 
+@with_realization
 def _transport_case(
     case,
     record_timing=False,
@@ -835,6 +834,7 @@ def _cxr_for_case(case, E_grid, *, coherent=None):
     ).values
 
 
+@with_realization
 def _cxr_pair_for_case(
     case, E_grid, *, want_coherent, return_characteristic=False, return_transition=False
 ):
@@ -892,6 +892,7 @@ def _cxr_pair_for_case(
     return spec, spec_coherent, characteristic, case_transition_spectrum(case, transport)
 
 
+@with_realization
 def _spectrum_case(case, tp, record_timing=False):
     """GPU phase of run_case: CXR spectrum + brem from the already-transported
     segments ``tp`` (from _transport_case). Runs in the main process, so only one

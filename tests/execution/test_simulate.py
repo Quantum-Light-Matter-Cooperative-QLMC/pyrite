@@ -227,3 +227,37 @@ def test_executor_cannot_drop_requested_directional_output(scene, controls):
             numerics=controls,
             executor=LocalExecutor(lambda *a, **kw: [scalar_output()]),
         )
+
+
+@pytest.mark.parametrize("key_mode", ["correct", "unmarked", "wrong_tables"])
+def test_realized_executor_uses_independently_keyed_prepared_case(
+    scene, controls, tmp_path, key_mode
+):
+    from pyrite.execution.artifacts import ArtifactIntegrityError, CaseArtifactStore
+    from pyrite.montecarlo.realization import TransportRealization
+
+    class Worker:
+        transport_realization = TransportRealization()
+        store = CaseArtifactStore(tmp_path)
+
+        def execute(self, cases, **options):
+            [case] = cases
+            assert dict(case["transport_realization"]) == dict(self.transport_realization)
+            supplied = dict(case)
+            if key_mode == "unmarked":
+                supplied.pop("transport_realization")
+            key = api.source_content_key_fn()(supplied)
+            if key_mode == "wrong_tables":
+                key = api.case_content_key(case, xsgen_tables={"wrong": "table"})
+            return [self.store.publish(case["crystal"], key, scalar_output())]
+
+    if key_mode != "correct":
+        with pytest.raises(ArtifactIntegrityError, match="key"):
+            api.simulate(scene, numerics=controls, executor=Worker())
+    else:
+        result = api.simulate(scene, numerics=controls, executor=Worker())
+        assert result.provenance.identity_digest == api.source_content_key_fn()(result.case)
+        assert dict(result.case["transport_realization"]) == dict(Worker.transport_realization)
+        assert result.provenance["execution"]["transport_realization"] == dict(
+            Worker.transport_realization
+        )

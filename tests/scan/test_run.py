@@ -774,9 +774,11 @@ def test_shard_manifest_scans_accumulated_results_only_at_consolidation(tmp_path
     real_manifest_for = persistence._manifest_for
     scanned_record_counts = []
 
-    def counted_manifest_for(results, dataset_identity=None):
+    def counted_manifest_for(results, dataset_identity=None, *, transport_realization=None):
         scanned_record_counts.append(sum(len(by_energy) for by_energy in results.values()))
-        return real_manifest_for(results, dataset_identity)
+        return real_manifest_for(
+            results, dataset_identity, transport_realization=transport_realization
+        )
 
     monkeypatch.setattr(persistence, "_manifest_for", counted_manifest_for)
     cases = [

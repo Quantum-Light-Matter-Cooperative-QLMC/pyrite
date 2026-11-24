@@ -36,6 +36,12 @@ the existing `store_result` / CAS / checkpoint lifecycle. Workers never own
 checkpoint manifests. Use the existing `case_content_key` with any required
 external-table markers, not a hand-rolled hash of scheduler metadata.
 
+An executor that opts into a numerical `transport_realization` binds it to the
+canonical case before keys or resume are read. The coordinator independently
+hashes that prepared case with the same table markers. CPU history sharding
+uses this contract to separate per-electron results from ordinary unmarked
+results; see [the identity and resume rules](../repo-design/compute/history-shards.md#numerical-identity-and-stored-work).
+
 Publication creates a temporary `.tmp` file, writes a complete HDF5 payload,
 fsyncs it, and atomically links it into a per-case inbox path. Publication
 is complete only after a separate atomic checksum receipt is committed. A crash

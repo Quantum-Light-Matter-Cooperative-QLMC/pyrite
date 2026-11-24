@@ -10,6 +10,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from ..console.outputs import output_dir
+from ..montecarlo.realization import common_realization, require_matching_realization
 from ..paths import cache_dir
 from ..results import records, sweep_values
 from . import _checkpoint_io, _checkpoint_store
@@ -74,6 +75,9 @@ def _write_case_manifest(checkpoint_path, cases, content_key_fn, dataset_identit
         "material": cases[0]["crystal"] if cases else None,
         "cases": entries,
     }
+    realization = common_realization(cases)
+    if realization is not None:
+        manifest["transport_realization"] = dict(realization)
     if dataset_identity is not None:
         from ..campaign.profiles import normalize_dataset_identity
 
@@ -305,7 +309,7 @@ def _validity_manifest_entry(name, energy, case):
     return {"name": str(name), "E0_keV": float(energy), "audit": case_kinematic_validity(case)}
 
 
-def _manifest_for(results, dataset_identity=None):
+def _manifest_for(results, dataset_identity=None, *, transport_realization=None):
     """Build the sidecar manifest dict for a ``results`` store: distinct beam
     energies, total record count, and the swept case fields (see
     :func:`pyrite.results.sweep_values`). Numpy scalars are coerced to plain
@@ -339,7 +343,20 @@ def _manifest_for(results, dataset_identity=None):
         identity = normalize_dataset_identity(dataset_identity)
         manifest["identity_version"] = identity["identity_version"]
         manifest["dataset_identity"] = identity
+    realization = _records_realization(results, transport_realization)
+    if realization is not None:
+        manifest["transport_realization"] = dict(realization)
     return manifest
+
+
+def _records_realization(results, requested=None):
+    cases = [record["case"] for by_energy in results.values() for record in by_energy.values()]
+    actual = common_realization(cases)
+    if requested is not None:
+        if cases:
+            require_matching_realization(requested, actual)
+        return requested
+    return actual
 
 
 class _IncrementalManifest:
@@ -353,13 +370,18 @@ class _IncrementalManifest:
 
     _FIELDS = ("crystal", "E0_keV", "tilt_deg", "tilt_azim_deg", "thickness_ang", "B_ang2")
 
-    def __init__(self, dataset_identity=None):
+    def __init__(self, dataset_identity=None, transport_realization=None):
         self._keys = set()
         self._values = defaultdict(set)
         self._identity = dataset_identity
         self._validity = []
+        self._realization = transport_realization
 
     def add(self, results):
+        realization = _records_realization(results, self._realization)
+        if self._keys:
+            require_matching_realization(self._realization, realization)
+        self._realization = realization
         for name, by_energy in results.items():
             for energy, record in by_energy.items():
                 key = (str(name), float(energy))
@@ -392,6 +414,8 @@ class _IncrementalManifest:
             identity = normalize_dataset_identity(self._identity)
             manifest["identity_version"] = identity["identity_version"]
             manifest["dataset_identity"] = identity
+        if self._realization is not None:
+            manifest["transport_realization"] = dict(self._realization)
         return manifest
 
 
@@ -427,7 +451,7 @@ def _manifest_write(checkpoint_path, manifest):
     return manifest
 
 
-def _manifest_save(checkpoint_path, results, dataset_identity=None):
+def _manifest_save(checkpoint_path, results, dataset_identity=None, *, transport_realization=None):
     """Build and atomically refresh the sidecar checkpoint manifest.
 
     Full construction is used for authoritative component saves and backfills.
@@ -441,7 +465,7 @@ def _manifest_save(checkpoint_path, results, dataset_identity=None):
                 dataset_identity = json.load(existing).get("dataset_identity")
         except (OSError, ValueError, TypeError):
             pass
-    manifest = _manifest_for(results, dataset_identity)
+    manifest = _manifest_for(results, dataset_identity, transport_realization=transport_realization)
     return _manifest_write(checkpoint_path, manifest)
 
 
@@ -553,12 +577,21 @@ class _SweepCheckpoint:
     metadata_completion_supported = True
 
     def __init__(
-        self, checkpoint_path, results, material, dataset_identity, on_timing=None, on_activity=None
+        self,
+        checkpoint_path,
+        results,
+        material,
+        dataset_identity,
+        on_timing=None,
+        on_activity=None,
+        *,
+        transport_realization=None,
     ):
         self.checkpoint_path = checkpoint_path
         self.results = results
         self.material = material
         self.dataset_identity = dataset_identity
+        self.transport_realization = transport_realization
         self.on_timing = on_timing
         self.on_activity = on_activity
         self.incremental_manifest = None
@@ -634,7 +667,12 @@ class _SweepCheckpoint:
         summary after a fresh save."""
         subset = self.material_subset()
         _checkpoint_components_save(self.checkpoint_path, subset)
-        _manifest_save(self.checkpoint_path, subset, self.dataset_identity)
+        _manifest_save(
+            self.checkpoint_path,
+            subset,
+            self.dataset_identity,
+            transport_realization=self.transport_realization,
+        )
         self.unpublished.clear()
 
     def timed_save(self):
@@ -654,7 +692,9 @@ class _SweepCheckpoint:
         path = Path(self.checkpoint_path)
         _checkpoint_store.save_part(path.name, path.parent, name, self.results[name])
         if self.incremental_manifest is None:
-            self.incremental_manifest = _IncrementalManifest(self.dataset_identity)
+            self.incremental_manifest = _IncrementalManifest(
+                self.dataset_identity, self.transport_realization
+            )
             self.incremental_manifest.add(self.material_subset())
         else:
             self.incremental_manifest.add({name: self.results[name]})
@@ -676,11 +716,11 @@ class _SweepCheckpoint:
         _checkpoint_store.clear_parts(path.name, path.parent)
 
 
-def sweep_checkpoint(*args, retain_results=True):
+def sweep_checkpoint(*args, retain_results=True, transport_realization=None):
     """Choose the publication lifecycle without changing the default backend."""
     checkpoint_type = _SweepCheckpoint
     if not retain_results:
         from ._disk_sweep import DiskSweepCheckpoint
 
         checkpoint_type = DiskSweepCheckpoint
-    return checkpoint_type(*args)
+    return checkpoint_type(*args, transport_realization=transport_realization)

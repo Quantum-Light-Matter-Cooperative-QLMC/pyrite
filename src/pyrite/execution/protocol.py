@@ -30,6 +30,12 @@ class Executor(Protocol):
         ``engine``, ``requested_workers`` and ``effective_workers``. Without it,
         ``run_sweep`` reports ``engine="external"`` and no worker count rather
         than the local runner's topology.
+
+    An opt-in read-only ``transport_realization`` record binds the numerical
+    CPU core to cases before identity, resume and dispatch. Currently only
+    ``{schema: 'pyrite.transport-realization.v1', core: 'per-electron'}`` is
+    admitted. Omission preserves ordinary case shape, keys and core selection;
+    this is numerical identity, independently validated by the coordinator.
     """
 
     def execute(

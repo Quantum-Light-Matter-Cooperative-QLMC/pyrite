@@ -524,7 +524,7 @@ def _pool_worker(case, *, transport):
 
     Resolved per call, so the plain workers are read from this module's globals.
     """
-    if case.get("adaptive_precision") is not None:
+    if case.get("adaptive_precision") is not None or "transport_realization" in case:
         return _transport_adaptive_case_worker if transport else _run_adaptive_case_worker
     return _transport_case if transport else run_case
 

@@ -1008,7 +1008,12 @@ def case_transport_core(case, requested="auto"):
     ``max(Ne, Ne_brem)``, and ``auto`` keeps a grooved entrance face on the lockstep core.
     """
 
+    from ..realization import case_realization, required_core
     from ..transport import resolve_transport_core
+
+    realization = case_realization(case)
+    if realization is not None:
+        return required_core(requested, realization=realization)
 
     if case.get("transport_mode") == "mixed":
         # No lockstep specialization: every CPU route is the per-electron core.
@@ -1034,6 +1039,8 @@ def _adaptive_worker_call(function, case, *args, **kwargs):
     from ..._util.env import env_value, set_canonical_env
     from .. import runner
 
+    if "transport_realization" in case and runner._WORKER_INHERITED_CORE == "cuda":
+        raise ValueError("transport_realization conflicts with inherited cuda transport core")
     if runner._WORKER_INHERITED_CORE not in ("", "auto", "cuda"):
         return function(case, *args, **kwargs)
     original = env_value("PYRITE_MC_TRANSPORT_CORE", "")

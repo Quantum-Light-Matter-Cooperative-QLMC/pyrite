@@ -378,6 +378,11 @@ def resolve_transport_core(requested, Ne, groove=None):
     Validation: gpu-transport-core
     """
 
+    from ..realization import required_core
+
+    required = required_core(requested)
+    if required is not None:
+        return required
     pinned = env_value("PYRITE_MC_TRANSPORT_CORE", "").strip().lower()
     if pinned:
         if pinned not in TRANSPORT_CORES:

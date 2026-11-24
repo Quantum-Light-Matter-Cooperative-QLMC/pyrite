@@ -49,6 +49,7 @@ from ..materials.crystal import CRYSTALS, structure_factor_marker
 from ..materials.photon_cross_sections import ATTENUATION_MODEL
 from ..montecarlo.case import Case
 from ..montecarlo.channeling.handoff import CHANNELING_MODEL
+from ..montecarlo.realization import TransportRealization
 from ..montecarlo.spectrum import BREMSSTRAHLUNG_MODEL, CHARACTERISTIC_MODEL, CXR_ESCAPE_MODEL
 from ..montecarlo.spectrum.brem_bremslib import BREMSSTRAHLUNG_BREMSLIB_MODEL
 from ..montecarlo.spectrum.brem_lattice_share import lattice_share_model
@@ -200,6 +201,9 @@ def resolve_numerics(
 def _jsonable(value: Any) -> Any:
     if isinstance(value, Precision):
         return _jsonable(value.to_dict())
+    if isinstance(value, TransportRealization):
+        # Its mapping, not its fields: CPU scoring stays implicit (#1387).
+        return dict(value)
     if dataclasses.is_dataclass(value):
         names = {"cxr_grid_policy": "line_grid_policy"} if isinstance(value, Sweep) else {}
         return {
@@ -726,6 +730,33 @@ def normalize_dataset_identity(identity: Mapping[str, Any]) -> dict[str, Any]:
     normalized = dict(identity)
     normalized["identity_version"] = version
     return normalized
+
+
+def _with_transport_realization(identity, realization):
+    """Derive a divergence-only dataset identity from its canonical payload."""
+    from ..montecarlo.realization import normalize_realization, require_matching_realization
+
+    if identity is None:
+        return None
+    resolved = identity.get("resolved_parameters")
+    recorded = resolved.get("transport_realization") if isinstance(resolved, Mapping) else None
+    if realization is None:
+        require_matching_realization(None, recorded)
+        return identity
+    marker = normalize_realization(realization)
+    if not isinstance(resolved, Mapping) or identity.get("schema") != DATASET_IDENTITY_SCHEMA:
+        raise ValueError(
+            "transport_realization requires a canonical dataset resolved_parameters payload"
+        )
+    if recorded is not None:
+        require_matching_realization(marker, recorded)
+    payload = {**resolved, "transport_realization": dict(marker)}
+    encoded = json.dumps(_jsonable(payload), sort_keys=True, separators=(",", ":")).encode()
+    return {
+        **identity,
+        "resolved_parameters": payload,
+        "parameter_sha256": hashlib.sha256(encoded).hexdigest(),
+    }
 
 
 def case_content_key(

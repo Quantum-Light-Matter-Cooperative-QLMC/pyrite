@@ -760,6 +760,8 @@ def _policy_cache_key(payload, case, n_hats, *, observation):
         + (_WEIGHT_INPUT_KEYS if measured or local else ())
     )
     inputs = {key: case[key] for key in keys if case.get(key, None) is not None}
+    if "transport_realization" in case:
+        inputs["transport_realization"] = dict(case["transport_realization"])
     inputs["backend_dtype"] = np.dtype(REAL).name
     dispersion_law = None
     if windowed or measured:
