@@ -321,6 +321,28 @@ def _cli_pull_json(
     emit_json_result(result)
 
 
+def _pullable_materials(jobid, materials):
+    """Return ``(pullable, needing_pull)`` after a scan, or ``None`` when nothing saved.
+
+    A material that failed mid-scan still keeps every case it finished in its
+    checkpoint, so it is pulled with a warning instead of being dropped.
+    """
+    completed = state._completed_materials(jobid, materials)
+    partial = state._partial_materials(
+        jobid, [material for material in materials if material not in completed]
+    )
+    for material, (new_cases, total_cases) in partial.items():
+        emit_diagnostic(
+            f"warning: scan failed for {material} after {new_cases}/{total_cases} new "
+            "case(s); pulling its partial checkpoint"
+        )
+    if not completed and not partial:
+        emit_diagnostic("warning: the SLURM scan saved no new checkpoint cases; nothing to pull")
+        return None
+    needing_pull = set(state._materials_needing_pull(jobid, completed)) if completed else set()
+    return [*completed, *partial], needing_pull | set(partial)
+
+
 def _cli_start(
     *,
     materials,
@@ -419,16 +441,13 @@ def _cli_start(
                 "skipping automatic checkpoint pull"
             )
         return
-    completed = state._completed_materials(jobid, materials)
-    if not completed:
-        emit_diagnostic(
-            "warning: the SLURM scan produced no successful checkpoints; nothing to pull"
-        )
+    selection = _pullable_materials(jobid, materials)
+    if selection is None:
         return
-    materials_needing_pull = set(state._materials_needing_pull(jobid, completed))
+    pullable, materials_needing_pull = selection
     if quick or catalog_profile == "standard":
         material_stems = scripts._material_stems(
-            completed,
+            pullable,
             quick,
             high_energy_min_kev=high_energy_min_kev,
             catalog_profile=catalog_profile,
@@ -439,7 +458,7 @@ def _cli_start(
         # nonexistent directory when profile/catalog inputs changed meanwhile.
         material_stems = [
             (material, stem)
-            for material in completed
+            for material in pullable
             for stem in lifecycle.resolve_profile_stems(material, catalog_profile)
         ]
     from ...checkpoints import _checkpoint_store

@@ -59,6 +59,7 @@ def test_performance_run_with_step_warnings_skips_artifact_pull(monkeypatch, cap
         lambda _jobid: "done with 1 warning(s) [3/3] 2026-09-19T00:00:00+00:00",
     )
     monkeypatch.setattr(state, "_completed_materials", lambda _jobid, _mats: [])
+    monkeypatch.setattr(state, "_partial_materials", lambda _jobid, _mats: {})
     monkeypatch.setattr(
         lifecycle,
         "pull_performance_profile",
@@ -77,6 +78,7 @@ def test_failed_performance_run_skips_artifact_pull(monkeypatch, capsys):
     monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
     monkeypatch.setattr(state, "_job_succeeded", lambda _jobid: False)
     monkeypatch.setattr(state, "_completed_materials", lambda _jobid, _mats: [])
+    monkeypatch.setattr(state, "_partial_materials", lambda _jobid, _mats: {})
     monkeypatch.setattr(
         lifecycle,
         "pull_performance_profile",
