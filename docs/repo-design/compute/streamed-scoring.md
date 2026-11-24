@@ -203,6 +203,19 @@ streamed-vs-joined summation order, and `adaptive_sampling` is the same record
   the realized counts. Only explicit grids qualify: a policy grid needs the
   whole population, and its truncation audit and the line roulette size
   per-electron state by the line population.
+- **Coalesced chunks.** Adaptive chunks are small (`AdaptiveChunkPlan`, about
+  2,000 for the case below), so the sink joins kept chunks with
+  `merge_electron_blocks` into blocks of at least the fixed route's
+  `block_electrons` before scoring. It scores early when the next chunk lies
+  across the brem freeze, and at the end of the pass. On the 16 GiB RTX 5080
+  (`cleo_sub_perf1` HOPG 500 nm, 300 keV, 15°, explicit grid, 55.1M realized
+  electrons) the single pass scoring each chunk alone took 126.4 / 122.9 s
+  against 100.1 / 94.2 s for the measure route (job 15605). Coalesced, it took
+  84.1 / 82.6 s against 94.8 / 96.7 s, 11-15 % faster, with no OOM recovery
+  (job 15613). Spectra differ from the measure route by at most 2.8e-11 of
+  the peak, because the blocks are partitioned differently for the fp32
+  device sums. Brem arrays are equal, and the selected reflection set is
+  identical.
 - **Policy grids stay on the measure route.** The grid needs the whole
   population, and its speed-cache key reads the realized `Ne`/`Ne_brem`, so
   a cache hit is known only at the stop. Collecting the evidence inside the
