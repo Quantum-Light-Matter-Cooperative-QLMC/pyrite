@@ -10,7 +10,7 @@ and, beyond, the float32 far-field envelope ``1 / (2 pi^2 x_lo x_hi)`` in the
 operation order of ``_far_envelope_float32`` (head/carry float32 splits). The
 exact part transliterates the device preamble ``SINCSQ_BIN_PREAMBLE``
 (``pyrite_si_minus_half_pi``, ``pyrite_sincsq_tail``: power series for
-``t <= 4``, modified-Lentz continued fraction of ``E1(i t)`` below ``t = 48``,
+``t <= 4``, Cephes rational auxiliary fits for ``4 < t < 48``,
 auxiliary-function asymptotic series above), not ``scipy.special.sici``, so it
 differs from the NumPy evaluator only at FP64 rounding (the preamble's stated
 accuracy). No ``(line, bin)`` temporaries are allocated; bins run in parallel
@@ -24,10 +24,52 @@ Validation: sinc-bin-far-envelope
 import numpy as np
 from numba import njit, prange
 
+from ._sine_integral import SI_RATIONAL_COEFFICIENTS
+
 _PI = np.pi
 _INV_PI_F32 = np.float32(0.318309886)
 _TWO_PI_SQ_F32 = np.float32(19.7392088)
 _ONE_F32 = np.float32(1.0)
+
+
+@njit(cache=True)
+def _horner(z, coefficients):
+    value = coefficients[0]
+    for coefficient in coefficients[1:]:
+        value = value * z + coefficient
+    return value
+
+
+@njit(cache=True)
+def _si_rational_complement(t):
+    """Dimensionless ``Si(t) - pi/2`` on ``4 < t < 48`` (host device mirror).
+
+    Source: Cephes sici auxiliary fits, cited in ``_sine_integral``.
+    Assumes real 4 < t < 48; f ~ 1/t and g ~ 1/t**2 give the
+    large-t complement -cos(t)/t. The outer evaluator owns the joins.
+
+    Validation: sinc-bin-integration
+    """
+    z = 1.0 / (t * t)
+    if t < 8.0:
+        f = _horner(z, SI_RATIONAL_COEFFICIENTS[0][0]) / (
+            t * _horner(z, SI_RATIONAL_COEFFICIENTS[0][1])
+        )
+        g = (
+            z
+            * _horner(z, SI_RATIONAL_COEFFICIENTS[0][2])
+            / _horner(z, SI_RATIONAL_COEFFICIENTS[0][3])
+        )
+    else:
+        f = _horner(z, SI_RATIONAL_COEFFICIENTS[1][0]) / (
+            t * _horner(z, SI_RATIONAL_COEFFICIENTS[1][1])
+        )
+        g = (
+            z
+            * _horner(z, SI_RATIONAL_COEFFICIENTS[1][2])
+            / _horner(z, SI_RATIONAL_COEFFICIENTS[1][3])
+        )
+    return -f * np.cos(t) - g * np.sin(t)
 
 
 @njit(cache=True)
@@ -46,30 +88,7 @@ def _si_minus_half_pi(t):  # pragma: no cover - numba
                 break
         return total - 0.5 * _PI
     if t < 48.0:
-        b_re, b_im = 1.0, t
-        c_re, c_im = 1.0e300, 0.0
-        den = b_re * b_re + b_im * b_im
-        d_re, d_im = b_re / den, -b_im / den
-        h_re, h_im = d_re, d_im
-        for k in range(1, 200):
-            an = -float(k) * float(k)
-            b_re += 2.0
-            x_re = an * d_re + b_re
-            x_im = an * d_im + b_im
-            den = x_re * x_re + x_im * x_im
-            d_re = x_re / den
-            d_im = -x_im / den
-            den = c_re * c_re + c_im * c_im
-            c_re = b_re + an * c_re / den
-            c_im = b_im - an * c_im / den
-            e_re = c_re * d_re - c_im * d_im
-            e_im = c_re * d_im + c_im * d_re
-            n_re = h_re * e_re - h_im * e_im
-            h_im = h_re * e_im + h_im * e_re
-            h_re = n_re
-            if abs(e_re - 1.0) + abs(e_im) < 1.0e-16:
-                break
-        return h_im * np.cos(t) - h_re * np.sin(t)
+        return _si_rational_complement(t)
     y = 1.0 / (t * t)
     f_term, g_term, f, g = 1.0, 1.0, 0.0, 0.0
     for k in range(13):

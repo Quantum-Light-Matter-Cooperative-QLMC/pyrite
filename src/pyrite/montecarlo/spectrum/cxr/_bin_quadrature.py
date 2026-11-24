@@ -29,13 +29,11 @@ evaluated in FP64 and cast to the working precision only as a finished bin mean.
 * NumPy: ``scipy.special.sici`` below 48, the auxiliary-function asymptotic
   series above.
 * CUDA/ROCm (both the CuPy fallback and the fused reduction): the C preamble
-  below -- power series for ``t <= 4``, the modified-Lentz continued fraction
-  of ``E1(i t)`` for ``4 < t < 48``, the same asymptotic series above. Measured
-  against 40-digit ``mpmath`` on 1,500 points over ``[0, 1e12]``: absolute
-  error <= 1e-15 for ``t <= 4`` and <= 2.1e-15/t beyond, i.e. relative to the
-  ``1/t`` envelope of ``Si(t) - pi/2``. The ``t <= 4`` bound is stated with
-  margin: it is libm- and compiler-dependent, and an independent host
-  ``gcc -O2 -ffp-contract=off`` build measures 7.8e-16.
+  below -- power series for ``t <= 4``, rational auxiliary-function fits
+  for ``4 < t < 48`` (Cephes; split at 8), the same asymptotic series above. Measured
+  against 60-digit ``mpmath`` in the branch-boundary regressions: absolute
+  error <= 1e-15 for ``t <= 4`` and <= 2.1e-15/t beyond, relative to the
+  ``1/t`` envelope of ``Si(t) - pi/2``.
 * Other accelerators (SYCL): the NumPy evaluator on host.
 
 Production routes (``sincsq_bin_lineshape``, ``run_bin_mean_reduction_kernel``)
@@ -64,13 +62,14 @@ from functools import cache
 import numpy as np
 
 from ...._backend import REAL, _to_cpu, xp
+from ._sine_integral import SI_RATIONAL_PREAMBLE
 
 #: Line quadratures ``mc_cxr_spectrum`` accepts. ``"node"`` is the default.
 CXR_QUADRATURES = ("node", "bin-mean")
 NODE_QUADRATURE = "node"
 BIN_MEAN_QUADRATURE = "bin-mean"
 
-#: ``Si`` evaluator partition: exact library/continued fraction below, the
+#: ``Si`` evaluator partition: exact library/rational fits below, the
 #: auxiliary-function asymptotic series at and above.
 _SI_ASYMPTOTIC_T = 48.0
 #: Asymptotic terms. The first omitted term at ``t = 48`` is 26!/48**26 < 1e-17
@@ -98,6 +97,7 @@ SINCSQ_BIN_PREAMBLE = (
 #define PYRITE_SERIES_MAX_DX {_SERIES_MAX_DX!r}
 #define PYRITE_SERIES_MIN_X {_SERIES_MIN_X!r}
 """
+    + SI_RATIONAL_PREAMBLE
     + r"""
 static const double PYRITE_PI = 3.14159265358979323846264338327950288;
 
@@ -119,33 +119,7 @@ static __device__ double pyrite_si_minus_half_pi(double t) {
         return sum - 0.5 * PYRITE_PI;
     }
     if (t < 48.0) {
-        /* E1(i t) exp(i t) by modified Lentz; Si - pi/2 is Im(h exp(-i t)). */
-        double b_re = 1.0, b_im = t;
-        double c_re = 1.0e300, c_im = 0.0;
-        double den = b_re * b_re + b_im * b_im;
-        double d_re = b_re / den, d_im = -b_im / den;
-        double h_re = d_re, h_im = d_im;
-        for (int k = 1; k < 200; ++k) {
-            const double an = -(double)k * (double)k;
-            b_re += 2.0;
-            const double x_re = an * d_re + b_re;
-            const double x_im = an * d_im + b_im;
-            den = x_re * x_re + x_im * x_im;
-            d_re = x_re / den;
-            d_im = -x_im / den;
-            den = c_re * c_re + c_im * c_im;
-            c_re = b_re + an * c_re / den;
-            c_im = b_im - an * c_im / den;
-            const double e_re = c_re * d_re - c_im * d_im;
-            const double e_im = c_re * d_im + c_im * d_re;
-            const double n_re = h_re * e_re - h_im * e_im;
-            h_im = h_re * e_im + h_im * e_re;
-            h_re = n_re;
-            if (fabs(e_re - 1.0) + fabs(e_im) < 1.0e-16) {
-                break;
-            }
-        }
-        return h_im * cos(t) - h_re * sin(t);
+        return pyrite_si_rational_complement(t);
     }
     /* Si = pi/2 - f cos t - g sin t, f and g by their asymptotic series. */
     const double y = 1.0 / (t * t);
@@ -815,7 +789,10 @@ def sincsq_bin_lineshape(
 #: v10 (#1392): the uniform runs of a ``"segmented"`` axis share one line
 #: transform at the largest run period and broad threshold, each run
 #: evaluated at its centres by an ES type-2 transform (``_fourier_runs``).
-CXR_BIN_REDUCTION_MODEL = "fourier-auto-v11"
+#: v12 (#1407): device Si complement uses Cephes rational auxiliary fits on
+#: 4 < t < 48 instead of the modified-Lentz continued fraction; host near/far
+#: mirrors it. Classification, series window, and far envelope are unchanged.
+CXR_BIN_REDUCTION_MODEL = "fourier-auto-v12"
 #: Lines per Fourier-route flush: amortises the per-call FFT and planning.
 FOURIER_FLUSH_LINES = 10_000_000
 
