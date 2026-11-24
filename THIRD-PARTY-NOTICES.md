@@ -8,7 +8,8 @@ integrated as separate driver-tier tooling (`pyrite.xsgen`, tracked under
 issue #161); their notices were prepared in advance of that integration,
 per issue #162.
 
-None of PyRITE's own source is licensed under any of the terms below. This
+Except for the explicitly identified adaptations below, PyRITE's own source
+is not licensed under any of these terms. This
 file exists to satisfy the attribution obligations that follow from
 redistributing or downloading these codes and data, from invoking them, and from redistributing
 tables derived or resampled from their output.
@@ -351,3 +352,41 @@ require derived or adapted material to be marked as such.
   describe the selection and transcription. These numerical measurements are
   attributed to their original authors; no license to the source articles or
   compilation is asserted here.
+
+## Cephes sine-integral auxiliary fits (SciPy xsf)
+
+The coefficients in `src/pyrite/montecarlo/spectrum/cxr/_sine_integral.py`
+are adapted from [SciPy xsf `sici.h`](https://github.com/scipy/xsf/blob/55c14c958e42b7457071978f5b8ab8097174c172/include/xsf/cephes/sici.h).
+Original Cephes copyright 1984, 1987, 1989 by Stephen L. Moshier.
+The adaptation retains the following [SciPy xsf license](https://github.com/scipy/xsf/blob/55c14c958e42b7457071978f5b8ab8097174c172/LICENSE):
+
+```text
+BSD 3-Clause License
+
+Copyright (c) 2024, SciPy
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```

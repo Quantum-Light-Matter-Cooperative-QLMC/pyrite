@@ -65,7 +65,17 @@ Anchor: `tests/montecarlo/spectrum/test_sinc_bin_integration.py`, `tests/monteca
 
 ## Si evaluators
 
-The host path uses `scipy.special.sici` for $t < 48$ and the auxiliary-function asymptotic series ($f t = \sum (-1)^k (2k)!/t^{2k}$, $g t^2 = \sum (-1)^k (2k+1)!/t^{2k}$, 13 terms; the first omitted term at $t = 48$ is below $10^{-17}$) at and above, returning $\operatorname{Si} - \pi/2$ without subtracting from $\pi/2$. The CUDA/ROCm C preamble (`_bin_quadrature.py::SINCSQ_BIN_PREAMBLE`) uses the power series for $t \le 4$, the modified-Lentz continued fraction of $E_1(it)$ for $4 < t < 48$, and the same asymptotic series. Against 40-digit `mpmath` on 1,500 points in $[0, 10^{12}]$ (compiled with `gcc -ffp-contract=off` on host): absolute error $\le 10^{-15}$ for $t \le 4$, and error times $t$ $\le 2.1\times10^{-15}$ for $t > 4$ (i.e. relative to the $1/t$ envelope). The $t \le 4$ bound is stated with margin over the $6.7\times10^{-16}$ measured here, because it is libm- and compiler-dependent: an independent host `gcc -O2 -ffp-contract=off` build measures $7.8\times10^{-16}$.
+The NumPy matrix path uses `scipy.special.sici` for $t < 48$ and the auxiliary-function asymptotic series ($f t = \sum (-1)^k (2k)!/t^{2k}$, $g t^2 = \sum (-1)^k (2k+1)!/t^{2k}$, 13 terms; the first omitted term at $t = 48$ is below $10^{-17}$) at and above. The device C preamble (`_bin_quadrature.py::SINCSQ_BIN_PREAMBLE`) and its Numba near/far mirror use the power series for $t \le 4$, rational auxiliary fits for $4 < t < 48$, and the same asymptotic series.
+
+The rational branch (#1407) evaluates
+
+$$
+\operatorname{Si}(t)-\frac{\pi}{2}=-f(t)\cos t-g(t)\sin t,
+$$
+
+using the Cephes fits in $z=1/t^2$, with separate coefficient sets for $4<t<8$ and $8\le t<48$. The coefficients come from [SciPy xsf `sici.h`](https://github.com/scipy/xsf/blob/55c14c958e42b7457071978f5b8ab8097174c172/include/xsf/cephes/sici.h); `_sine_integral.py` owns them and generates the device Horner expressions from the same tuples consumed by the host mirror. The complement is computed directly, avoiding cancellation against $\pi/2$. The midpoint-series window, near/far classification, bin-mass equation and far envelope are unchanged. This replaces the modified-Lentz continued fraction of $E_1(it)$; `CXR_BIN_REDUCTION_MODEL` advances to `fourier-auto-v12`.
+
+The original continued-fraction implementation was measured against 40-digit `mpmath` on 1,500 points in $[0,10^{12}]$: absolute error $\le 10^{-15}$ for $t\le4$, and $t|\mathrm{error}|\le2.1\times10^{-15}$ for $t>4$. The rational replacement retains those bounds in the 60-digit `mpmath` regression `test_sine_integral.py` and its device counterpart in `test_sinc_bin_integration_cuda.py`, covering a uniform mesh plus both one-ulp neighbours and the exact values of 4, 8 and 48. These are implementation accuracy checks; fresh-context validation of the replacement is required separately. The original independent derivation below remains the record for the unchanged integral and tail equations.
 
 ## Routes and measurements
 

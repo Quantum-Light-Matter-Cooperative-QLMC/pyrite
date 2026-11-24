@@ -226,6 +226,8 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged(identity_pin):
     Fourier runs on segmented axes).
     #1403 re-mints them for ``fourier-auto-v11`` (near/far kernel splits lines
     across chunks when bins are few; sums regroup, FP64/float32 rounding only).
+    #1407 re-mints them for ``fourier-auto-v12`` (rational Si complement
+    replacing the device/Numba continued fraction on 4 < t < 48).
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"

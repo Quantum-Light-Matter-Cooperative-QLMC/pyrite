@@ -1,6 +1,6 @@
 """CUDA-gated agreement of the bin-mean kernels with the host FP64 evaluator (#116).
 
-The C preamble's ``Si`` (series / continued fraction / asymptotic) is an
+The C preamble's ``Si`` (series / rational auxiliary fits / asymptotic) is an
 independent port of the host evaluator (``scipy.special.sici`` / asymptotic),
 so these tests are the device-side accuracy gate. Whole-route agreement runs
 under ``PYRITE_TEST_BACKEND=cuda`` through ``test_sinc_bin_integration.py``.
@@ -484,3 +484,27 @@ def test_band_mass_kernel_matches_the_host_closed_form(monkeypatch):
         )
         == 0.0
     )
+
+
+def test_device_si_complement_retains_accuracy_and_host_parity_at_branch_boundaries():
+    """Validation: sinc-bin-integration -- rational split and both outer joins."""
+    import mpmath as mp
+
+    from pyrite.montecarlo.spectrum.cxr._bin_mean_jit import _si_minus_half_pi
+
+    neighbors = [np.nextafter(t, toward) for t in (4.0, 8.0, 48.0) for toward in (0, np.inf)]
+    t = np.unique(np.r_[0.0, np.linspace(0.01, 48.0, 257), neighbors, 4.0, 8.0, 48.0])
+    with mp.workdps(60):
+        reference = np.array([float(mp.si(float(x)) - mp.pi / 2) for x in t])
+    kernel = cp.ElementwiseKernel(
+        "float64 t",
+        "float64 out",
+        "out = pyrite_si_minus_half_pi(t);",
+        "pyrite_test_si_complement",
+        preamble=bq.SINCSQ_BIN_PREAMBLE,
+    )
+    actual = cp.asnumpy(kernel(cp.asarray(t)))
+    bound = np.where(t <= 4.0, 1e-15, 2.1e-15 / np.maximum(t, 1.0))
+    assert np.all(np.abs(actual - reference) <= bound)
+    host = np.array([_si_minus_half_pi(x) for x in t])
+    assert np.all(np.abs(actual - host) <= 2 * bound)
