@@ -44,7 +44,7 @@ only in `parallel=True` kernels. The old kernel looped over
 negative-index wraparound check, which blocks vectorization, so neither SVML
 nor `fastmath` could act.
 
-Looping over zero-based window slices (65ef52609) removes the check. Same
+Looping over zero-based window slices (the first commit of #1465) removes the check. Same
 operations, same order: the output stays bit-identical, and the kernel gets
 1.6x faster on stock Numba 0.68.
 
@@ -101,7 +101,7 @@ Hardware: qlmc-queen (Ryzen 9 9950X3D, AVX-512), four bound CPUs, Slurm jobs
 Wall time is the mean of the two warm samples. The first, cold sample includes
 JIT compilation and is excluded.
 
-| Case | Numba threads | Base 9836de899 | `vector_sin` 4703ea1a4 | Speedup | Reducer, base → new |
+| Case | Numba threads | Base (`main` before #1465) | `vector_sin` (#1465) | Speedup | Reducer, base → new |
 |---|---:|---:|---:|---:|---:|
 | photon-case (Cu 30 keV) | 1 | 26.9 s | 9.3 s | 2.9x | 20.6 → 2.7 s |
 | photon-case | 4 | 10.9 s | 7.0 s | 1.6x | 5.3 → <1.4 s |

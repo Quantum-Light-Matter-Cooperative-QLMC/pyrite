@@ -32,7 +32,8 @@ def _arguments():
 def _near_quadrant_multiples():
     # Nearest doubles to k pi/2 and their neighbours: maximal cancellation in the reduction.
     k = np.arange(1, int(VECTOR_SIN_LIMIT / (np.pi / 2)), dtype=np.float64)
-    base = (k.astype(np.longdouble) * (np.longdouble(np.pi) / 2)).astype(np.float64)
+    half_pi = np.arccos(np.longdouble(-1.0)) / 2  # extended-precision pi, not float64 np.pi
+    base = (k.astype(np.longdouble) * half_pi).astype(np.float64)
     x = np.concatenate([base, np.nextafter(base, 0.0), np.nextafter(base, np.inf)])
     return x[np.abs(x) < VECTOR_SIN_LIMIT]
 

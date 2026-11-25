@@ -45,6 +45,9 @@ _C1, _C2, _C3, _C4, _C5, _C6 = (
 )
 
 
+# Numba's on-disk cache keys a caller on its own file: after editing this
+# module, clear the ``__pycache__`` of ``_node_window.py`` or its inlined copy
+# of ``vector_sin`` stays stale.
 @njit(inline="always", cache=True)
 def vector_sin(x):  # pragma: no cover - numba
     """``sin(x)`` for ``|x| < VECTOR_SIN_LIMIT``, within 0.79 ulp."""
