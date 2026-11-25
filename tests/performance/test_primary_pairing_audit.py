@@ -239,6 +239,7 @@ def test_v1_1_amendment_derives_from_frozen_v1():
         else:
             assert new["support"] == old["support"]
     assert design["resources"]["confirmation_gpu_hours"] == 12.0
+    assert design["resources"]["cpu_ceiling_scope"] == "cpu-only-jobs"
     assert design["exact_agreement"]["score_bounds"]["transmitted_energy_keV"] == (
         "beam_energy_keV"
     )

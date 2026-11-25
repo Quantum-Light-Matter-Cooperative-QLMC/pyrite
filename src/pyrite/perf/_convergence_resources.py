@@ -282,7 +282,10 @@ def resource_plan(design, pilots):
     lookup = _validate_pilots(pilots, {r["id"] for r in expected})
     rows = [_row_forecast(r, lookup.get(r["id"]), design) for r in expected]
     arms = [a for r in rows for a in r.get("arms", []) if a["status"] == "forecast"]
-    cpu = math.fsum(a["cpu_core_hours"] for a in arms)
+    # v1.1 (owner, 2026-11-25): GPU jobs count against the GPU-hour ceiling only.
+    cpu_only = design["resources"].get("cpu_ceiling_scope") == "cpu-only-jobs"
+    cpu = math.fsum(a["cpu_core_hours"] for a in arms if not (cpu_only and a["gpus"]))
+    gpu_job_cpu = math.fsum(a["cpu_core_hours"] for a in arms if a["gpus"])
     gpu = math.fsum(a["gpu_hours"] for a in arms)
     complete = all(r["status"] == "forecast" for r in rows)
     limits = design["resources"]
@@ -303,6 +306,8 @@ def resource_plan(design, pilots):
         pairing_audit_sha256=pilots.get("pairing_audit_sha256"),
         rows=rows,
         forecast_cpu_core_hours=cpu,
+        forecast_gpu_job_cpu_core_hours=gpu_job_cpu,
+        cpu_ceiling_scope="cpu-only-jobs" if cpu_only else "all-jobs",
         forecast_gpu_hours=gpu,
         cost_complete=complete,
         budget_status="over-budget" if over else ("within-ceilings" if complete else "incomplete"),

@@ -117,6 +117,7 @@ def amend_v1_1(frozen, frozen_sha256, gpu_hours):
     old_m = out["multiplicity"]
     added = parity_rows(out)
     out["resources"]["confirmation_gpu_hours"] = gpu_hours
+    out["resources"]["cpu_ceiling_scope"] = "cpu-only-jobs"
     out["amendment"] = dict(
         version="1.1",
         amends="convergence-design-v1.json",
@@ -132,6 +133,8 @@ def amend_v1_1(frozen, frozen_sha256, gpu_hours):
             f"parity rows added for carried CPU-fp64/CUDA-mixed arms: M {old_m} -> "
             f"{old_m + added}, row_alpha = family_alpha / M",
             f"confirmation_gpu_hours {old_ceiling} -> {gpu_hours}",
+            "CPU core-hour ceiling covers CPU-only jobs; GPU jobs count against the "
+            "GPU-hour ceiling only (owner, 2026-11-25)",
         ],
     )
     return out

@@ -179,6 +179,21 @@ def test_exact_rule_does_not_apply_with_discordances_or_without_the_frozen_rule(
         plan(exact_design(), independent)
 
 
+def test_cpu_only_scope_keeps_gpu_job_cpus_out_of_the_cpu_ceiling():
+    gpu = dict(arm(), gpus=1, peak_vram_bytes=4096)
+    p = pilot()
+    p["rows"][0]["arms"] = [gpu, arm()]
+    d = design()
+    everything = resource_plan(d, p)
+    d["resources"]["cpu_ceiling_scope"] = "cpu-only-jobs"
+    scoped = resource_plan(d, p)
+    gpu_cpu, cpu_cpu = (a["cpu_core_hours"] for a in scoped["rows"][0]["arms"])
+    assert everything["forecast_cpu_core_hours"] == pytest.approx(gpu_cpu + cpu_cpu)
+    assert scoped["forecast_cpu_core_hours"] == pytest.approx(cpu_cpu)
+    assert scoped["forecast_gpu_job_cpu_core_hours"] == pytest.approx(gpu_cpu)
+    assert scoped["forecast_gpu_hours"] == everything["forecast_gpu_hours"] > 0
+
+
 def test_time_ceiling_splits_each_repeat_and_charges_overhead_every_shard():
     p = pilot()
     for a in p["rows"][0]["arms"]:

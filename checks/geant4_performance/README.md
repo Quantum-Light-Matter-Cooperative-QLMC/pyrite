@@ -147,7 +147,10 @@ any confirmation run:
   allowance `S*eps/3/4`. A carried arm inherits the reference ladder only if
   its parity row passes and the reference's summed nominal:L3 bounds plus the
   parity bound stay within `B`;
-- the confirmation GPU-hour ceiling is extended to the recorded value.
+- the confirmation GPU-hour ceiling is extended to the recorded value, and
+  the 256 CPU core-hour ceiling covers CPU-only jobs
+  (`cpu_ceiling_scope: cpu-only-jobs`). GPU jobs count against the GPU-hour
+  ceiling only; their CPU allocation is reported separately.
 
 Existing row IDs and allowances are unchanged. The 108 parity rows are
 appended (IDs `comparison-07074` onward), so the multiplicity grows from
