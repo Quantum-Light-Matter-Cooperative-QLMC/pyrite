@@ -14,7 +14,9 @@ def _available_mem_mb():
 def _mem_worker_cap(per_worker_mb=None):
     """Max workers host RAM allows at ``per_worker_mb`` each.
 
-    ``min(MemAvailable, 0.9 * MemTotal) // per_worker_mb``. Binds BOTH worker
+    ``min(MemAvailable, 0.9 * MemTotal) // per_worker_mb``, where both terms
+    are bounded by the job's cgroup v2 headroom and ``memory.max`` (#1460;
+    see ``chunking._available_mem_mb`` / ``_total_mem_mb``). Binds BOTH worker
     pools (full-case CPU pool and GPU-pipeCXR transport pool) so neither can
     oversubscribe host RAM and re-create the 2026-07-18 remote-host OOM, where the
     kernel killed one worker and ``BrokenProcessPool`` lost the whole run. The
@@ -139,7 +141,7 @@ def _cpu_pool_workers(max_workers, n):
     n: number of cases (never spawn more workers than cases).
 
     The memory cap binds BOTH branches: even an explicit request is clamped to
-    min(MemAvailable, 0.85*MemTotal) // _WORKER_MEM_MB, so a pinned count can't
+    _mem_worker_cap() (cgroup-bounded MemAvailable / 0.9*MemTotal), so a pinned count can't
     re-create the OOM. To deliberately run tighter than the measured budget,
     raise PYRITE_MC_WORKER_MEM_MB -- that's the knob for "my workload is smaller
     than the default assumes", not a bigger --max-workers.

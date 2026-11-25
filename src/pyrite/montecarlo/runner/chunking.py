@@ -13,6 +13,7 @@ from ..._util.env import env_value
 from .. import spectrum as _spectrum_mod
 from .._resources import admitted_chunk, resolve_resource_policy
 from ..spectrum.brem_blocks import eedl_staged_panel_count
+from ..transport import host_memory
 
 
 def _env_chunk(name, default):
@@ -29,7 +30,20 @@ def _env_chunk(name, default):
 
 
 def _available_mem_mb() -> int:
-    return psutil.virtual_memory().available // 1_000_000
+    """MemAvailable, bounded by the tightest cgroup v2 headroom (#1460)."""
+    available = int(psutil.virtual_memory().available)
+    headroom = host_memory._cgroup_headroom_bytes()
+    return (available if headroom is None else min(available, headroom)) // 1_000_000
+
+
+def _total_mem_mb() -> int:
+    """MemTotal, bounded by the tightest cgroup v2 ``memory.max`` (#1460).
+
+    Inside a batch job the cgroup limit, not the node's RAM, is what the
+    kernel OOM-kills against."""
+    total = int(psutil.virtual_memory().total)
+    limit = host_memory._cgroup_limit_bytes()
+    return (total if limit is None else min(total, limit)) // 1_000_000
 
 
 @dataclass
@@ -105,7 +119,7 @@ def _resolve_runner_resource_policy() -> _RunnerResourcePolicy:
         gpu=_GPU,
         nsys=env_value("PYRITE_MC_NSYS", "") not in ("", "0"),
         n_cpus=None,
-        total_mem_mb=psutil.virtual_memory().total // 1_000_000,
+        total_mem_mb=_total_mem_mb(),
         available_mem_mb=_available_mem_mb,
         spec_chunk=_env_chunk("PYRITE_MC_CXR_CHUNK", 0),
         brem_chunk=_env_chunk("PYRITE_MC_BREM_CHUNK", 0),
