@@ -8,7 +8,7 @@ copies it into ``src/pyrite/data/xsgen/`` -- so that
 
 Usage::
 
-    UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run python scripts/release_bremslib_tables.py \\
+    pixi run python scripts/release_bremslib_tables.py \\
         --source ../BremsLib_v2.0.8 --url https://.../bremslib-tables.zip --pin
 
 Run it when the catalogue admits a new transport element, when the BremsLib

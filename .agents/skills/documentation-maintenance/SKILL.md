@@ -41,10 +41,10 @@ signature belongs in generated Python API reference, and response physics in
 - CLI edits: regenerate and check `pyrite-dev cli-reference` and
   `pyrite-dev cli-deprecations` as applicable.
 - Ownership edits: `pyrite-dev repo-map --check`.
-- MyST, Sphinx and navigation: `uv run pyrite-dev docs` and
+- MyST, Sphinx and navigation: `pixi run pyrite-dev docs` and
   `pyrite-dev test tests/dev/test_docs_*.py`.
-- Skill edits: `uv run pyrite-dev sync-skills`, then
-  `uv run pyrite-dev check-skills`.
+- Skill edits: `pixi run pyrite-dev sync-skills`, then
+  `pixi run pyrite-dev check-skills`.
 
 Inspect the scoped diff and report evidence gaps. For sidebar changes, check
 rendered deep navigation and mobile layout as well as link validity.

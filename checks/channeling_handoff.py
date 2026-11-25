@@ -11,7 +11,7 @@ whole-depth marginal, the overflow share, and the mean free handoff angle in
 units of the planar critical angle ``psi_c = sqrt(2 U_depth / (p v))``, the
 scale the declared 300 eV margin sets.
 
-    PYRITE_MC_BACKEND=cpu uv run python checks/channeling_handoff.py
+    PYRITE_MC_BACKEND=cpu pixi run python checks/channeling_handoff.py
 
 Exit 0 when the largest chunk distance is at most ``--tolerance`` (0.1).
 

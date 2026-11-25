@@ -13,13 +13,13 @@ cd "$SLURM_SUBMIT_DIR"
 hold=$1 histories=$2; shift 2; seeds=("$@")
 trap 'touch "evidence/hold-release-$hold"' EXIT
 source checks/geant4_performance/env.sh
-uv sync --extra nvidia --locked -q
+pixi install --locked -e nvidia
 [[ "$(squeue -h -j "$hold" -o %T)" == RUNNING ]] || { echo "hold job $hold not running"; exit 1; }
 out="evidence/run/$SLURM_JOB_ID"; mkdir -p "$out"
 cp .pyrite-sync "$out/sync.json"; lscpu > "$out/cpu.txt"; nvidia-smi > "$out/gpu.txt"
 squeue -w DESKTOP-QNIHO3D > "$out/node-jobs.txt"; free -g > "$out/memory.txt"
 sha256sum "$G4BENCH" checks/geant4_performance/*.py checks/geant4_performance/g4bench/* > "$out/code.txt"
-uv run --no-sync python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
+pixi run --as-is -e nvidia python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
 scenes=(si-300keV-100um w-300keV-10um si-1MeV-1mm w-1MeV-100um si-3MeV-1mm w-3MeV-100um)
 warm=$((histories / 100))
 for seed in "${seeds[@]}"; do
@@ -34,12 +34,12 @@ for seed in "${seeds[@]}"; do
                 # 1e6-segment chunks is 40-80x faster than adaptive (bias <= 0.4%, < 1 SE).
                 extra=()
                 [[ $arm == pyc ]] && extra=(--estimator continuous --cone-mode point --chunk 1000000)
-                PYRITE_MC_BACKEND=cuda uv run --no-sync python checks/geant4_performance/pyrite_bench.py \
+                PYRITE_MC_BACKEND=cuda pixi run --as-is -e nvidia python checks/geant4_performance/pyrite_bench.py \
                     "$s" --histories "$histories" --seed "$seed" --rows-per-round 1024 \
                     --device-staging "${extra[@]}" --output "$stem.json" > "$stem.log" 2>&1 \
                     || echo "FAIL $arm $s $seed"
             else
-                uv run --no-sync python checks/geant4_performance/geant4_bench.py "$s" \
+                pixi run --as-is -e nvidia python checks/geant4_performance/geant4_bench.py "$s" \
                     --histories "$histories" --warmup "$warm" --seed "$seed" --threads "${arm#g4-}" \
                     --executable "$G4BENCH" --output "$stem.json" > "$stem.log" 2>&1 \
                     || echo "FAIL $arm $s $seed"
@@ -48,4 +48,4 @@ for seed in "${seeds[@]}"; do
         done
     done
 done
-uv run --no-sync python checks/geant4_performance/analyze.py "$out" --output "$out/summary.json"
+pixi run --as-is -e nvidia python checks/geant4_performance/analyze.py "$out" --output "$out/summary.json"

@@ -156,11 +156,15 @@ def is_documented_invocation(tokens: list[str]) -> bool:
 
 
 def strip_line_prefixes(tokens: list[str]) -> list[str]:
-    """Strip leading ``VAR=value`` env assignments and a leading ``uv run``."""
+    """Strip leading ``VAR=value`` env assignments and a ``pixi run [-e ENV]``."""
     while tokens and _ENV_ASSIGNMENT_RE.match(tokens[0]):
         tokens = tokens[1:]
-    if len(tokens) >= 2 and tokens[0] == "uv" and tokens[1] == "run":
+    if len(tokens) >= 2 and tokens[0] == "pixi" and tokens[1] == "run":
         tokens = tokens[2:]
+        while tokens and (
+            tokens[0] in ("--locked", "--frozen", "--as-is") or tokens[0] in ("-e", "--environment")
+        ):
+            tokens = tokens[2:] if tokens[0] in ("-e", "--environment") else tokens[1:]
         while tokens and _ENV_ASSIGNMENT_RE.match(tokens[0]):
             tokens = tokens[1:]
     return tokens

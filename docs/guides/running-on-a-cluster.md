@@ -18,8 +18,8 @@ on a login node.
 In a source checkout, install the Dask extra only if using Dask:
 
 ```bash
-uv sync --extra dask
-uv run pyrite tables verify
+pixi install
+pixi run pyrite tables verify
 ```
 
 ### Reuse compiled kernels across jobs
@@ -79,7 +79,7 @@ lists every field and a worked Hoffman2 example.
 2. Build the environment inside a short compute-node job, not on the login node:
 
    ```bash
-   srun --time=00:30:00 --cpus-per-task=2 --mem=8G uv sync --extra dask
+   srun --time=00:30:00 --cpus-per-task=2 --mem=8G pixi install
    ```
 
    Add the GPU vendor extra (for example `--extra nvidia`) for GPU workers.
@@ -131,7 +131,7 @@ rather than a checkpoint pull.
 
 The helper needs SSH access to a SLURM login node, `uv` on that host, and a
 home or project directory that compute nodes also see. Do not install PyRITE
-or fetch tables there yourself: each batch job runs `uv sync` (and downloads
+or fetch tables there yourself: each batch job runs `pixi install` (and downloads
 a supported Python if needed) on its compute node, and `pyrite remote sync`
 ships your local tables.
 
@@ -171,7 +171,7 @@ ships your local tables.
    pyrite remote sync --target campus
    ```
 
-   Each job runs an exact `uv sync` of the vendor extra, which removes
+   Each job runs an exact `pixi install` of the vendor extra, which removes
    other extras from the shared environment. To keep the Dask backend there,
    add `--extras dask` (comma-separated for several).
 
@@ -247,10 +247,10 @@ ships your local tables.
    ```
 
    The job log header names the node. Compute nodes must reach the package
-   index for the first `uv sync`; on a site without outbound access, fill
+   index for the first `pixi install`; on a site without outbound access, fill
    uv's cache once from an interactive allocation
    (`srun --time=01:00:00 --cpus-per-task=4 --mem=8G --pty $SHELL -l`) by
-   running `uv sync --package pyrite-mc --no-default-groups --extra nvidia`
+   running `pixi install --package pyrite-mc --no-default-groups --extra nvidia`
    in the remote directory.
 
 (amd-rocm-nodes)=

@@ -13,16 +13,16 @@
 # overlapped Nsight run whose `run` busy fraction shows the filled device idle time.
 # usage (from an isolated synced checkout root): sbatch -J o862-<sha> checks/stream_overlap_862.sbatch [OUTDIR]
 set -uo pipefail
-export PATH=$HOME/.local/bin:$PATH
+export PATH=$HOME/.pixi/bin:$PATH
 cd "$SLURM_SUBMIT_DIR"
 export TMPDIR="$HOME/tmp-nsys"; mkdir -p "$TMPDIR"
 export PYRITE_HOME=$HOME/pyrite PYRITE_CATALOG=$PWD/src/pyrite/data/catalog PYRITE_USER_CATALOG=$(mktemp -d)/catalog
 export PYRITE_MC_BACKEND=cuda
 echo "code $(cat CODE_SHA)"
-uv sync -q --locked --package pyrite-mc --no-default-groups --extra nvidia
-B=(uv run --no-sync python checks/streamed_scoring_memory.py)
+pixi install --locked -e nvidia
+B=(pixi run --as-is -e nvidia python checks/streamed_scoring_memory.py)
 ROOT=${1:-o862_out}
-summary() { uv run --no-sync python -c 'import json,sys; r=json.load(open(sys.argv[1])); print(json.dumps({k: r[k] for k in ("wall_s", "phase_s", "n_segments", "host_peak_MiB", "device_pool_peak_above_base_MiB")}))' "$1"; }
+summary() { pixi run --as-is -e nvidia python -c 'import json,sys; r=json.load(open(sys.argv[1])); print(json.dumps({k: r[k] for k in ("wall_s", "phase_s", "n_segments", "host_peak_MiB", "device_pool_peak_above_base_MiB")}))' "$1"; }
 for ARM in "silicon 20000 4096" "tungsten 20000 4096" "tungsten 65536 8192"; do
   read -r MAT NE BLOCK <<< "$ARM"
   OUT=$ROOT/$MAT-$NE-$BLOCK; mkdir -p "$OUT"

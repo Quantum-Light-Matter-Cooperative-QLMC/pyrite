@@ -25,7 +25,7 @@ Entry states (all through the #504 ``DensityMatrixSolver``, TDS + electronic):
   registration to the lattice under the translation average; the converter
   below is the prototype psi(x) -> basis interface proposed for #56.
 
-    PYRITE_MC_BACKEND=cpu uv run python checks/channeling_modulated_emission.py
+    PYRITE_MC_BACKEND=cpu pixi run python checks/channeling_modulated_emission.py
 
 Exit 0 when the built-in limits hold: an aligned plane wave (uniform
 density) has ``F(0) = 1`` up to ``2 (n_max / n_bar) sqrt(w)``, where ``w`` is the

@@ -21,7 +21,7 @@ This skill owns packaged Marimo applications and the legacy Jupyter check,
 Put reusable logic in `src/pyrite/`; keep apps thin. Add no new `.ipynb`
 workflows. Keep legacy notebook output-free.
 
-After marimo edits run `uv run marimo check <app.py>`. For legacy notebook run
+After marimo edits run `pixi run marimo check <app.py>`. For legacy notebook run
 `pyrite-dev nbqa` before edits and `nbstrip` before handoff. Use
 the affected app's test module; add reusable-logic consumers only when changed.
 Follow `AGENTS.md` "Choose tests by impact"; `apps` is for shared app changes.

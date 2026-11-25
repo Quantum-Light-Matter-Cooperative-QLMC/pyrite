@@ -9,16 +9,16 @@
 #SBATCH --output=validation-344-%j.log
 set -euo pipefail
 cd "${SLURM_SUBMIT_DIR:?}"
-# SLURM batch env lacks ~/.local/bin (uv); the box config pins a stale catalog,
+# SLURM batch env lacks ~/.pixi/bin (pixi); the box config pins a stale catalog,
 # so mirror pyrite.remote.config.remote_runtime_env() for the synced checkout.
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 export PYRITE_HOME="${PWD}"
 export PYRITE_CATALOG="${PWD}/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="${PWD}/user-catalog"
 : "${SLURM_JOB_ID:?SLURM allocation required}"
 output="evidence/validation-344/${SLURM_JOB_ID}"
 # Sync the selected GPU extra on the *box*, not on a GitHub runner.
-uv sync --extra nvidia --locked
-uv run --extra nvidia pyrite tables fetch
-uv run --extra nvidia python checks/scheduled_cuda_parity.py --output-dir "$output"
+pixi install --locked -e nvidia
+pixi run -e nvidia pyrite tables fetch
+pixi run -e nvidia python checks/scheduled_cuda_parity.py --output-dir "$output"
 echo "Validation parity evidence: $PWD/$output/report.json"

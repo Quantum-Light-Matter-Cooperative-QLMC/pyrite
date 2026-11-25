@@ -508,7 +508,7 @@ using the real post-entry straight runs. No crossings or transport are mocked.
 Run this transport acceptance check explicitly:
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --slow \
+pixi run pyrite-dev test --slow \
   tests/montecarlo/spectrum/test_optical_finite_case.py --durations=0
 ```
 
@@ -1296,7 +1296,7 @@ digest and test hash. Reproduce after syncing the intended tree and
 staging the test (tests are not included in `pyrite remote sync`):
 
 ```bash
-PYRITE_TEST_BACKEND=cuda uv run --extra nvidia pyrite-dev test \
+PYRITE_TEST_BACKEND=cuda pixi run -e nvidia pyrite-dev test \
   tests/montecarlo/spectrum/test_optical_cuda_parity.py --durations=0
 ```
 
@@ -1312,7 +1312,7 @@ the device source/plane adapters. That transport check is marked `slow`.
 Run it explicitly with the retained forward checks:
 
 ```bash
-PYRITE_TEST_BACKEND=cuda uv run --extra nvidia pyrite-dev test --slow \
+PYRITE_TEST_BACKEND=cuda pixi run -e nvidia pyrite-dev test --slow \
   tests/montecarlo/spectrum/test_optical_source_cuda.py \
   tests/montecarlo/spectrum/test_optical_cuda_parity.py --durations=0
 ```

@@ -13,10 +13,10 @@ Install the [pinned physics tables](../development-workspace.md) first. Run from
 the checkout being measured, with its locked dependencies and bundled catalog:
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache NUMBA_CACHE_DIR=/tmp/pyrite-startup-numba \
+NUMBA_CACHE_DIR=/tmp/pyrite-startup-numba \
   pyrite-dev startup --cache warm --repeats 3 --json \
   --profile /tmp/pyrite-startup.prof > /tmp/pyrite-startup.json
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run python -m pstats /tmp/pyrite-startup.prof
+pixi run python -m pstats /tmp/pyrite-startup.prof
 ```
 
 Warm mode runs an unmeasured priming process before the samples. Cold mode
@@ -290,7 +290,7 @@ PCH-on timing; no prebuilt header is supplied.
 Run each cold sample with the chosen `CUPY_NVRTC_USE_PCH=0` or `1`:
 
 ```bash
-CUPY_NVRTC_USE_PCH=1 uv run pyrite-dev startup --backend cuda --cache cold --repeats 1 --json
+CUPY_NVRTC_USE_PCH=1 pixi run pyrite-dev startup --backend cuda --cache cold --repeats 1 --json
 ```
 
 For warm controls use separate empty Numba/CuPy cache directories per arm and

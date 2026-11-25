@@ -45,7 +45,7 @@ one table, fix every `fail`, and re-run only the failed verifiers.
 - Format the write-up per `docs/validation/formatting-style.md`: math is
   `$...$` inline and `$$` display. `\(...\)` and `\[...\]` are dropped to
   literal text by the MyST build and raise no warning.
-- Before reporting, run `uv run pyrite-dev test tests/dev/test_docs.py` and
+- Before reporting, run `pixi run pyrite-dev test tests/dev/test_docs.py` and
   confirm the built
   `docs/_build/html/validation/<domain>/<id>.html` shows every expression
   inside a `class="math notranslate"` element with no `$` left in the body.
@@ -54,7 +54,7 @@ one table, fix every `fail`, and re-run only the failed verifiers.
 
 - Ledger: `docs/validation/physics-validation-ledger.md` (index) with one
   domain part per `docs/validation/ledger-*.md`; edit the part, then run
-  `uv run pyrite-dev validation-ledger --write`
+  `pixi run pyrite-dev validation-ledger --write`
 - Derivations: ledgered `docs/validation/<domain>/<id>.md`
 - Fast anchors: `tests/`
 - Heavier or external comparisons: `checks/`

@@ -42,11 +42,11 @@ The two-point VTP layout uses 72 bytes per segment for coordinates, connectivity
 ```bash
 # Four small CPU captures: eight primaries, seed 11, Si, cutoff 2 keV.
 # Requires installed SBETHE tables and pinned shell configuration.
-uv run python checks/trajectory_viewer_benchmark.py --generate-small /tmp/viewer-captures
+pixi run python checks/trajectory_viewer_benchmark.py --generate-small /tmp/viewer-captures
 
-uv run --with pyvista --with kaleido python checks/trajectory_viewer_benchmark.py \
+pixi run -e viz python checks/trajectory_viewer_benchmark.py \
   /tmp/viewer-captures/200-shell-soft-hard.h5 --backend plotly --output /tmp/plotly.json
-uv run --with pyvista --with kaleido python checks/trajectory_viewer_benchmark.py \
+pixi run -e viz python checks/trajectory_viewer_benchmark.py \
   /tmp/viewer-captures/200-shell-soft-hard.h5 --backend pyvista --output /tmp/pyvista.json
 ```
 

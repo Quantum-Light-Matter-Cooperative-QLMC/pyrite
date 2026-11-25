@@ -13,13 +13,13 @@
 #   sbatch -J s907-<sha> checks/streamed_block_sizing.sbatch
 # nsys needs a writable TMPDIR (/tmp/nvidia is not writable on the lab box).
 set -uo pipefail
-export PATH=$HOME/.local/bin:/usr/local/cuda/bin:$PATH
+export PATH=$HOME/.pixi/bin:/usr/local/cuda/bin:$PATH
 cd "$SLURM_SUBMIT_DIR"
 export TMPDIR="$HOME/tmp-nsys"; mkdir -p "$TMPDIR"
 export PYRITE_HOME=/home/aamador/pyrite PYRITE_CATALOG=$PWD/src/pyrite/data/catalog PYRITE_USER_CATALOG=$(mktemp -d)/catalog
 export PYRITE_MC_BACKEND=cuda PROBE_SHA=$(cat CODE_SHA)
 echo "code $PROBE_SHA"
-uv sync -q --locked --package pyrite-mc --no-default-groups --extra nvidia
+pixi install --locked -e nvidia
 H=checks/streamed_block_sizing.py
 OUT=s907_out; mkdir -p $OUT
 cat > $OUT/rtx5080.arms <<'EOF'
@@ -36,10 +36,10 @@ transport 262144 16384 2048 32 0 PROBE_SPLIT=1
 joined 32768 0 4096 32 0
 streamed 32768 8192 4096 32 0
 EOF
-uv run --no-sync python -u $H sweep $OUT/rtx5080.arms $OUT/sweep
+pixi run --as-is -e nvidia python -u $H sweep $OUT/rtx5080.arms $OUT/sweep
 echo "== nsys streamed 65536/16384"
 nsys profile --trace=cuda,nvtx,osrt --sample=none --cpuctxsw=none -o $OUT/nsys-streamed -f true \
-  uv run --no-sync python -u $H streamed 65536 16384 2048 32 0 $OUT/nsys-streamed
+  pixi run --as-is -e nvidia python -u $H streamed 65536 16384 2048 32 0 $OUT/nsys-streamed
 nsys stats --report cuda_gpu_kern_sum,cuda_gpu_mem_time_sum,cuda_gpu_mem_size_sum,cuda_api_sum \
   --format csv -o $OUT/nsys-streamed $OUT/nsys-streamed.nsys-rep >/dev/null
 for r in cuda_gpu_kern_sum cuda_gpu_mem_time_sum cuda_api_sum; do
@@ -50,7 +50,7 @@ echo "== ncu one full-population transport launch (block 16384)"
 # measured run's first (full-population) continuation round.
 ncu --set full --kernel-name regex:transport --launch-skip 40 --launch-count 1 \
   -o $OUT/ncu-transport -f \
-  uv run --no-sync python -u $H transport 16384 16384 2048 32 0 $OUT/ncu-run
+  pixi run --as-is -e nvidia python -u $H transport 16384 16384 2048 32 0 $OUT/ncu-run
 ncu --import $OUT/ncu-transport.ncu-rep --page details --csv > $OUT/ncu-transport.csv
 ncu --import $OUT/ncu-transport.ncu-rep --page details | head -200
 echo "done rc=0"

@@ -12,12 +12,11 @@ set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 exec {sync_lock_fd}<>.pyrite-sync.lock
 flock -s -w 30 "$sync_lock_fd"
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$PWD/user-catalog"
 export PYRITE_MC_BACKEND=cpu PYRITE_TEST_BACKEND=cpu
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache
 policy=checks/equal_precision/moment-heldout-788.json
 out="evidence/moment-heldprod788/${OUT_TAG:?}"
 mkdir -p "$out"
@@ -28,15 +27,15 @@ scontrol show job "$SLURM_JOB_ID" > "$out/job-$SLURM_JOB_ID.txt"
 # A fresh checkout lacks the W SBETHE table; generate once, serialized.
 (
     flock -x -w 1800 8
-    uv run --no-sync python checks/equal_precision/prepare_stopping.py > "$out/tables-$SLURM_JOB_ID.json"
+    pixi run --as-is python checks/equal_precision/prepare_stopping.py > "$out/tables-$SLURM_JOB_ID.json"
 ) 8>"$out/.prepare.lock"
-mapfile -t cases < <(uv run --no-sync python -c "import json; print('\n'.join(json.load(open('$policy'))['cases']))")
+mapfile -t cases < <(pixi run --as-is python -c "import json; print('\n'.join(json.load(open('$policy'))['cases']))")
 read -ra seeds <<< "${SEEDS:?}"
 run() {
     local case=$1 variant=$2 seed=$3 histories=$4 stem=$5; shift 5
     local scene=${case%%:*} cutoff=()
     if [[ $case == *:* ]]; then cutoff=(--cutoff-ev "${case#*:}"); fi
-    timeout --signal=TERM --kill-after=5s 600s uv run --no-sync python \
+    timeout --signal=TERM --kill-after=5s 600s pixi run --as-is python \
         checks/equal_precision/benchmark_moment_production.py "$variant" "$stem-audit.json" \
         "$@" "$scene" "${cutoff[@]}" --histories "$histories" --seed "$seed" --core per-electron \
         --batch-histories "$histories" --scratch-mib 4096 --probe-electrons 0 \

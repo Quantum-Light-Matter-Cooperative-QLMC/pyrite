@@ -468,9 +468,9 @@
   "baseline_job": 2512,
   "baseline_revision": "ba6dbda412cc931a82dde56136eee709352381df",
   "commands": [
-    "uv run --extra nvidia --extra optimization python -m checks.photon_cuda.benchmark scaling",
-    "uv run --extra nvidia --extra optimization python -m checks.photon_cuda.benchmark tune",
-    "uv run --extra nvidia --extra optimization python -m checks.photon_cuda.benchmark trace"
+    "pixi run -e nvidia python -m checks.photon_cuda.benchmark scaling",
+    "pixi run -e nvidia python -m checks.photon_cuda.benchmark tune",
+    "pixi run -e nvidia python -m checks.photon_cuda.benchmark trace"
   ],
   "failed_predecessor": {
     "job": 2513,
@@ -1132,7 +1132,7 @@
       "report_sha256": "8d9fb29e518edfa3e0a0d751dcbe900f1579b5b9a3f669f78720ab950b745f03"
     }
   },
-  "nsight_command": "nsys profile --trace=cuda,nvtx --sample=none --cpuctxsw=none --capture-range=cudaProfilerApi --capture-range-end=stop --force-overwrite=true --output=fused-flight-trace uv run --extra nvidia --extra optimization python -m checks.photon_cuda.benchmark trace",
+  "nsight_command": "nsys profile --trace=cuda,nvtx --sample=none --cpuctxsw=none --capture-range=cudaProfilerApi --capture-range-end=stop --force-overwrite=true --output=fused-flight-trace pixi run -e nvidia python -m checks.photon_cuda.benchmark trace",
   "optuna_version": "4.9.0",
   "scope": "Standalone analytic photon first-flight performance and backend parity only; not full-track validation"
 }

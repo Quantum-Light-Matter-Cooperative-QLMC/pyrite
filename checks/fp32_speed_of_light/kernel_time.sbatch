@@ -18,7 +18,7 @@ scenes=${2:?scene:histories list}; seeds=${3:-"1 2 3"}; read -r -a precisions <<
 out="$here/evidence/ktime1013/$SLURM_JOB_ID"; mkdir -p "$out"
 for tree in "${trees[@]}"; do
     (cd "$tree" && . checks/rocm/env.sh && pyrite_gpu_sync -q \
-        && uv run --no-sync python checks/equal_precision/prepare_stopping.py > /dev/null)
+        && pixi run --as-is -e amd python checks/equal_precision/prepare_stopping.py > /dev/null)
     echo "$tree $(cat "$tree/SHA" 2>/dev/null || echo unknown)" >> "$out/trees.txt"
 done
 arms=()
@@ -31,7 +31,7 @@ for spec in $scenes; do
             tree=${arm%:*} p=${arm##*:} tag="$(basename "$tree")-$p-$s-$seed"
             (cd "$tree" && . checks/rocm/env.sh \
                 && export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 NUMBA_NUM_THREADS=1 \
-                && uv run --no-sync python "$here/checks/fp32_speed_of_light/kernel_time.py" \
+                && pixi run --as-is -e amd python "$here/checks/fp32_speed_of_light/kernel_time.py" \
                     --stats "$out/$tag.stats.json" "$s" --histories "$h" --seed "$seed" \
                     --rows-per-round 1024 --device-staging --transport-precision "$p" --no-audit \
                     --warmup-histories -1 --output "$out/$tag.json" > "$out/$tag.log" 2>&1) \

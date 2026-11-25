@@ -7,7 +7,7 @@
 #SBATCH --output=step-activity-%j.log
 set -euo pipefail
 cd /home/aamador/pyrite-510-precision-20261015
-export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog" UV_CACHE_DIR=/tmp/pyrite-uv-cache
+export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1 MPLBACKEND=Agg PYRITE_MC_BACKEND=cpu
 out=scratch/cheap-validation/activity-$SLURM_JOB_ID
 mkdir -p "$out/source"
@@ -23,7 +23,7 @@ for scene in si-300-100um-0deg w-300-10um-0deg si-800-100um-0deg w-800-10um-0deg
       status=1
       continue
     fi
-    if timeout --signal=KILL 15s "$HOME/.local/bin/uv" run --no-sync python checks/equal_precision/probe_step_activity.py "$scene" "$cap" "$out/$name.json" > "$out/$name.log" 2>&1; then
+    if timeout --signal=KILL 15s "${PYRITE_REMOTE_PIXI:-$HOME/.pixi/bin/pixi}" run --as-is python checks/equal_precision/probe_step_activity.py "$scene" "$cap" "$out/$name.json" > "$out/$name.log" 2>&1; then
       echo "OK $name"
     else
       printf '{"reason":"activity subprocess failed or exceeded 15s"}\n' > "$out/$name.failed.json"

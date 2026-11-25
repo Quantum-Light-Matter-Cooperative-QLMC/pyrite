@@ -2,7 +2,7 @@
 
 Run from the repository root with::
 
-    PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=4 uv run python checks/channeling_submev_w001_entry.py
+    PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=4 pixi run python checks/channeling_submev_w001_entry.py
 
 This *diagnostic* projects an incident plane wave (and an isotropic 2D Gaussian
 angular mixture of such waves, integrated over the Brillouin zone) onto the

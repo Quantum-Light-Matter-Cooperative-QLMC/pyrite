@@ -13,7 +13,7 @@
 set -uo pipefail
 CASE=$1
 ROOT=${2:-grid1001_out}
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 cd "$SLURM_SUBMIT_DIR"
 export PYRITE_HOME="$HOME/pyrite"  # shared tables; code runs from this isolated copy
 export XDG_CONFIG_HOME="$(mktemp -d)"
@@ -23,8 +23,8 @@ export PYRITE_MC_BACKEND=cuda
 export OPENBLAS_NUM_THREADS=1
 echo "code $(cat CODE_SHA) case $CASE"
 nvidia-smi --query-gpu=name,memory.total --format=csv
-uv sync -q --locked --no-default-groups --extra nvidia || exit 1
-B=(uv run --no-sync python checks/streamed_scoring_memory.py)
+pixi install --locked -e nvidia || exit 1
+B=(pixi run --as-is -e nvidia python checks/streamed_scoring_memory.py)
 OUT=$ROOT/$CASE; mkdir -p "$OUT"
 arm() {  # MODE NE BLOCK NAME
   echo "== $4"

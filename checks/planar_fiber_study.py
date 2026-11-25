@@ -2,8 +2,8 @@
 
 Heavy arms run on the lab box (remote-gpu-jobs skill); local pilots::
 
-    uv run python checks/planar_fiber_study.py run si110_5 absorbing 0 50 --out a.npz
-    uv run python checks/planar_fiber_study.py analyze si110_5 a*.npz --reference r*.npz
+    pixi run python checks/planar_fiber_study.py run si110_5 absorbing 0 50 --out a.npz
+    pixi run python checks/planar_fiber_study.py analyze si110_5 a*.npz --reference r*.npz
 
 Model: :mod:`pyrite.montecarlo.channeling.planar_fiber` (claim
 ``cr-planar-fiber-unraveling``), Si at 293.15 K, independent-string TDS plus

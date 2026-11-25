@@ -29,7 +29,7 @@ instead of extrapolating. HOPG, hBN and WSe2 (001) lack channeling thermal data
 and are listed as not computable. A supported cell that loses its data, or an
 unsupported cell that gains it, fails the gate until the table is reviewed.
 
-    PYRITE_MC_BACKEND=cpu uv run python checks/quantum_decoherence_budget.py
+    PYRITE_MC_BACKEND=cpu pixi run python checks/quantum_decoherence_budget.py
 
 Exit 0 when the limits hold in every computed cell: ``Gamma(0) = 0``;
 ``Gamma_TDS(Delta -> inf)`` saturates (relative change below 1e-3 from 100 to

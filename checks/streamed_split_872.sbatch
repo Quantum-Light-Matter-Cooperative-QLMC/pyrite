@@ -9,14 +9,14 @@
 # plus a joined W 4000 reference and an Nsight kernel summary of the streamed W arm.
 # usage (from the synced checkout root): sbatch -J s872-<sha> checks/streamed_split_872.sbatch [OUTDIR]
 set -uo pipefail
-export PATH=$HOME/.local/bin:$PATH
+export PATH=$HOME/.pixi/bin:$PATH
 cd "$SLURM_SUBMIT_DIR"
 export TMPDIR="$HOME/tmp-nsys"; mkdir -p "$TMPDIR"
 export PYRITE_HOME=/home/aamador/pyrite PYRITE_CATALOG=$PWD/src/pyrite/data/catalog PYRITE_USER_CATALOG=$(mktemp -d)/catalog
 export PYRITE_MC_BACKEND=cuda
 echo "code $(cat CODE_SHA)"
-uv sync -q --locked --package pyrite-mc --no-default-groups --extra nvidia
-B=(uv run --no-sync python checks/streamed_scoring_memory.py)
+pixi install --locked -e nvidia
+B=(pixi run --as-is -e nvidia python checks/streamed_scoring_memory.py)
 ROOT=${1:-s872_out}
 for MAT in silicon tungsten; do
   OUT=$ROOT/$MAT; mkdir -p $OUT

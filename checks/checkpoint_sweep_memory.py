@@ -1,6 +1,6 @@
 """Profile sweep retention with real campaign cases and synthetic spectra.
 
-Run: uv run python checks/checkpoint_sweep_memory.py
+Run: pixi run python checks/checkpoint_sweep_memory.py
 Each arm runs in a fresh CPU process and empty checkpoint directory. This
 isolates orchestration/storage from Monte Carlo; it is not a transport benchmark.
 Linux only: RSS and /proc I/O counters, with an 8 GiB virtual-memory cap.

@@ -12,17 +12,17 @@
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 source checks/geant4_performance/env.sh
-uv sync --extra nvidia --locked -q
+pixi install --locked -e nvidia
 out="evidence/pilot3/$SLURM_JOB_ID"; mkdir -p "$out"
 cp .pyrite-sync "$out/sync.json"
-uv run --no-sync python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
+pixi run --as-is -e nvidia python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
 for s in w-300keV-10um w-1MeV-100um; do
     for h in 10000 100000; do
         for arm in py pyc; do
             extra=()
             [[ $arm == pyc ]] && extra=(--estimator continuous --cone-mode point --chunk 1000000)
             stem="$out/$arm-$s-$h"
-            PYRITE_MC_BACKEND=cuda uv run --no-sync python checks/geant4_performance/pyrite_bench.py \
+            PYRITE_MC_BACKEND=cuda pixi run --as-is -e nvidia python checks/geant4_performance/pyrite_bench.py \
                 "$s" --histories "$h" --seed 1 --rows-per-round 1024 --device-staging \
                 "${extra[@]}" --output "$stem.json" > "$stem.log" 2>&1 || echo "FAIL $arm $s $h"
             echo "DONE $arm $s $h"

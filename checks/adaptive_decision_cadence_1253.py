@@ -1,6 +1,6 @@
 """Replay saved #1252 primary scores under decision-point stopping (#1253).
 
-Usage: uv run python checks/adaptive_decision_cadence_1253.py CAPTURE_DIR... --out REPORT
+Usage: pixi run python checks/adaptive_decision_cadence_1253.py CAPTURE_DIR... --out REPORT
 
 Selects the longest #1252 capture per (material, energy, tilt), hashes it, and
 replays the stopping rule (CPU, no transport):

@@ -10,14 +10,14 @@
 # launches/copies per char.* range for W and Si.
 # usage (from an isolated synced checkout root): sbatch -J c1005-<arm> checks/characteristic_scoring_1005.sbatch [OUTDIR] [NSYS]
 set -uo pipefail
-export PATH=$HOME/.local/bin:$PATH
+export PATH=$HOME/.pixi/bin:$PATH
 cd "$SLURM_SUBMIT_DIR"
 export TMPDIR="$HOME/tmp-nsys"; mkdir -p "$TMPDIR"
 export PYRITE_HOME=$HOME/pyrite PYRITE_CATALOG=$PWD/src/pyrite/data/catalog PYRITE_USER_CATALOG=$(mktemp -d)/catalog
 export PYRITE_MC_BACKEND=cuda
 echo "code $(cat CODE_SHA)"
-uv sync -q --locked --package pyrite-mc --no-default-groups --extra nvidia
-B=(uv run --no-sync python checks/characteristic_scoring_1005.py)
+pixi install --locked -e nvidia
+B=(pixi run --as-is -e nvidia python checks/characteristic_scoring_1005.py)
 ROOT=${1:-c1005_out}
 NSYS=${2:-1}
 for MAT in silicon tungsten tungsten/silicon; do
@@ -37,5 +37,5 @@ for MAT in silicon tungsten; do
   nsys profile --trace=cuda,nvtx --sample=none --cpuctxsw=none -o "$ROOT/$MAT/nsys" -f true \
     "${B[@]}" run streamed 20000 4096 "$ROOT/$MAT/nsys.json" "$MAT" 300 cuda 1e5 1 | tail -1
   nsys export --type sqlite -o "$ROOT/$MAT/nsys.sqlite" -f true "$ROOT/$MAT/nsys.nsys-rep" > /dev/null
-  uv run --no-sync python checks/characteristic_nsys_1005.py "$ROOT/$MAT/nsys.sqlite" | tee "$ROOT/$MAT/nsys_char.json"
+  pixi run --as-is -e nvidia python checks/characteristic_nsys_1005.py "$ROOT/$MAT/nsys.sqlite" | tee "$ROOT/$MAT/nsys_char.json"
 done

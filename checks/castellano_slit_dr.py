@@ -70,7 +70,7 @@ Only ``disc`` reproduces Fig. 8, so the agreement is conditional on that horn mo
 The thesis describes the 1998 TR station; the 2000 DR run used the same
 interferometer (PRE ref. [15]), but its installation distances are assumed.
 
-Run: ``uv run python checks/castellano_slit_dr.py`` (about 1 min).
+Run: ``pixi run python checks/castellano_slit_dr.py`` (about 1 min).
 """
 
 import sys

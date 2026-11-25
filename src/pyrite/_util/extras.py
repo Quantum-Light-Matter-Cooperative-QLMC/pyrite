@@ -20,6 +20,16 @@ EXTRA_MODULES: dict[str, tuple[str, ...]] = {
 }
 
 
+#: Extras a development checkout gets from a dedicated pixi environment; every
+#: other extra is already in the ``default`` environment.
+_EXTRA_ENVIRONMENTS = {"nvidia": "nvidia", "amd": "amd", "intel": "intel"}
+
+
+def checkout_environment(extra: str) -> str:
+    """The pixi environment of a development checkout that provides ``extra``."""
+    return _EXTRA_ENVIRONMENTS.get(extra, "default")
+
+
 class MissingExtraError(ImportError):
     """An optional dependency of a ``pyrite-mc`` extra is not installed."""
 
@@ -30,7 +40,7 @@ class MissingExtraError(ImportError):
         super().__init__(
             f"{feature} requires the optional '{extra}' extra (missing: {', '.join(missing)}). "
             f'Install with `pip install "pyrite-mc[{extra}]"` or, in a checkout, '
-            f"`uv sync --extra {extra}`."
+            f"`pixi install -e {checkout_environment(extra)}`."
         )
 
 

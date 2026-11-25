@@ -1,6 +1,6 @@
 """Bound candidate mixture moment changes over every pinned ELSEPA table.
 
-Run: uv run python checks/elsepa_interpolation_moments.py --output <path.json>
+Run: pixi run python checks/elsepa_interpolation_moments.py --output <path.json>
 Reads installed tables only; never generates/fetches them or samples tracks.
 Validation: elsepa-energy-mixture-moments
 """

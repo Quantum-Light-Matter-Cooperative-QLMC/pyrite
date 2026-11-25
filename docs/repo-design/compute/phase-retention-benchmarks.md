@@ -154,11 +154,11 @@ Flat omission alone cannot eliminate.
 ## Reproduce
 
 Sync to an isolated lab checkout with `pyrite remote sync`, install its locked
-CUDA environment with `uv sync --extra nvidia --locked`, then execute inside a
+CUDA environment with `pixi install --locked -e nvidia`, then execute inside a
 bounded SLURM allocation with the environment above:
 
 ```bash
-uv run --no-sync python checks/coherent_flat_omission.py \
+pixi run --as-is python checks/coherent_flat_omission.py \
   --electrons 200 --physical-electrons 200 --thickness-ang 50000 \
   --bunch-rms-fs 0.001 --trajectory results/phase365/thick-short.h5 \
   --phase-policy --repeats 7 --route eager

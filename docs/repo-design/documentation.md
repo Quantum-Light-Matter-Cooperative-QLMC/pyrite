@@ -426,13 +426,13 @@ For the first example, explicitly regenerate with installed reference tables:
 
 ```bash
 MPLCONFIGDIR=/tmp/pyrite-matplotlib PYRITE_MC_BACKEND=cpu \
-  uv run python docs/_tutorials.py --regenerate python_api_workflow
+  pixi run python docs/_tutorials.py --regenerate python_api_workflow
 ```
 
 The results tutorial loads an existing single-case quickstart checkpoint:
 
 ```bash
-uv run python docs/_tutorials.py --regenerate working_with_results \
+pixi run python docs/_tutorials.py --regenerate working_with_results \
   --input pyrite-output/checkpoints/hopg@quickstart-cdf8eed9af74
 ```
 
@@ -472,7 +472,7 @@ cache:
 
 ```bash
 pyrite app validation reproduce          # or --remote, then pull the cache back
-uv run python scripts/export_docs_demo.py
+pixi run python scripts/export_docs_demo.py
 ```
 
 The export refuses a missing or stale cache and never reruns the reproduction.
@@ -553,10 +553,10 @@ First-time migration from the old iframe wrappers, after syncing docs dependenci
 and acquiring reference tables, is explicit:
 
 ```bash
-uv lock
-uv run --group docs --extra optimization python docs/_notebooks.py --regenerate-all
-uv run --group docs python docs/_notebooks.py --check
-uv run --group docs sphinx-build -j auto -b html -W --keep-going docs docs/_build/html
+pixi lock
+pixi run python docs/_notebooks.py --regenerate-all
+pixi run python docs/_notebooks.py --check
+pixi run sphinx-build -j auto -b html -W --keep-going docs docs/_build/html
 ```
 
 The `optimization` extra supplies Optuna for notebook 11. Regeneration uses the
@@ -573,15 +573,15 @@ earlier successful captures remain published. The migration carries over each pa
 `Continue learning` links and canonical-source download. The author-controlled
 Molab badge is inserted immediately after the native notebook title, never into
 Marimo source. Repeated regeneration uses stored page metadata. Commit the
-`.ipynb` captures, removed `.md` wrappers and updated `uv.lock` together.
+`.ipynb` captures, removed `.md` wrappers and updated `pixi.lock` together.
 
 For subsequent notebook changes, regenerate only the affected capture, then
 check and review its rendered plots, source digest, and scientific limitations:
 
 ```bash
-uv run --group docs python docs/_notebooks.py --regenerate 03-pxr-line-energies
-uv run --group docs python docs/_notebooks.py --check
-uv run marimo edit docs/notebooks/01-first-spectrum.py
+pixi run python docs/_notebooks.py --regenerate 03-pxr-line-energies
+pixi run python docs/_notebooks.py --check
+pixi run marimo edit docs/notebooks/01-first-spectrum.py
 ```
 
 CUDA tutorials (`backend = "cuda"`) are regenerated on the lab GPU whenever it
@@ -608,7 +608,7 @@ tutorials it affects.
 Upgrade existing byte-hash or v1-fingerprint captures without execution using:
 
 ```bash
-uv run --group docs python docs/_notebooks.py --migrate-hashes
+pixi run python docs/_notebooks.py --migrate-hashes
 ```
 
 Migration requires the exact captured source, recovered by its byte digest from
@@ -622,7 +622,7 @@ For prose-only edits, explicitly refresh the generated page without rerunning
 unchanged computation:
 
 ```bash
-uv run --group docs python docs/_notebooks.py --refresh-page 11-optimizing-xray-source
+pixi run python docs/_notebooks.py --refresh-page 11-optimizing-xray-source
 ```
 
 This exports without execution and preserves outputs only when all exported

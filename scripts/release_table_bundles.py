@@ -6,8 +6,8 @@ The record (concept DOI 10.5281/zenodo.23220627) holds one zip and one
 Usage::
 
     # 1. Install the pinned datasets, then stage the upload set.
-    UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite tables fetch
-    UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run python scripts/release_table_bundles.py \\
+    pixi run pyrite tables fetch
+    pixi run python scripts/release_table_bundles.py \\
         build --version 2 --archives build/xsgen-release
 
     # 2. In Zenodo, choose "New version" on the table record, upload every
@@ -15,7 +15,7 @@ Usage::
     #    zenodo-metadata.json, apply the metadata, and publish.
 
     # 3. Pin the published record and check its bytes.
-    UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run python scripts/release_table_bundles.py \\
+    pixi run python scripts/release_table_bundles.py \\
         pin --record 12345678
 
 ``build`` reuses local copies of the pinned table archives from

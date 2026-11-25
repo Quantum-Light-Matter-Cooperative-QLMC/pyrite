@@ -5,9 +5,9 @@ worked far-IR example. Install the apps extra, then launch the Plotly optical
 diagnostic:
 
 ```bash
-uv run pyrite app optical-diagnostics launch
-uv run pyrite app optical-diagnostics launch --smoke
-uv run pyrite app optical-diagnostics export
+pixi run pyrite app optical-diagnostics launch
+pixi run pyrite app optical-diagnostics launch --smoke
+pixi run pyrite app optical-diagnostics export
 ```
 
 The initial page performs no numerical calculation. Select a view and click its

@@ -1,6 +1,6 @@
 """Compare full/selected HDF5 reads with identical warm-cache inputs.
 
-Run: uv run python checks/checkpoint_selective_memory.py
+Run: pixi run python checks/checkpoint_selective_memory.py
 Synthetic spectral storage benchmark; no simulation or physics claim.
 Linux peak RSS includes interpreter/import overhead. Each read runs in a fresh
 process; fixture generation runs separately so its peak cannot contaminate RSS.

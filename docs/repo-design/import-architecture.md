@@ -14,9 +14,9 @@ review.
 From a checkout, before and after each slice:
 
 ```bash
-uv run pyrite-dev repo-map --json > /tmp/pyrite-package-imports.json
-uv run pyrite-dev repo-map --check
-uv run lint-imports
+pixi run pyrite-dev repo-map --json > /tmp/pyrite-package-imports.json
+pixi run pyrite-dev repo-map --check
+pixi run lint-imports
 ```
 
 The JSON contains sorted exact module-level import pairs, collapsed

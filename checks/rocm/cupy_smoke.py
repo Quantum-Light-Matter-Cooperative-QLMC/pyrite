@@ -4,7 +4,7 @@
 a file; job 3590 defined it in a stdin heredoc and the JIT check failed for that
 reason alone.
 
-    uv run --no-sync python checks/rocm/cupy_smoke.py
+    pixi run --as-is -e nvidia python checks/rocm/cupy_smoke.py
 """
 
 import sys

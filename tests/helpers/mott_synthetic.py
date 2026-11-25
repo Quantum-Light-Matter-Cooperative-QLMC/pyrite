@@ -12,7 +12,7 @@ Because ``log10 alpha`` is linear in ``log10 E``, interpolating these nodes is
 exact, so a "mott" run over them reproduces the analytic screened-Rutherford
 angles everywhere on the 10 eV - 100 MeV grid.
 
-Regenerate with ``uv run python -m tests.helpers.mott_synthetic``.
+Regenerate with ``pixi run python -m tests.helpers.mott_synthetic``.
 """
 
 from pathlib import Path

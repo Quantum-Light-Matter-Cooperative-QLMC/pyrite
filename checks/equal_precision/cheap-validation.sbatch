@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1 MPLBACKEND=Agg
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1 MPLBACKEND=Agg
 export G4LEDATA="$HOME/.local/opt/pyrite-issue-182/geant4/share/Geant4/data/EMLOW8.8"
 export G4ENSDFSTATEDATA="$HOME/.local/opt/pyrite-issue-182/geant4/share/Geant4/data/ENSDFSTATE3.0"
 export LD_LIBRARY_PATH="$HOME/.local/opt/pyrite-issue-182/geant4/lib:${LD_LIBRARY_PATH:-}"
@@ -29,7 +29,7 @@ else
   tar -czf "$out/geant4-source.tar.gz" -C "$g4" source
 fi
 set +e
-"$HOME/.local/bin/uv" run --no-sync python checks/equal_precision/run_cheap_validation.py "$1" "$out"
+"${PYRITE_REMOTE_PIXI:-$HOME/.pixi/bin/pixi}" run --as-is -e nvidia python checks/equal_precision/run_cheap_validation.py "$1" "$out"
 status=$?
 set -e
 find "$out" -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > "$out/SHA256SUMS"

@@ -9,15 +9,15 @@ precision, never Monte Carlo.
 ``REAL`` is fixed when :mod:`pyrite._backend` is imported, so each backend and
 precision is its own process:
 
-    uv run python checks/line_window_backend_agreement.py transport --out p.pkl
-    PYRITE_MC_BACKEND=cpu  uv run python checks/line_window_backend_agreement.py \\
+    pixi run python checks/line_window_backend_agreement.py transport --out p.pkl
+    PYRITE_MC_BACKEND=cpu  pixi run python checks/line_window_backend_agreement.py \\
         evaluate --payload p.pkl --out cpu64.npz --expect-dtype float64
-    PYRITE_MC_BACKEND=cuda uv run python checks/line_window_backend_agreement.py \\
+    PYRITE_MC_BACKEND=cuda pixi run python checks/line_window_backend_agreement.py \\
         evaluate --payload p.pkl --out gpu32.npz --expect-dtype float32
-    PYRITE_FP64=1 PYRITE_MC_BACKEND=cuda uv run python \\
+    PYRITE_FP64=1 PYRITE_MC_BACKEND=cuda pixi run python \\
         checks/line_window_backend_agreement.py evaluate --payload p.pkl \\
         --out gpu64.npz --expect-dtype float64
-    uv run python checks/line_window_backend_agreement.py compare \\
+    pixi run python checks/line_window_backend_agreement.py compare \\
         --reference cpu64.npz --candidate gpu64.npz --candidate gpu32.npz
 
 The grid is the real thing: seeds from the registered providers, merged by

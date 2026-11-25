@@ -12,19 +12,19 @@
 #SBATCH --output=verify825-%j.log
 set -uo pipefail
 cd "$SLURM_SUBMIT_DIR"
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 export PYRITE_HOME="$HOME/pyrite" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$PWD/user-catalog" XDG_CONFIG_HOME="$PWD/.xdg-config"
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=8
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache PYRITE_MC_BACKEND=cuda
+export PYRITE_MC_BACKEND=cuda
 out="evidence/verify825/$SLURM_JOB_ID"; mkdir -p "$out"
 cp CODE_SHA "$out/" 2>/dev/null || true
-uv sync --package pyrite-mc --no-default-groups --group test --extra nvidia --locked -q
-PYRITE_SLOW_TESTS=1 uv run --no-sync python -m pytest -q -p no:cacheprovider \
+pixi install --locked -e nvidia
+PYRITE_SLOW_TESTS=1 pixi run --as-is -e nvidia python -m pytest -q -p no:cacheprovider \
     tests/montecarlo/transport/test_transport_continuation_cuda.py tests/montecarlo/transport/test_transport_continuation.py \
     > "$out/tests.log" 2>&1
 echo "rc=$? tests"
-uv run --no-sync python checks/equal_precision/prepare_stopping.py > /dev/null
+pixi run --as-is -e nvidia python checks/equal_precision/prepare_stopping.py > /dev/null
 for seed in 1 2 3; do
     modes=(host host-numpy staging); (( seed % 2 == 0 )) && modes=(staging host-numpy host)
     for s in w-1MeV-100um si-300keV-100um; do
@@ -35,7 +35,7 @@ for seed in 1 2 3; do
             [[ $mode == staging ]] && flags+=(--device-staging)
             [[ $mode == host-numpy ]] && env+=(SPILL_PROBE_NUMPY_DST=1)
             env "${env[@]}" SPILL_PROBE_RSS="$stem.rss.json" PYRITE_MC_TRANSPORT_SCHEDULE=continuation PV_NTHREADS=32 \
-                /usr/bin/time -v -o "$stem.time" timeout 600 uv run --no-sync python \
+                /usr/bin/time -v -o "$stem.time" timeout 600 pixi run --as-is -e nvidia python \
                 checks/geant4_performance/spill825_probe.py \
                 --variant exact --bench checks/geant4_performance/pyrite_bench.py --stats "$stem.stats.json" \
                 "$s" --histories 8000 --block 8000 --seed "$seed" "${flags[@]}" --no-audit \

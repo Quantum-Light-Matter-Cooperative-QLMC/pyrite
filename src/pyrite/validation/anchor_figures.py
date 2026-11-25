@@ -31,7 +31,7 @@ runs the (slow) MC, writes figures/, and prints the validation tables. The Zhai
 section of src/pyrite/apps/validation_app.py is the thin interactive wrapper.
 
 Run (CPU-force on a box with the cupy wheel but no CUDA device):
-  uv run python -c "import sys;sys.modules['cupy']=None;from pyrite.validation.anchor_figures import main;main()"
+  pixi run python -c "import sys;sys.modules['cupy']=None;from pyrite.validation.anchor_figures import main;main()"
 """
 
 import hashlib

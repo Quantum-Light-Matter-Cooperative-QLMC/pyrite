@@ -47,7 +47,7 @@ introduced; this script reports that filtered comparison alongside the
 unfiltered one so a reviewer can see whether filtering amplifies or damps
 the reconstruction error for partially covered pixels.
 
-Run: `uv run python checks/pixel_reconstruction_oracle.py --help`
+Run: `pixi run python checks/pixel_reconstruction_oracle.py --help`
 Named geometry presets and explicit statistics/output arguments make remote
 evidence runs reproducible without editing this file on the lab box.
 The three fixed seeds below exercise both transport and the Timepix response;

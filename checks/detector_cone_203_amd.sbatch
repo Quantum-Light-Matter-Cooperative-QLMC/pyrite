@@ -8,19 +8,18 @@
 #SBATCH -o cone203-amd-%j.log
 # Experimental pilot only; no independent validation or characteristic tally.
 set -euo pipefail
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 cd "$SLURM_SUBMIT_DIR"
 export PYRITE_HOME="$PWD"
 export PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$PWD/user-catalog"
-export UV_PROJECT_ENVIRONMENT="$PWD/.venv-amd"
 export OPENBLAS_NUM_THREADS=1
 source src/pyrite/remote/rocm_build_env.sh
 _pyrite_rocm_env "$PWD"
 export PYRITE_MC_BACKEND=rocm
 echo "code $(cat CODE_SHA)"
-uv sync --locked --no-default-groups --extra amd
-B=(uv run --no-sync python checks/detector_cone_variance_reduction.py)
+pixi install --locked -e amd
+B=(pixi run --as-is -e amd python checks/detector_cone_variance_reduction.py)
 OUT=${1:-cone203_amd_out}
 mkdir -p "$OUT"
 for SCENE in hbn5 hopg15 hopg30; do

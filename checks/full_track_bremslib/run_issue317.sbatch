@@ -17,5 +17,5 @@ export NUMBA_NUM_THREADS=1 OMP_NUM_THREADS=1
 mkdir -p "$D/i317_out"
 OUT="$D/i317_out/${CASE}_${EL}_${IN}_${AT}_b${B}.json"
 [ -s "$OUT" ] && exit 0
-"${PYRITE_REMOTE_UV:-$HOME/.local/bin/uv}" run --frozen python "$D/prod_bench.py" \
+"${PYRITE_REMOTE_PIXI:-$HOME/.pixi/bin/pixi}" run --frozen python "$D/prod_bench.py" \
   "$CASE" "$EL" "$ST" "$IN" "$NE" "$OUT" "$B" "$AT"

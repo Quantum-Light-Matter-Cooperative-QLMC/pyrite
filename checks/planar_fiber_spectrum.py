@@ -2,8 +2,8 @@
 
 Heavy arms run on the lab box (remote-gpu-jobs skill); local pilots::
 
-    uv run python checks/planar_fiber_spectrum.py run demo_17 0 20 --out a.npz
-    uv run python checks/planar_fiber_spectrum.py analyze demo_17 a*.npz --out report.json
+    pixi run python checks/planar_fiber_spectrum.py run demo_17 0 20 --out a.npz
+    pixi run python checks/planar_fiber_spectrum.py analyze demo_17 a*.npz --out report.json
 
 Model: :func:`pyrite.montecarlo.channeling.planar_fiber.planar_on_axis_source`
 (claim ``cr-planar-fiber-regression``): the on-axis two-time source of the

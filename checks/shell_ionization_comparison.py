@@ -22,8 +22,8 @@ Exit 0 pass, 1 fail, 2 skip (parameters not installed).
 Validation: eedl-shell-ionization-comparison
 
 Run:
-  PYRITE_MC_BACKEND=cpu uv run python checks/shell_ionization_comparison.py --download
-  PYRITE_MC_BACKEND=cpu uv run python checks/shell_ionization_comparison.py --output REPORT.json
+  PYRITE_MC_BACKEND=cpu pixi run python checks/shell_ionization_comparison.py --download
+  PYRITE_MC_BACKEND=cpu pixi run python checks/shell_ionization_comparison.py --output REPORT.json
 """
 
 import argparse

@@ -10,7 +10,7 @@
 # per-electron core); add `--gres=gpu:1` (Hoffman2: `--constraint 'A100|H200'`) at submit.
 # ARGS: the full argument list of checks/detector_cone_acceptance_379.py (mode first).
 set -euo pipefail
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 cd "$SLURM_SUBMIT_DIR"
 export PYRITE_HOME="$PWD"
 export PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
@@ -20,16 +20,14 @@ if [ "${GPU:-0}" = 1 ]; then
     . /u/local/Modules/default/init/modules.sh
     module load cuda
   fi
-  export UV_PROJECT_ENVIRONMENT="$PWD/.venv-gpu"
   sync_extra=(--extra nvidia)
 else
-  export UV_PROJECT_ENVIRONMENT="$PWD/.venv-cpu"
   sync_extra=()
 fi
 export OPENBLAS_NUM_THREADS=1
 export NUMBA_NUM_THREADS="${SLURM_CPUS_PER_TASK:-16}"
 echo "code $(cat CODE_SHA 2>/dev/null || echo unknown)"
-uv sync --locked --no-default-groups "${sync_extra[@]}"
+pixi install --locked -e nvidia "${sync_extra[@]}"
 nvidia-smi -L 2>/dev/null || true
 read -r -a argv <<<"${ARGS:?set ARGS}"
-uv run --no-sync python checks/detector_cone_acceptance_379.py "${argv[@]}"
+pixi run --as-is -e nvidia python checks/detector_cone_acceptance_379.py "${argv[@]}"

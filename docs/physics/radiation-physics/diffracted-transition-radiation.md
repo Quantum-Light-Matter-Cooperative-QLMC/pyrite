@@ -152,8 +152,8 @@ inspect the signed interference spectrum rather than interpreting this as
 a flux enhancement.
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache MPLCONFIGDIR=/tmp/pyrite-mpl \
-  uv run python -m pyrite.validation.dtr_reference \
+MPLCONFIGDIR=/tmp/pyrite-mpl \
+  pixi run python -m pyrite.validation.dtr_reference \
   --output-dir /tmp/pyrite-dtr-reference
 ```
 
@@ -306,8 +306,8 @@ homogeneous TR/CTR implementation.
 The same alternating reference stack can be scored with both diagnostics:
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache MPLCONFIGDIR=/tmp/pyrite-mpl \
-  uv run python -m pyrite.validation.dtr_reference --two-beam \
+MPLCONFIGDIR=/tmp/pyrite-mpl \
+  pixi run python -m pyrite.validation.dtr_reference --two-beam \
   --output-dir /tmp/pyrite-dtr-two-beam
 ```
 

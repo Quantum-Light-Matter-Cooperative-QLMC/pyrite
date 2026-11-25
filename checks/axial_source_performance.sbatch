@@ -8,8 +8,7 @@
 #SBATCH --output=runs/profile1154-%A-%a.log
 # Run from the isolated synced checkout root. GPU comparison submitted separately.
 set -euo pipefail
-export PATH=$HOME/.local/bin:$PATH
-export UV_PROJECT_ENVIRONMENT=/tmp/pyrite-1154-cpu UV_CACHE_DIR=/tmp/pyrite-uv-cache
+export PATH=$HOME/.pixi/bin:$PATH
 export PYRITE_MC_BACKEND=cpu
 export PYRITE_HOME=$PWD PYRITE_CATALOG=$PWD/src/pyrite/data/catalog PYRITE_USER_CATALOG=$PWD/user-catalog
 export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
@@ -34,4 +33,4 @@ case $probe in
 esac
 # Worker/batch comparisons all use exactly B and identical IDs/seed.
 if (( probe >= 9 )); then case_key=B; fi
-uv run --frozen python checks/axial_source_performance.py --case "$case_key" "${args[@]}" --out "runs/profile-$SLURM_ARRAY_TASK_ID.json"
+pixi run --frozen python checks/axial_source_performance.py --case "$case_key" "${args[@]}" --out "runs/profile-$SLURM_ARRAY_TASK_ID.json"

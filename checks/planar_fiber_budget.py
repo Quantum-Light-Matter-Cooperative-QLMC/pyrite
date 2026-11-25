@@ -44,8 +44,8 @@ bound of all bins.
 
 Usage::
 
-    uv run python checks/planar_fiber_budget.py run demo_17 0 100 --out-dir scratch/budget
-    uv run python checks/planar_fiber_budget.py analyze demo_17 scratch/budget --out report.json
+    pixi run python checks/planar_fiber_budget.py run demo_17 0 100 --out-dir scratch/budget
+    pixi run python checks/planar_fiber_budget.py analyze demo_17 scratch/budget --out report.json
 
 Validation: cr-planar-fiber-unraveling
 """

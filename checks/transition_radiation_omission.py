@@ -8,7 +8,7 @@ lines and CXR only make the comparison more favourable). The decision rule is
 observable can draw from. Small runs; the TR solve follows PYRITE_MC_BACKEND
 (NumPy or CuPy, complex128 on both). No remote compute needed.
 
-    PYRITE_MC_BACKEND=cpu uv run python checks/transition_radiation_omission.py \
+    PYRITE_MC_BACKEND=cpu pixi run python checks/transition_radiation_omission.py \
         [--trials 100] [--json out.json]
 
 Validation: tr-detected-omission-bound

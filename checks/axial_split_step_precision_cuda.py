@@ -3,7 +3,7 @@
 Research measurement only; production axial MCWF stays complex128. Run in a
 bounded remote GPU allocation (remote-gpu-jobs skill)::
 
-    uv run --extra nvidia python checks/axial_split_step_precision_cuda.py --out precision.json
+    pixi run -e nvidia python checks/axial_split_step_precision_cuda.py --out precision.json
 
 The deterministic no-jump Strang step of ``AxialMCWF`` (half kinetic phase,
 complex potential with absorptive loss, half kinetic phase; Validation:

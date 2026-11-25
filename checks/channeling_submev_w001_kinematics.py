@@ -2,7 +2,7 @@
 
 Run from the repository root with::
 
-    PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=4 uv run python checks/channeling_submev_w001_kinematics.py
+    PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=4 pixi run python checks/channeling_submev_w001_kinematics.py
 
 For a potential ``V`` independent of the axial coordinate ``z``, the
 spin-free Klein--Gordon equation ``[(E - V)^2 - c^2 p^2 - m^2 c^4] psi = 0``

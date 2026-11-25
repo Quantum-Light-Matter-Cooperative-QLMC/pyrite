@@ -17,7 +17,7 @@ stores the Z-mean ``p`` and refits ``s`` at it. Below 2 MeV the implied
 it, so ``p = 1`` and ``s`` meets ``etabar`` alone. It prints the per-element
 fits, the stored values and the residuals of both constraints.
 
-    uv run python checks/sb85_eta_small_kappa_fit.py
+    pixi run python checks/sb85_eta_small_kappa_fit.py
 
 Validation: bremslib-electron-electron
 """

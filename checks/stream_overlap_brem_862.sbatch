@@ -14,16 +14,16 @@
 # usage (from an isolated synced checkout root): sbatch -J ob862-<sha> checks/stream_overlap_brem_862.sbatch [OUTDIR]
 set -uo pipefail
 shopt -s nullglob
-export PATH=$HOME/.local/bin:$PATH
+export PATH=$HOME/.pixi/bin:$PATH
 cd "$SLURM_SUBMIT_DIR"
 export PYRITE_HOME=$HOME/pyrite PYRITE_CATALOG=$PWD/src/pyrite/data/catalog PYRITE_USER_CATALOG=$(mktemp -d)/catalog
 export PYRITE_MC_BACKEND=cuda
 CASES=${CASES:-"silicon 2097152 131072;silicon 16777216 1048576;tungsten 2097152 65536;tungsten 8388608 65536"}
 echo "code $(cat CODE_SHA)"; nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv
-uv sync -q --locked --package pyrite-mc --no-default-groups --extra nvidia
-B=(uv run --no-sync python checks/streamed_scoring_memory.py)
+pixi install --locked -e nvidia
+B=(pixi run --as-is -e nvidia python checks/streamed_scoring_memory.py)
 ROOT=${1:-ob862_out}; mkdir -p "$ROOT"
-summary() { uv run --no-sync python -c 'import json,sys; r=json.load(open(sys.argv[1])); print(json.dumps({k: r.get(k) for k in ("wall_s", "phase_s", "n_segments", "host_peak_MiB", "device_pool_peak_above_base_MiB")}))' "$1"; }
+summary() { pixi run --as-is -e nvidia python -c 'import json,sys; r=json.load(open(sys.argv[1])); print(json.dumps({k: r.get(k) for k in ("wall_s", "phase_s", "n_segments", "host_peak_MiB", "device_pool_peak_above_base_MiB")}))' "$1"; }
 STREAM_CXR=none "${B[@]}" run streamed 1000 1024 "$ROOT/warmup.json" tungsten 300 cuda > /dev/null
 IFS=';' read -ra CASE_LIST <<< "$CASES"
 for CASE in "${CASE_LIST[@]}"; do

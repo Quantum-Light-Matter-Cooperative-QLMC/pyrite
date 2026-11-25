@@ -63,10 +63,10 @@ accepted tolerances for slices F--H.
 
 Validation: energy-step-convergence
 
-Run:  uv run python checks/energy_step_convergence_matrix.py
-      uv run python checks/energy_step_convergence_matrix.py --quick
-      uv run python checks/energy_step_convergence_matrix.py --part c
-      uv run python checks/energy_step_convergence_matrix.py --part d
+Run:  pixi run python checks/energy_step_convergence_matrix.py
+      pixi run python checks/energy_step_convergence_matrix.py --quick
+      pixi run python checks/energy_step_convergence_matrix.py --part c
+      pixi run python checks/energy_step_convergence_matrix.py --part d
 """
 
 import argparse

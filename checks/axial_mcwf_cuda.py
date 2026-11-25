@@ -1,6 +1,6 @@
 """Real-hardware axial MCWF benchmark; run only in bounded remote GPU allocation.
 
-Stage with ``pyrite remote sync``; use ``uv run --extra nvidia python
+Stage with ``pyrite remote sync``; use ``pixi run -e nvidia python
 checks/axial_mcwf_cuda.py``. Complex128 CPU/CUDA, same crystal/grid/seed/depth,
 CPU and CUDA independent Philox algorithms. Target declared before tuning:
 >= 2x warm end-to-end speedup on the 48²/128-electron/100-step workload.

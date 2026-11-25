@@ -55,7 +55,7 @@ BremsLib table digests in these records match the verified-pin emission runs
 below, so these results are retained. These 10,000-primary records predate
 batching; batch 0 of the current driver uses the same seed. The Slurm script
 `run_cpu.sbatch` runs photon cutoffs of 1, 5 and 10 keV: 10,000 primaries at
-1 keV and 3,000 at each higher cutoff. It requires a staged checkout and uv
+1 keV and 3,000 at each higher cutoff. It requires a staged checkout and pixi
 environment on the remote CPU node. The exact JSON summaries and compressed CPU log are
 in `results/`; table keys and digests are in each JSON record.
 
@@ -65,7 +65,7 @@ directory (`sbatch` with no path assumptions beyond the following):
 - `PYRITE_BENCH_ROOT`: staging directory holding the pinned `pyrite/` checkout
   (`pyrite-fa20e0dd/` for `run_emission.sbatch`) and `test_benchmark.py`. It
   defaults to the submission directory; `run_emission.sbatch` requires it.
-- `PYRITE_REMOTE_UV`: `uv` executable, default `$HOME/.local/bin/uv`. Use an
+- `PYRITE_REMOTE_PIXI`: `pixi` executable, default `$HOME/.pixi/bin/pixi`. Use an
   absolute path; a literal `~` is not expanded here.
 - Slurm logs (`--output`) are written to the submission directory. The scripts
   pin no node; add `sbatch -w NODE` (and `-p PARTITION` if your site does not
@@ -320,7 +320,7 @@ job 928 (commit `0b826c10`, 2026-10-04) are archived in
 `results/issue317_records.json.gz`. Recompute the comparison with:
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run python checks/full_track_bremslib/compare_issue317.py
+pixi run python checks/full_track_bremslib/compare_issue317.py
 ```
 
 It exits non-zero unless every continuous-mode case has 100,000 primaries

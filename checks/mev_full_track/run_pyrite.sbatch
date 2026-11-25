@@ -2,7 +2,7 @@
 # Issue #439: PyRITE side of the MeV full-track benchmark. Task i runs shard
 # (i-1) % 10 (10,000 primaries, batches 200*shard onward) of case (i-1) / 10 in
 # the fixed order below. Submit from the staging root; PYRITE_CHECKOUT is a
-# synced checkout with its uv environment, PYRITE_REMOTE_UV the uv binary.
+# synced checkout with its pixi environment, PYRITE_REMOTE_PIXI the pixi binary.
 #SBATCH --job-name=issue439-pyrite
 #SBATCH --partition=cpu
 #SBATCH --cpus-per-task=1
@@ -17,5 +17,5 @@ i=$((SLURM_ARRAY_TASK_ID - 1))
 CASE=${CASES[$((i / 10))]}
 SHARD=$((i % 10))
 cd "$PYRITE_CHECKOUT"
-"${PYRITE_REMOTE_UV:-$HOME/.local/bin/uv}" run --no-sync python "$ROOT/pyrite_bench.py" \
+"${PYRITE_REMOTE_PIXI:-$HOME/.pixi/bin/pixi}" run --as-is python "$ROOT/pyrite_bench.py" \
   "$CASE" 10000 $((200 * SHARD)) "$ROOT/results/${CASE}_pyrite_${SHARD}.npz"

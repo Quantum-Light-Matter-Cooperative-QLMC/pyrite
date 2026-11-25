@@ -19,7 +19,7 @@ Two quantities per case:
 
 Run with the pinned optional dependency:
 
-    uv run --group oracle python checks/xraylib_cascade_oracle.py
+    pixi run python checks/xraylib_cascade_oracle.py
 
 Missing xraylib returns 2; threshold violations return 1. This is
 implementation-side external evidence, not a human physics sign-off.
@@ -109,7 +109,7 @@ def main() -> int:
         import xraylib as xrl
     except ImportError as exc:
         print(exc)
-        print("RESULT: SKIP — rerun with `uv run --group oracle`.")
+        print("RESULT: SKIP — rerun with `pixi run`.")
         return 2
 
     rows = []

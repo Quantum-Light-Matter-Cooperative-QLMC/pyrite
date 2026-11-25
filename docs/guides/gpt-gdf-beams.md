@@ -101,5 +101,5 @@ checks reject stale output; explicit regeneration runs import and transport:
 <!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
 MPLCONFIGDIR=/tmp/pyrite-matplotlib PYRITE_MC_BACKEND=cpu \
-  uv run python docs/_tutorials.py --regenerate gpt_gdf_beams
+  pixi run python docs/_tutorials.py --regenerate gpt_gdf_beams
 ```

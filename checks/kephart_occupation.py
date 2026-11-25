@@ -19,7 +19,7 @@ assumed.
 Heavy sweeps belong on ``pyrite remote`` (SLURM); one case at the default grid
 runs locally in about a minute::
 
-    PYRITE_MC_BACKEND=cpu uv run python checks/kephart_occupation.py \
+    PYRITE_MC_BACKEND=cpu pixi run python checks/kephart_occupation.py \
         --cases si110_17 --margins inf --orders 24 --cells 16 --dz 250 --out k.json
 
 ``--backend cuda`` runs the depth step on the GPU (#1125); the anchor settings

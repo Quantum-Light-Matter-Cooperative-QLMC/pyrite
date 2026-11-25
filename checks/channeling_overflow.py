@@ -6,7 +6,7 @@ loss counts repeated jumps and need not be at most one. A failed closure
 is retained as a negative result, never normalized into a successful tail.
 Fixed energy, no stopping or returning flux. No production launch is changed.
 
-    PYRITE_MC_BACKEND=cpu uv run python checks/channeling_overflow.py \\
+    PYRITE_MC_BACKEND=cpu pixi run python checks/channeling_overflow.py \\
         --orders 16 --cells 16 --tail-orders 32 64 --out overflow.json
 
 Exit 0 only when every requested transfer window passes closure; otherwise 1.

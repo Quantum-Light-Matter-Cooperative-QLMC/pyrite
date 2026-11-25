@@ -105,7 +105,7 @@ def _parse_info(
             raise MaterialConfigError(
                 (
                     "required dependency 'gemmi' is not installed; "
-                    "install the project environment with `uv sync`",
+                    "install pyrite-mc with its dependencies, or run `pixi install` in a checkout",
                 )
             ) from None
         raise

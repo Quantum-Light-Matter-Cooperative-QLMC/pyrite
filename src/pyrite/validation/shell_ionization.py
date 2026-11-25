@@ -89,7 +89,7 @@ def load_bote_salvat(
         download=download,
         missing=BoteSalvatUnavailableError,
         hint="fetch the Bote-Salvat parameters with "
-        "`uv run python checks/shell_ionization_comparison.py --download` "
+        "`pixi run python checks/shell_ionization_comparison.py --download` "
         f"or set {BOTE_SALVAT_ENV}",
     )
     return parse_bote_salvat(data.decode("utf-8"))

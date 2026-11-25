@@ -39,20 +39,14 @@ def _():
     def run_checks(filenames, force_cpu):
         """Run selected standalone checks and retain their complete console reports.
 
-        The Dans_Diffraction oracle is a non-default `uv` dependency group, so
-        its check always launches through `uv run --group oracle`: that syncs
-        the pinned dependency into the shared venv on demand, regardless of
-        whether a plain `uv sync`/`uv run` (which does not include optional
-        groups) most recently stripped it back out.
+        Every check runs on this interpreter. The pinned Dans_Diffraction
+        oracle is in the `oracle` dependency group, which the default pixi
+        environment includes; elsewhere its check reports itself skipped.
         """
         reports = []
         for filename in filenames:
             path = checks_dir / filename
-            interpreter = (
-                ["uv", "run", "--group", "oracle", "python"]
-                if filename == "dans_diffraction_oracle.py"
-                else [sys.executable]
-            )
+            interpreter = [sys.executable]
             env = None
             if force_cpu:
                 command = [
@@ -280,7 +274,7 @@ def _(mo):
         - The applicability audit intentionally emits warnings for recoil and long
           coherent lengths. Those warnings are results, not test failures.
         - The pinned Dans_Diffraction oracle is thresholded and fail-closed;
-          launch with `uv run --group oracle` or its report is marked **Skipped**.
+          launch from the default pixi environment (`pixi run`) or its report is marked **Skipped**.
         """),
         kind="warn",
     )
@@ -355,7 +349,7 @@ def _(check_authorities, check_reports, mo):
         authority = check_authorities[name]
         if authority == "Optional oracle" and "result: skip" in report["output"].lower():
             state = "Skipped"
-            next_action = "Run under `uv run --group oracle` to install the pinned dependency."
+            next_action = "Run from the default pixi environment, which pins the oracle."
         elif report["returncode"] != 0:
             state = "Failed"
             next_action = "Inspect full report and fix failure."

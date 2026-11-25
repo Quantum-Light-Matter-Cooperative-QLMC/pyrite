@@ -32,7 +32,7 @@ Zhai setup) -- four independent validity parameters are printed:
 4. REC  = E_photon / E_kinetic : quantum recoil (classical-trajectory)
    parameter; the paper keeps this < 5%.
 
-Run: uv run python checks/kinematic_validity_check.py
+Run: pixi run python checks/kinematic_validity_check.py
 """
 
 import numpy as np

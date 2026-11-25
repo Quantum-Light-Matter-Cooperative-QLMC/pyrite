@@ -1,6 +1,6 @@
 """Run one #821 benchmark arm with a study-only polar interpolation switch.
 
-Run from checkout: uv run python checks/elsepa_statistical/run.py
+Run from checkout: pixi run python checks/elsepa_statistical/run.py
     --law quantile|mixture <pyrite_bench.py arguments>
 Fresh subprocess per arm; no checkpoint reuse and no production defaults changed.
 """

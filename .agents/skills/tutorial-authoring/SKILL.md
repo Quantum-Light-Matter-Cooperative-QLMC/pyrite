@@ -33,7 +33,7 @@ packaged marimo applications (which use `notebook-workflow`).
 - Cross-link related how-to, API, Physics and Validation pages instead of
   turning the notebook into a manual.
 
-Validate with `uv run marimo check <notebook.py>` and the focused source,
+Validate with `pixi run marimo check <notebook.py>` and the focused source,
 public-import and scientific checks; run
-`uv run pyrite-dev docs`. Use `uv run pyrite-dev sync-skills` and
-`uv run pyrite-dev check-skills` if this canonical skill changes.
+`pixi run pyrite-dev docs`. Use `pixi run pyrite-dev sync-skills` and
+`pixi run pyrite-dev check-skills` if this canonical skill changes.

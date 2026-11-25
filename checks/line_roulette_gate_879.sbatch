@@ -9,7 +9,7 @@
 # h-BN reproduces #203's energy/thickness/orientation, using #872's scoring
 # settings and explicit grid. This is a timing gate, not a yield reproduction.
 set -euo pipefail
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 cd "$SLURM_SUBMIT_DIR"
 export PYRITE_HOME="$PWD"
 export PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
@@ -18,8 +18,8 @@ export PYRITE_MC_BACKEND=cuda
 export OPENBLAS_NUM_THREADS=1
 echo "code $(cat CODE_SHA)"
 nvidia-smi
-uv sync -q --locked --no-default-groups --extra nvidia
-B=(uv run --no-sync python checks/streamed_scoring_memory.py)
+pixi install --locked -e nvidia
+B=(pixi run --as-is -e nvidia python checks/streamed_scoring_memory.py)
 ROOT=${1:-roulette879_out}
 mkdir -p "$ROOT/hbn" "$ROOT/tungsten"
 # Each arm is a fresh process, as in #872. Warmups populate on-disk JIT caches;

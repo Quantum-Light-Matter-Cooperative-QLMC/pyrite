@@ -11,15 +11,15 @@
 # usage (from a synced checkout root): sbatch checks/characteristic_chunk_kernel_1455.sbatch [OUTDIR] [NSYS] [SEGMENTS]
 # Set PYRITE_MC_BACKEND=rocm at submit for an AMD node.
 set -uo pipefail
-export PATH=$HOME/.local/bin:$PATH
+export PATH=$HOME/.pixi/bin:$PATH
 cd "$SLURM_SUBMIT_DIR"
 export TMPDIR="$HOME/tmp-nsys"; mkdir -p "$TMPDIR"
 export PYRITE_HOME=$HOME/pyrite PYRITE_CATALOG=$PWD/src/pyrite/data/catalog PYRITE_USER_CATALOG=$(mktemp -d)/catalog
 export PYRITE_MC_BACKEND=${PYRITE_MC_BACKEND:-cuda}
 EXTRA=$([ "$PYRITE_MC_BACKEND" = rocm ] && echo amd || echo nvidia)
 [ -f CODE_SHA ] && echo "code $(cat CODE_SHA)"
-uv sync -q --locked --package pyrite-mc --no-default-groups --extra "$EXTRA"
-B=(uv run --no-sync python checks/characteristic_chunk_kernel_1455.py)
+pixi install --locked -e amd
+B=(pixi run --as-is -e amd python checks/characteristic_chunk_kernel_1455.py)
 ROOT=${1:-c1455_out}
 NSYS=${2:-1}
 SEGMENTS=${3:-2000000}

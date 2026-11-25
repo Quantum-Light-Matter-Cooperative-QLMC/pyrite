@@ -22,8 +22,7 @@
 set -euo pipefail
 mode=${1:?mode}; shift
 source checks/native_cpu_audit/bind.sh
-export PATH=$HOME/.local/bin:$PATH
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache
+export PATH=$HOME/.pixi/bin:$PATH
 export PYRITE_HOME=$PWD PYRITE_CATALOG=$PWD/src/pyrite/data/catalog
 export PYRITE_USER_CATALOG=$PWD/user-catalog PYRITE_MC_BACKEND=cpu
 export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
@@ -35,37 +34,37 @@ if [ "$mode" = gaps ]; then
     for rep in "${1:?run dir}"/*.nsys-rep; do
         stem=${rep%.nsys-rep}
         nsys export --type sqlite --force-overwrite true --output "$stem.sqlite" "$rep" > "$stem-export.log" 2>&1
-        uv run --no-sync python $audit/nsys_gaps.py "$stem.sqlite" "$stem-gaps.json" > "$stem-gaps.log" 2>&1
+        pixi run --as-is python $audit/nsys_gaps.py "$stem.sqlite" "$stem-gaps.json" > "$stem-gaps.log" 2>&1
         echo "gaps rc=$? $stem"
         rm -f "$stem.sqlite"
     done
     exit 0
 fi
-uv run --frozen python -c 'from pyrite.validation.check_records import current_revision; print(current_revision())'
+pixi run --frozen python -c 'from pyrite.validation.check_records import current_revision; print(current_revision())'
 case $mode in
 cases)
     names=(thin30 thin100 crystal300 photon-case layered mos2_5mev)
     if (($#)); then names=("$@"); fi
     for name in "${names[@]}"; do
-        timeout "${ARM_TIMEOUT_S:-600}" uv run --frozen python checks/native_cpu_audit.py --case "$name" \
+        timeout "${ARM_TIMEOUT_S:-600}" pixi run --frozen python checks/native_cpu_audit.py --case "$name" \
             --repeats "${REPEATS:-2}" --out "runs/$name-t$threads.json" || echo "ARM_FAILED $name $?"
     done ;;
 startup)
     for cache_mode in cold warm; do
-        timeout 300 uv run --frozen pyrite-dev startup --cache "$cache_mode" --repeats 3 \
+        timeout 300 pixi run --frozen pyrite-dev startup --cache "$cache_mode" --repeats 3 \
             --backend cpu --json > "runs/startup-$cache_mode.json"
     done ;;
 topology)
     for name in crystal300 char-multi char-layered; do
-        timeout 90 uv run --frozen python checks/native_cpu_audit.py --case "$name" --repeats 3 --out "runs/$name-t1.json"
+        timeout 90 pixi run --frozen python checks/native_cpu_audit.py --case "$name" --repeats 3 --out "runs/$name-t1.json"
     done
-    NUMBA_NUM_THREADS=4 timeout 90 uv run --frozen python checks/native_cpu_audit.py --case crystal300 \
+    NUMBA_NUM_THREADS=4 timeout 90 pixi run --frozen python checks/native_cpu_audit.py --case crystal300 \
         --repeats 3 --out runs/crystal300-t4.json
-    timeout 240 uv run --frozen python $audit/cpu_budget.py topology --case crystal300 --out runs/topology.json ;;
+    timeout 240 pixi run --frozen python $audit/cpu_budget.py topology --case crystal300 --out runs/topology.json ;;
 pools)
-    NUMBA_NUM_THREADS=4 uv run --frozen python $audit/cpu_budget.py pools --out runs/pool-budget.json ;;
+    NUMBA_NUM_THREADS=4 pixi run --frozen python $audit/cpu_budget.py pools --out runs/pool-budget.json ;;
 axial-proto)
-    timeout 1500 uv run --frozen python $audit/axial_prototypes.py --histories 1000 --rounds 2 \
+    timeout 1500 pixi run --frozen python $audit/axial_prototypes.py --histories 1000 --rounds 2 \
         --out runs/axial-prototypes.json || echo "ARM_FAILED axial-prototypes $?" ;;
 *) echo "unknown mode $mode" >&2; exit 2 ;;
 esac

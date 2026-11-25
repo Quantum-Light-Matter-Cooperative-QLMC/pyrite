@@ -8,7 +8,7 @@ Chantler/FFAST data with independent Henke/CXRO data over 1--8 keV.
 
 Run with the pinned optional dependency:
 
-    uv run --group oracle python checks/dans_diffraction_oracle.py
+    pixi run python checks/dans_diffraction_oracle.py
 
 Missing dependencies, non-finite results, or threshold violations return
 nonzero. This remains an implementation-side external anchor, not a human
@@ -54,7 +54,7 @@ def main() -> int:
         )
     except DansDiffractionUnavailableError as exc:
         print(exc)
-        print("RESULT: SKIP — rerun with `uv run --group oracle`.")
+        print("RESULT: SKIP — rerun with `pixi run`.")
         return 2
 
     limits = DEFAULT_DANS_TOLERANCES

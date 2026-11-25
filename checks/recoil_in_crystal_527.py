@@ -34,7 +34,7 @@ It then sizes the in-medium corrections the vacuum root omits, at the Fig. 1c
   branch centroid is unshifted, so at EDS resolution the line broadens rather
   than moves. It is therefore excluded from the gate.
 
-    uv run python checks/recoil_in_crystal_527.py
+    pixi run python checks/recoil_in_crystal_527.py
 
 Exit 0 when the mean measured-minus-predicted defect lies within twice its
 combined statistical and calibration uncertainty, the classical value lies

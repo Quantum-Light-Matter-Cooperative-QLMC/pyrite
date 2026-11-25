@@ -12,7 +12,7 @@
 #       OUT_DIR "MATERIAL:E0_KEV:TILT ..." HISTORIES "SEED ..." BUDGETS [ARM_TIMEOUT_S]
 # BUDGETS is comma-separated; the first arm also runs the production pass; 0 = full.
 set -uo pipefail
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 cd "$SLURM_SUBMIT_DIR"
 . checks/rocm/env.sh
 export XDG_CONFIG_HOME="$PWD/.xdg-config" PYRITE_USER_CATALOG="$PWD/.xdg-config/pyrite"
@@ -31,10 +31,10 @@ for spec in "${case_list[@]}"; do
     for seed in "${seed_list[@]}"; do
         stem="$OUT/$material-$e0-$tilt-n$HISTORIES-s$seed"
         echo "== $(date -Is) $stem"
-        timeout "$ARM_TIMEOUT" uv run --no-sync python -u $H run "$material" "$e0" "$tilt" \
+        timeout "$ARM_TIMEOUT" pixi run --as-is -e amd python -u $H run "$material" "$e0" "$tilt" \
             "$HISTORIES" "$seed" "$BUDGETS" "$stem.json" > "$stem.log" 2>&1
         echo "rc=$? $(tail -c 600 "$stem.log" | tr '\n' ' ' | cut -c1-600)"
     done
 done
-uv run --no-sync python $H table "$OUT" | tee "$OUT/table.txt"
+pixi run --as-is -e amd python $H table "$OUT" | tee "$OUT/table.txt"
 sha256sum "$OUT"/* > "$OUT/SHA256SUMS" 2>/dev/null

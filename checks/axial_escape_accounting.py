@@ -2,7 +2,7 @@
 
 Run the bounded CPU example with::
 
-    uv run python checks/axial_escape_accounting.py
+    pixi run python checks/axial_escape_accounting.py
 
 For a plane wave with integer momentum order p, independent TDS sources have
 transfer rates lambda * |s_q|**2 * (1 - exp(-a**2 * |q|**2)). Count p + q

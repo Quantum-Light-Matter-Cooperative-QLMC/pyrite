@@ -36,8 +36,8 @@ expectation, not an exact identity.
 Validation: shell-secondary-transport
 
 Run (remote CPU; never locally at full size):
-  PYRITE_MC_BACKEND=cpu uv run python checks/shell_secondary_transport_observables.py --quick
-  PYRITE_MC_BACKEND=cpu uv run python checks/shell_secondary_transport_observables.py --output REPORT.json
+  PYRITE_MC_BACKEND=cpu pixi run python checks/shell_secondary_transport_observables.py --quick
+  PYRITE_MC_BACKEND=cpu pixi run python checks/shell_secondary_transport_observables.py --output REPORT.json
 """
 
 import argparse

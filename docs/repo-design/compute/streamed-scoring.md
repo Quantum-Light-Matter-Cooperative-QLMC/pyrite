@@ -578,8 +578,8 @@ allocation over the measured range, not a bound for arbitrary scenes.
 The probe supports a matched host baseline via `PROBE_HOST_SEGMENTS=1`:
 
 ```bash
-PROBE_SPLIT=1 PROBE_HOST_SEGMENTS=1 uv run python checks/streamed_block_sizing.py streamed 65536 8192 2048 32 0 scratch/host
-PROBE_SPLIT=1 uv run python checks/streamed_block_sizing.py streamed 65536 8192 2048 32 0 scratch/resident
+PROBE_SPLIT=1 PROBE_HOST_SEGMENTS=1 pixi run python checks/streamed_block_sizing.py streamed 65536 8192 2048 32 0 scratch/host
+PROBE_SPLIT=1 pixi run python checks/streamed_block_sizing.py streamed 65536 8192 2048 32 0 scratch/resident
 ```
 
 Run each arm on an allocated remote GPU; the arguments fix the workload and

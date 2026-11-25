@@ -12,7 +12,7 @@ installs exactly these tables.
 
 Usage::
 
-    UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run python scripts/release_sbethe_tables.py \\
+    pixi run python scripts/release_sbethe_tables.py \\
         --generate --url https://.../sbethe-tables.zip --pin
 
 Run it when the catalogue gains a material or medium, or when a composition,

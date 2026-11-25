@@ -161,7 +161,7 @@ def browse_plotly(
         import plotly.graph_objects as go
     except ImportError as e:
         raise ImportError(
-            "browse_plotly needs plotly (`uv add plotly` / `pip install plotly`); "
+            "browse_plotly needs plotly (`pip install plotly`); "
             "use browse(..., kind=...) for the matplotlib path."
         ) from e
     if kind not in ("by_energy", "full"):

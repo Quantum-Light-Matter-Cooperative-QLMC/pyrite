@@ -8,13 +8,13 @@
 #SBATCH --output=grid286-%j.log
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$PWD/user-catalog" XDG_CONFIG_HOME="$PWD/.xdg-config"
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache PYRITE_MC_BACKEND=cuda
+export PYRITE_MC_BACKEND=cuda
 mkdir -p "$XDG_CONFIG_HOME" "$PYRITE_USER_CATALOG" evidence/grid286
-uv sync --extra nvidia --locked -q
+pixi install --locked -e nvidia
 cp .pyrite-sync "evidence/grid286/sync-$SLURM_JOB_ID.txt"
 nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv
-uv run --no-sync python -W ignore checks/line_grid_candidates_286.py \
+pixi run --as-is -e nvidia python -W ignore checks/line_grid_candidates_286.py \
     --output "evidence/grid286/grid-$SLURM_JOB_ID.json"

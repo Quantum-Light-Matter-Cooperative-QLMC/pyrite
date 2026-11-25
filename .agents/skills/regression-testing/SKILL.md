@@ -29,7 +29,7 @@ Report original symptom, pre-fix failure, seed/tolerance rationale, and focused
 command:
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test \
+pixi run pyrite-dev test \
   tests/path/to/test.py -k test_name
 ```
 

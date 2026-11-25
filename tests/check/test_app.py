@@ -384,7 +384,7 @@ def test_validation_oracle_distinguishes_missing_dependency_from_failed_comparis
     skip_branch = 'authority == "Optional oracle" and "result: skip"'
     assert skip_branch in source
     assert source.index(skip_branch) < source.index('report["returncode"] != 0')
-    assert "uv run --group oracle" in source
+    assert "default pixi environment" in source
 
 
 def test_validation_force_cpu_pins_backend_env_for_child_checks():

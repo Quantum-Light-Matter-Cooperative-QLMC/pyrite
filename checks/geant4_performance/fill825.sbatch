@@ -11,16 +11,16 @@
 #SBATCH --output=fill825-%j.log
 set -uo pipefail
 cd "$SLURM_SUBMIT_DIR"
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$PWD/user-catalog" XDG_CONFIG_HOME="$PWD/.xdg-config"
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache PYRITE_MC_BACKEND=cuda
+export PYRITE_MC_BACKEND=cuda
 mkdir -p "$XDG_CONFIG_HOME" "$PYRITE_USER_CATALOG"
 out="evidence/fill825/$SLURM_JOB_ID"; mkdir -p "$out"; cp .pyrite-sync "$out/sync.json"
 nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv > "$out/gpu.csv"
-uv sync --extra nvidia --locked -q
-uv run --no-sync python checks/equal_precision/prepare_stopping.py > /dev/null
+pixi install --locked -e nvidia
+pixi run --as-is -e nvidia python checks/equal_precision/prepare_stopping.py > /dev/null
 N=${FILL_HISTORIES:-8000}
 # scene:schedule:scratch_mib:seg_capacity:probe:threads:variant
 # prod = production defaults (512 MiB scratch, seg_capacity 512, probe 1024, 128 threads).
@@ -59,7 +59,7 @@ for a in "${arms[@]}"; do
     IFS=: read -r s sch mib cap probe nt v n <<< "$a"
     N=${n:-$N}
     stem="$out/$s-$sch-m$mib-t$nt-$v-n$N"
-    PYRITE_MC_TRANSPORT_SCHEDULE=$sch PV_NTHREADS=$nt timeout 420 uv run --no-sync python \
+    PYRITE_MC_TRANSPORT_SCHEDULE=$sch PV_NTHREADS=$nt timeout 420 pixi run --as-is -e nvidia python \
         checks/fp32_speed_of_light/precision_variants.py \
         --variant "$v" --bench checks/geant4_performance/pyrite_bench.py --stats "$stem.stats.json" \
         "$s" --histories "$N" --block "$N" --seed 1 --device-staging --no-audit \

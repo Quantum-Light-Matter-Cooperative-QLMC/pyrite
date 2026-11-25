@@ -687,6 +687,19 @@ UV_TOOL_DIR = "$PIXI_PROJECT_ROOT/.pixi/uv-tools"
 UV_TOOL_BIN_DIR = "$PIXI_PROJECT_ROOT/.pixi/uv-tools/bin"
 UV_CACHE_DIR = "$PIXI_PROJECT_ROOT/.pixi/uv-cache"
 
+# One-off research scripts (trajectory scene viewers, PDF figure digitizing)
+# that need packages nothing else uses: `pixi run -e viz python checks/...`.
+[tool.pixi.feature.viz]
+platforms = ["linux-64"]
+
+[tool.pixi.feature.viz.pypi-dependencies]
+pyvista = "*"
+trame = "*"
+trame-vtk = "*"
+trame-vuetify = "*"
+pymupdf = "*"
+scikit-image = "*"
+
 [tool.pixi.feature.cuda]
 platforms = ["linux-64-cuda"]
 
@@ -719,12 +732,14 @@ intel-cmplr-lib-rt = "*"
 "https://repo.anaconda.com/pkgs/main" = { mapping = { numpy = "numpy", numpy-base = false, numba = "numba", llvmlite = "llvmlite", python = false } }
 
 [tool.pixi.environments]
-# Contributor default: every dependency group (what `uv run` used to sync).
-default = { features = ["cpu", "py313", "test", "lint", "docs", "notebooks", "oracle", "browser"], solve-group = "py313" }
-py314 = { features = ["cpu", "py314", "test", "lint", "docs", "notebooks", "oracle", "browser"], solve-group = "py314" }
+# Contributor default: every dependency group plus the pure-Python extras.
+default = { features = ["cpu", "py313", "test", "lint", "docs", "notebooks", "oracle", "browser", "dask", "optimization"], solve-group = "py313" }
+py314 = { features = ["cpu", "py314", "test", "lint", "docs", "notebooks", "oracle", "browser", "dask", "optimization"], solve-group = "py314" }
 docs = { features = ["cpu", "py313", "docs"], solve-group = "py313" }
-# Lab/GPU environments carry the test group and the cluster extras jobs use.
-nvidia = { features = ["py313", "cuda", "test", "notebooks", "dask", "optimization"] }
+# Lab/GPU environments carry the test group and the cluster extras jobs use;
+# nvidia also carries docs, to regenerate the CUDA tutorial captures.
+nvidia = { features = ["py313", "cuda", "test", "docs", "notebooks", "dask", "optimization"] }
 amd = { features = ["py313", "amd", "test", "notebooks", "dask", "optimization"] }
 intel = { features = ["py313", "intel", "test", "notebooks", "dask", "optimization"] }
 svml = { features = ["py313", "svml", "test"] }
+viz = { features = ["py313", "test", "notebooks", "viz"], solve-group = "py313" }

@@ -118,7 +118,7 @@ def load_seltzer_berger(path: Path | None = None, *, download: bool = False) -> 
         download=download,
         missing=SeltzerBergerUnavailableError,
         hint="fetch the Seltzer-Berger table with "
-        "`uv run python checks/brem_source_comparison.py --download` "
+        "`pixi run python checks/brem_source_comparison.py --download` "
         f"or set {SELTZER_BERGER_ENV}",
     )
     return parse_seltzer_berger(data.decode("ascii"))

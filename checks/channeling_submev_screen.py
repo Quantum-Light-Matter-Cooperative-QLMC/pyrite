@@ -1,6 +1,6 @@
 """Static sub-MeV planar channeling-radiation screen (#585).
 
-Run with ``PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=4 uv run python checks/channeling_submev_screen.py``.
+Run with ``PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=4 pixi run python checks/channeling_submev_screen.py``.
 Print JSON for Si and diamond low-index planes at 30 keV--1 MeV: band
 structure over the Brillouin zone, candidate bound->bound vacuum forward line
 energies with velocity-form dipoles, entry populations at plane alignment, and

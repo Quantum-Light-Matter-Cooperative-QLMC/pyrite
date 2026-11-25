@@ -188,7 +188,7 @@ def test_setup_no_gpu_prints_no_install_instructions(monkeypatch, tmp_path, caps
 
     assert cli.main(["config", "setup"]) is None
 
-    assert "uv sync" not in capsys.readouterr().out
+    assert "pixi install" not in capsys.readouterr().out
 
 
 def test_setup_detected_gpu_non_interactive_defaults_to_cpu_with_stderr_hint(
@@ -224,7 +224,7 @@ def test_setup_yes_flag_accepts_top_detected_backend_without_prompt(monkeypatch,
 
     assert not env_path.exists()
     assert _config.resolve("backend.default").value == "cuda"
-    assert "uv sync --extra nvidia" in capsys.readouterr().out
+    assert "pixi install -e nvidia" in capsys.readouterr().out
 
 
 def test_setup_interactive_prompt_accept_writes_detected_backend(monkeypatch, tmp_path, capsys):
@@ -241,7 +241,7 @@ def test_setup_interactive_prompt_accept_writes_detected_backend(monkeypatch, tm
 
     assert not env_path.exists()
     assert _config.resolve("backend.default").value == "rocm"
-    assert "CUPY_INSTALL_USE_HIP=1 uv sync --extra amd" in capsys.readouterr().out
+    assert "CUPY_INSTALL_USE_HIP=1 pixi install -e amd" in capsys.readouterr().out
 
 
 def test_setup_interactive_prompt_decline_defaults_to_cpu(monkeypatch, tmp_path):

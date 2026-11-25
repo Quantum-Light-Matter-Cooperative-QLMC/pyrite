@@ -8,13 +8,13 @@
 # #864 streamed wall time with vs without per-block hard-photon completion, 4k blocks.
 # usage (from the synced checkout root): sbatch -J s864-<sha> checks/streamed_completion_864.sbatch
 set -uo pipefail
-export PATH=$HOME/.local/bin:$PATH
+export PATH=$HOME/.pixi/bin:$PATH
 cd "$SLURM_SUBMIT_DIR"
 export PYRITE_HOME=/home/aamador/pyrite PYRITE_CATALOG=$PWD/src/pyrite/data/catalog PYRITE_USER_CATALOG=$(mktemp -d)/catalog
 export PYRITE_MC_BACKEND=cuda
 echo "code $(cat CODE_SHA)"
-uv sync -q --locked --package pyrite-mc --no-default-groups --extra nvidia
-B=(uv run --no-sync python checks/streamed_scoring_memory.py)
+pixi install --locked -e nvidia
+B=(pixi run --as-is -e nvidia python checks/streamed_scoring_memory.py)
 for MAT in silicon tungsten; do
   OUT=s864_out/$MAT; mkdir -p $OUT
   "${B[@]}" run streamed 1000 1000 $OUT/warmup.json $MAT 300 cuda 1e5 1

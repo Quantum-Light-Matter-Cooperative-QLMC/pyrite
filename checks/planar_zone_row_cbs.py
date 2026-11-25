@@ -23,7 +23,7 @@ The planar potential holds only the plane's own row, so only own-row native
 emission can overlap the density-matrix source; other rows are reported for
 completeness. Band integrals are photons/sr per incident line electron.
 
-    PYRITE_MC_BACKEND=cpu uv run python checks/planar_zone_row_cbs.py \
+    PYRITE_MC_BACKEND=cpu pixi run python checks/planar_zone_row_cbs.py \
         --psi-mrad 0 2.2 --electrons 2000 --out scratch/zone-cbs.json
 
 Heavy settings (production basis, many electrons, several cases) go through

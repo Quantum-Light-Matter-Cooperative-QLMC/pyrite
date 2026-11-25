@@ -131,7 +131,7 @@ design, and its cost is the point of the comparison.
    split.
 
 ```bash
-uv run python checks/geant4_performance/precision_plan.py evidence/run/2835 \
+pixi run python checks/geant4_performance/precision_plan.py evidence/run/2835 \
     evidence/pilot3/2864 evidence/pilot4/JOB --output precision-plan.json
 hold=$(sbatch --parsable checks/geant4_performance/hold.sbatch)
 sbatch --dependency=after:$hold checks/geant4_performance/precision.sbatch $hold precision-plan.json
@@ -165,13 +165,13 @@ the arm's quadrature and the 25 eV grid. The densities go to
 
 ## Running
 
-From a synced lab checkout (`PYRITE_REMOTE_DIR=~/pyrite-821/repo uv run pyrite remote sync`):
+From a synced lab checkout (`PYRITE_REMOTE_DIR=~/pyrite-821/repo pixi run pyrite remote sync`):
 
 ```bash
 sbatch checks/geant4_performance/pilot.sbatch
 hold=$(sbatch --parsable checks/geant4_performance/hold.sbatch)
 sbatch --dependency=after:$hold checks/geant4_performance/run.sbatch $hold 100000 1 2 3
-uv run python checks/geant4_performance/analyze.py evidence/run/JOB --output summary.json
+pixi run python checks/geant4_performance/analyze.py evidence/run/JOB --output summary.json
 ```
 
 `hold.sbatch` takes the cpu partition's 16 CPUs on the GPU host while

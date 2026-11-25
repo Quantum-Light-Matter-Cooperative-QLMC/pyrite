@@ -1,4 +1,4 @@
-"""Generate documentation schematics; run with ``uv run python scripts/docs_figures.py``.
+"""Generate documentation schematics; run with ``pixi run python scripts/docs_figures.py``.
 
 Only the Python standard library is needed. These SVGs contain no simulation data.
 """

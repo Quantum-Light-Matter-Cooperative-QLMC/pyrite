@@ -24,7 +24,7 @@ pyrite-dev complexity --write            # rewrite the baseline, print its chang
 | Line inventory | `scc` on `PATH`, or `PYRITE_SCC=/path/to/scc` | Informational, optional |
 | Churn | `git log --numstat --no-renames`, scope pathspec only | Informational, opt-in |
 
-A missing Radon fails with the `uv sync` command that restores it. A missing or
+A missing Radon fails with the `pixi install` command that restores it. A missing or
 failing `scc` is reported in the inventory line and never fails a run; point
 `PYRITE_SCC` at the installed binary when a launcher wrapper (a snap shim that
 fails DBus setup, say) breaks. No local install path is hardcoded.

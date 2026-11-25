@@ -1,8 +1,8 @@
 """Generate or check the CLI deprecation table.
 
 Usage:
-    uv run pyrite-dev cli-deprecations --write
-    uv run pyrite-dev cli-deprecations --check
+    pixi run pyrite-dev cli-deprecations --write
+    pixi run pyrite-dev cli-deprecations --check
 """
 
 import argparse

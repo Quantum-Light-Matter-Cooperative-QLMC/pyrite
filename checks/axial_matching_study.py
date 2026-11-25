@@ -2,8 +2,8 @@
 
 Run the bounded CPU example with::
 
-    uv run python checks/axial_matching_study.py          # Gamma point, ~25 s
-    uv run python checks/axial_matching_study.py bloch    # Bloch-k grids, 4-8 min
+    pixi run python checks/axial_matching_study.py          # Gamma point, ~25 s
+    pixi run python checks/axial_matching_study.py bloch    # Bloch-k grids, 4-8 min
 
 The retained projector is the spectral projector P(E_m) of the transverse
 Hamiltonian, so [H_perp, P] = 0 and the closure of the escape effects in

@@ -26,7 +26,7 @@ and phase bit for bit. Shi heights come from the vector-digitized Fig. 2
 PXR-only classical rate, so Part 1 also reports PyRITE's classical PXR
 component (``checks/shi_2024_matrix_elements_1103.py``).
 
-Run:  uv run python checks/transverse_recoil_527.py [electrons]
+Run:  pixi run python checks/transverse_recoil_527.py [electrons]
 
 Validation: quantum-recoil-observability
 """

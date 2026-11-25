@@ -45,7 +45,7 @@ SCC_ENV = "PYRITE_SCC"
 _CC_RANKS = ((5, "A"), (10, "B"), (20, "C"), (30, "D"), (40, "E"))
 _MISSING_RADON = (
     "radon is not installed; it is pinned in the `lint` dependency group. "
-    "Run `uv sync` (default groups) or `uv sync --group lint`, then retry."
+    "Run through the default pixi environment (`pixi run pyrite-dev ...`), then retry."
 )
 
 
@@ -255,7 +255,7 @@ def ratchet_problems(baseline: dict[str, Any], current: Scan, radon_version: str
     if baseline.get("tool", {}).get("radon") != radon_version:
         problems.append(
             f"baseline was produced with radon {baseline.get('tool', {}).get('radon')}, "
-            f"installed radon is {radon_version}; run `uv sync` to restore the pinned version"
+            f"installed radon is {radon_version}; run `pixi install` to restore the pinned version"
         )
     if baseline.get("scope") != current.scope:
         problems.append(f"baseline scope {baseline.get('scope')!r} is not {current.scope!r}")

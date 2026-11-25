@@ -10,18 +10,17 @@ set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 exec 9>.pyrite-sync.lock
 flock -s -w 30 9
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$PWD/user-catalog"
 export PYRITE_MC_BACKEND=cuda PYRITE_TEST_BACKEND=cuda
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache
 out="evidence/moment-anchors788/$SLURM_JOB_ID"
 mkdir -p "$out"
 cp .pyrite-sync "$out/sync.txt"
 scontrol show job "$SLURM_JOB_ID" > "$out/job.txt"
 nvidia-smi -q > "$out/gpu.txt"
-uv run --no-sync python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
+pixi run --as-is -e nvidia python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
 deadline=$((SECONDS + 1380))
 # Wider #788 anchors: energy extremes, oblique backscatter and a 10 keV cutoff.
 # Each case is "scene[:cutoff_eV]"; only exact versus default-budget tables.
@@ -32,7 +31,7 @@ run() {
     local case=$1 variant=$2 seed=$3 histories=$4 stem=$5; shift 5
     local scene=${case%%:*} cutoff=()
     if [[ $case == *:* ]]; then cutoff=(--cutoff-ev "${case#*:}"); fi
-    timeout --signal=TERM --kill-after=5s 120s uv run --no-sync python \
+    timeout --signal=TERM --kill-after=5s 120s pixi run --as-is -e nvidia python \
         checks/equal_precision/benchmark_moment_transport.py "$variant" "$stem-audit.json" \
         "$@" "$scene" "${cutoff[@]}" --histories "$histories" --seed "$seed" --core cuda \
         --batch-histories "$histories" --scratch-mib 4096 --probe-electrons 0 \

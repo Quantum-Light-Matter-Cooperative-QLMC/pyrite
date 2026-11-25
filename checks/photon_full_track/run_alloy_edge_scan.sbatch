@@ -1,6 +1,6 @@
 #!/bin/bash
 # Geant4-only near-edge K-line scan (issue #341; alloy_edge_scan.py).
-# Submit from an isolated git-archive checkout after `uv sync --locked` and
+# Submit from an isolated git-archive checkout after `pixi install --locked` and
 # `alloy_edge_scan.py macros scan --events $EVENTS`; one array task per
 # macro listed in scan/runs.txt (36 runs). Report with
 # `alloy_edge_scan.py report scan --events $EVENTS --output scan/report.json`.

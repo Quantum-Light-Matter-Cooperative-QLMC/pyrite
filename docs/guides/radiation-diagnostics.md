@@ -11,11 +11,11 @@ measured data or a validated bunch-length diagnostic.
 From a source checkout:
 
 ```bash
-uv sync --extra apps
-uv run pyrite app optical-diagnostics launch
+pixi install
+pixi run pyrite app optical-diagnostics launch
 ```
 
-For an installed distribution, install `pyrite-mc[apps]`, then omit `uv run`.
+For an installed distribution, install `pyrite-mc[apps]`, then omit `pixi run`.
 Select **Instrument and inference** and click
 **Compute interferogram and conditional fit** with the defaults:
 **200 fs RMS**, **0.0005–0.025 eV**, **±1.2 mm mirror travel**, **61 nodes** and
@@ -68,7 +68,7 @@ a fit. See the [model and validation limits](../physics/radiation-physics/optica
 ## Saved outputs
 
 ```bash
-uv run pyrite app optical-diagnostics export --stem optical_diagnostics
+pixi run pyrite app optical-diagnostics export --stem optical_diagnostics
 ```
 
 Open `pyrite-output/results/optical_diagnostics.html` for the initial controls

@@ -42,10 +42,10 @@ memory, not GPU peak allocation; `gpu.txt` records device configuration.
 Use the linked issue worktree and a dedicated remote checkout:
 
 ```bash
-PYRITE_REMOTE_DIR='~/pyrite-642-straggling' uv run pyrite remote sync
+PYRITE_REMOTE_DIR='~/pyrite-642-straggling' pixi run pyrite remote sync
 ```
 
-On the lab host, inside that folder, install `uv sync --extra nvidia --locked`.
+On the lab host, inside that folder, install `pixi install --locked -e nvidia`.
 Submit `sbatch checks/straggling_defaults/run.sbatch silicon` as preflight,
 then `hopg`, `mos2`, `wse2`, and `sapphire`. Each allocation requests one CPU,
 one GPU, 24 GiB RAM and at most ten minutes; each arm has a two-minute timeout.
@@ -66,7 +66,7 @@ SHA-256 manifests under `evidence/straggling/JOB-MODE/`. Pull those directories
 and analyze with:
 
 ```bash
-uv run python checks/straggling_defaults/analyze.py RAW_ROOT summary.json
+pixi run python checks/straggling_defaults/analyze.py RAW_ROOT summary.json
 ```
 
 The protocol lists deferred energies, layer/groove cases, line/detector
@@ -94,7 +94,7 @@ The script records `SOURCE_SHA`, which the submitter writes into the staged
 checkout. Analyze with:
 
 ```bash
-uv run python checks/straggling_defaults/analyze.py RAW_ROOT summary.json \
+pixi run python checks/straggling_defaults/analyze.py RAW_ROOT summary.json \
   --protocol checks/straggling_defaults/protocol-stage2.json
 ```
 

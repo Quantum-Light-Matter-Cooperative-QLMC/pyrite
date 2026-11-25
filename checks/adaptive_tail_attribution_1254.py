@@ -2,7 +2,7 @@
 
 Copy this diagnostic into that checkout's checks/ directory and run with its
 original catalog overlay, CPU environment and workspace/table selection:
-``uv run python checks/adaptive_tail_attribution_1254.py``. It uses the
+``pixi run python checks/adaptive_tail_attribution_1254.py``. It uses the
 existing #1252 profile resolver and counter-addressed primary offsets. Eight
 single-primary runs, not a sweep. Requires out-cpu-1000/ captures; writes
 attribution-1254.json. Exact captured-score agreement is mandatory.

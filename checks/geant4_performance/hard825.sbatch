@@ -13,15 +13,15 @@
 #SBATCH --output=hard825-%j.log
 set -uo pipefail
 new="$SLURM_SUBMIT_DIR"; base="${AB_BASE:-$new/../base}"
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 export PYRITE_HOME="$HOME/pyrite" PYRITE_CATALOG="$new/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$new/user-catalog" XDG_CONFIG_HOME="$new/.xdg-config"
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=8
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache PYRITE_MC_BACKEND=cuda
+export PYRITE_MC_BACKEND=cuda
 out="$new/evidence/hard825/$SLURM_JOB_ID"; mkdir -p "$out"
 for t in "$base" "$new"; do
-    (cd "$t" && uv sync --package pyrite-mc --no-default-groups --extra nvidia --locked -q \
-        && uv run --no-sync python checks/equal_precision/prepare_stopping.py > /dev/null)
+    (cd "$t" && pixi install --locked -e nvidia \
+        && pixi run --as-is -e nvidia python checks/equal_precision/prepare_stopping.py > /dev/null)
     echo "rc=$? sync $t $(cat "$t/CODE_SHA")" | tee -a "$out/trees.txt"
 done
 run() {  # tree seed tag [env...]
@@ -30,7 +30,7 @@ run() {  # tree seed tag [env...]
     local stem="$out/w-1MeV-100um-$tree-$tag-s$seed"
     (cd "$dir" && env "$@" HARD825_OUT="$stem.probe.json" \
         PYRITE_MC_TRANSPORT_SCHEDULE=continuation PV_NTHREADS=32 \
-        /usr/bin/time -v -o "$stem.time" timeout 900 uv run --no-sync python \
+        /usr/bin/time -v -o "$stem.time" timeout 900 pixi run --as-is -e nvidia python \
         checks/geant4_performance/hard825_probe.py \
         --variant exact --bench checks/geant4_performance/pyrite_bench.py --stats "$stem.stats.json" \
         w-1MeV-100um --histories 8000 --block 8000 --seed "$seed" --no-audit \

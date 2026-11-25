@@ -11,5 +11,5 @@
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 source checks/geant4_performance/env.sh
-uv sync --locked --package pyrite-mc --no-default-groups --extra nvidia -q
+pixi install --locked -e nvidia
 sha256sum "$G4BENCH"

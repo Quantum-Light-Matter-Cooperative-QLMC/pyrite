@@ -166,7 +166,7 @@
         "xml_sha256": "4f6061861f81c60ef8ff0e03ed1fb6769201f11e1fe30cf3867dbb63de3e3b8d"
       }
     },
-    "reproduction": "uv run pyrite-dev test --slow tests/montecarlo/test_photon_reentry_pair_cuda.py",
+    "reproduction": "pixi run pyrite-dev test --slow tests/montecarlo/test_photon_reentry_pair_cuda.py",
     "scope": "Nonempty pair conversion inside a production-prepared Si filter. Photon channel rates are replaced throughout: forced pair conversion above threshold, transparent returned photons below threshold. Conditional final states, CUDA charged flights, vacancies, annihilation and coupled-queue rest accounting remain real; high-energy exit count is checked in aggregate.",
     "source_revision": "cbcb7302e8d173c27bb1c251da315309d7805450",
     "source_sha256": {
@@ -332,6 +332,6 @@
       "result": "18 passed; four Cu fixtures refused before primary transport because Cu lacks shell conduction data. Switched fixture to supported W and added a CPU refusal regression. No model/tolerance change."
     }
   ],
-  "reproduction": "uv run pyrite-dev test --slow tests/montecarlo/test_photon_reentry_cuda.py tests/montecarlo/test_photon_production_cuda.py",
+  "reproduction": "pixi run pyrite-dev test --slow tests/montecarlo/test_photon_reentry_cuda.py tests/montecarlo/test_photon_production_cuda.py",
   "scope": "Production charged scene re-entry and CPU/CUDA implementation parity; no external full-track validation"
 }

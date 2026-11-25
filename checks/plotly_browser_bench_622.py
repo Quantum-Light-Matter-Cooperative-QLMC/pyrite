@@ -1,7 +1,7 @@
 """Browser render benchmark for Plotly spectrum traces: SVG versus WebGL (#622).
 
 Run:
-    uv run python checks/plotly_browser_bench_622.py \
+    pixi run python checks/plotly_browser_bench_622.py \
         --out scratch/plotly_browser_bench_622.json
 
 Builds spectrum-shaped figures through the production Plotly spectrum trace
@@ -255,7 +255,8 @@ def main(argv=None) -> int:
         import selenium  # noqa: F401
     except ImportError:
         print(
-            "selenium missing: install the `browser` dependency group (`uv sync`)", file=sys.stderr
+            "selenium missing: install the `browser` dependency group (`pixi install`)",
+            file=sys.stderr,
         )
         return 2
     record = run(args)

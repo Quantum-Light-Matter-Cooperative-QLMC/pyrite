@@ -22,7 +22,7 @@ export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THRE
 scenes=${1:?scene:histories list}; seeds=${2:-"201 202 203"}; estimators=${3:-discrete}
 read -r -a bench_extra <<< "${4:-}"
 pyrite_gpu_sync -q
-uv run --no-sync python checks/equal_precision/prepare_stopping.py > /dev/null
+pixi run --as-is -e amd python checks/equal_precision/prepare_stopping.py > /dev/null
 out="evidence/gate838/$SLURM_JOB_ID"; mkdir -p "$out"
 cp .pyrite-sync "$out/sync.json"; pyrite_gpu_info > "$out/gpu.txt" 2>&1
 for spec in $scenes; do
@@ -35,7 +35,7 @@ for spec in $scenes; do
             ps=(fp64 mixed); (( seed % 2 )) && ps=(mixed fp64)
             for p in "${ps[@]}"; do
                 stem="$out/$p-$est-$s-$seed"
-                uv run --no-sync python checks/geant4_performance/pyrite_bench.py "$s" \
+                pixi run --as-is -e amd python checks/geant4_performance/pyrite_bench.py "$s" \
                     --histories "$h" --seed "$seed" --rows-per-round 1024 --device-staging \
                     --transport-precision "$p" --no-audit "${extra[@]}" --output "$stem.json" \
                     > "$stem.log" 2>&1 && echo "DONE $p $est $s $seed" || echo "FAIL $p $est $s $seed"
@@ -43,5 +43,5 @@ for spec in $scenes; do
         done
     done
 done
-uv run --no-sync python checks/fp32_speed_of_light/gate838.py "$out" --output "$out/summary.json" \
+pixi run --as-is -e amd python checks/fp32_speed_of_light/gate838.py "$out" --output "$out/summary.json" \
     > "$out/summary.md"

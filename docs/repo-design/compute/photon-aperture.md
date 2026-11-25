@@ -198,9 +198,9 @@ EPDL workload against the CPU reference, then prints JSON with source/data
 hashes, device/runtime, repeated warm end-to-end timings and memory context.
 It includes host table evaluation and both transfer directions in the CUDA
 timing. Run it from a synced checkout in a bounded remote GPU allocation with
-`uv run --extra nvidia python checks/photon_first_flight_cuda.py`.
+`pixi run -e nvidia python checks/photon_first_flight_cuda.py`.
 
-`uv run --extra nvidia --extra optimization python -m
+`pixi run -e nvidia python -m
 checks.photon_cuda.benchmark scaling` compares warm CPU, array-CUDA and fused-CUDA
 first flights across ray counts and region counts. The `tune` mode reuses
 `OptunaOptimizer`'s ask/tell interface to vary batch chunks and block sizes,

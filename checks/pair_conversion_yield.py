@@ -18,8 +18,8 @@ it is not a physics anchor and emits no validation records. The
 recorded results are in the physics page's pair-conversion section.
 
 Run (CPU, quick is a few minutes locally):
-  PYRITE_MC_BACKEND=cpu uv run python checks/pair_conversion_yield.py --quick
-  PYRITE_MC_BACKEND=cpu uv run python checks/pair_conversion_yield.py --output REPORT.json
+  PYRITE_MC_BACKEND=cpu pixi run python checks/pair_conversion_yield.py --quick
+  PYRITE_MC_BACKEND=cpu pixi run python checks/pair_conversion_yield.py --output REPORT.json
 """
 
 import argparse

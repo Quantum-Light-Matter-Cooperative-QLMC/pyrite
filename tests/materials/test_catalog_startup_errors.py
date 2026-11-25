@@ -32,7 +32,7 @@ cli.main(["run", "standard", "-m", "hopg", "--quick"])
 
     assert result.returncode != 0
     assert "required dependency 'gemmi' is not installed" in result.stderr
-    assert "uv sync" in result.stderr
+    assert "pixi install" in result.stderr
     assert result.stderr.count("required dependency 'gemmi'") == 1
     assert "materials." not in result.stderr
     assert "Traceback" not in result.stderr
@@ -66,7 +66,7 @@ runpy.run_module("pyrite._entry.scan", run_name="__main__")
 
     assert result.returncode != 0
     assert "required dependency 'gemmi' is not installed" in result.stderr
-    assert "uv sync" in result.stderr
+    assert "pixi install" in result.stderr
     assert result.stderr.count("required dependency 'gemmi'") == 1
     assert "materials." not in result.stderr
     assert "Traceback" not in result.stderr

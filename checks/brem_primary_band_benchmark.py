@@ -1,9 +1,9 @@
 """Capture a bounded #821 production population and replay identical band inputs.
 
 All output must be gitignored. Example (CUDA allocation, configured catalogs):
-uv run python checks/brem_primary_band_benchmark.py capture si-3MeV-1mm \
+pixi run python checks/brem_primary_band_benchmark.py capture si-3MeV-1mm \
     --histories 128 --output scratch/issue938/si3
-uv run python checks/brem_primary_band_benchmark.py replay scratch/issue938/si3 \
+pixi run python checks/brem_primary_band_benchmark.py replay scratch/issue938/si3 \
     --output scratch/issue938/si3-replay --repeats 5
 
 Capture reuses the pinned in-tree #821 production setup, aborting after its first

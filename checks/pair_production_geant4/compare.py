@@ -26,8 +26,8 @@ Their differences are reported, not gated.
 Validation: pair-production-sampling
 
 Run:
-  uv run python checks/pair_production_geant4/compare.py reduce RAW_DIR
-  uv run python checks/pair_production_geant4/compare.py [--samples N] [--output REPORT.json]
+  pixi run python checks/pair_production_geant4/compare.py reduce RAW_DIR
+  pixi run python checks/pair_production_geant4/compare.py [--samples N] [--output REPORT.json]
 """
 
 import argparse

@@ -110,8 +110,8 @@ whole implementation packages.
 Run:
 
 ```bash
-uv run pyrite-dev api check
-uv run pyrite-dev api check --imports  # additionally resolve bindings and object identity
+pixi run pyrite-dev api check
+pixi run pyrite-dev api check --imports  # additionally resolve bindings and object identity
 ```
 
 The default check is AST/TOML-based and performs **no application imports**.

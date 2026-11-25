@@ -13,11 +13,11 @@
 # CPU node (qlmc-queen): sbatch -p cpu -w qlmc-queen --gres=none --export=ALL,PROBE_CPU=1 ...
 set -uo pipefail
 cd "$SLURM_SUBMIT_DIR"
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 if [ "${PROBE_CPU:-0}" = 1 ]; then
-    export PYRITE_MC_BACKEND=cpu UV_CACHE_DIR="$HOME/.cache/uv-cpu"
-    export UV_PROJECT_ENVIRONMENT="$PWD/.venv-cpu" NUMBA_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
-    pyrite_gpu_sync() { uv sync --locked "$@"; }
+    export PYRITE_MC_BACKEND=cpu
+    export NUMBA_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
+    pyrite_gpu_sync() { pixi install --locked -e amd "$@"; }
     pyrite_gpu_info() { nproc; free -g; }
 else
     . checks/rocm/env.sh
@@ -37,9 +37,9 @@ for spec in "${case_list[@]}"; do
     IFS=: read -r material e0 tilt family <<< "$spec"
     stem="$OUT/$material-$e0-$tilt-n$HISTORIES"
     echo "== $(date -Is) $stem"
-    timeout "$CASE_TIMEOUT" uv run --no-sync python -u $H run "$material" "$e0" "$tilt" \
+    timeout "$CASE_TIMEOUT" pixi run --as-is -e amd python -u $H run "$material" "$e0" "$tilt" \
         "$HISTORIES" "$family" "$stem.json" > "$stem.log" 2>&1
     echo "rc=$? $(tail -c 600 "$stem.log" | tr '\n' ' ' | cut -c1-600)"
 done
-uv run --no-sync python $H table "$OUT" | tee "$OUT/table.txt"
+pixi run --as-is -e amd python $H table "$OUT" | tee "$OUT/table.txt"
 sha256sum "$OUT"/* > "$OUT/SHA256SUMS" 2>/dev/null

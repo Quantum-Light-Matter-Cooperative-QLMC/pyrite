@@ -132,7 +132,7 @@ python compare.py --output report.json
 
 `PYRITE_HOME` is a dedicated data root holding the pinned tables and
 datasets, including `epdl-differential`. The staging root holds its own
-`git archive` checkout and uv environment, so neither the shared remote
+`git archive` checkout and pixi environment, so neither the shared remote
 workspace nor its table store is touched.
 
 ## Results
@@ -170,8 +170,8 @@ they preserve every mean, SE and covariance used by this check. The full
 To compact a freshly reduced file, then reproduce the failing comparison:
 
 ```bash
-uv run python checks/photon_full_track/compare.py compact RAW.json OUTPUT.json.gz
-uv run python checks/photon_full_track/compare.py --output report.json
+pixi run python checks/photon_full_track/compare.py compact RAW.json OUTPUT.json.gz
+pixi run python checks/photon_full_track/compare.py --output report.json
 ```
 
 The comparison requires all eight cases and returns 1 for the two known
@@ -208,13 +208,13 @@ Source: [Geant4 11.4.2 atomic deexcitation](https://github.com/Geant4/geant4/blo
 From an isolated, committed checkout on the box:
 
 ```bash
-uv sync --locked
-uv run python checks/photon_full_track/monoenergetic.py macros macros --events 100000
+pixi install --locked
+pixi run python checks/photon_full_track/monoenergetic.py macros macros --events 100000
 mkdir -p results
 # Set PHOTON_DATA_ROOT, PHOTON_G4_ROOT, PHOTON_G4_ENV and PHOTON_MICROMAMBA
 # to the pinned data home, original TestEm5 staging root, Geant4 env and runner.
 sbatch --export=ALL checks/photon_full_track/run_monoenergetic.sbatch
-uv run python checks/photon_full_track/monoenergetic.py summary results/w_20kev_cascade.json
+pixi run python checks/photon_full_track/monoenergetic.py summary results/w_20kev_cascade.json
 ```
 
 Reductions retain 100 equal incident-history blocks, including zero-hit
@@ -235,14 +235,14 @@ generation, deexcitation cut handling and the output name; electron source,
 transport, geometry, seeds and charged-secondary suppression stay identical.
 
 ```bash
-uv run python checks/photon_full_track/make_macros.py --case w_0p3mev \
+pixi run python checks/photon_full_track/make_macros.py --case w_0p3mev \
   --complete-cascade --output /path/to/isolated-staging
 # In that directory, create results/ and set GEANT4_ENV, MICROMAMBA, and
 # TESTEM5 to the existing pinned environment, runner and patched binary.
 sbatch --array=1-10 --export=ALL /path/to/checkout/checks/photon_full_track/run_geant4.sbatch
-uv run python checks/photon_full_track/compare.py reduce-geant4-cascade \
+pixi run python checks/photon_full_track/compare.py reduce-geant4-cascade \
   w_0p3mev cascade-reference.json /path/to/isolated-staging/results/*.log.gz
-uv run python checks/photon_full_track/compare.py compare-cascade \
+pixi run python checks/photon_full_track/compare.py compare-cascade \
   w_0p3mev cascade-reference.json --output cascade-report.json
 ```
 
@@ -317,16 +317,16 @@ scattering and relax its shell vacancy (PyRITE relaxes every EADL subshell
 above the cutoff; Geant4 Penelope only identified shells for 5 < Z < 105).
 
 ```bash
-# isolated git-archive checkout on the box, after `uv sync --locked`
-uv run python checks/photon_full_track/alloy_fluorescence.py macros macros \
+# isolated git-archive checkout on the box, after `pixi install --locked`
+pixi run python checks/photon_full_track/alloy_fluorescence.py macros macros \
   --events 100000 --shards 10
 mkdir -p results
 # PHOTON_DATA_ROOT, PHOTON_G4_ROOT, PHOTON_G4_ENV, PHOTON_MICROMAMBA as above
 sbatch --export=ALL checks/photon_full_track/run_alloy_fluorescence.sbatch
 for c in gaas_11p5kev gaas_15kev gaas_30kev; do for e in geant4 pyrite; do
-  uv run python checks/photon_full_track/alloy_fluorescence.py merge \
+  pixi run python checks/photon_full_track/alloy_fluorescence.py merge \
     alloy-results/${c}_$e.json.gz results/${c}_s*_$e.json.gz; done; done
-uv run python checks/photon_full_track/alloy_fluorescence.py compare alloy-results \
+pixi run python checks/photon_full_track/alloy_fluorescence.py compare alloy-results \
   --output alloy-results/report.json
 ```
 
@@ -379,8 +379,8 @@ records under-predicted ungated W backscatter (internal source 100–300 keV
 [validation page](../../docs/validation/radiation-physics/photon-annihilation-escape.md).
 
 ```bash
-uv run python checks/photon_full_track/annihilation_escape.py macros macros --events 100000
-uv run python checks/photon_full_track/annihilation_escape.py macros macros --events 100000 \
+pixi run python checks/photon_full_track/annihilation_escape.py macros macros --events 100000
+pixi run python checks/photon_full_track/annihilation_escape.py macros macros --events 100000 \
   --physics emlivermore
 mkdir -p results
 sbatch --export=ALL checks/photon_full_track/run_annihilation_escape.sbatch
@@ -388,7 +388,7 @@ PHOTON_G4_PHYSICS=emlivermore sbatch --export=ALL --array=1-40 \
   checks/photon_full_track/run_annihilation_escape.sbatch
 # merge results/<config>_s*_{pyrite,geant4,geant4_emlivermore}.json.gz into
 # escape-results/<config>_<arm>.json.gz, then:
-uv run python checks/photon_full_track/annihilation_escape.py compare escape-results \
+pixi run python checks/photon_full_track/annihilation_escape.py compare escape-results \
   --output escape-results/report-penelope.json
 ```
 

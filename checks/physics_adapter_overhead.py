@@ -1,6 +1,6 @@
 """Small matched-revision CPU transport/scoring benchmark for ADR-0017.
 
-Run through uv in each checkout, using identical locked dependencies and data.
+Run through `pixi run` in each checkout, using identical locked dependencies and data.
 No sweep, checkpoint I/O, downloads, or device execution. Reports cold process
 initialization/first calls separately from warmed phase medians and all samples.
 """

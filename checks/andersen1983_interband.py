@@ -33,7 +33,7 @@ Eq. (4.19), which this estimate omits.
 
 CPU, a few minutes locally::
 
-    uv run python checks/andersen1983_interband.py --out andersen.json
+    pixi run python checks/andersen1983_interband.py --out andersen.json
 
 Diagnostic; always exits 0.
 

@@ -8,7 +8,7 @@
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache PYRITE_MC_BACKEND=cpu
+export PYRITE_MC_BACKEND=cpu
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1 MPLBACKEND=Agg
 out="scratch/activity-ladder/$SLURM_JOB_ID"
 mkdir -p "$out/source"
@@ -22,7 +22,7 @@ cp "$protocol" "$out/source/protocol.json"
 cp -r src/pyrite/montecarlo/transport "$out/source/transport"
 find "$out/source" -type d -name __pycache__ -prune -exec rm -rf {} +
 set +e
-"$HOME/.local/bin/uv" run --no-sync python checks/equal_precision/run_activity_ladder.py "$out/samples" --protocol "$protocol"
+"${PYRITE_REMOTE_PIXI:-$HOME/.pixi/bin/pixi}" run --as-is python checks/equal_precision/run_activity_ladder.py "$out/samples" --protocol "$protocol"
 status=$?
 set -e
 find "$out" -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > "$out/SHA256SUMS"

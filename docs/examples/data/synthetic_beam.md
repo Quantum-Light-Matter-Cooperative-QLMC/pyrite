@@ -30,9 +30,9 @@ factor. All arrays are explicitly supplied.
 From the checkout, explicitly regenerate the input, then the simulated output:
 
 ```bash
-uv run python docs/examples/gpt_gdf_beams.py --make-fixture
+pixi run python docs/examples/gpt_gdf_beams.py --make-fixture
 MPLCONFIGDIR=/tmp/pyrite-matplotlib PYRITE_MC_BACKEND=cpu \
-  uv run python docs/_tutorials.py --regenerate gpt_gdf_beams
+  pixi run python docs/_tutorials.py --regenerate gpt_gdf_beams
 ```
 
 The example uses 64 CPU histories per radiation component and two reflection

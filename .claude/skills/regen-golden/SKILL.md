@@ -10,8 +10,8 @@ regen could mask unexplained drift.
 
 ```bash
 git status --short src/pyrite/data/catalog src/pyrite/materials/catalog.py
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev regen-golden
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test \
+pixi run pyrite-dev regen-golden
+pixi run pyrite-dev test \
   tests/materials/test_material_catalog.py -k golden
 git diff --stat tests/data/material_catalog_golden.json
 ```

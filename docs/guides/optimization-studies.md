@@ -30,8 +30,8 @@ Start with one four-history CPU preflight:
 
 <!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
-uv sync --extra optimization
-PYRITE_MC_BACKEND=cpu uv run python checks/pxr_optimization.py \
+pixi install
+PYRITE_MC_BACKEND=cpu pixi run python checks/pxr_optimization.py \
   preflight --output /tmp/pxr-optimization
 ```
 
@@ -48,9 +48,9 @@ synced checkout, explicit catalog environment and memory allocation:
 
 <!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
-PYRITE_MC_BACKEND=cpu OPENBLAS_NUM_THREADS=1 uv run --extra optimization \
+PYRITE_MC_BACKEND=cpu OPENBLAS_NUM_THREADS=1 pixi run \
   python checks/pxr_optimization.py search --output pyrite-output/optimization/pxr-demo
-PYRITE_MC_BACKEND=cpu OPENBLAS_NUM_THREADS=1 uv run --extra optimization \
+PYRITE_MC_BACKEND=cpu OPENBLAS_NUM_THREADS=1 pixi run \
   python checks/pxr_optimization.py validate --output pyrite-output/optimization/pxr-demo
 ```
 

@@ -29,8 +29,8 @@ Per (material, beam):
 Validation: shell-soft-hard-transport
 
 Run:
-  uv run python checks/shell_soft_hard_transport_observables.py --quick
-  uv run python checks/shell_soft_hard_transport_observables.py --output REPORT.json
+  pixi run python checks/shell_soft_hard_transport_observables.py --quick
+  pixi run python checks/shell_soft_hard_transport_observables.py --output REPORT.json
 """
 
 import argparse

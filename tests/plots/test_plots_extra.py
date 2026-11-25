@@ -37,5 +37,5 @@ def test_lazy_plot_name_without_matplotlib_raises_install_hint(monkeypatch):
         monkeypatch.delitem(sys.modules, name)
     monkeypatch.delitem(pyrite.plots.__dict__, "plot_by_energy", raising=False)
 
-    with pytest.raises(extras.MissingExtraError, match="uv sync --extra plots"):
+    with pytest.raises(extras.MissingExtraError, match="pixi install -e default"):
         pyrite.plots.plot_by_energy  # noqa: B018

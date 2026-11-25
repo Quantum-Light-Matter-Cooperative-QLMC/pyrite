@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 BR="$PWD"
-export PATH="$HOME/.local/bin:$PATH" PYRITE_MC_BACKEND=cuda UV_CACHE_DIR=/tmp/pyrite-uv-cache
+export PATH="$HOME/.pixi/bin:$PATH" PYRITE_MC_BACKEND=cuda
 export OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 export PYRITE_HOME="$BR" PYRITE_CATALOG="$BR/src/pyrite/data/catalog" PYRITE_USER_CATALOG="$BR/user-catalog"
 export XDG_CONFIG_HOME="$BR/config-home" XDG_DATA_HOME="$BR/data-home"
@@ -24,15 +24,15 @@ scontrol show job "$SLURM_JOB_ID" > "$out/job.txt"; nvidia-smi -q > "$out/gpu.tx
 # a real cgroup v2 memory.max <= the reserved 28 GiB protects the node.
 MEM_MAX_BYTES=$((28 * 1024 * 1024 * 1024))
 python "$BR/checks/equal_precision/contained_sample.py" --max-bytes "$MEM_MAX_BYTES" -- /usr/bin/true
-uv sync --package pyrite-mc --no-default-groups --group dev --extra nvidia -q
-for code in elsepa bremslib sbethe sbethe-tables eedl eadl epdl; do uv run --no-sync pyrite tables fetch "$code" > /dev/null; done
+pixi install --locked -e nvidia
+for code in elsepa bremslib sbethe sbethe-tables eedl eadl epdl; do pixi run --as-is -e nvidia pyrite tables fetch "$code" > /dev/null; done
 run() {  # schedule scene histories seed
   local stem="$2-$3-$4-$1" rc state
   # A sidecar is created *before* each sample. SIGKILL leaves it "running"
   # rather than silently omitting a measurement from qualification.
   printf '{"status":"running","exit_code":null}\n' > "$out/$stem.status.json"
   if PYRITE_MC_TRANSPORT_SCHEDULE=$1 timeout --signal=TERM --kill-after=5s 2400s \
-      uv run --no-sync python "$BR/checks/equal_precision/contained_sample.py" \
+      pixi run --as-is -e nvidia python "$BR/checks/equal_precision/contained_sample.py" \
       --max-bytes "$MEM_MAX_BYTES" -- \
       python "$BR/checks/equal_precision/qualify_schedule.py" "$2" \
       --histories "$3" --seed "$4" --output "$out/$stem.json" \

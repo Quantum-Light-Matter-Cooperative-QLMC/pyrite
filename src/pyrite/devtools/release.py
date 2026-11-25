@@ -6,8 +6,8 @@ at or before the target is still shipped, and render notes from conventional
 commits since the last ``v*`` tag.
 
 Usage:
-    uv run pyrite-dev release X.Y.Z [--base REV] [--notes-file PATH] [--check]
-    uv run pyrite-dev release-notes vX.Y.Z [--notes-file PATH]
+    pixi run pyrite-dev release X.Y.Z [--base REV] [--notes-file PATH] [--check]
+    pixi run pyrite-dev release-notes vX.Y.Z [--notes-file PATH]
     python -m pyrite.devtools.release vX.Y.Z [--notes-file PATH]   # tag-push workflow;
         # runtime dependencies only, unlike pyrite-dev
 """

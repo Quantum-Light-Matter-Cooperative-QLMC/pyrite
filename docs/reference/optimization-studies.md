@@ -3,7 +3,7 @@
 The `pyrite.optimization` module chooses **physical Scene parameters**. It does
 not replace the existing Monte Carlo runner, executor, or case checkpoints.
 Optuna is optional: install `pyrite-mc[optimization]` or use
-`uv sync --extra optimization` in a checkout.
+`pixi install` in a checkout.
 
 ## Defining a bounded study
 
@@ -93,7 +93,7 @@ numeric study digests remain unchanged.
 ## Selecting an Optuna sampler
 
 The `optimization` extra requires Optuna 5.0 or newer (within major version 5).
-Run `uv lock --upgrade-package optuna` and `uv sync --extra optimization`
+Run `pixi lock --upgrade-package optuna` and `pixi install`
 after updating your checkout. The lockfile is regenerated locally, rather
 than included in the source patch.
 
@@ -248,7 +248,7 @@ A bounded local preflight runs only one four-history case:
 
 <!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
-PYRITE_MC_BACKEND=cpu uv run --extra optimization python checks/pxr_optimization.py \
+PYRITE_MC_BACKEND=cpu pixi run python checks/pxr_optimization.py \
   preflight --output /tmp/pxr-optimization
 ```
 
@@ -259,9 +259,9 @@ request:
 
 <!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
-PYRITE_MC_BACKEND=cpu OPENBLAS_NUM_THREADS=1 uv run --extra optimization \
+PYRITE_MC_BACKEND=cpu OPENBLAS_NUM_THREADS=1 pixi run \
   python checks/pxr_optimization.py search --output pyrite-output/optimization/pxr-demo
-PYRITE_MC_BACKEND=cpu OPENBLAS_NUM_THREADS=1 uv run --extra optimization \
+PYRITE_MC_BACKEND=cpu OPENBLAS_NUM_THREADS=1 pixi run \
   python checks/pxr_optimization.py validate --output pyrite-output/optimization/pxr-demo
 ```
 

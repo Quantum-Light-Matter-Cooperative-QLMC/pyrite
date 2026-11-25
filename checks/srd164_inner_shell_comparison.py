@@ -8,7 +8,7 @@ the outer-shell scale ``N(E)`` with either source. Report only: no gate. The
 SRD 164 tables are not redistributed; point ``--database`` at the
 ``NISTxyz/database`` directory extracted from the NIST164 distribution.
 
-    uv run python checks/srd164_inner_shell_comparison.py --database DIR
+    pixi run python checks/srd164_inner_shell_comparison.py --database DIR
 
 Exit 0 on a report, 2 when the database is missing. Issue #439; backend: #92.
 

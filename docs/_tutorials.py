@@ -48,7 +48,7 @@ def checked_output(name):
     if payload["source_sha256"] != source_digest(name):
         raise ValueError(
             f"stale tutorial output: {name}; regenerate with "
-            f"uv run python docs/_tutorials.py --regenerate {name}"
+            f"pixi run python docs/_tutorials.py --regenerate {name}"
         )
     output = payload["output"]
     for filename, digest in output.get("input_sha256", {}).items():

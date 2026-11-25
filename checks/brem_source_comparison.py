@@ -47,8 +47,8 @@ Exit 0 pass, 1 fail, 2 skip (table or BremsLib release not installed).
 Validation: brem-source-comparison
 
 Run:
-  PYRITE_MC_BACKEND=cpu uv run python checks/brem_source_comparison.py --download
-  PYRITE_MC_BACKEND=cpu uv run python checks/brem_source_comparison.py --output REPORT.json
+  PYRITE_MC_BACKEND=cpu pixi run python checks/brem_source_comparison.py --download
+  PYRITE_MC_BACKEND=cpu pixi run python checks/brem_source_comparison.py --output REPORT.json
 """
 
 import argparse

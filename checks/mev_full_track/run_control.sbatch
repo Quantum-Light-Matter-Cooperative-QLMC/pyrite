@@ -11,16 +11,16 @@
 #SBATCH --output=results/%x_%a.out
 set -euo pipefail
 ROOT=${SLURM_SUBMIT_DIR}
-UV=${PYRITE_REMOTE_UV:-$HOME/.local/bin/uv}
+PIXI="${PYRITE_REMOTE_PIXI:-$HOME/.pixi/bin/pixi}"
 TABLE="$ROOT/results/w_point_nucleus_elsepa.npz"
 cd "$PYRITE_CHECKOUT"
 if [ "$SLURM_ARRAY_TASK_ID" -eq 0 ]; then
-  "$UV" run --no-sync python "$ROOT/point_nucleus_table.py" "$TABLE"
+  "$PIXI" run --as-is python "$ROOT/point_nucleus_table.py" "$TABLE"
   exit 0
 fi
 CASES=(w_50mev w_100mev)
 i=$((SLURM_ARRAY_TASK_ID - 1))
 CASE=${CASES[$((i / 10))]}
 SHARD=$((i % 10))
-"$UV" run --no-sync python "$ROOT/pyrite_bench.py" "$CASE" 10000 $((200 * SHARD)) \
+"$PIXI" run --as-is python "$ROOT/pyrite_bench.py" "$CASE" 10000 $((200 * SHARD)) \
   "$ROOT/results/${CASE}_point_${SHARD}.npz" --elastic-npz "$TABLE"

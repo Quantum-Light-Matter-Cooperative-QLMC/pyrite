@@ -10,7 +10,7 @@
 #SBATCH --array=1-59
 #SBATCH --output=results/%x_%a.out
 set -euo pipefail
-export PATH=$HOME/.local/bin:$PATH
+export PATH=$HOME/.pixi/bin:$PATH
 ROOT=${SLURM_SUBMIT_DIR}
 MAC=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$ROOT/cases.txt")
 test -n "$MAC"

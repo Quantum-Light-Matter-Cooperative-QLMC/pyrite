@@ -14,7 +14,7 @@ move materially? Numbers from this script are recorded in
 ``docs/validation/beam-transport/radiation-error-estimators.md`` and the
 chosen defaults live in ``montecarlo/spectrum/diagnostics.py``.
 
-Run:  uv run python checks/radiation_error_estimator_calibration.py
+Run:  pixi run python checks/radiation_error_estimator_calibration.py
 
 Validation: radiation-error-estimators
 """

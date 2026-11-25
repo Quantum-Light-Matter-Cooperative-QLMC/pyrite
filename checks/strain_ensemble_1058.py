@@ -21,7 +21,7 @@ acoustic (or static) distribution of local plane tilt and lattice parameter:
 
 Run (CPU, a few minutes per planar case)::
 
-    uv run python checks/strain_ensemble_1058.py --out scratch/strain-1058.json
+    pixi run python checks/strain_ensemble_1058.py --out scratch/strain-1058.json
 
 ``--skip-planar`` runs the analytic parts only (seconds).
 """

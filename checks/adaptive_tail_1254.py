@@ -1,6 +1,6 @@
 """Replay captured primary scores against the CXR variance guard (#1254).
 
-Usage: uv run python checks/adaptive_tail_1254.py CAPTURE_DIR... --out REPORT
+Usage: pixi run python checks/adaptive_tail_1254.py CAPTURE_DIR... --out REPORT
 
 Selects the longest #1252 capture for each (material, energy, tilt), hashes
 its bytes, and replays old and new policies on that identical population.

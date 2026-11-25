@@ -2,7 +2,7 @@
 # Issue #341: PyRITE side of the thick-target photon check. Task i runs shard
 # (i-1) % 20 (1,000 primaries, batches 20*shard onward) of case (i-1) / 20 in
 # the fixed order below. Submit from the staging root; PYRITE_CHECKOUT is a
-# staged checkout with its uv environment and PYRITE_HOME its data root.
+# staged checkout with its pixi environment and PYRITE_HOME its data root.
 #SBATCH --job-name=issue341-pyrite
 #SBATCH --partition=cpu
 #SBATCH --cpus-per-task=1

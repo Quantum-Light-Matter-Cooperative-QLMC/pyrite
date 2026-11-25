@@ -42,7 +42,7 @@ first=1
 for spec in "${case_list[@]}"; do
     IFS=: read -r material e0 tilt <<< "$spec"
     stem="$OUT/$material-$e0-$tilt"
-    run=(uv run --no-sync python -u $H "$material" "$e0" "$tilt")
+    run=(pixi run --as-is -e amd python -u $H "$material" "$e0" "$tilt")
     for name in $ARMS; do
         case $name in
         warm) [ $first = 1 ] && arm "$stem-warm" "${run[@]}" "$stem-warm.json" ;;
@@ -56,7 +56,7 @@ for spec in "${case_list[@]}"; do
             if [ -f "$stem.nsys-rep" ]; then
                 nsys export --type sqlite --force-overwrite true --output "$stem.sqlite" "$stem.nsys-rep" \
                     > "$stem-export.log" 2>&1
-                uv run --no-sync python checks/native_cpu_audit/nsys_gaps.py "$stem.sqlite" "$stem-gaps.json" \
+                pixi run --as-is -e amd python checks/native_cpu_audit/nsys_gaps.py "$stem.sqlite" "$stem-gaps.json" \
                     > "$stem-gaps.log" 2>&1
                 echo "gaps rc=$? $(tail -n 1 "$stem-gaps.log" | cut -c1-400)"
                 rm -f "$stem.sqlite"

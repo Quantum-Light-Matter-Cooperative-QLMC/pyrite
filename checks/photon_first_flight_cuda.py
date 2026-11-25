@@ -1,6 +1,6 @@
 """Real-CUDA first-flight parity and bounded end-to-end timing for #341.
 
-Use ``uv run --extra nvidia python checks/photon_first_flight_cuda.py`` in a
+Use ``pixi run -e nvidia python checks/photon_first_flight_cuda.py`` in a
 bounded remote GPU allocation after ``pyrite remote sync``. No CUDA means
 failure. Outputs one JSON record; this is backend parity, not a new physics
 validation or evidence for the full photon history queue.
