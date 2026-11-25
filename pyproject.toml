@@ -99,7 +99,7 @@ plots = [
 apps = [
     "pyrite-mc[plots]",
     "anywidget>=0.11.0",
-    "marimo[recommended]>=0.25.1",
+    "marimo[recommended]>=0.26.0",
 ]
 
 [project.scripts]
@@ -188,6 +188,7 @@ notebooks = [
     "pyrite-mc[apps]",
     "nbconvert>=7.17.1",
     "pandoc>=2.4",
+    "marimo[recommended]>=0.26.0",
 ]
 
 [tool.pytest.ini_options]
@@ -640,6 +641,9 @@ cache-dir = "/tmp/pyrite-uv-cache"
 # all contributor groups; the `notebooks` group pulls `pyrite-mc[apps]`, which
 # tests need (plotly, marimo). Runtime-only installs pass `--no-default-groups`.
 default-groups = "all"
+constraint-dependencies = [
+    "boto3>=1.35.0",
+]
 conflicts = [
     [
         { extra = "nvidia" },
