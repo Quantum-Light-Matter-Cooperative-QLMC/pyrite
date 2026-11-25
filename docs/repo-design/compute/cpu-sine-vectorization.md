@@ -142,34 +142,20 @@ A dry run built Python 3.13.18, NumPy 2.2.5, Numba 0.61.2 and the SVML llvmlite
 
 ## Opt-in SVML path
 
-Proposed; not implemented. All steps are measured except the runtime switch.
+Proposed; not implemented. The environment is part of the general move from
+uv to pixi (#1462), as its `svml` environment, rather than a standalone conda
+file. The runtime switch is not measured; the other steps are.
 
 1. **Relax the floors** to `numpy>=2.2` and `numba>=0.61`.
    - With those floors, `pip install` inside a `pkgs/main` environment keeps
      the conda numpy 2.2.5, numba 0.61.2 and llvmlite 0.44.0 as already
      satisfied (dry run).
-   - `uv.lock` still resolves to the latest versions, so the default install
-     does not change.
-2. **Ship one environment file,** `environment-svml.yml`:
-
-   ```yaml
-   name: pyrite-svml
-   channels: [pkgs/main, nodefaults]
-   dependencies:
-     - python=3.13
-     - numpy=2.2
-     - numba=0.61
-     - llvmlite=0.44
-     - intel-cmplr-lib-rt
-     - pip
-     - pip:
-         - pyrite-mc   # or "-e ." from a checkout
-   ```
-
-   - The user runs `conda env create -f environment-svml.yml`, then
-     `numba -s | grep SVML`.
-   - A from-checkout version of this file built in 17 s from a warm package
-     cache, and all four SVML checks reported True.
+   - The default environment still resolves to the latest versions.
+2. **Add a pixi `svml` environment.** It takes Python 3.13, `numpy=2.2`,
+   `numba=0.61`, `llvmlite=0.44` and `intel-cmplr-lib-rt` from `pkgs/main`,
+   plus a `conda-pypi-map` so NumPy is not also installed from PyPI.
+   - The same packages, built as a one-off conda environment, built in 17 s
+     from a warm package cache, with all four SVML checks True.
 3. **Add a runtime switch** `PYRITE_CPU_MATH=svml-fast`, set through the
    config table in `console/config.py`.
    - It compiles a second window kernel that calls `np.sin` with
