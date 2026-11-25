@@ -73,12 +73,13 @@ def control_level(control, controls):
 
 
 def classify(record, configs):
-    """Return (config id, workload, setting) for one PyRITE CUDA bench record."""
+    """Return (config id, workload, setting) for one PyRITE CUDA or CPU bench record."""
     if record["schema"] != "pyrite.geant4-performance.sample.v1":
         raise ValueError("not a bench sample record")
     controls = record["controls"]
     algorithm = "ss" if controls["mixed_c1"] is None else "mixed"
-    arm = f"pyrite-{algorithm}-cuda-{controls['transport_precision']}"
+    backend = "cpu" if controls.get("transport_core", "cuda") == "per-electron" else "cuda"
+    arm = f"pyrite-{algorithm}-{backend}-{controls['transport_precision']}"
     config = configs.get(f"{record['scene']['id']}|{arm}")
     if config is None:
         raise ValueError(f"no design configuration for {record['scene']['id']}|{arm}")
@@ -164,6 +165,11 @@ def discordance(design, row, d):
 
 
 def arm_summary(runs, observable, root, identities):
+    cpu = all(r["vram_telemetry"] is None for _, r in runs)
+    if not cpu and any(r["vram_telemetry"] is None for _, r in runs):
+        raise ValueError("one pilot arm mixes CPU and GPU records")
+    if cpu and not identities.get("cpu_arm_cpus"):
+        raise ValueError("CPU pilot records need --cpu-arm-cpus and --cpu-arm-hardware")
     scores = [v for _, v in arm_scores(runs, observable)]
     files = []
     for path, _ in runs:
@@ -175,12 +181,17 @@ def arm_summary(runs, observable, root, identities):
         histories=int(pooled.size),
         elapsed_seconds=float(sum(t["warm_request"] for t in timings)),
         overhead_seconds=float(max(t["process_total"] - t["warm_request"] for t in timings)),
-        cpus=identities["cpus"],
-        gpus=1,
+        cpus=identities["cpu_arm_cpus"] if cpu else identities["cpus"],
+        gpus=0 if cpu else 1,
         peak_memory_bytes=max(r["peak_rss_kib"] for _, r in runs) * 1024,
         memory_margin_factor=identities["memory_margin_factor"],
-        peak_vram_bytes=max(r["vram_telemetry"]["peak_device_used_bytes"] for _, r in runs),
-        hardware_identity=f"{identities['hardware']}; device {runs[0][1]['device']}",
+        peak_vram_bytes=0
+        if cpu
+        else max(r["vram_telemetry"]["peak_device_used_bytes"] for _, r in runs),
+        hardware_identity=(
+            f"{identities['cpu_arm_hardware'] if cpu else identities['hardware']}; "
+            f"device {runs[0][1]['device']}"
+        ),
         runtime_identity=identities["runtime"],
         seeds=sorted(r["seed"] for _, r in runs),
         mean=float(pooled.mean()),
@@ -197,17 +208,23 @@ def summarize(design_path, paths, root, identities, audit_path=None):
     cells = verified_cells(audit)
     rows, evidence, seeds = [], {}, set()
     for row in design["expected_rows"]:
-        if row["support"] != "available" or row["contrast"] not in CONTRASTS:
+        if row["support"] != "available":
             continue
-        sides, settings = [], []
-        for level in CONTRASTS[row["contrast"]]:
-            setting = ((row["control"], level),) if level else ()
-            settings.append(setting)
-            sides.append(groups.get((row["config"], row["workload"], setting)))
+        if row["contrast"].startswith("parity:"):
+            # Nominal settings in both arms; difference is carried minus reference.
+            pairs = [(row["reference_config"], ()), (row["config"], ())]
+        elif row["contrast"] in CONTRASTS:
+            pairs = [
+                (row["config"], ((row["control"], level),) if level else ())
+                for level in CONTRASTS[row["contrast"]]
+            ]
+        else:
+            continue
+        sides = [groups.get((config, row["workload"], setting)) for config, setting in pairs]
         if not all(sides):
             continue
         d = None
-        if all((row["config"], s, row["observable"]) in cells for s in settings):
+        if all((config, s, row["observable"]) in cells for config, s in pairs):
             d = paired_differences(sides, row["observable"])
         arms, variance, files = [], 0.0, []
         for runs in sides:
@@ -262,6 +279,8 @@ def main():
     parser.add_argument("--hardware", required=True)
     parser.add_argument("--runtime", required=True)
     parser.add_argument("--memory-margin", type=float, default=1.5)
+    parser.add_argument("--cpu-arm-cpus", type=int, default=None, help="CPUs per CPU-arm job")
+    parser.add_argument("--cpu-arm-hardware", default=None, help="CPU-arm host identity")
     parser.add_argument(
         "--pairing-audit", type=Path, default=None, help="audit_primary_pairing.py output"
     )
@@ -278,6 +297,8 @@ def main():
         hardware=args.hardware,
         runtime=args.runtime,
         memory_margin_factor=args.memory_margin,
+        cpu_arm_cpus=args.cpu_arm_cpus,
+        cpu_arm_hardware=args.cpu_arm_hardware,
     )
     result = summarize(args.design, paths, root, identities, args.pairing_audit)
     with args.output.open("x") as stream:

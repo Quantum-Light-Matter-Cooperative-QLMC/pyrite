@@ -133,9 +133,25 @@ any confirmation run:
   family share, like every unsupported control, and are never reported as a
   pass;
 - audited common-random-number pairing is admitted (next section);
+- **exact-agreement rule** (`EXACT_AGREEMENT`): for an audited `crn-paired`
+  transport contrast with allowance `b`, a primary is discordant when
+  `|D| > b/2`. With zero discordances among `N` primaries,
+  `|E D| <= b/2 + R*p_U`, where `p_U = 1 - (row_alpha/2)**(1/N)` is the exact
+  zero-event binomial bound. `R` is the frozen per-primary score support: 1
+  for fates, the beam energy for transmitted energy. The row passes when that
+  bound is at most `b`. A single discordance makes the rule not-applicable.
+  Cone rows have no frozen bound and are excluded;
+- **parity rows** (`PARITY`, owner 2026-11-25): each carried arm
+  (CPU-fp64 and CUDA-mixed, SS and mixed scattering) gets one nominal row per
+  scene headline member against its CUDA-fp64 reference. Each row has
+  allowance `S*eps/3/4`. A carried arm inherits the reference ladder only if
+  its parity row passes and the reference's summed nominal:L3 bounds plus the
+  parity bound stay within `B`;
 - the confirmation GPU-hour ceiling is extended to the recorded value.
 
-Rows, row IDs, the multiplicity of 7,074 and the row alpha are unchanged.
+Existing row IDs and allowances are unchanged. The 108 parity rows are
+appended (IDs `comparison-07074` onward), so the multiplicity grows from
+7,074 to 7,182 and the row alpha becomes `0.05/7182`.
 
 ```bash
 uv run python checks/geant4_performance/amend_convergence_design.py --check
@@ -272,7 +288,8 @@ required; `submission_ready=false`, `numerical_gate="unmeasured"` and
 
 `summarize_convergence_pilot.py RECORD.json... --root DIR --cpus N --hardware H
 --runtime R --output DIR/summary.json` builds the planner input above from
-PyRITE CUDA bench records on pilot seeds 301–303. Scene, arm, workload and
+PyRITE CUDA bench records, plus CPU per-electron records (`--transport-core
+per-electron`, costed with `--cpu-arm-cpus` and `--cpu-arm-hardware`), on pilot seeds 301–303. Scene, arm, workload and
 the level of every design control are derived from each record's effective
 settings, not file names; a record refining two primitives, an off-ladder
 value or another seed fails. Raw NPZ hashes are verified before pooling.
@@ -280,7 +297,9 @@ Without `--pairing-audit`, different levels are independent populations, so
 `variance` is the sum of both arms' per-primary variances. With an audit that
 verifies both arms' (config, setting, observable) cells and matching seeds and
 histories, the row is `crn-paired` and also keeps `independent_variance`. Only `available` per-control contrasts
-(`nominal:L3`, `L1:L2`, `L2:L3`) with both arms present become rows;
+(`nominal:L3`, `L1:L2`, `L2:L3`) and parity rows (nominal carried arm minus
+nominal reference) with both arms present become rows. Under v1.1, paired
+rows also record their discordant-primary count and largest `|D|`;
 unavailable controls and all-fine corners stay missing. Rate is summed warm
 request time over pooled histories; per-shard overhead is the largest
 `process_total - warm_request`. Peak VRAM comes from the bench's sampled
@@ -290,7 +309,7 @@ context. Summaries are planning evidence, never convergence verdicts.
 ### Primary pairing audit
 
 `audit_primary_pairing.py RECORD.json... --root DIR --output DIR/audit.json`
-checks, from bench records only, that a PyRITE CUDA configuration's
+checks, from bench records only, that a PyRITE CUDA or CPU configuration's
 per-primary score depends on `(seed, global primary index, configuration)`
 alone. That is the design's precondition for paired variances (a common seed
 is not enough):

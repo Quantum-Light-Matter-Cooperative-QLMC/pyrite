@@ -199,6 +199,7 @@ def test_table_only_preflight_checks_real_payloads_without_cuda(tmp_path, monkey
         dict(mixed_c1=0.025),
         dict(cone_energy_order=8),
         dict(capture_tracks=Path("new-track-capture")),
+        dict(transport_core="per-electron"),
     ],
 )
 def test_numerical_settings_cannot_enter_frozen_nominal_timing(override):
@@ -213,6 +214,7 @@ def test_numerical_settings_cannot_enter_frozen_nominal_timing(override):
         mixed_c1=None,
         inelastic_cutoff_ev=None,
         transport_precision="mixed",
+        transport_core="cuda",
         cone_order=8,
         cone_rtol=1e-3,
     )
@@ -345,3 +347,22 @@ def test_moment_ladder_preserves_nominal_and_refuses_exact_override():
     assert factory(None, "exact") is None
     with pytest.raises(ValueError, match="requires"):
         factory(1, "exact")
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        [],  # default mixed precision exists only on the CUDA core
+        ["--transport-precision", "fp64", "--estimator", "continuous"],
+        ["--transport-precision", "fp64", "--spectrum-step-ev", "25"],
+    ],
+)
+def test_cpu_core_bench_is_limited_to_discrete_fp64_transport(monkeypatch, tmp_path, capsys, extra):
+    argv = [str(HARNESS), "si-300keV-100um", "--histories", "2", "--seed", "301"]
+    argv += ["--transport-core", "per-electron"]
+    argv += ["--output", str(tmp_path / "x.json"), *extra]
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(SystemExit):
+        runpy.run_path(str(HARNESS))["main"]()
+    assert "per-electron supports discrete fp64" in capsys.readouterr().err
+    assert not (tmp_path / "x.json").exists()

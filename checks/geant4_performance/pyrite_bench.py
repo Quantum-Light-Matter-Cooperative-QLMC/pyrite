@@ -508,6 +508,7 @@ def numerical_study(args, bounds, nominal):
         or args.mixed_c1 is not None
         or args.inelastic_cutoff_ev is not None
         or args.transport_precision != "mixed"
+        or args.transport_core != "cuda"
         or args.cone_order != 8
         or getattr(args, "cone_energy_order", None) is not None
         or getattr(args, "capture_tracks", None) is not None
@@ -603,6 +604,13 @@ def main():
         help="CUDA transport kernel selection where the build supports it (#827)",
     )
     parser.add_argument(
+        "--transport-core",
+        choices=["cuda", "per-electron"],
+        default="cuda",
+        help="exact transport core; per-electron is the CPU core sharing the CUDA core's "
+        "per-electron streams (#1041 parity arm: discrete fp64 transport scoring only)",
+    )
+    parser.add_argument(
         "--transport-precision",
         choices=["fp64", "mixed"],
         default="mixed",
@@ -668,6 +676,18 @@ def main():
         parser.error(
             "--capture-tracks requires continuous audited scoring, a new directory and positive byte ceiling"
         )
+    if args.transport_core != "cuda" and (
+        args.transport_precision != "fp64"
+        or args.estimator != "discrete"
+        or args.kernel != "default"
+        or args.capture_tracks is not None
+        or args.spectrum_geometric_nodes
+        or args.spectrum_step_ev
+    ):
+        parser.error(
+            "--transport-core per-electron supports discrete fp64 transport scoring only, "
+            "without CUDA kernels, capture or spectrum grids"
+        )
     if args.cone_energy_order is not None and (
         args.estimator != "continuous" or args.cone_mode == "adaptive" or args.tables_only
     ):
@@ -729,7 +749,17 @@ def main():
         )
         return
 
-    import cupy as cp
+    cp = None
+    if args.transport_core == "cuda":
+        import cupy as cp
+
+    def sync():
+        if cp is not None:
+            cp.cuda.Device().synchronize()
+
+    def free():
+        if pool is not None:
+            pool.free_all_blocks()
 
     # WSL2/WDDM pages device memory to host instead of failing an allocation
     # past physical VRAM, which silently slows scoring several-fold. Keep the
@@ -740,9 +770,11 @@ def main():
         if not hasattr(_jit_launch, "_SPECIALIZE_TRANSPORT_KERNEL"):
             raise RuntimeError("--kernel needs a build with per-configuration kernels (#827)")
         _jit_launch._SPECIALIZE_TRANSPORT_KERNEL = args.kernel == "specialized"
-    pool = cp.get_default_memory_pool()
-    pool.set_limit(fraction=args.pool_fraction)
-    vram = DevicePeakSampler(cp)
+    pool = vram = None
+    if cp is not None:
+        pool = cp.get_default_memory_pool()
+        pool.set_limit(fraction=args.pool_fraction)
+        vram = DevicePeakSampler(cp)
     import numpy as np
 
     from pyrite.montecarlo.transport import TransportLUTConfig
@@ -802,7 +834,7 @@ def main():
         bremslib_tables=brem,
         radiative_moments=args.radiative_moments,
         _radiative_moment_policy=moment_policy,
-        transport_core="cuda",
+        transport_core=args.transport_core,
         transport_precision=args.transport_precision,
         per_electron_config=config,
         # ELSEPA bypasses the LUT anyway; explicit so `auto` cannot fall back on it.
@@ -855,14 +887,14 @@ def main():
         retained = 0
         rounds.update(launched_rows=0, launches=0, assembly=[])
         log.messages.clear()
-        cp.cuda.Device().synchronize()
+        sync()
         t0 = time.perf_counter()
         transport_s = scoring_s = 0.0
         grids = {label: dict(seconds=0.0, density_sum=None, chunks=set()) for label in grid_nodes}
         for offset, n in balanced_blocks(histories, args.block):
             t1 = time.perf_counter()
             r = simulate_trajectories(**kwargs, Ne=n, seed=seed, _electron_start=offset)
-            cp.cuda.Device().synchronize()
+            sync()
             transport_s += time.perf_counter() - t1
             if moment_policy is not None:
                 identity = r["radiative"]
@@ -871,7 +903,7 @@ def main():
                 }
             retained += int(np.asarray(r["event_kind"]).size)
             t2 = time.perf_counter()
-            pool.free_all_blocks()
+            free()
             block = block_scores(r, n, kwargs["E0_keV"])
             if args.estimator == "continuous":
                 if capture is not None:
@@ -888,13 +920,13 @@ def main():
                     block[key] = v
             else:
                 block |= discrete_cone_scores(r, n, cone)
-            cp.cuda.Device().synchronize()
+            sync()
             scoring_s += time.perf_counter() - t2
             for label, g in grids.items():
-                pool.free_all_blocks()
+                free()
                 t3 = time.perf_counter()
                 density, chunk = grid_spectrum(r, grid_nodes[label], cone, ctx)
-                cp.cuda.Device().synchronize()
+                sync()
                 g["seconds"] += time.perf_counter() - t3
                 weighted = n * density
                 g["density_sum"] = (
@@ -904,7 +936,7 @@ def main():
             for key, v in block.items():
                 scores.setdefault(key, np.empty(histories))[offset : offset + n] = v
             del r
-        cp.cuda.Device().synchronize()
+        sync()
         grid_s = sum(g["seconds"] for g in grids.values())
         # The grid diagnostic stays outside the arm's request time.
         wall = time.perf_counter() - t0 - grid_s
@@ -1033,12 +1065,18 @@ def main():
     np.savez_compressed(npz, **scores)
     if last_grids:
         np.savez_compressed(args.output.with_suffix(".grid.npz"), **last_grids)
-    import cupy
-
-    dev = cupy.cuda.runtime.getDeviceProperties(0)
+    if cp is not None:
+        device = cp.cuda.runtime.getDeviceProperties(0)["name"].decode()
+    else:
+        models = [
+            line.split(":", 1)[1].strip()
+            for line in Path("/proc/cpuinfo").read_text().splitlines()
+            if line.startswith("model name")
+        ]
+        device = f"cpu {models[0] if models else 'unknown'}; {os.cpu_count()} logical"
     record = dict(
         schema="pyrite.geant4-performance.sample.v1",
-        engine="pyrite-cuda",
+        engine="pyrite-cuda" if cp is not None else "pyrite-cpu",
         estimator=args.estimator,
         cone=cone,
         cone_scoring=dict(
@@ -1080,6 +1118,7 @@ def main():
             pool_fraction=args.pool_fraction,
             score_rows=args.score_rows,
             kernel=args.kernel,
+            transport_core=args.transport_core,
             transport_precision=args.transport_precision,
             mixed_c1=args.mixed_c1,
             mixed_c2=args.mixed_c2,
@@ -1104,9 +1143,9 @@ def main():
             bremslib=brem[scene["material"]].key,
             elsepa=[t.key for e in entries for t in e.tables],
         ),
-        device=dev["name"].decode(),
+        device=device,
         peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
-        vram_telemetry=vram.finish(),
+        vram_telemetry=None if vram is None else vram.finish(),
         environment={
             k: os.environ.get(k) for k in ("PYRITE_MC_BACKEND", "PYRITE_MC_TRANSPORT_SCHEDULE")
         },

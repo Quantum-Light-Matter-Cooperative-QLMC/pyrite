@@ -33,7 +33,7 @@ def primaries(seed, shift=0.0):
     )
 
 
-def write(root, name, seed, scores, *, cutoff=10.0, block=8121, rows=256):
+def write(root, name, seed, scores, *, cutoff=10.0, block=8121, rows=256, core="cuda"):
     npz = root / f"{name}.npz"
     np.savez_compressed(npz, **scores)
     record = dict(
@@ -53,13 +53,14 @@ def write(root, name, seed, scores, *, cutoff=10.0, block=8121, rows=256):
             mixed_c2=None,
             mixed_max_step_um=None,
             transport_precision="fp64",
+            transport_core=core,
             moment_policy=None,
             rows_per_round=rows,
             seg_capacity=16384,
         ),
         timings_s=dict(warm_request=2.0, process_total=12.0),
         peak_rss_kib=1024,
-        vram_telemetry=dict(peak_device_used_bytes=4096),
+        vram_telemetry=None if core != "cuda" else dict(peak_device_used_bytes=4096),
         device="fake-gpu",
         raw_scores_sha256=hashlib.sha256(npz.read_bytes()).hexdigest(),
     )
@@ -125,6 +126,67 @@ def test_v1_1_summary_counts_discordances_and_plans_exact_agreement(tmp_path):
     assert all(plan[r["id"]]["sampling"] == "crn-paired" for r in energy)
 
 
+def test_v1_1_parity_rows_compare_carried_arms_with_their_cuda_fp64_reference():
+    design = AMEND["derive"](12.0)
+    configs = {c["id"]: c for c in design["configurations"]}
+    parity = [r for r in design["expected_rows"] if r["control"] == "parity"]
+    members = {
+        (r["config"], r["workload"], r["observable"])
+        for r in design["expected_rows"]
+        if r["contrast"] == "nominal:L3"
+    }
+    assert {r["support"] for r in parity} == {"available"}
+    assert {(r["config"], r["workload"], r["observable"]) for r in parity} == {
+        m
+        for m in members
+        if configs[m[0]]["arm"]["id"] in AMEND["PARITY_REFERENCES"]
+        and (
+            f"{configs[m[0]]['scene']}|{AMEND['PARITY_REFERENCES'][configs[m[0]]['arm']['id']]}",
+            m[1],
+            m[2],
+        )
+        in members
+    }
+    assert len(parity) == 108
+    for row in parity:
+        carried, reference = configs[row["config"]], configs[row["reference_config"]]
+        assert carried["scene"] == reference["scene"]
+        assert AMEND["PARITY_REFERENCES"][carried["arm"]["id"]] == reference["arm"]["id"]
+        assert row["contrast"] == f"parity:{reference['arm']['id']}"
+        assert row["allowance"] == pytest.approx(row["total_allowance"] / 4, rel=1e-15)
+    ids = [r["id"] for r in design["expected_rows"]]
+    assert ids == [f"comparison-{i:05d}" for i in range(len(ids))]
+
+
+def test_cpu_cuda_parity_rows_pair_and_use_exact_agreement(tmp_path):
+    design_path = tmp_path / "design-v1.1.json"
+    design_path.write_text(json.dumps(AMEND["derive"](12.0)))
+    paths = [
+        write(tmp_path, "cuda-301", 301, primaries(301)),
+        write(tmp_path, "cuda-302", 302, primaries(302)),
+        write(tmp_path, "cuda-301-r", 301, primaries(301), block=97, rows=64),
+        write(tmp_path, "cpu-301", 301, primaries(301), core="per-electron"),
+        write(tmp_path, "cpu-302", 302, primaries(302), core="per-electron"),
+        write(tmp_path, "cpu-301-r", 301, primaries(301), block=97, rows=64, core="per-electron"),
+    ]
+    audit = AUDIT["audit"](design_path, paths, tmp_path)
+    assert not audit["failed"] and len(audit["verified"]) == 2 * 4
+    audit_path = tmp_path / "audit.json"
+    audit_path.write_text(json.dumps(audit))
+    production = [p for p in paths if p.name in ("cuda-301.json", "cpu-301.json")]
+    with pytest.raises(ValueError, match="cpu-arm-cpus"):
+        SUMMARY["summarize"](design_path, production, tmp_path, IDS, audit_path)
+    ids = IDS | dict(cpu_arm_cpus=8, cpu_arm_hardware="cpu-host")
+    summary = SUMMARY["summarize"](design_path, production, tmp_path, ids, audit_path)
+    assert len(summary["rows"]) == 4
+    assert all(r["sampling"] == "crn-paired" and r["discordant"] == 0 for r in summary["rows"])
+    out = tmp_path / "summary.json"
+    out.write_text(json.dumps(summary))
+    rows = [r for r in PLANNER["make_plan"](design_path, out)["rows"] if "arms" in r]
+    assert {r["sampling"] for r in rows} == {"exact-agreement"}
+    assert all([a["gpus"] for a in r["arms"]] == [1, 0] for r in rows)
+
+
 def test_score_above_frozen_support_is_refused(tmp_path):
     design = AMEND["derive"](12.0)
     row = next(r for r in design["expected_rows"] if r["observable"] == "transmitted")
@@ -166,9 +228,10 @@ def test_missing_terminal_fate_refused(tmp_path):
 def test_v1_1_amendment_derives_from_frozen_v1():
     design = AMEND["derive"](12.0)
     frozen = json.loads(DESIGN.read_text())
-    assert design["multiplicity"] == frozen["multiplicity"] == len(design["expected_rows"])
-    assert design["row_alpha"] == frozen["row_alpha"] and design["target_rse"] == 0.05
-    for old, new in zip(frozen["expected_rows"], design["expected_rows"], strict=True):
+    m = frozen["multiplicity"] + 108  # carried arms x scene headline members (parity rows)
+    assert design["multiplicity"] == m == len(design["expected_rows"])
+    assert design["row_alpha"] == 0.05 / m and design["target_rse"] == 0.05
+    for old, new in zip(frozen["expected_rows"], design["expected_rows"], strict=False):
         assert new["id"] == old["id"]
         assert new["allowance"] == pytest.approx(2.5 * old["allowance"], rel=1e-14)
         if old["control"] == "elsepa_energy_density":

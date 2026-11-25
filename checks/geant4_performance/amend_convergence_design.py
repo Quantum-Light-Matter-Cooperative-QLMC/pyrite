@@ -45,6 +45,28 @@ EXACT_AGREEMENT = dict(
         "frozen support bound and are excluded."
     ),
 )
+PARITY_REFERENCES = {
+    "pyrite-ss-cpu-fp64": "pyrite-ss-cuda-fp64",
+    "pyrite-ss-cuda-mixed": "pyrite-ss-cuda-fp64",
+    "pyrite-mixed-cpu-fp64": "pyrite-mixed-cuda-fp64",
+    "pyrite-mixed-cuda-mixed": "pyrite-mixed-cuda-fp64",
+}
+PARITY = dict(
+    rule="arm reduction by parity (owner, 2026-11-25, compute reduction 4)",
+    references=PARITY_REFERENCES,
+    allowance="S*eps/3/4 per (scene, workload, observable): one family's share",
+    statement=(
+        "A carried arm inherits the convergence ladder of its CUDA-fp64 reference "
+        "(same algorithm) only if its parity row passes with U_parity <= S*eps/3/4 "
+        "and, for every observable, the reference's summed nominal:L3 bounds plus "
+        "U_parity stay <= B = S*eps/3. The comparison is nominal settings, same seeds "
+        "and primaries in both arms. CPU per-electron and CUDA cores share "
+        "counter-addressed per-electron streams, so parity may use crn-paired or the "
+        "exact-agreement rule when both arms pass the primary pairing audit. Otherwise "
+        "the arms are independent. A carried arm without a passed parity row keeps "
+        "its own ladder rows; those rows stay in M either way."
+    ),
+)
 ELSEPA_REASON = (
     "Owner 2026-11-24: ELSEPA energy-grid convergence is a physics-data question split to "
     "#1426; not qualified in #1041"
@@ -60,8 +82,10 @@ def amend_v1_1(frozen, frozen_sha256, gpu_hours):
     keeps its rows, multiplicity and family share like any unsupported
     control), admits audited common-random-number pairing, freezes the
     zero-discordance exact-agreement rule (``EXACT_AGREEMENT``) and
-    raises the confirmation GPU-hour ceiling. Rows, multiplicity and alpha
-    allocation are unchanged.
+    raises the confirmation GPU-hour ceiling. Existing rows and allowances
+    keep their ids; parity rows for carried arms (``PARITY``, owner
+    2026-11-25) are appended, so multiplicity grows and the Bonferroni row
+    alpha shrinks accordingly.
     """
     if frozen["schema"] != "pyrite.geant4-performance.convergence-design.v1":
         raise ValueError("unsupported convergence design")
@@ -89,6 +113,9 @@ def amend_v1_1(frozen, frozen_sha256, gpu_hours):
                 control["support"], control["reason"] = "unsupported", ELSEPA_REASON
     out["seed_policy"]["pairing"] = V1_1_PAIRING
     out["exact_agreement"] = copy.deepcopy(EXACT_AGREEMENT)
+    out["parity"] = copy.deepcopy(PARITY)
+    old_m = out["multiplicity"]
+    added = parity_rows(out)
     out["resources"]["confirmation_gpu_hours"] = gpu_hours
     out["amendment"] = dict(
         version="1.1",
@@ -102,10 +129,53 @@ def amend_v1_1(frozen, frozen_sha256, gpu_hours):
             "elsepa_energy_density unresolved -> unsupported (split to #1426)",
             "pairing: audited common-random-number pairs admitted",
             "exact-agreement rule for zero-discordance crn-paired transport contrasts",
+            f"parity rows added for carried CPU-fp64/CUDA-mixed arms: M {old_m} -> "
+            f"{old_m + added}, row_alpha = family_alpha / M",
             f"confirmation_gpu_hours {old_ceiling} -> {gpu_hours}",
         ],
     )
     return out
+
+
+def parity_rows(design):
+    """Append one nominal parity row per carried arm, scene, workload and observable."""
+    scale = {(x["scene"], x["workload"], x["observable"]): x["scale"] for x in design["scales"]}
+    configs = {c["id"]: c for c in design["configurations"]}
+    members = {}
+    for row in design["expected_rows"]:
+        if row["contrast"] == "nominal:L3":
+            members.setdefault(row["config"], set()).add((row["workload"], row["observable"]))
+    rows = design["expected_rows"]
+    start = len(rows)
+    for config_id, config in configs.items():
+        reference = PARITY_REFERENCES.get(config["arm"]["id"])
+        if reference is None:
+            continue
+        ref_id = f"{config['scene']}|{reference}"
+        if ref_id not in configs:
+            raise ValueError(f"missing parity reference configuration {ref_id}")
+        for workload, observable in sorted(members[config_id] & members[ref_id]):
+            total = scale[config["scene"], workload, observable] * design["target_rse"] / 3
+            rows.append(
+                dict(
+                    allowance=total / 4,
+                    config=config_id,
+                    contrast=f"parity:{reference}",
+                    control="parity",
+                    id=f"comparison-{len(rows):05d}",
+                    observable=observable,
+                    reason=None,
+                    reference_config=ref_id,
+                    support="available",
+                    total_allowance=total,
+                    workload=workload,
+                )
+            )
+    if len(rows) == start:
+        raise ValueError("no parity rows were generated")
+    design["multiplicity"] = len(rows)
+    design["row_alpha"] = design["family_alpha"] / len(rows)
+    return len(rows) - start
 
 
 def derive(gpu_hours):
