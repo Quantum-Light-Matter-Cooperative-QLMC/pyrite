@@ -220,14 +220,12 @@ def apply_plotly_theme(fig, theme: str):
         paper_bgcolor=surface,
         plot_bgcolor=surface,
         font=dict(color=text, size=15),
-
         title=dict(
             font=dict(color=text),
             x=0.5,
             xanchor="center",
             xref="paper",
         ),
-
         legend=dict(
             font=dict(color=text, size=14),
             title=dict(font=dict(color=text, size=16)),
