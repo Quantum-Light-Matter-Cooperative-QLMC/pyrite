@@ -138,7 +138,11 @@ policy's directory and threshold from `pyrite.simulate`
   row stream, so held blocks, a joined array and spilled runs (any block
   layout) give the same bits, and a spill needs no sorted copy on disk. The
   reference's float summation error bounds its quantile index to a weight band
-  of `4 * rows * u * total`; the quantile at both band edges is computed, and
+  of `5 * rows * u * limit * total`: the target and the prefix sums near it are
+  about `limit * total`, so their rounding scales with the limit. A first
+  version omitted the limit factor; on cleo_test (26M-118M distinct widths,
+  limit 0.001) that band spanned thousands of rows and selection always fell
+  back to the sort (qlmc jobs 15977/15979). The quantile at both band edges is computed, and
   when they are the same width the spacing equals the stable sort's bit for
   bit. When they are adjacent distinct widths the spacing is returned only if
   they differ by at most `SPACING_RTOL = 1e-6` (relative), so it is within

@@ -11,10 +11,17 @@ stream, so the in-memory samples and the spilled runs (same rows, any block
 layout) give identical sums, hence identical results.
 
 Tolerance. The stable-sort reference accumulates the weights sequentially in
-the working precision, so its cumulative sum and target carry a rounding error
-of at most ``rows * u * total`` (``u`` the unit roundoff); the selection sums
-carry less. The reference's quantile index is therefore known only to the
-weight band ``+-DELTA_FACTOR * rows * u * total`` around the target. The
+the working precision (``u`` the unit roundoff, all weights non-negative). Its
+target ``limit * total`` inherits the total's error, at most
+``rows * u * total``, scaled by ``limit``. The prefix sums it compares near the
+quantile are themselves about ``limit * total``, so they carry at most
+``rows * u * limit * total``. The selection's own fixed-chunk totals, the
+weight below the lower pivot and the bracket cumsum are bounded the same way.
+The reference's quantile index is therefore known only to the weight band
+``+-DELTA_FACTOR * rows * u * limit * total`` around the target. Before #1453's
+follow-up the band omitted the ``limit`` factor: on cleo_test (26M-118M distinct
+widths, ``limit = 0.001``) it spanned thousands of rows, its edges never agreed,
+and selection always fell back to the sort. The
 quantile at both band edges is computed from the bracket: when they are the
 same width the selected spacing equals the reference **bit for bit**; when
 they are adjacent distinct widths, the selected spacing is the band's central
@@ -35,9 +42,12 @@ import numpy as np
 
 #: Largest relative difference between the selected and the stable-sort spacing.
 SPACING_RTOL = 1e-6
-#: Band half-width in units of ``rows * u * total``: both cumulative sums, the
-#: reference's total and the product with the limit, each at most ``rows * u``.
-DELTA_FACTOR = 4.0
+#: Band half-width in units of ``rows * u * limit * total``: the reference's
+#: total (scaled by the limit) and its prefix sums near the quantile, the
+#: selection's chunk totals, below-pivot weight and bracket cumsum, each at most
+#: ``rows * u`` of a quantity no larger than ``limit * total`` (one sum per term;
+#: a chunk or bracket holds at most ``rows`` rows).
+DELTA_FACTOR = 5.0
 #: Rows per summation chunk; fixed so the sums do not depend on the block layout.
 SELECT_CHUNK_ROWS = 1 << 22
 #: Fewer rows than this are sorted: the sort is cheap and bitwise the reference.
@@ -165,7 +175,7 @@ def sinc_spacing_by_selection(source, aliased_weight_limit=0.01):
         raise ValueError("cannot derive sinc spacing: diagnostic transport has no valid segments")
     if rows < SELECT_MIN_ROWS or sample is None or not total > 0.0:
         return None
-    delta = DELTA_FACTOR * rows * (np.finfo(np.float64).eps / 2) * total
+    delta = DELTA_FACTOR * rows * (np.finfo(np.float64).eps / 2) * limit * total
     targets = [max(limit * total - delta, 0.0), limit * total, limit * total + delta]
     spread = max(limit, SPREAD_FLOOR)
     for _ in range(SPREAD_RETRIES):

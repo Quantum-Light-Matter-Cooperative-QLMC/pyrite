@@ -6,6 +6,7 @@ bitwise equal unless the quantile sits within float summation error of a width
 change. Populations it cannot bound fall back to the sort.
 """
 
+import math
 import tracemalloc
 
 import numpy as np
@@ -91,6 +92,33 @@ def test_selection_is_taken_on_representative_populations(small_selection):
     for kind in ["lognormal", "correlated"]:
         width, weight = _population(kind, 50_000, np.random.default_rng(7))
         assert sinc_spacing_by_selection(lambda w=(width, weight): iter([w]), 0.01) is not None
+
+
+def test_selection_band_scales_with_the_limit(small_selection, monkeypatch):
+    """The rounding band is ``DELTA_FACTOR * rows * u * limit * total`` (cleo_test, jobs 15977/15979).
+
+    The target and the prefix sums near it are about ``limit * total``. Without
+    the limit factor the band on 26M-118M distinct widths at limit 0.001 spanned
+    thousands of rows, its edges never agreed, and selection always sorted.
+    """
+    width, weight = _population("correlated", 50_000, np.random.default_rng(13))
+    seen = []
+    quantiles = spacing_selection._quantiles
+
+    def spy(bracket, targets, *, capped):
+        seen.append(targets)
+        return quantiles(bracket, targets, capped=capped)
+
+    monkeypatch.setattr(spacing_selection, "_quantiles", spy)
+    for limit in (0.001, 0.01):
+        seen.clear()
+        selected = sinc_spacing_by_selection(lambda: iter([(width, weight)]), limit)
+        total = math.fsum(float(c.sum()) for c in np.array_split(weight, 50))
+        low, center, high = seen[0]
+        expected = spacing_selection.DELTA_FACTOR * width.size * np.finfo(float).eps / 2
+        assert center == limit * total
+        assert (high - center) == pytest.approx(expected * limit * total, rel=1e-9)
+        assert selected is not None and selected[0] == _reference(width, weight, limit)[0]
 
 
 def test_chunk_layout_does_not_change_the_result(small_selection):
