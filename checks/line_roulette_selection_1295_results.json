@@ -1346,5 +1346,189 @@
    }
   ],
   "finding": "Production time scales with histories on the post-#1390/#1392 code (180 s at N=16, 6413 s at N=256: 35.7x for 16x histories). The timed arm scored 67.8% of rows in 36% of the analog time (per-row cost is not uniform: kept rows ran at ~0.65 ms/row, the analog mean was 1.24 ms/row), so the measured FOM gain is 2.3-2.5x, above the 1.5x threshold. Analog and rouletted VOV gates fail at N=256; a pooled larger-N mass check (15931-15934, seeds 0-3 x N=1024, 1 and 5 MeV, mass-only) decides whether the concentration estimate holds."
+ },
+ "thick_target_pooled_vov": {
+  "jobs": [
+   15931,
+   15932,
+   15947,
+   15948
+  ],
+  "code_sha": "2f74b0e65f613a84bf3fe15dc3d810be4fcbb72c",
+  "note": "Same code as thick_target_scaling (main 2f74b0e65 plus the #1430 brem hunk). PROBE_MASS_ONLY=1, seeds 0-3 x N=1024 per energy, pooled to 4096 histories by concatenating the per-history masses and rows and rerunning predict(). Pooled arm draws reuse seed 0's pilot and roulette uniforms over ids 0-4095 (approximation); the bound and analog diagnostics do not depend on them. Gains assume a free screen and time proportional to rows scored, so they are upper bounds. 15933/15934 were cancelled while pending and resubmitted as 15947/15948.",
+  "device": "RTX 5080 (qlmc gpu partition), CuPy",
+  "profile": "thick_hiE_1295_45deg (remote private config)",
+  "case": "mos2 1 mm, tilt 15, 45 deg aperture",
+  "per_seed": {
+   "1000": [
+    {
+     "seed": 0,
+     "screen_s": 129.7,
+     "mass_cv": 1.641,
+     "optimal_bound_free_screen": 2.98,
+     "analog_vov": 0.0095,
+     "analog_vov_gate_passes": false,
+     "best_arm": [
+      0.25,
+      0.1,
+      1.78
+     ]
+    },
+    {
+     "seed": 1,
+     "screen_s": 140.7,
+     "mass_cv": 1.597,
+     "optimal_bound_free_screen": 2.92,
+     "analog_vov": 0.008,
+     "analog_vov_gate_passes": true,
+     "best_arm": [
+      0.25,
+      0.1,
+      1.77
+     ]
+    },
+    {
+     "seed": 2,
+     "screen_s": 131.5,
+     "mass_cv": 1.589,
+     "optimal_bound_free_screen": 2.84,
+     "analog_vov": 0.0092,
+     "analog_vov_gate_passes": false,
+     "best_arm": [
+      0.25,
+      0.1,
+      1.76
+     ]
+    },
+    {
+     "seed": 3,
+     "screen_s": 129.0,
+     "mass_cv": 1.58,
+     "optimal_bound_free_screen": 2.81,
+     "analog_vov": 0.0088,
+     "analog_vov_gate_passes": true,
+     "best_arm": [
+      0.25,
+      0.1,
+      1.76
+     ]
+    }
+   ],
+   "5000": [
+    {
+     "seed": 0,
+     "screen_s": 1359.0,
+     "mass_cv": 4.038,
+     "optimal_bound_free_screen": 13.0,
+     "analog_vov": 0.0523,
+     "analog_vov_gate_passes": false,
+     "best_arm": [
+      0.05,
+      0.05,
+      3.57
+     ]
+    },
+    {
+     "seed": 1,
+     "screen_s": 1401.9,
+     "mass_cv": 3.937,
+     "optimal_bound_free_screen": 11.66,
+     "analog_vov": 0.0453,
+     "analog_vov_gate_passes": false,
+     "best_arm": [
+      0.05,
+      0.05,
+      3.13
+     ]
+    },
+    {
+     "seed": 2,
+     "screen_s": 1357.7,
+     "mass_cv": 3.681,
+     "optimal_bound_free_screen": 11.04,
+     "analog_vov": 0.0295,
+     "analog_vov_gate_passes": false,
+     "best_arm": [
+      0.1,
+      0.05,
+      3.3
+     ]
+    },
+    {
+     "seed": 3,
+     "screen_s": 1381.5,
+     "mass_cv": 4.117,
+     "optimal_bound_free_screen": 13.32,
+     "analog_vov": 0.0751,
+     "analog_vov_gate_passes": false,
+     "best_arm": [
+      0.1,
+      0.05,
+      3.4
+     ]
+    }
+   ]
+  },
+  "pooled": {
+   "1000": {
+    "histories": 4096,
+    "mass_cv": 1.603,
+    "mass_share_top": {
+     "0.001": 0.0113,
+     "0.01": 0.0863,
+     "0.1": 0.4931,
+     "0.5": 0.9753
+    },
+    "rows_mass_correlation": 0.145,
+    "optimal_bound_free_screen": 2.89,
+    "analog": {
+     "relative_se": 0.025,
+     "variance_of_variance": 0.0022,
+     "vov_gate_passes": true,
+     "shift_over_se": 0.019,
+     "effective_sample_size": 1147.9,
+     "max_share": 0.0031
+    },
+    "best_arm": {
+     "keep_fraction": 0.25,
+     "floor": 0.1,
+     "fom_gain_free_screen": 1.96,
+     "fom_gain_realized": 1.96,
+     "rouletted_vov": 0.002,
+     "rouletted_vov_gate_passes": true
+    },
+    "verdict": "pays"
+   },
+   "5000": {
+    "histories": 4096,
+    "mass_cv": 3.94,
+    "mass_share_top": {
+     "0.001": 0.0459,
+     "0.01": 0.2955,
+     "0.1": 0.9175,
+     "0.5": 0.9943
+    },
+    "rows_mass_correlation": 0.186,
+    "optimal_bound_free_screen": 12.18,
+    "analog": {
+     "relative_se": 0.0616,
+     "variance_of_variance": 0.0118,
+     "vov_gate_passes": false,
+     "shift_over_se": 0.048,
+     "effective_sample_size": 247.9,
+     "max_share": 0.0133
+    },
+    "best_arm": {
+     "keep_fraction": 0.05,
+     "floor": 0.05,
+     "fom_gain_free_screen": 4.83,
+     "fom_gain_realized": 4.71,
+     "rouletted_vov": 0.0109,
+     "rouletted_vov_gate_passes": false
+    },
+    "verdict": "pays"
+   }
+  },
+  "finding": "Both energies meet the pays rule. 1 MeV: the four seeds agree (CV 1.58-1.64, bound 2.81-2.98x); pooled, the analog VOV gate passes (0.0022 + 1/n), the bound is 2.89x and the best arm keep 0.25 / floor 0.1 gives 1.96x with a passing rouletted gate. 5 MeV: heavy-tailed (top 10% of histories hold 92% of the mass, CV 3.94); the pooled analog gate still fails narrowly (0.0118 + 1/n against 0.01), but the bound is 12.2x and the best arm keep 0.05 / floor 0.05 gives 4.8x. The 5 MeV screen costs ~1370 s at N=1024 and its analog pass is untimed, so the 5 MeV arm gains exclude screen cost."
  }
 }
