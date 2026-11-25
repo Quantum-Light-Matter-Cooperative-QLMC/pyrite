@@ -161,8 +161,12 @@ class CoherentDispersionLaw:
             # _from_chantler trims three native nodes beyond the full query
             # extrema, then interpolates f1 with a not-a-knot cubic. f2 uses
             # the same trimmed table with log-linear interpolation.
-            row = xraydb.get_xraydb().get_cache("Chantler", column="element", value=element)[0]
-            native = np.asarray(json.loads(row.energy), dtype=float)
+            db = xraydb.get_xraydb()
+            # xraydb >= 4.6 stores array columns as xz-compressed JSON; its
+            # ``unpack`` decodes either encoding.
+            unpack = getattr(db, "unpack", json.loads)
+            row = db.get_cache("Chantler", column="element", value=element)[0]
+            native = np.asarray(unpack(row.energy), dtype=float)
             if self.start <= native.min() or self.stop >= native.max() or self.stop > 1e6:
                 raise ValueError(
                     f"coherent dispersion band is outside the supported {element} table"
@@ -170,8 +174,8 @@ class CoherentDispersionLaw:
             first = max(0, int(np.searchsorted(native, self.start, side="right")) - 4)
             last = min(native.size, int(np.searchsorted(native, self.stop, side="right")) + 2)
             energies = native[first : last + 1]
-            anomalous = np.asarray(json.loads(row.f1), dtype=float)[first : last + 1]
-            imaginary = np.asarray(json.loads(row.f2), dtype=float)[first : last + 1]
+            anomalous = np.asarray(unpack(row.f1), dtype=float)[first : last + 1]
+            imaginary = np.asarray(unpack(row.f2), dtype=float)[first : last + 1]
             anomalous = np.where(np.abs(anomalous) < 1e-99, 1e-99, anomalous)
             imaginary = np.where(np.abs(imaginary) < 1e-99, 1e-99, imaginary)
             if (
