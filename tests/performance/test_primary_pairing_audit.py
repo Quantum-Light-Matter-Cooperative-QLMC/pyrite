@@ -105,6 +105,33 @@ def test_audited_pairs_feed_planner_with_difference_variance(tmp_path):
         PLANNER["make_plan"](DESIGN, out)
 
 
+def test_v1_1_summary_counts_discordances_and_plans_exact_agreement(tmp_path):
+    design_path = tmp_path / "design-v1.1.json"
+    design_path.write_text(json.dumps(AMEND["derive"](12.0)))
+    production, replay = evidence(tmp_path)
+    audit = AUDIT["audit"](design_path, production + replay, tmp_path)
+    path = tmp_path / "audit.json"
+    path.write_text(json.dumps(audit))
+    nominal_only = [p for p in production if "302" not in p.name]
+    summary = SUMMARY["summarize"](design_path, nominal_only, tmp_path, IDS, path)
+    fates = [r for r in summary["rows"] if r["variance"] == 0]
+    energy = [r for r in summary["rows"] if r["variance"] > 0]
+    assert fates and all(r["discordant"] == 0 for r in fates)
+    assert energy and all(r["discordant"] > 0 for r in energy)
+    out = tmp_path / "summary.json"
+    out.write_text(json.dumps(summary))
+    plan = {r["id"]: r for r in PLANNER["make_plan"](design_path, out)["rows"]}
+    assert {plan[r["id"]]["sampling"] for r in fates} == {"exact-agreement"}
+    assert all(plan[r["id"]]["sampling"] == "crn-paired" for r in energy)
+
+
+def test_score_above_frozen_support_is_refused(tmp_path):
+    design = AMEND["derive"](12.0)
+    row = next(r for r in design["expected_rows"] if r["observable"] == "transmitted")
+    with pytest.raises(ValueError, match="score bound"):
+        SUMMARY["discordance"](design, row, np.array([0.0, 2.0]))
+
+
 def test_layout_dependent_scores_are_not_verified(tmp_path):
     production, replay = evidence(tmp_path, replay_shift=1e-9)
     audit = AUDIT["audit"](DESIGN, production + replay, tmp_path)
@@ -149,6 +176,9 @@ def test_v1_1_amendment_derives_from_frozen_v1():
         else:
             assert new["support"] == old["support"]
     assert design["resources"]["confirmation_gpu_hours"] == 12.0
+    assert design["exact_agreement"]["score_bounds"]["transmitted_energy_keV"] == (
+        "beam_energy_keV"
+    )
     assert design["amendment"]["amends_sha256"] == hashlib.sha256(DESIGN.read_bytes()).hexdigest()
     with pytest.raises(ValueError, match="extend"):
         AMEND["derive"](4.0)

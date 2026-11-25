@@ -5,6 +5,15 @@ replay population), Var(Y_right - Y_left) for common-random-number pairs whose
 summary cites a primary pairing audit (both arms charged), or
 Var(Y_left) + Var(Y_right) for independent equal-size arms. Summaries must be
 independently audited against raw evidence before any job can be authorized.
+
+Rows whose audited common-random-number arms agree per primary (v1.1
+exact-agreement rule) have no variance to forecast from. For such a row the
+mean difference obeys ``|mean D| <= tau + R * p_U`` deterministically outside
+an event of probability ``alpha/2``: primaries with ``|D| <= tau`` contribute
+at most ``tau``, each discordant primary (``|D| > tau``) at most the frozen
+score-support bound ``R``, and with zero discordances in ``N`` the one-sided
+exact binomial bound on the discordance rate is ``p_U = 1 - (alpha/2)**(1/N)``.
+The row qualifies only with zero discordances and ``R * p_U <= b - tau``.
 """
 
 import math
@@ -23,6 +32,47 @@ def _integer(value, name, *, zero=False):
     if type(value) is not int:
         raise ValueError(f"invalid integer {name}")
     return _positive(value, name, zero=zero)
+
+
+def zero_discordance_rate_bound(n, alpha):
+    """Exact one-sided upper bound on a rate with zero events in ``n`` trials."""
+    _integer(n, "histories")
+    _positive(alpha, "alpha")
+    return -math.expm1(math.log(alpha / 2) / n)
+
+
+def exact_agreement_bound(n, discordant, score_bound, allowance, alpha, tolerance_fraction):
+    """Verdict of the frozen exact-agreement rule for one paired contrast.
+
+    ``passed`` needs zero discordant primaries and ``tau + R * p_U <= b``;
+    otherwise the row is not decided by this rule (``not-applicable`` with
+    discordances, ``unresolved`` when ``N`` is too small).
+    """
+    _integer(discordant, "discordant primaries", zero=True)
+    _positive(score_bound, "score bound")
+    _positive(allowance, "allowance")
+    if not 0 < tolerance_fraction < 1:
+        raise ValueError("invalid tolerance fraction")
+    tau = tolerance_fraction * allowance
+    if discordant:
+        return dict(status="not-applicable", tolerance=tau, discordant=discordant)
+    bound = tau + score_bound * zero_discordance_rate_bound(n, alpha)
+    status = "passed" if bound <= allowance else "unresolved"
+    return dict(status=status, tolerance=tau, discordant=0, bound=bound, histories=n)
+
+
+def exact_agreement_histories(score_bound, allowance, alpha, tolerance_fraction):
+    """Smallest N for which zero discordances satisfy the exact-agreement rule."""
+    room = (1 - tolerance_fraction) * allowance / score_bound
+    if room >= 1:
+        return 1
+    n = math.ceil(math.log(alpha / 2) / math.log1p(-room))
+    while (
+        exact_agreement_bound(n, 0, score_bound, allowance, alpha, tolerance_fraction)["status"]
+        != "passed"
+    ):
+        n += 1  # guard against floating rounding at the boundary
+    return n
 
 
 def _validate_design(design):
@@ -46,6 +96,13 @@ def _validate_design(design):
         eligibility["min_histories_per_repeat"],
     ) != (1.25, 3, 20000):
         raise ValueError("changed confirmation population policy")
+    rule = design.get("exact_agreement")
+    if rule is not None:
+        if not 0 < rule["tolerance_fraction"] < 1 or rule["requires"] != "crn-paired":
+            raise ValueError("invalid exact-agreement rule")
+        for bound in rule["score_bounds"].values():
+            if bound != "beam_energy_keV":
+                _positive(bound, "score bound")
     resources = design["resources"]
     for key in ("confirmation_cpu_core_hours", "confirmation_gpu_hours", "max_shard_minutes"):
         _positive(resources[key], key)
@@ -75,6 +132,11 @@ def _validate_pilots(pilots, ids):
             raise ValueError("unknown sampling model")
         if sampling == "crn-paired" and not pilots.get("pairing_audit_sha256"):
             raise ValueError("common-random-number pairs need a cited pairing audit")
+        if "discordant" in pilot:
+            if sampling != "crn-paired":
+                raise ValueError("discordance counts need audited common-random-number pairs")
+            _integer(pilot["discordant"], "discordant primaries", zero=True)
+            _positive(pilot["discordance_threshold"], "discordance threshold")
         if len(pilot["arms"]) != (1 if sampling == "paired" else 2):
             raise ValueError(
                 "paired forecasts need one replay population; other sampling needs two arms"
@@ -140,12 +202,52 @@ def _arm_forecast(arm, count, resources):
     )
 
 
+def score_bound(design, row):
+    """Frozen per-primary |D| bound R for an exact-agreement row, else None."""
+    rule = design.get("exact_agreement")
+    if rule is None or row["workload"] not in rule["workloads"]:
+        return None
+    bound = rule["score_bounds"].get(row["observable"])
+    if bound == "beam_energy_keV":
+        scene = next(c["scene"] for c in design["configurations"] if c["id"] == row["config"])
+        spec = design["scene_specification"]["scenes"]
+        return float(next(s["energy_keV"] for s in spec if s["id"] == scene))
+    return bound
+
+
+def _exact_forecast(row, pilot, design):
+    bound = score_bound(design, row)
+    if bound is None or pilot["sampling"] != "crn-paired" or pilot.get("discordant") != 0:
+        return None
+    fraction = design["exact_agreement"]["tolerance_fraction"]
+    if not math.isclose(pilot["discordance_threshold"], fraction * row["allowance"], rel_tol=1e-12):
+        raise ValueError("pilot discordance threshold differs from the frozen tolerance")
+    alpha = design["row_alpha"]
+    required = exact_agreement_histories(bound, row["allowance"], alpha, fraction)
+    count = 3 * max(20000, (required + 2) // 3)
+    arms = [_arm_forecast(a, count, design["resources"]) for a in pilot["arms"]]
+    status = "forecast" if all(a["status"] == "forecast" for a in arms) else "over-budget"
+    return dict(row) | dict(
+        status=status,
+        sampling="exact-agreement",
+        score_bound=bound,
+        discordance_threshold=pilot["discordance_threshold"],
+        required_histories=required,
+        histories_per_arm=count,
+        repeats=3,
+        arms=arms,
+    )
+
+
 def _row_forecast(row, pilot, design):
     base = dict(row)
     if row["support"] != "available":
         return base | dict(status=row["support"], reason=row.get("reason"))
     if pilot is None:
         return base | dict(status="missing", reason="no pilot summary")
+    exact = _exact_forecast(row, pilot, design)
+    if exact is not None:
+        return exact
     variance = pilot["variance"]
     if variance == 0:
         return base | dict(status="unresolved", reason="zero variance is not a population forecast")
@@ -206,7 +308,10 @@ def resource_plan(design, pilots):
         budget_status="over-budget" if over else ("within-ceilings" if complete else "incomplete"),
         ceilings=limits,
         seed_policy=design.get("seed_policy"),
+        exact_agreement=design.get("exact_agreement"),
         blockers=[
+            "Exact-agreement rows qualify only with zero confirmation discordances; any "
+            "discordance makes the rule not-applicable, never an outcome-dependent top-up",
             "Pilot summaries require raw-evidence, diagnostics and identity audits",
             "No per-shard seed/substream map or collision audit; no jobs authorized",
             "Each contrast charged separately; shared runs require a separately audited schedule",

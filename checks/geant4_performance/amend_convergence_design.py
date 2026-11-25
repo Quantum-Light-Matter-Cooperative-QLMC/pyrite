@@ -22,6 +22,29 @@ V1_1_PAIRING = (
     "audit_primary_pairing.py, with identical seeds and global primary offsets in both "
     "arms; otherwise independent"
 )
+EXACT_AGREEMENT = dict(
+    rule="zero-discordance exact agreement (owner, 2026-11-24, compute reduction 2)",
+    requires="crn-paired",
+    workloads=["transport"],
+    score_bounds=dict(
+        backscattered=1.0,
+        transmitted=1.0,
+        stopped=1.0,
+        transmitted_energy_keV="beam_energy_keV",
+    ),
+    tolerance_fraction=0.5,
+    statement=(
+        "For an audited crn-paired contrast with allowance b, a primary is discordant when "
+        "|D| > tau = 0.5*b. With zero discordances among N confirmation primaries, "
+        "|mean D| <= tau + R*p_U, p_U = 1-(row_alpha/2)**(1/N), outside probability "
+        "row_alpha/2; R is the frozen per-primary score support (1 for fate indicators, "
+        "beam kinetic energy for transmitted energy, which secondaries-off transport "
+        "cannot exceed). The row passes iff tau + R*p_U <= b. Any discordance makes "
+        "this rule not-applicable; the row then needs the normal interval with its "
+        "discordance and diagnostic minima, or stays unresolved. Cone rows have no "
+        "frozen support bound and are excluded."
+    ),
+)
 ELSEPA_REASON = (
     "Owner 2026-11-24: ELSEPA energy-grid convergence is a physics-data question split to "
     "#1426; not qualified in #1041"
@@ -35,7 +58,8 @@ def amend_v1_1(frozen, frozen_sha256, gpu_hours):
     recomputed as S*eps/3/4/k, never rescaled), moves the ELSEPA
     energy-density ladder out of scope (``unsupported``, owned by #1426; it
     keeps its rows, multiplicity and family share like any unsupported
-    control), admits audited common-random-number pairing and
+    control), admits audited common-random-number pairing, freezes the
+    zero-discordance exact-agreement rule (``EXACT_AGREEMENT``) and
     raises the confirmation GPU-hour ceiling. Rows, multiplicity and alpha
     allocation are unchanged.
     """
@@ -64,6 +88,7 @@ def amend_v1_1(frozen, frozen_sha256, gpu_hours):
             if control["id"] == "elsepa_energy_density":
                 control["support"], control["reason"] = "unsupported", ELSEPA_REASON
     out["seed_policy"]["pairing"] = V1_1_PAIRING
+    out["exact_agreement"] = copy.deepcopy(EXACT_AGREEMENT)
     out["resources"]["confirmation_gpu_hours"] = gpu_hours
     out["amendment"] = dict(
         version="1.1",
@@ -76,6 +101,7 @@ def amend_v1_1(frozen, frozen_sha256, gpu_hours):
             "target_rse 0.02 -> 0.05; allowances recomputed as S*0.05/3/4/k",
             "elsepa_energy_density unresolved -> unsupported (split to #1426)",
             "pairing: audited common-random-number pairs admitted",
+            "exact-agreement rule for zero-discordance crn-paired transport contrasts",
             f"confirmation_gpu_hours {old_ceiling} -> {gpu_hours}",
         ],
     )

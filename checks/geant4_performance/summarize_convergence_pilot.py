@@ -7,7 +7,10 @@ Without a pairing audit, arms at different levels are independent populations
 and their per-primary variances are summed. With an ``audit_primary_pairing.py``
 result that verifies both arms' (config, setting, observable) cells, rows whose
 arms share seeds and histories use the common-random-number paired variance
-Var(Y_right - Y_left) and still charge both arms. Rows with missing arms, or
+Var(Y_right - Y_left) and still charge both arms. Under a design with the
+v1.1 exact-agreement rule, such rows also record their discordant-primary count
+at the frozen tolerance and the largest |D|, refusing any |D| above the frozen
+score bound. Rows with missing arms, or
 design support other than ``available``, are omitted and stay missing.
 """
 
@@ -20,6 +23,7 @@ from pathlib import Path
 import numpy as np
 
 from pyrite._util.hashing import file_sha256
+from pyrite.perf._convergence_resources import score_bound
 
 HERE = Path(__file__).resolve().parent
 PILOT_SEEDS = (301, 302, 303)
@@ -135,13 +139,28 @@ def verified_cells(audit):
     }
 
 
-def paired_variance(sides, observable):
-    """Var(Y_right - Y_left) over primaries aligned by seed and global index."""
+def paired_differences(sides, observable):
+    """Per-primary Y_right - Y_left aligned by seed and global index, else None."""
     left, right = (arm_scores(runs, observable) for runs in sides)
     if [(s, v.size) for s, v in left] != [(s, v.size) for s, v in right]:
         return None
-    d = np.concatenate([b - a for (_, a), (_, b) in zip(left, right, strict=True)])
-    return float(d.var(ddof=1))
+    return np.concatenate([b - a for (_, a), (_, b) in zip(left, right, strict=True)])
+
+
+def discordance(design, row, d):
+    """Exact-agreement pilot statistics, or {} when the frozen rule does not apply."""
+    bound = score_bound(design, row)
+    if bound is None:
+        return {}
+    largest = float(np.max(np.abs(d)))
+    if largest > bound:
+        raise ValueError(f"|D|={largest} exceeds the frozen score bound {bound}: {row['id']}")
+    tau = design["exact_agreement"]["tolerance_fraction"] * row["allowance"]
+    return dict(
+        discordant=int(np.count_nonzero(np.abs(d) > tau)),
+        discordance_threshold=tau,
+        max_abs_difference=largest,
+    )
 
 
 def arm_summary(runs, observable, root, identities):
@@ -187,9 +206,9 @@ def summarize(design_path, paths, root, identities, audit_path=None):
             sides.append(groups.get((row["config"], row["workload"], setting)))
         if not all(sides):
             continue
-        paired = None
+        d = None
         if all((row["config"], s, row["observable"]) in cells for s in settings):
-            paired = paired_variance(sides, row["observable"])
+            d = paired_differences(sides, row["observable"])
         arms, variance, files = [], 0.0, []
         for runs in sides:
             arm, var, used = arm_summary(runs, row["observable"], root, identities)
@@ -202,13 +221,14 @@ def summarize(design_path, paths, root, identities, audit_path=None):
         rows.append(
             dict(
                 id=row["id"],
-                sampling="independent" if paired is None else "crn-paired",
-                variance=variance if paired is None else paired,
+                sampling="independent" if d is None else "crn-paired",
+                variance=variance if d is None else float(d.var(ddof=1)),
                 independent_variance=variance,
                 evidence_files=sorted(set(files)),
                 arms=arms,
                 difference=arms[1]["mean"] - arms[0]["mean"],
             )
+            | ({} if d is None else discordance(design, row, d))
         )
     if not rows:
         raise ValueError("no expected row has both pilot arms")

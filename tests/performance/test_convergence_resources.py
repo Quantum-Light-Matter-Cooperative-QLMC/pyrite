@@ -10,7 +10,12 @@ from statistics import NormalDist
 
 import pytest
 
-from pyrite.perf._convergence_resources import resource_plan
+from pyrite.perf._convergence_resources import (
+    exact_agreement_bound,
+    exact_agreement_histories,
+    resource_plan,
+    zero_discordance_rate_bound,
+)
 
 
 def design():
@@ -104,6 +109,74 @@ def test_zero_variance_cannot_forecast_zero_confirmation():
     assert result["rows"][0]["status"] == "unresolved"
     assert result["forecast_cpu_core_hours"] == 0
     assert not result["cost_complete"]
+
+
+def exact_design():
+    d = design()
+    d["expected_rows"][0].update(
+        config="c", workload="transport", observable="transmitted_energy_keV"
+    )
+    d["configurations"] = [dict(id="c", scene="s")]
+    d["scene_specification"] = dict(scenes=[dict(id="s", energy_keV=300)])
+    d["exact_agreement"] = dict(
+        requires="crn-paired",
+        workloads=["transport"],
+        score_bounds=dict(transmitted=1.0, transmitted_energy_keV="beam_energy_keV"),
+        tolerance_fraction=0.5,
+    )
+    return d
+
+
+def exact_pilot(discordant=0):
+    p = pilot()
+    p["pairing_audit_sha256"] = "sha256:audit"
+    p["rows"][0].update(
+        sampling="crn-paired", variance=0, discordant=discordant, discordance_threshold=0.005
+    )
+    return p
+
+
+def test_zero_discordance_bound_is_the_exact_binomial_upper_limit():
+    alpha, n = 0.05 / 7074, 100000
+    p_u = zero_discordance_rate_bound(n, alpha)
+    assert (1 - p_u) ** n == pytest.approx(alpha / 2, rel=1e-9)
+    assert zero_discordance_rate_bound(2 * n, alpha) < p_u
+
+
+def test_exact_agreement_needs_zero_discordances_and_enough_primaries():
+    alpha = 0.025
+    n = exact_agreement_histories(300.0, 0.01, alpha, 0.5)
+    passed = exact_agreement_bound(n, 0, 300.0, 0.01, alpha, 0.5)
+    assert passed["status"] == "passed" and passed["bound"] <= 0.01
+    assert exact_agreement_bound(n - 1, 0, 300.0, 0.01, alpha, 0.5)["status"] == "unresolved"
+    assert exact_agreement_bound(10 * n, 1, 300.0, 0.01, alpha, 0.5)["status"] == "not-applicable"
+    assert n == pytest.approx(math.log(alpha / 2) / math.log1p(-0.005 / 300.0), abs=1)
+
+
+def test_zero_discordance_row_is_forecast_by_the_exact_rule_not_unresolved():
+    result = plan(exact_design(), exact_pilot())
+    row = result["rows"][0]
+    assert row["status"] == "forecast" and row["sampling"] == "exact-agreement"
+    assert row["score_bound"] == 300.0
+    required = exact_agreement_histories(300.0, 0.01, 0.025, 0.5)
+    assert row["histories_per_arm"] >= max(60000, required) and row["histories_per_arm"] % 3 == 0
+    assert len(row["arms"]) == 2 and result["exact_agreement"]["tolerance_fraction"] == 0.5
+
+
+def test_exact_rule_does_not_apply_with_discordances_or_without_the_frozen_rule():
+    assert plan(exact_design(), exact_pilot(discordant=1))["rows"][0]["status"] == "unresolved"
+    assert plan(design(), exact_pilot())["rows"][0]["status"] == "unresolved"
+    cone = exact_design()
+    cone["expected_rows"][0]["workload"] = "cone"
+    assert plan(cone, exact_pilot())["rows"][0]["status"] == "unresolved"
+    shifted = exact_pilot()
+    shifted["rows"][0]["discordance_threshold"] = 0.004
+    with pytest.raises(ValueError, match="threshold"):
+        plan(exact_design(), shifted)
+    independent = exact_pilot()
+    independent["rows"][0]["sampling"] = "independent"
+    with pytest.raises(ValueError, match="discordance counts"):
+        plan(exact_design(), independent)
 
 
 def test_time_ceiling_splits_each_repeat_and_charges_overhead_every_shard():
