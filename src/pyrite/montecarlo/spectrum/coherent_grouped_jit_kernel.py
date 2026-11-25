@@ -8,6 +8,8 @@ their support. Validation: coherent-inter-electron-decoherence,
 coherent-formation-absorption
 """
 
+from typing import cast
+
 import cupy as xp
 import numpy as np
 
@@ -371,7 +373,7 @@ def run_coherent_grouped_intensity_kernel(
     if use_medium:
         if int(L_esc.size) != n_seg * n_layers:
             raise ValueError("L_esc must have one entry per segment and layer")
-        if int(delta_omega.size) != n_energies * n_layers:
+        if int(cast(np.ndarray, delta_omega).size) != n_energies * n_layers:
             raise ValueError("delta_omega must have one entry per energy bin and layer")
     else:
         L_esc = delta_omega = _dummy()

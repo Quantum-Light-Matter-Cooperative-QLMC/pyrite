@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from pyrite.plots._labels import SPECTRAL_INTENSITY_TITLE
 from pyrite.plots.plotly import pixels, spectra, sweeps, temporal
 
 
@@ -41,7 +42,7 @@ def test_spectrum_components_preserve_coordinates_and_units():
     assert list(figure.data[0].x) == [10, 11, 12]
     assert list(figure.data[0].y) == [1, 0, 8]
     assert list(figure.data[1].y) == [2, 0, 5]
-    assert figure.layout.yaxis.title.text == "Intensity (Phs/s/eV/uA)"
+    assert figure.layout.yaxis.title.text == SPECTRAL_INTENSITY_TITLE
     pd.testing.assert_frame_equal(frame, original)
 
 

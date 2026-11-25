@@ -120,13 +120,18 @@ def _total_y(fig):
 def test_compare_chart_one_line_per_hue_value_tilt():
     fig = compare_spectrum_chart(_store_multi_tilt(), _settings(), hue="tilt_deg")
     assert isinstance(fig, go.Figure)
-    assert _labels(fig) == {"40.0", "20.0", "0.0"}
-    assert fig.layout.legend.title.text
+    assert _labels(fig) == {"40", "20", "0"}
+    assert fig.layout.legend.title.text == r"$\theta_{\mathrm{tilt}}\ (^\circ)$"
+    # The title pins only what is common: no single tilt for a tilt comparison.
+    title = fig.layout.title.text
+    assert title.startswith("$") and title.endswith("$")
+    assert r"\theta" not in title and r"\phi_{\mathrm{azim}} = 0^\circ" in title
+    assert fig.layout.title.subtitle.text is None
 
 
 def test_compare_chart_one_line_per_hue_value_azimuth():
     fig = compare_spectrum_chart(_store_multi_azim(), _settings(), hue="tilt_azim_deg")
-    assert _labels(fig) == {"0.0", "45.0", "90.0"}
+    assert _labels(fig) == {"0", "45", "90"}
 
 
 def test_compare_frame_carries_every_hue_field():
@@ -138,8 +143,8 @@ def test_compare_frame_carries_every_hue_field():
 @pytest.mark.parametrize(
     ("store", "hue", "values"),
     [
-        (_store_multi_tilt, "tilt_deg", {"40.0", "20.0", "0.0"}),
-        (_store_multi_azim, "tilt_azim_deg", {"0.0", "45.0", "90.0"}),
+        (_store_multi_tilt, "tilt_deg", {"40", "20", "0"}),
+        (_store_multi_azim, "tilt_azim_deg", {"0", "45", "90"}),
     ],
 )
 def test_compare_chart_broadband_uses_wide_brem_tail(store, hue, values):
@@ -244,7 +249,7 @@ def test_both_emissions_sum_the_same_selected_components():
 
 def test_compare_chart_single_hue_value_still_renders_one_line():
     fig = compare_spectrum_chart(_store_single_tilt(), _settings(), hue="tilt_deg")
-    assert _labels(fig) == {"20.0"}
+    assert _labels(fig) == {"20"}
 
 
 def test_compare_chart_rejects_unknown_hue():

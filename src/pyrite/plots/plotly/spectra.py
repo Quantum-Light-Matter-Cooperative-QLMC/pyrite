@@ -18,8 +18,16 @@ from plotly.colors import qualitative
 _COLORS = qualitative.Plotly
 
 from ...results import records
-from .._common import _COMPARISON_SELECTION_TITLES, _case_title, _comparison_drop_message
+from .._common import _COMPARISON_SELECTION_TITLES, _comparison_drop_message
 from .._decimation import DEFAULT_PLOT_RESOLUTION, resolve_plot_resolution
+from .._labels import (
+    FIELD_SYMBOLS,
+    PHOTON_ENERGY_TITLE,
+    SPECTRAL_INTENSITY_TITLE,
+    field_label,
+    field_value_text,
+    slice_title,
+)
 from .._spectrum_frames import (
     _COMPARE_HUE_FIELDS,
     _compare_frame,
@@ -32,7 +40,7 @@ from .._spectrum_frames import (
     spectrum_frame,
 )
 
-_INTENSITY_TITLE = "Intensity (Phs/s/eV/uA)"
+_INTENSITY_TITLE = "Intensity (Phs/s/eV/uA)"  # plain: detector figures
 # Per-trace point count above which a line uses WebGL. Measured in Firefox and
 # Chrome (#622, checks/plotly_browser_bench_622.py): SVG renders faster at every
 # size up to 100k points x 12 traces; WebGL only shortens zoom/pan redraws at
@@ -118,10 +126,10 @@ def _native_points(df, hue):
 
 
 def _sampling_note(df, hue):
-    """Figure subtitle stating native vs displayed coordinates (#1440).
+    """Caption text stating native vs displayed coordinates (#1440).
 
-    Exports of the figure (PNG/SVG download, ``write_image``) carry this note,
-    so a decimated export always says so.
+    Stored in ``layout.meta["sampling_note"]`` rather than drawn on the figure,
+    so publication exports stay clean; apps show it as a caption.
     """
     record = df.attrs.get("display_points")
     if not record:
@@ -155,11 +163,11 @@ def _trace_series(df, *, hue, components, width, height, title, x_type, y_type, 
     _axis_type(x_type)
     _axis_type(y_type)
     signed = bool((df["intensity"] < 0).any())
+    note, _decimated = _sampling_note(df, hue)
     if signed and y_type == "log":
         y_type = "linear"
-        title += " · signed values: linear y"
+        note = " · ".join(filter(None, (note, "signed values: linear y")))
     fig = go.Figure()
-    note, _decimated = _sampling_note(df, hue)
     counts = _native_points(df, hue)
     labels = list(dict.fromkeys(df[hue].tolist()))
     # Numeric cases get stable, human-meaningful sorting, not lexical sorting.
@@ -180,6 +188,7 @@ def _trace_series(df, *, hue, components, width, height, title, x_type, y_type, 
             dash, thickness = _STYLES[component]
             trace_type = go.Scattergl if xs.size > _WEBGL_MIN_POINTS else go.Scatter
             native = counts.get(label, (xs.size, xs.size))[0]
+            text = field_value_text(hue, label) if hue in FIELD_SYMBOLS else str(label)
             line = dict(color=color, width=thickness, dash=dash)
             if trace_type is go.Scatter:
                 # Plotly's SVG path simplification drops near-collinear nodes;
@@ -190,13 +199,13 @@ def _trace_series(df, *, hue, components, width, height, title, x_type, y_type, 
                     x=xs,
                     y=plot_y,
                     mode="lines",
-                    name=f"{label} · {component}" if len(components) > 1 else str(label),
+                    name=f"{text} · {component}" if len(components) > 1 else text,
                     legendgroup=str(idx),
                     line=line,
                     # Trace-level label (not per-point customdata): an object
                     # array per coordinate dominated build time and payload.
                     meta={
-                        "label": str(label),
+                        "label": text,
                         "native_points": int(native),
                         "displayed_points": int(xs.size),
                     },
@@ -211,15 +220,17 @@ def _trace_series(df, *, hue, components, width, height, title, x_type, y_type, 
     if not fig.data:
         return None
     fig.update_layout(
-        title=dict(text=title, subtitle=dict(text=note) if note else None),
-        meta={"display_points": df.attrs.get("display_points")},
+        title=dict(text=title),
+        meta={"display_points": df.attrs.get("display_points"), "sampling_note": note},
         width=width,
         height=height,
         hovermode="closest",
-        legend=dict(title=_COMPARE_HUE_FIELDS.get(hue, "case")),
-        xaxis=dict(title="Photon energy (eV)", type=x_type, range=_axis_range(x_domain, x_type)),
+        legend=dict(
+            title=field_label(hue) if hue in FIELD_SYMBOLS else _COMPARE_HUE_FIELDS.get(hue, "case")
+        ),
+        xaxis=dict(title=PHOTON_ENERGY_TITLE, type=x_type, range=_axis_range(x_domain, x_type)),
         yaxis=dict(
-            title=_INTENSITY_TITLE,
+            title=SPECTRAL_INTENSITY_TITLE,
             type=y_type,
             range=_y_range(
                 df,
@@ -282,7 +293,7 @@ def spectrum_chart(
         + (("coherent",) if include_coherent else ()),
         width=width,
         height=height,
-        title=_case_title(recs[0]["case"], "response-free source", latex=False),
+        title=slice_title((r["case"] for r in recs), varying="E0_keV"),
         x_type=x_type,
         y_type=y_type,
         x_domain=domain,
@@ -348,7 +359,7 @@ def prepare_compare_spectra(
         + (("brem",) if include_brem and not sum_components else ())
         + (("line",) if include_cxr and not sum_components else ())
         + (("coherent",) if include_coherent else ()),
-        title=_case_title(recs[0]["case"], "comparison", latex=False),
+        title=slice_title((r["case"] for r in recs), varying=hue),
         domain=_narrow_line_domain(recs, band, x_domain),
     )
 

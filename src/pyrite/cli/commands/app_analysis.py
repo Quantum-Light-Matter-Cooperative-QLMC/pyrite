@@ -44,6 +44,10 @@ from .._extras import require_cli_extra
 
 NOTEBOOK = str(app_dir() / "analysis_app.py")
 TUNNEL_PORT = 2718
+# Spectra at the High/Publication/Full plot resolutions exceed marimo's 8 MB
+# default cell-output cap (17 tilts at Full: ~115 MB). A caller's own
+# MARIMO_RUNTIME_OUTPUT_MAX_BYTES wins.
+OUTPUT_MAX_BYTES = 512_000_000
 
 
 def _command(material, *, edit=False, watch=False, tunnel=False, no_token=False):
@@ -92,7 +96,11 @@ def _launch(
     if tunnel:
         print(f"ssh -L {TUNNEL_PORT}:127.0.0.1:{TUNNEL_PORT} <your-pi-ssh-host>")
         print(f"http://127.0.0.1:{TUNNEL_PORT}")
-    env = {**os.environ, "PYRITE_ANALYZE_INITIAL": material}
+    env = {
+        "MARIMO_RUNTIME_OUTPUT_MAX_BYTES": str(OUTPUT_MAX_BYTES),
+        **os.environ,
+        "PYRITE_ANALYZE_INITIAL": material,
+    }
     if smoke:
         with tempfile.TemporaryDirectory(prefix="pyrite-analysis-") as tmpdir:
             subprocess.run(

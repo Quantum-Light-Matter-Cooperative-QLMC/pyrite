@@ -10,6 +10,7 @@ import numpy as np
 import plotly.graph_objects as go
 import pytest
 
+from pyrite.plots._labels import PHOTON_ENERGY_TITLE, SPECTRAL_INTENSITY_TITLE
 from pyrite.plots._spectrum_frames import _NA_PER_UA, spectrum_frame
 from pyrite.plots.plotly.spectra import spectrum_chart
 
@@ -65,7 +66,7 @@ def _components(fig):
 
 
 def _trace(fig, label, component):
-    return next(t for t in fig.data if t.name == f"{label} · {component}")
+    return next(t for t in fig.data if t.name == f"{label:g} · {component}")
 
 
 # ---- renderer-neutral frames ---------------------------------------------------
@@ -265,9 +266,9 @@ def test_spectrum_chart_one_trace_per_energy_and_component():
     assert isinstance(fig, go.Figure)
     assert len(fig.data) == 4  # 2 beam energies x (total, brem)
     assert _components(fig) == {"total", "brem"}
-    assert fig.layout.xaxis.title.text == "Photon energy (eV)"
-    assert fig.layout.yaxis.title.text == "Intensity (Phs/s/eV/uA)"
-    assert fig.layout.legend.title.text == "beam energy (keV)"
+    assert fig.layout.xaxis.title.text == PHOTON_ENERGY_TITLE
+    assert fig.layout.yaxis.title.text == SPECTRAL_INTENSITY_TITLE
+    assert fig.layout.legend.title.text == r"$E_0\ (\mathrm{keV})$"
     fig.to_json()
 
 
@@ -358,7 +359,7 @@ def test_spectrum_chart_linear_y_range_auto_when_no_x_domain():
 
 def test_spectrum_chart_total_only_without_brem():
     fig = spectrum_chart(_store(), _settings(), include_brem=False)
-    assert [trace.name for trace in fig.data] == ["30.0", "60.0"]
+    assert [trace.name for trace in fig.data] == ["30", "60"]
 
 
 def test_spectrum_chart_none_on_empty():
