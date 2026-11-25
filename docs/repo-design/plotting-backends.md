@@ -22,17 +22,75 @@ results; pixel views take prepared frames. Static Plotly export (Kaleido) is
 optional. The former Altair renderer (`pyrite.plots.altair`) was removed in
 #622; its frame builders moved to the neutral modules above.
 
-Spectra are decimated **before** figure construction by the peak-aware
-paired-component sampler (`max_points`, default 5000 per chart, 2500 with both
-emissions). Pixel images are dense `Heatmap` arrays with masked missing cells,
-raw hover values and row zero at the top; the logarithmic count view uses a
-signed `log1p` transform labelled in physical counts.
+Pixel images are dense `Heatmap` arrays with masked missing cells, raw hover
+values and row zero at the top; the logarithmic count view uses a signed
+`log1p` transform labelled in physical counts.
+
+## Spectral display resolution
+
+Spectra and detector-response curves are sampled for display **before** figure
+construction (`pyrite.plots._decimation`; #1440, #1442). Sampling selects
+indices of stored nodes only: no interpolation, smoothing or rebinning, and
+checkpoints, record arrays and metrics never see the selection. A bin-mean
+value therefore stays a bin average at its stored coordinate.
+
+| Preset | Points per trace | Shared safety budget |
+| --- | ---: | ---: |
+| `fast` | 2,000 | 30,000 |
+| `standard` (default) | 5,000 | 100,000 |
+| `high` | 25,000 | 400,000 |
+| `publication` | 100,000 | none |
+| `full` | every native point | none |
+
+Pass `resolution=` (a preset name or `PlotResolution`) to the Plotly spectrum
+and detector builders; the legacy `max_points=` overrides the shared budget. A
+shared budget never drops a trace below 1,000 points, so 15 polar tilts no
+longer fall to ~330 points each. Paired total/background components share one
+coordinate set; the line grid owns the budget and the wide background tail
+keeps a tenth.
+
+Each trace keeps the largest and smallest sample of every display bucket
+(min/max). Buckets are uniform in the displayed coordinate (energy, or log10
+energy on a log axis), so nonuniform grids are handled and empty buckets are
+skipped. With an x window (the narrowband line domain, or a zoom range) the
+budget goes to the visible range, every visible native node is kept when it
+fits, and a tenth of the budget keeps coarse context outside. `full` also turns
+off Plotly's SVG `line.simplify`. Each figure states native versus displayed
+counts in its subtitle, `layout.meta["display_points"]` and per-trace
+hover/`meta`, so a downloaded or `write_image` export discloses any
+decimation. Matplotlib figures are never decimated.
+
+Algorithm choice (100k-point synthetic sinc² line, overlapping pair, 1 % weak
+line and shoulder; worst per-pixel envelope error over 1000 columns, fraction
+of peak; recorded on #1442):
+
+| Budget | Max-only (former) | Min/max | M4 | LTTB |
+| ---: | ---: | ---: | ---: | ---: |
+| 1,500 | 0.34 | 0.12 | 0.13 | 0.043 |
+| 5,000 | 0.039 | 0.006 | 0.021 | 0.022 |
+
+Min/max keeps exact extrema (peaks, minima, sidelobes) and is visually lossless
+once a bucket is no wider than a pixel; LTTB wins only below that, at the cost
+of 3-5 % peak and dip heights. `fast` therefore keeps about 1000 buckets.
+
+Python cost for 15 traces of 71k-104k native points (HOPG `cleo_sub`-sized):
+`standard` builds and serializes in 0.21-0.23 s and 1.7 MB, the same as the
+former 333-point traces (0.22-0.24 s, 0.17 MB); `high` 0.3 s and 8.5 MB;
+`full` 0.3-0.6 s and 31 MB. Browser render follows the SVG table below.
+
+In the analysis app, **Plot resolution** sits on the axis panel of the Spectra,
+Detectors and case-basket views. Spectra charts are `mo.ui.plotly` elements:
+a zoom stores the x range in marimo state, and the band is re-sampled from its
+cached native frame for that window (`apps/analysis_ui/zoom.py`), so zooming
+in restores native sampling without rebuilding record frames. marimo exposes
+the relayout range only through the element's private `_selection_data`;
+`tests/notebooks/analysis_app/test_zoom.py` pins that contract.
 
 ## SVG versus WebGL for spectrum traces
 
 A spectrum trace switches to `Scattergl` only above `_WEBGL_MIN_POINTS =
-100_000` points (`pyrite.plots.plotly.spectra`); decimated app spectra always
-render as SVG. `checks/plotly_browser_bench_622.py` measured the production
+100_000` points (`pyrite.plots.plotly.spectra`); app spectra up to the
+`publication` preset render as SVG. `checks/plotly_browser_bench_622.py` measured the production
 trace builder on synthetic line + continuum spectra in headless Firefox 160 and
 Chrome 158 with GPU WebGL (Mesa Intel Raptor Lake-P iGPU, Plotly 7.1.0 bundled
 plotly.js). Medians of five repeats after one warm-up; times include two
