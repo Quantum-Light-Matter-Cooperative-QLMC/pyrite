@@ -197,8 +197,11 @@ def apply_plotly_theme(fig, theme: str):
 
     axis_2d = dict(
         color=text,
-        tickfont=dict(color=text),
-        title=dict(font=dict(color=text)),
+        tickfont=dict(color=text, size=15),
+        title=dict(
+            font=dict(color=text, size=18),
+        ),
+        automargin=True,
         gridcolor=rule,
         zerolinecolor=muted,
         linecolor=muted,
@@ -216,11 +219,18 @@ def apply_plotly_theme(fig, theme: str):
         template="plotly_white" if mode == "light" else "plotly_dark",
         paper_bgcolor=surface,
         plot_bgcolor=surface,
-        font=dict(color=text),
-        title=dict(font=dict(color=text)),
-        legend=dict(
+        font=dict(color=text, size=15),
+
+        title=dict(
             font=dict(color=text),
-            title=dict(font=dict(color=text)),
+            x=0.5,
+            xanchor="center",
+            xref="paper",
+        ),
+
+        legend=dict(
+            font=dict(color=text, size=14),
+            title=dict(font=dict(color=text, size=16)),
             bgcolor="rgba(0,0,0,0)",
         ),
         xaxis=axis_2d,

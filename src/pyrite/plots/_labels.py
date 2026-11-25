@@ -19,14 +19,14 @@ _GREEK = frozenset({"alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta"}
 FIELD_SYMBOLS = {
     "E0_keV": r"E_0",
     "tilt_deg": r"\theta_{\mathrm{tilt}}",
-    "tilt_azim_deg": r"\phi_{\mathrm{azim}}",
+    "tilt_azim_deg": r"\phi_{\mathrm{tilt}}",
 }
 _FIELD_UNITS = {"E0_keV": r"\,\mathrm{keV}", "tilt_deg": r"^\circ", "tilt_azim_deg": r"^\circ"}
 _LEGEND_UNITS = {"E0_keV": r"\mathrm{keV}", "tilt_deg": r"^\circ", "tilt_azim_deg": r"^\circ"}
 
 #: Spectrum axis titles (Plotly/MathJax and matplotlib mathtext both typeset these).
-PHOTON_ENERGY_TITLE = r"$\mathrm{Photon\ energy}\ (\mathrm{eV})$"
-SPECTRAL_INTENSITY_TITLE = r"$\mathrm{Intensity}\ (\mathrm{ph\,s^{-1}\,eV^{-1}\,\mu A^{-1}})$"
+PHOTON_ENERGY_TITLE = r"$\large{\mathrm{Photon\ energy}\ (\mathrm{eV})}$"
+SPECTRAL_INTENSITY_TITLE = r"$\large{\mathrm{Intensity}\ (\mathrm{ph\,s^{-1}\,eV^{-1}\,\mu A^{-1}})}$"
 
 
 def _latex_word(word: str) -> str:
@@ -114,7 +114,7 @@ def slice_title(cases: Iterable[Mapping], *, varying: str | None = None) -> str:
         value = _common_value(cases, field)
         if value is not None:
             parts.append(rf"{symbol} = {float(value):g}{_FIELD_UNITS[field]}")
-    return "$" + r",\ ".join(parts) + "$"
+    return r"$\Large{" + r",\ ".join(parts) + "}$"
 
 
 def append_to_title(title: str | None, text: str) -> str | None:

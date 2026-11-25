@@ -5,9 +5,11 @@
 
 import marimo
 
-__generated_with = "0.25.0"
+__generated_with = "0.26.0"
 app = marimo.App(
-    width="full", app_title="PyRITE · Analysis", html_head_file="../_assets/branding/head.html"
+    width="full",
+    app_title="PyRITE · Analysis",
+    html_head_file="../_assets/branding/head.html",
 )
 
 with app.setup:
@@ -167,7 +169,6 @@ def _(base_context, checkpoint_ui, emission_ui, material_ui, slice_controls):
         slice_controls=slice_controls,
         results=base_context.checkpoint_results,
     )
-    return
 
 
 @app.cell
@@ -187,7 +188,6 @@ def _(context):
             kind="info",
         )
     no_data_notice
-    return
 
 
 @app.cell
@@ -306,7 +306,6 @@ def _(
             "broad": (broad_zoom_get, broad_zoom_set),
         },
     )
-    return
 
 
 @app.cell
@@ -380,7 +379,6 @@ def _(
         trends=map_trends,
         theme=app_theme,
     )
-    return
 
 
 @app.cell
@@ -414,7 +412,6 @@ def _(
         axes=resolve_axis_pair(detector_axes_controls.value),
         theme=app_theme,
     )
-    return
 
 
 if __name__ == "__main__":

@@ -226,7 +226,23 @@ def _trace_series(df, *, hue, components, width, height, title, x_type, y_type, 
         height=height,
         hovermode="closest",
         legend=dict(
-            title=field_label(hue) if hue in FIELD_SYMBOLS else _COMPARE_HUE_FIELDS.get(hue, "case")
+            title=dict(
+                text=(
+                    field_label(hue)
+                    if hue in FIELD_SYMBOLS
+                    else _COMPARE_HUE_FIELDS.get(hue, "case")
+                ),
+                side="top",
+                font=dict(size=16),
+            ),
+            orientation="v",
+            x=1.02,
+            xanchor="left",
+            y=1.0,
+            yanchor="top",
+            font=dict(size=14),
+            tracegroupgap=0,
+            maxheight=0.95,
         ),
         xaxis=dict(title=PHOTON_ENERGY_TITLE, type=x_type, range=_axis_range(x_domain, x_type)),
         yaxis=dict(
@@ -239,7 +255,7 @@ def _trace_series(df, *, hue, components, width, height, title, x_type, y_type, 
                 automatic_x_domain=x_domain is None,
             ),
         ),
-        margin=dict(l=70, r=24, b=62, t=70),
+        margin=dict(l=85, r=100, b=75, t=80),
     )
     return fig
 
