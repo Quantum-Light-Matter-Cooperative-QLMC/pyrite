@@ -644,6 +644,9 @@ def cmd_docs(args: argparse.Namespace) -> None:
         "-a",
         "-W",
         "--keep-going",
+        # Every docs extension is parallel-safe; serial builds take ~4x longer.
+        "-j",
+        "auto",
         "-b",
         builder,
         str(docs_dir),
