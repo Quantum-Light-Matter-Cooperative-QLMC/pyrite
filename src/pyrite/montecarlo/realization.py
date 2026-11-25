@@ -14,6 +14,30 @@ _SCHEMA = "pyrite.transport-realization.v1"
 #: CuPy backend and is recorded, giving a distinct case identity.
 _SCORING = ("cpu", "gpu")
 _CORE = ContextVar[str | None]("transport_realization_core", default=None)
+#: Per-context replacement for the pool's automatic ``PYRITE_MC_TRANSPORT_CORE``
+#: pin (#1423). It stays out of ``os.environ`` so concurrent cases in one
+#: process cannot observe, or restore over, each other's core.
+_CORE_PIN = ContextVar[str | None]("transport_core_pin", default=None)
+
+
+def effective_core_pin() -> str:
+    """The transport-core pin in force: a context override, else the environment."""
+    from .._util.env import env_value
+
+    override = _CORE_PIN.get()
+    if override is not None:
+        return override
+    return env_value("PYRITE_MC_TRANSPORT_CORE", "").strip().lower()
+
+
+@contextmanager
+def core_pin_override(core: str) -> Iterator[None]:
+    """Pin ``core`` for this context only, shadowing ``PYRITE_MC_TRANSPORT_CORE``."""
+    token = _CORE_PIN.set(core)
+    try:
+        yield
+    finally:
+        _CORE_PIN.reset(token)
 
 
 @dataclass(frozen=True, slots=True)
@@ -149,12 +173,10 @@ def require_matching_realization(expected, actual) -> None:
 
 def required_core(requested="auto", *, realization=None):
     """Resolve only an opt-in requirement; never reinterpret an ordinary pin."""
-    from .._util.env import env_value
-
     core = _CORE.get() if realization is None else normalize_realization(realization).core
     if core is None:
         return None
-    pinned = env_value("PYRITE_MC_TRANSPORT_CORE", "").strip().lower()
+    pinned = effective_core_pin()
     if requested not in ("auto", core) or pinned not in ("", "auto", core):
         raise ValueError(
             "transport_realization conflicts with requested/environment transport core: "

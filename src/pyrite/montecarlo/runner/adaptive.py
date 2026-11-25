@@ -1110,22 +1110,20 @@ def case_transport_core(case, requested="auto"):
 def _adaptive_worker_call(function, case, *args, **kwargs):
     """Replace only the pool's automatic lockstep pin for one adaptive or split case.
 
-    Explicit inherited CPU-core choices remain authoritative. Restore the pool
-    default afterwards, so a fixed case in a mixed batch keeps its old draws.
+    Explicit inherited CPU-core choices remain authoritative. The override ends
+    with the call, so a fixed case in a mixed batch keeps its old draws.
     """
-    from ..._util.env import env_value, set_canonical_env
     from .. import runner
+    from ..realization import core_pin_override
 
     if "transport_realization" in case and runner._WORKER_INHERITED_CORE == "cuda":
         raise ValueError("transport_realization conflicts with inherited cuda transport core")
     if runner._WORKER_INHERITED_CORE not in ("", "auto", "cuda"):
         return function(case, *args, **kwargs)
-    original = env_value("PYRITE_MC_TRANSPORT_CORE", "")
-    set_canonical_env("PYRITE_MC_TRANSPORT_CORE", "per-electron")
-    try:
+    # A context override, not an os.environ swap: the environment is process-wide,
+    # so two cases in one process would restore over each other (#1423).
+    with core_pin_override("per-electron"):
         return function(case, *args, **kwargs)
-    finally:
-        set_canonical_env("PYRITE_MC_TRANSPORT_CORE", original)
 
 
 def _run_adaptive_case_worker(case, *args, **kwargs):

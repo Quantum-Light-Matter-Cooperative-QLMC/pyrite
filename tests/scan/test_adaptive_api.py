@@ -406,15 +406,52 @@ def test_mixed_cpu_pool_preserves_fixed_case_and_adaptive_provenance(scene, monk
 @pytest.mark.parametrize("inherited", ["auto", "per-electron", "lockstep"])
 def test_adaptive_worker_only_overrides_automatic_pool_pin(monkeypatch, inherited):
     from pyrite._util.env import env_value
+    from pyrite.montecarlo.realization import effective_core_pin
+    from pyrite.montecarlo.runner.adaptive import _adaptive_worker_call
 
     monkeypatch.setattr(runner, "_WORKER_INHERITED_CORE", inherited)
     pinned = "lockstep" if inherited == "auto" else inherited
     monkeypatch.setenv("PYRITE_MC_TRANSPORT_CORE", pinned)
+
+    def observe(_case):
+        # The override is context-local: the process environment never changes.
+        return effective_core_pin(), env_value("PYRITE_MC_TRANSPORT_CORE")
+
+    core, env_inside = _adaptive_worker_call(observe, {})
+    assert core == ("per-electron" if inherited == "auto" else inherited)
+    assert env_inside == pinned
+    assert effective_core_pin() == pinned
+
+
+def test_adaptive_worker_pin_is_isolated_between_threads(monkeypatch):
+    """Concurrent cases see their own core; neither restores over the other (#1423)."""
+    import threading
+
+    from pyrite._util.env import env_value
+    from pyrite.montecarlo.realization import effective_core_pin
     from pyrite.montecarlo.runner.adaptive import _adaptive_worker_call
 
-    core = _adaptive_worker_call(lambda _case: env_value("PYRITE_MC_TRANSPORT_CORE"), {})
-    assert core == ("per-electron" if inherited == "auto" else inherited)
-    assert env_value("PYRITE_MC_TRANSPORT_CORE") == pinned
+    monkeypatch.setattr(runner, "_WORKER_INHERITED_CORE", "")
+    monkeypatch.setenv("PYRITE_MC_TRANSPORT_CORE", "lockstep")
+    both_inside = threading.Barrier(2, timeout=30)
+    seen = {}
+
+    def adaptive(_case):
+        both_inside.wait()  # the other thread's case is live now
+        seen["adaptive"] = effective_core_pin()
+        both_inside.wait()
+
+    def fixed():
+        both_inside.wait()
+        seen["fixed"] = effective_core_pin()
+        both_inside.wait()
+
+    thread = threading.Thread(target=fixed)
+    thread.start()
+    _adaptive_worker_call(adaptive, {})
+    thread.join(30)
+    assert seen == {"adaptive": "per-electron", "fixed": "lockstep"}
+    assert env_value("PYRITE_MC_TRANSPORT_CORE") == "lockstep"
 
 
 def test_precision_cannot_cross_with_electron_count_sweep(scene, precision):

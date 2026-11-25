@@ -29,6 +29,7 @@ math-mode
 
 startup-latency
 slow-test-audit
+concurrent-case-audit
 phase-retention
 transport-precision-experiment
 physics-adapter-overhead

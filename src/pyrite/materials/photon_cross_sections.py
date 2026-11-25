@@ -37,6 +37,7 @@ refractive index keep the Chantler/Waasmaier--Kirfel factors of
 """
 
 import hashlib
+import threading
 from collections import OrderedDict
 from functools import cache
 
@@ -68,6 +69,8 @@ _BARN_TO_ANG2 = 1.0e-8
 
 _TOTAL_MEMO: OrderedDict[tuple, np.ndarray] = OrderedDict()
 _TOTAL_MEMO_MAX = 256
+# Guards the get/move_to_end and insert/evict pairs against concurrent eviction (#1423).
+_TOTAL_MEMO_LOCK = threading.Lock()
 
 
 @cache
@@ -182,17 +185,19 @@ def total_photon_cross_section_ang2(element: str, E_eV: object) -> np.ndarray:
         energy.shape,
         hashlib.blake2b(np.ascontiguousarray(energy).tobytes()).digest(),
     )
-    cached = _TOTAL_MEMO.get(key)
-    if cached is not None:
-        _TOTAL_MEMO.move_to_end(key)
-        return cached
+    with _TOTAL_MEMO_LOCK:
+        cached = _TOTAL_MEMO.get(key)
+        if cached is not None:
+            _TOTAL_MEMO.move_to_end(key)
+            return cached
     channels = photon_cross_sections_ang2(element, energy)
     total = sum(channels[name] for name in PHOTON_CHANNELS)
     total = np.asarray(total, dtype=float)
     total.flags.writeable = False
-    _TOTAL_MEMO[key] = total
-    if len(_TOTAL_MEMO) > _TOTAL_MEMO_MAX:
-        _TOTAL_MEMO.popitem(last=False)
+    with _TOTAL_MEMO_LOCK:
+        _TOTAL_MEMO[key] = total
+        if len(_TOTAL_MEMO) > _TOTAL_MEMO_MAX:
+            _TOTAL_MEMO.popitem(last=False)
     return total
 
 

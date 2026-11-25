@@ -23,6 +23,7 @@ Conventions:
 """
 
 import hashlib
+import threading
 from collections import OrderedDict
 from functools import cache, lru_cache
 
@@ -112,6 +113,9 @@ def _chantler_bounds(element):
 # Returns bit-identical arrays (frozen read-only so a hit can't be mutated).
 _HENKE_MEMO: OrderedDict[tuple, tuple[np.ndarray, np.ndarray]] = OrderedDict()
 _HENKE_MEMO_MAX = 256
+# ``move_to_end``/``popitem`` after a bare ``get`` raise KeyError when another
+# thread evicts the key between the two calls (#1423).
+_HENKE_MEMO_LOCK = threading.Lock()
 
 
 def henke_dispersion(element, E_eV, on_out_of_range="nan"):
@@ -159,10 +163,11 @@ def henke_dispersion(element, E_eV, on_out_of_range="nan"):
     if on_out_of_range != "raise":
         digest = hashlib.blake2b(np.ascontiguousarray(E).tobytes()).digest()
         key = (element, on_out_of_range, shape, digest)
-        cached = _HENKE_MEMO.get(key)
-        if cached is not None:
-            _HENKE_MEMO.move_to_end(key)
-            return cached
+        with _HENKE_MEMO_LOCK:
+            cached = _HENKE_MEMO.get(key)
+            if cached is not None:
+                _HENKE_MEMO.move_to_end(key)
+                return cached
 
     Eflat = np.atleast_1d(E).ravel()
 
@@ -187,9 +192,10 @@ def henke_dispersion(element, E_eV, on_out_of_range="nan"):
     if on_out_of_range != "raise":
         out_fp.flags.writeable = False
         out_fpp.flags.writeable = False
-        _HENKE_MEMO[key] = (out_fp, out_fpp)
-        if len(_HENKE_MEMO) > _HENKE_MEMO_MAX:
-            _HENKE_MEMO.popitem(last=False)
+        with _HENKE_MEMO_LOCK:
+            _HENKE_MEMO[key] = (out_fp, out_fpp)
+            if len(_HENKE_MEMO) > _HENKE_MEMO_MAX:
+                _HENKE_MEMO.popitem(last=False)
     return out_fp, out_fpp
 
 
