@@ -401,6 +401,7 @@ def _compare_frame(
     resolution="full",
     x_window=None,
     log_x=False,
+    decimate=True,
 ):
     """Tidy long-form spectrum table for ``recs``, ONE row per (hue value, energy
     -grid point, component) -- the generalization of :func:`spectrum_frame` to an
@@ -409,6 +410,8 @@ def _compare_frame(
     strongest-peak record, exactly like :func:`_best_azimuth`'s per-energy
     selection (the largest displayed line peak wins). ``band`` and
     ``max_points`` have the same meaning as in :func:`spectrum_frame`.
+    ``decimate=False`` returns the native frame with its sampling helper
+    columns, for callers that re-decimate per zoom window (#1442).
     """
     _validate_band(band)
     groups: dict[float, list] = {}
@@ -450,8 +453,11 @@ def _compare_frame(
     _columns = ["energy_eV", "intensity", "E0_keV", "tilt_deg", "tilt_azim_deg", "component"]
     if not frames:
         return pd.DataFrame(columns=_columns)
+    native = pd.concat(frames, ignore_index=True)
+    if not decimate:
+        return native
     return _decimate_frame(
-        pd.concat(frames, ignore_index=True),
+        native,
         max_points,
         resolution=resolution,
         x_window=x_window,

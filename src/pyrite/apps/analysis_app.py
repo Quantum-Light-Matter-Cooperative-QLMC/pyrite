@@ -47,6 +47,7 @@ with app.setup:
     from pyrite.apps.analysis_ui.navigation import DETECTORS, MAP, SPECTRA, make_view_nav
     from pyrite.apps.analysis_ui.views import (
         SPECTRA_SPECS,
+        prepare_spectra,
         render_detectors,
         render_map,
         render_map_trends,
@@ -235,11 +236,9 @@ def _(base_context, vary_ui, view_nav):
 
 @app.cell
 def _(
-    app_theme,
     azimuth_ui,
     context,
     energy_ui,
-    spectra_axes_controls,
     spectra_varying_ui,
     spectrum_components_ui,
     thickness_ui,
@@ -248,8 +247,8 @@ def _(
     view_nav,
 ):
     mo.stop(not context.has_data or view_nav.value != SPECTRA)
-    render_spectra(
-        mo,
+    # Native frames for this slice; zooming re-samples them without rebuilding (#1442).
+    spectra_prep = prepare_spectra(
         context=context,
         slice_values={
             "energy": energy_ui.value,
@@ -258,12 +257,52 @@ def _(
             "thickness": thickness_ui.value,
         },
         spec=SPECTRA_SPECS[vary_ui.value],
+        varying_values=list(spectra_varying_ui.value or []),
+        component_values=set(spectrum_components_ui.value),
+    )
+    # Fresh zoom state per slice: a new selection starts at the default domain.
+    narrow_zoom_get, narrow_zoom_set = mo.state(None)
+    broad_zoom_get, broad_zoom_set = mo.state(None)
+    return (
+        broad_zoom_get,
+        broad_zoom_set,
+        narrow_zoom_get,
+        narrow_zoom_set,
+        spectra_prep,
+    )
+
+
+@app.cell
+def _(
+    app_theme,
+    broad_zoom_get,
+    broad_zoom_set,
+    context,
+    narrow_zoom_get,
+    narrow_zoom_set,
+    spectra_axes_controls,
+    spectra_prep,
+    spectra_varying_ui,
+    spectrum_components_ui,
+    vary_ui,
+    view_nav,
+):
+    mo.stop(not context.has_data or view_nav.value != SPECTRA)
+    render_spectra(
+        mo,
+        context=context,
+        prep=spectra_prep,
+        spec=SPECTRA_SPECS[vary_ui.value],
         vary_ui=vary_ui,
         varying_ui=spectra_varying_ui,
         components=spectrum_components_ui,
         axes_controls=spectra_axes_controls,
         axes=resolve_axis_pair(spectra_axes_controls.value),
         theme=app_theme,
+        zoom={
+            "narrow": (narrow_zoom_get, narrow_zoom_set),
+            "broad": (broad_zoom_get, broad_zoom_set),
+        },
     )
     return
 

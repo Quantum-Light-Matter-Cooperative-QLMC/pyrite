@@ -169,7 +169,7 @@ def test_peak_aware_sampling_keeps_weak_detector_peak():
         )
     frame = pd.concat(rows, ignore_index=True)
     subset = frames._chart_frame(frame, value_column="intensity")
-    assert len(subset) == 5000
+    assert 4_500 <= len(subset) <= 5000
     incident = subset.loc[subset.kind == "incident"].energy_eV.tolist()
     detected = subset.loc[subset.kind == "detected"].energy_eV.tolist()
     assert incident == detected

@@ -29,6 +29,9 @@ _MIN_TRACE_POINTS = 1_000
 # Uniform-grid bucketing that fills this much of the budget is accepted
 # without the bisection refinement used for nonuniform grids.
 _FILLED_FRACTION = 0.9
+# Refinement steps for an underfilled budget (flat or nonuniform regions);
+# the best fitting count found so far is used when the cap is reached.
+_MAX_REFINEMENTS = 8
 
 
 @dataclass(frozen=True)
@@ -128,7 +131,13 @@ def _bucket_extrema(coord, y_max, y_min, n_bins):
     trough = np.repeat(np.minimum.reduceat(y_min[interior], starts), lengths)
     keep_max = _first_in_runs(y_max[interior] == peak, starts)
     keep_min = _first_in_runs(y_min[interior] == trough, starts)
-    return interior[np.union1d(keep_max, keep_min)]
+    # One max and one min per run, runs in order: pair them low-to-high and
+    # drop the duplicate where a bucket's max and min are one sample.
+    low, high = np.minimum(keep_max, keep_min), np.maximum(keep_max, keep_min)
+    pairs = np.column_stack((low, high)).ravel()
+    distinct = np.ones(pairs.size, dtype=bool)
+    distinct[1::2] = high != low
+    return interior[pairs[distinct]]
 
 
 def lineshape_indices(x, y, budget, *, log_x=False):
@@ -155,19 +164,28 @@ def lineshape_indices(x, y, budget, *, log_x=False):
     interior_budget = budget - 2
     # Each bucket keeps <= 2 points, so budget/2 buckets always fit; on a
     # uniform grid that fills the budget in one O(n) pass. Empty buckets
-    # (nonuniform grids) keep none: then bisect for the finest count that fits.
+    # (nonuniform grids) keep none and flat buckets keep one: then bisect for
+    # the finest count that fits.
     low = max(1, interior_budget // 2)
     best = _bucket_extrema(coord, y_max, y_min, low)
     if best.size >= _FILLED_FRACTION * interior_budget:
         return np.concatenate(([0], best, [n - 1]))
+    # Kept points grow roughly linearly with the bucket count: step to the
+    # proportional guess, bracketing with bisection when it overshoots.
     low, high = low + 1, interior_budget
-    while low <= high:
-        mid = (low + high) // 2
-        kept = _bucket_extrema(coord, y_max, y_min, mid)
+    guess = min(high, max(low, low * interior_budget // max(1, best.size)))
+    for _ in range(_MAX_REFINEMENTS):
+        if low > high:
+            break
+        kept = _bucket_extrema(coord, y_max, y_min, guess)
         if kept.size <= interior_budget:
-            best, low = kept, mid + 1
+            best, low = kept, guess + 1
+            if kept.size >= _FILLED_FRACTION * interior_budget:
+                break
+            guess = min(high, max(low, guess * interior_budget // max(1, kept.size)))
         else:
-            high = mid - 1
+            high = guess - 1
+            guess = (low + high) // 2
     return np.concatenate(([0], best, [n - 1]))
 
 

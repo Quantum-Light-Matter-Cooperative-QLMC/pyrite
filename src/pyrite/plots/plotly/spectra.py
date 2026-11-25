@@ -8,7 +8,10 @@ wide bremsstrahlung tails and peak-aware sampling remain shared.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 from plotly.colors import qualitative
 
@@ -20,6 +23,7 @@ from .._decimation import DEFAULT_PLOT_RESOLUTION, resolve_plot_resolution
 from .._spectrum_frames import (
     _COMPARE_HUE_FIELDS,
     _compare_frame,
+    _decimate_frame,
     _multi_case_frame,
     _narrow_line_domain,
     _tilt_records,
@@ -171,10 +175,15 @@ def _trace_series(df, *, hue, components, width, height, title, x_type, y_type, 
                     name=f"{label} · {component}" if len(components) > 1 else str(label),
                     legendgroup=str(idx),
                     line=line,
-                    customdata=np.full((xs.size, 1), str(label), dtype=object),
-                    meta={"native_points": int(native), "displayed_points": int(xs.size)},
+                    # Trace-level label (not per-point customdata): an object
+                    # array per coordinate dominated build time and payload.
+                    meta={
+                        "label": str(label),
+                        "native_points": int(native),
+                        "displayed_points": int(xs.size),
+                    },
                     hovertemplate=(
-                        f"{hue}: %{{customdata[0]}}<br>component: {component}"
+                        f"{hue}: %{{meta.label}}<br>component: {component}"
                         "<br>Energy: %{x:.6g} eV<br>Intensity: %{y:.6g} Phs/s/eV/uA"
                         f"<br>display: {xs.size:,} of {int(native):,} native points"
                         "<extra></extra>"
@@ -262,6 +271,106 @@ def spectrum_chart(
     )
 
 
+@dataclass(frozen=True)
+class PreparedSpectra:
+    """Native comparison spectra, prepared once and re-rendered per zoom (#1442).
+
+    ``frame`` is undecimated (it keeps the sampling helper columns); rendering
+    selects display nodes from it for a resolution and visible window, so a
+    zoom never rebuilds record DataFrames.
+    """
+
+    frame: pd.DataFrame
+    hue: str
+    components: tuple[str, ...]
+    title: str
+    domain: tuple | None
+
+
+def prepare_compare_spectra(
+    results,
+    settings,
+    *,
+    hue,
+    include_brem=True,
+    include_cxr=False,
+    include_characteristic=True,
+    include_channeling=True,
+    include_transition=True,
+    include_coherent=False,
+    sum_components=False,
+    x_domain=None,
+    band="narrow",
+):
+    """Native frame and chart metadata for :func:`render_prepared_spectra`."""
+    _validate_band(band)
+    if hue not in _COMPARE_HUE_FIELDS:
+        raise ValueError(f"hue must be one of {sorted(_COMPARE_HUE_FIELDS)}, got {hue!r}")
+    recs = records(results)
+    if not recs:
+        return None
+    frame = _compare_frame(
+        recs,
+        settings,
+        hue=hue,
+        include_brem=include_brem,
+        include_cxr=include_cxr,
+        include_characteristic=include_characteristic,
+        include_channeling=include_channeling,
+        include_transition=include_transition,
+        include_coherent=include_coherent,
+        sum_components=sum_components,
+        band=band,
+        decimate=False,
+    )
+    return PreparedSpectra(
+        frame=frame,
+        hue=hue,
+        components=("total",)
+        + (("brem",) if include_brem and not sum_components else ())
+        + (("line",) if include_cxr and not sum_components else ())
+        + (("coherent",) if include_coherent else ()),
+        title=_case_title(recs[0]["case"], "comparison", latex=False),
+        domain=_narrow_line_domain(recs, band, x_domain),
+    )
+
+
+def render_prepared_spectra(
+    prepared,
+    *,
+    resolution=DEFAULT_PLOT_RESOLUTION,
+    max_points=None,
+    viewport=None,
+    x_type="linear",
+    y_type="linear",
+    width=720,
+    height=360,
+):
+    """Plotly figure of ``prepared`` sampled for ``resolution`` and ``viewport``.
+
+    ``viewport`` (an ``(E_min, E_max)`` zoom range in eV) replaces the band's
+    default domain for both the axis range and the decimation window, so
+    zooming in restores native sampling.
+    """
+    if prepared is None:
+        return None
+    domain = viewport if viewport is not None else prepared.domain
+    frame = _decimate_frame(
+        prepared.frame, **_display_sampling(resolution, max_points, domain, x_type)
+    )
+    return _trace_series(
+        frame,
+        hue=prepared.hue,
+        components=prepared.components,
+        width=width,
+        height=height,
+        title=prepared.title,
+        x_type=x_type,
+        y_type=y_type,
+        x_domain=domain,
+    )
+
+
 def compare_spectrum_chart(
     results,
     settings,
@@ -284,15 +393,8 @@ def compare_spectrum_chart(
     height=360,
 ):
     """Plot one spectrum per selected case-field value (supports sum_components)."""
-    _validate_band(band)
-    if hue not in _COMPARE_HUE_FIELDS:
-        raise ValueError(f"hue must be one of {sorted(_COMPARE_HUE_FIELDS)}, got {hue!r}")
-    recs = records(results)
-    if not recs:
-        return None
-    domain = _narrow_line_domain(recs, band, x_domain)
-    frame = _compare_frame(
-        recs,
+    prepared = prepare_compare_spectra(
+        results,
         settings,
         hue=hue,
         include_brem=include_brem,
@@ -302,22 +404,17 @@ def compare_spectrum_chart(
         include_transition=include_transition,
         include_coherent=include_coherent,
         sum_components=sum_components,
+        x_domain=x_domain,
         band=band,
-        **_display_sampling(resolution, max_points, domain, x_type),
     )
-    return _trace_series(
-        frame,
-        hue=hue,
-        components=("total",)
-        + (("brem",) if include_brem and not sum_components else ())
-        + (("line",) if include_cxr and not sum_components else ())
-        + (("coherent",) if include_coherent else ()),
-        width=width,
-        height=height,
-        title=_case_title(recs[0]["case"], "comparison", latex=False),
+    return render_prepared_spectra(
+        prepared,
+        resolution=resolution,
+        max_points=max_points,
         x_type=x_type,
         y_type=y_type,
-        x_domain=domain,
+        width=width,
+        height=height,
     )
 
 

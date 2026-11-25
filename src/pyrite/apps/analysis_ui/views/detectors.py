@@ -60,6 +60,7 @@ def render_detectors(
                 x_type=band_axes.x_type,
                 y_type=band_axes.y_type,
                 band=band,
+                resolution=axes.resolution,
             )
             if chart is not None:
                 charts.append(themed_chart(chart, theme))

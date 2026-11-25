@@ -18,6 +18,8 @@ class AxisSpec:
 class AxisPair:
     narrow: AxisSpec
     broad: AxisSpec
+    # Display-only plotting resolution preset (#1440); never changes arrays.
+    resolution: str = "standard"
 
 
 @dataclass(frozen=True)

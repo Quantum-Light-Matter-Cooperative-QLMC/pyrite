@@ -104,7 +104,7 @@ def test_detector_chart_sampling_bounds_payload_and_keeps_both_peaks():
         ignore_index=True,
     )
     sampled = _chart_frame(frame, value_column="intensity")
-    assert len(sampled) == 5000
+    assert 4_500 <= len(sampled) <= 5000
     curves = {kind: part for kind, part in sampled.groupby("kind")}
     assert set(curves["incident"]["energy_eV"]) == set(curves["detected"]["energy_eV"])
     assert 4321.0 in set(curves["incident"]["energy_eV"])

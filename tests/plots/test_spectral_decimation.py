@@ -127,6 +127,7 @@ def test_full_mode_passes_every_native_coordinate_to_the_renderer():
     np.testing.assert_allclose(trace.y, expected, rtol=0, atol=0)
     assert trace.line.simplify is False
     assert trace.meta == {
+        "label": "300.0",
         "native_points": rec["E_grid"].size,
         "displayed_points": rec["E_grid"].size,
     }

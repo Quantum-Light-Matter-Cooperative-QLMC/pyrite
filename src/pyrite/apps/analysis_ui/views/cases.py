@@ -73,6 +73,7 @@ def render_case_comparison(
         x_type=axes.narrow.x_type,
         y_type=axes.narrow.y_type,
         band="narrow",
+        resolution=axes.resolution,
     )
     broad = multi_case_spectrum_chart(
         cases,
@@ -86,6 +87,7 @@ def render_case_comparison(
         x_type=axes.broad.x_type,
         y_type=axes.broad.y_type,
         band="broad",
+        resolution=axes.resolution,
     )
     narrow = themed_chart(narrow, theme)
     broad = themed_chart(broad, theme)
