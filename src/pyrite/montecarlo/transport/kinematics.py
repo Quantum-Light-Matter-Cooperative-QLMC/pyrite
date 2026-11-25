@@ -270,13 +270,30 @@ def counter_uniforms(root, n_electrons, n_draws, *, start=0):
     with a 52-bit mantissa so the half-offset is exact. It depends only on
     ``(root, e, c)``: never on the electron count, the block, or other draws.
     """
-    keys = stream_keys(root, n_electrons, start=start)[:, None]
-    counters = np.arange(n_draws, dtype=np.uint64)[None, :]
-    x = keys + _SM64_GOLDEN * (counters + _SM64_ONE)
-    x = (x ^ (x >> _SM64_S30)) * _SM64_MIX1
-    x = (x ^ (x >> _SM64_S27)) * _SM64_MIX2
-    x = x ^ (x >> _SM64_S31)
-    return ((x >> _SM64_S12).astype(np.float64) + 0.5) * _U52_SCALE
+    start = int(start)
+    if start < 0 or n_electrons < 0:
+        raise ValueError("stream_keys needs a non-negative start and count")
+    return _counter_uniforms_kernel(
+        np.uint64(root), int(n_electrons), max(0, int(n_draws)), np.uint64(start)
+    )
+
+
+@njit(cache=True, nogil=True)
+def _counter_uniforms_kernel(root, n_electrons, n_draws, start):
+    """Fuse the two unsigned hashes into the output, without NumPy temporaries.
+
+    Explicit uint64 operands preserve modulo-2**64 addition/multiplication and
+    logical right shifts. The 52-bit integer, half-offset and power-of-two
+    scaling are exactly representable; no fastmath or alternate quantile.
+    """
+    out = np.empty((n_electrons, n_draws), dtype=np.float64)
+    for i in range(n_electrons):
+        e = start + np.uint64(i)
+        key = _splitmix64(root + _SM64_GOLDEN * (e + _SM64_ONE))
+        for c in range(n_draws):
+            z = _splitmix64(key + _SM64_GOLDEN * (np.uint64(c) + _SM64_ONE))
+            out[i, c] = (np.float64(z >> _SM64_S12) + 0.5) * _U52_SCALE
+    return out
 
 
 def counter_normals(root, n_electrons, n_draws, *, start=0):

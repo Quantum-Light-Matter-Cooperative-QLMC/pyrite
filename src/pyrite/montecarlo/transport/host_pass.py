@@ -32,6 +32,7 @@ from .beam_entry import (
     resolve_bunch_times,
     table_energy_range,
 )
+from .beam_prefetch import sample_beam_positions
 from .continuation import effective_schedule, resolve_schedule
 from .core_specializations import (
     _transport_core_grooved,
@@ -473,9 +474,10 @@ def _sample_entry(p, c, stack, launch, electron_start):
         shape=p.long_shape,
         groove=p.groove,
     )
-    pos, transverse_slopes, beam_entry = initial_beam_positions(
-        p.seed,
-        p.Ne,
+    pos, transverse_slopes, beam_entry = sample_beam_positions(
+        initial_beam_positions,
+        p,
+        c.transport_core,
         transverse_distribution=p.transverse_distribution,
         beam_fwhm_mm=p.beam_fwhm_mm,
         beam_fwhm_y_mm=p.beam_fwhm_y_mm,

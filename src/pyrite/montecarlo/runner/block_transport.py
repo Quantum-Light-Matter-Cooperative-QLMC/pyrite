@@ -40,6 +40,7 @@ from ..transport.beam_entry import (
     face_arrival_delay_ang,
     initial_energies_keV,
 )
+from ..transport.beam_prefetch import BeamEntryPrefetch
 from ..transport.kinematics import _sample_bunch_offsets
 from .case_tables import _case_radiative_kwargs
 from .cutoffs import cutoff_floor
@@ -549,6 +550,38 @@ def _prefix_max_energy(E0_keV, seed, beam_kw):
 
 
 def transport_case_blocks(
+    keep,
+    *,
+    simulate,
+    case,
+    E_cut_by_electrons,
+    block_electrons,
+    beam_kw,
+    progress=None,
+    monitor=None,
+    consume=None,
+):
+    """Own the host entry worker for one block run, including recovery/stop."""
+    limit = (
+        block_electrons.stop
+        if isinstance(block_electrons, ElectronShard)
+        else int(E_cut_by_electrons.size)
+    )
+    with BeamEntryPrefetch(limit) as entries:
+        return _transport_case_blocks(
+            keep,
+            simulate=partial(entries.run, simulate),
+            case=case,
+            E_cut_by_electrons=E_cut_by_electrons,
+            block_electrons=block_electrons,
+            beam_kw=beam_kw,
+            progress=progress,
+            monitor=monitor,
+            consume=consume,
+        )
+
+
+def _transport_case_blocks(
     keep,
     *,
     simulate,

@@ -353,7 +353,7 @@
     },
     {
       "path": "src/pyrite/montecarlo/runner/block_transport.py",
-      "name": "transport_case_blocks",
+      "name": "_transport_case_blocks",
       "cc": 21
     },
     {
