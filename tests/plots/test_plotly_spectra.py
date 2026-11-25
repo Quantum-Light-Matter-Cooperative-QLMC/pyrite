@@ -160,8 +160,13 @@ def test_spectrum_frame_wide_brem_preserves_line_window_resolution():
 
     assert np.min(np.abs(total_energy - 2500.0)) == np.min(np.abs(line_energy - 2500.0))
     assert total_shape.max() == line_shape.max()
-    assert _sampled_fwhm(total_energy, total_shape) == _sampled_fwhm(line_energy, line_shape)
-    assert np.median(np.diff(total_energy)) <= 1.15 * np.median(np.diff(line_energy))
+    # The tail keeps a tenth of the budget, so line buckets differ slightly in
+    # width; the sampled FWHM may move by at most one sampled step.
+    assert (
+        abs(_sampled_fwhm(total_energy, total_shape) - _sampled_fwhm(line_energy, line_shape))
+        <= np.diff(line_energy).max()
+    )
+    assert np.mean(np.diff(total_energy)) <= 1.15 * np.mean(np.diff(line_energy))
     assert np.diff(total_energy).max() <= 1.15 * np.diff(line_energy).max()
 
 

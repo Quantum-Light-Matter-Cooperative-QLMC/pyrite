@@ -182,7 +182,13 @@ def test_eaglexo_charge_chart_none_on_empty():
 def test_dense_eagle_chart_bounds_points():
     store = {"HOPG bulk": {30.0: _record(30.0, -20.0, 0.0, n=8651)}}
     fig = eaglexo_detected_chart(store, _settings(), show_qe=False)
-    assert sum(len(t.x) for t in _curves(fig)) <= 5000
+    # Per-curve display budget (#1440): standard caps each curve at 5000.
+    assert max(len(t.x) for t in _curves(fig)) <= 5000
+    fast = eaglexo_detected_chart(store, _settings(), show_qe=False, resolution="fast")
+    assert max(len(t.x) for t in _curves(fast)) <= 2000
+    assert "of 8,651 native points" in fast.layout.title.subtitle.text
+    full = eaglexo_detected_chart(store, _settings(), show_qe=False, resolution="full")
+    assert max(len(t.x) for t in _curves(full)) == 8651
 
 
 def test_timepix_chart_incident_detected_and_threshold():
