@@ -52,7 +52,7 @@ from ..eedl_ionization import (
 )
 from ..eedl_ionization import EEDLSubshellTable as EEDLSubshellTable
 from ..eedl_ionization import load_eedl_shell_ionization as load_eedl_shell_ionization
-from . import _characteristic_fused
+from . import _characteristic_chunk_kernel, _characteristic_fused
 from .cxr import (
     _clip_segments_to_cutoff,
     _observation_direction,
@@ -861,6 +861,20 @@ def _accumulate_line_yields(
 
     Validation: cr-zone-incoherent-flux-weight
     """
+    fused = _characteristic_chunk_kernel.chunk_line_yields(
+        seg_E,
+        seg_L,
+        path_start,
+        path_end,
+        chunk=chunk,
+        number_density_ang3=number_density_ang3,
+        packed_shells=packed_shells,
+        response=response,
+        mu_by_line=mu_by_line,
+        shell_weight=shell_weight,
+    )
+    if fused is not None:  # one launch per chunk (#1455), opt-in
+        return fused
     n_lines = int(response.shape[1])
     # FP64 across chunks, so the chunk split changes only FP64 order (#1313).
     line_yields = xp.zeros(n_lines, dtype=xp.float64)

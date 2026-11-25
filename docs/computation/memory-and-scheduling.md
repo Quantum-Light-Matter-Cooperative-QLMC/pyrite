@@ -95,7 +95,7 @@ w\,\bigl[\mathrm{chunk}\,(2 n_{\text{shell}} + 16) + 8 \cdot 2^{22}\bigr] \le B
 
 with $w = 8$ bytes, since the line arrays are binary64. $n_{\text{shell}}$ is the largest subshell count of any emitting element. The chunk is capped at $2^{20}$ segments and then admitted against the device budget. With the grid-sized formula above, a fine sinc-oversampled line grid made the characteristic chunk a few hundred segments, and launch overhead dominated GPU idle time on high-tilt cases. The CPU keeps that grid-sized default.
 
-The line grouping (`_LINE_BATCH_ELEMENTS`) is an internal memory bound and not a tuning control. All of these chunk choices change only the FP64 summation order of the line yields (#1313). Spectra agree to rounding but are not bitwise identical across chunk sizes.
+The line grouping (`_LINE_BATCH_ELEMENTS`) is an internal memory bound and not a tuning control. An experimental fused route (`PYRITE_MC_CHARACTERISTIC_KERNEL=fused`) replaces the per-group launches with one kernel per chunk. Each thread interpolates its row's shells and loops over the lines, and a block tree reduction writes per-block partial sums. It allocates no (segment, line) arrays. All of these chunk choices change only the FP64 summation order of the line yields (#1313). Spectra agree to rounding but are not bitwise identical across chunk sizes.
 
 ### Blocking the bremsstrahlung photon grid
 
