@@ -51,9 +51,11 @@ class AnalysisContext:
     def title_for_face(self, chart: Any) -> Any:
         if chart is None or self.selected_face != "blazed":
             return chart
+        from pyrite.plots._labels import append_to_title
+
         title = getattr(getattr(chart.layout, "title", None), "text", None)
         if title:
-            chart.update_layout(title_text=f"{title} (blazed)")
+            chart.update_layout(title_text=append_to_title(title, "blazed"))
         return chart
 
 

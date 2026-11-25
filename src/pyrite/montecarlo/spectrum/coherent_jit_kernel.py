@@ -12,6 +12,7 @@ Validation: coherent-formation-absorption
 """
 
 from dataclasses import dataclass
+from typing import cast
 
 import cupy as xp
 import numpy as np
@@ -782,7 +783,7 @@ def run_coherent_reduction_kernel(
     if use_medium:
         if int(L_esc.size) != int(E_r.size):
             raise ValueError("L_esc must have one entry per line")
-        if int(delta_omega.size) != n_energies:
+        if int(cast(np.ndarray, delta_omega).size) != n_energies:
             raise ValueError("delta_omega must have one entry per energy bin")
     else:
         L_esc = delta_omega = _dummy()
@@ -793,7 +794,7 @@ def run_coherent_reduction_kernel(
     if use_formation:
         if not use_medium:
             raise ValueError("the formation factor needs L_esc and delta_omega")
-        if any(int(f.size) != int(E_r.size) for f in formation):
+        if any(int(cast(np.ndarray, f).size) != int(E_r.size) for f in formation):
             raise ValueError("half_dL, apb, bma and q must have one entry per line")
     else:
         half_dL = apb = bma = q = _dummy()

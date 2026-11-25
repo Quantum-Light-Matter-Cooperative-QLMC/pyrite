@@ -5,6 +5,7 @@ from plotly.colors import qualitative
 
 _COLORS = qualitative.Plotly
 
+from .._labels import FIELD_SYMBOLS, field_label, field_value_text
 from .._temporal_frames import temporal_frame
 
 
@@ -24,7 +25,8 @@ def temporal_chart(
     if frame.empty:
         return None
     fig = go.Figure()
-    for i, (label, group) in enumerate(frame.groupby(hue, sort=False, dropna=False)):
+    for i, (value, group) in enumerate(frame.groupby(hue, sort=False, dropna=False)):
+        label = field_value_text(hue, value) if hue in FIELD_SYMBOLS else value
         for component, part in group.groupby("component", sort=False):
             part = part.sort_values("time_fs")
             fig.add_trace(
@@ -46,8 +48,8 @@ def temporal_chart(
         title="Line temporal intensity profile",
         width=width,
         height=height,
-        xaxis_title="Arrival time − mean (fs)",
-        yaxis_title="I(t) (photons/sr/e⁻/fs)",
-        legend=dict(title=hue),
+        xaxis_title=r"$t - \langle t \rangle\ (\mathrm{fs})$",
+        yaxis_title=r"$I(t)\ (\mathrm{ph\,sr^{-1}\,e^{-1}\,fs^{-1}})$",
+        legend=dict(title=field_label(hue)),
     )
     return fig

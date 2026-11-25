@@ -47,6 +47,23 @@ def test_blazed_face_title_preserves_plotly_title_font() -> None:
     assert fig.layout.title.font.size == 18
 
 
+def test_blazed_face_title_stays_inside_math_title() -> None:
+    context = AnalysisContext(
+        selected_material="hopg",
+        selected_face="blazed",
+        checkpoint_stem=None,
+        settings=None,
+        checkpoint_results=None,
+        results=None,
+        cases=None,
+    )
+    fig = go.Figure(layout={"title": {"text": r"$\mathrm{HOPG}$"}})
+
+    fig = context.title_for_face(fig)
+
+    assert fig.layout.title.text == r"$\mathrm{HOPG}\ (\mathrm{blazed})$"
+
+
 def test_no_checkpoint_state_displays_without_analysis_tabs() -> None:
     # Checkpoint loading moved behind analysis_ui.load_context -> AnalysisContext;
     # the app cell now branches on context.has_data instead of MATERIAL is None.

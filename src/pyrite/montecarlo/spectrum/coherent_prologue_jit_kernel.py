@@ -10,6 +10,8 @@ field coefficients. Exact recoil makes ``aw`` and ``phase_slope`` per
 (segment, g) (``line-recoil-in-medium-root``).
 """
 
+from typing import cast
+
 import cupy as xp
 import numpy as np
 
@@ -565,7 +567,7 @@ def run_coherent_prologue_kernel(
     if use_formation:
         if not use_medium:
             raise ValueError("the formation factor needs the refractive model (delta_tab)")
-        if int(L_start.size) != n_segments or int(L_end.size) != n_segments:
+        if int(L_start.size) != n_segments or int(cast(np.ndarray, L_end).size) != n_segments:
             raise ValueError("L_start and L_end must have one entry per segment")
 
     G = g_flat.reshape(n_g, 3)

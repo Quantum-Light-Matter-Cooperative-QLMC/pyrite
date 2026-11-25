@@ -127,17 +127,18 @@ def test_full_mode_passes_every_native_coordinate_to_the_renderer():
     np.testing.assert_allclose(trace.y, expected, rtol=0, atol=0)
     assert trace.line.simplify is False
     assert trace.meta == {
-        "label": "300.0",
+        "label": "300",
         "native_points": rec["E_grid"].size,
         "displayed_points": rec["E_grid"].size,
     }
-    assert "every native point" in fig.layout.title.subtitle.text
+    assert "every native point" in fig.layout.meta["sampling_note"]
 
 
 def test_decimated_figure_and_export_say_so():
     fig = spectrum_chart({"HOPG bulk": {300.0: _record(15.0)}}, _settings(), resolution="fast")
 
-    note = fig.layout.title.subtitle.text
+    assert fig.layout.title.subtitle.text is None
+    note = fig.layout.meta["sampling_note"]
     assert "fast" in note and "of 20,000 native points" in note and "not interpolated" in note
     assert fig.layout.meta["display_points"]["traces"][0]["native"] == 20_000
     assert "display:" in fig.data[0].hovertemplate
@@ -273,4 +274,4 @@ def test_decimated_traces_disable_plotly_simplify_and_note_is_per_trace():
         band="broad",
     )
     assert all(trace.line.simplify is False for trace in fig.data)
-    assert "of 20,000 native points per trace" in fig.layout.title.subtitle.text
+    assert "of 20,000 native points per trace" in fig.layout.meta["sampling_note"]

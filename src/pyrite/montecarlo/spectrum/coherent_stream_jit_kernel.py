@@ -23,6 +23,7 @@ needed between the prologue and reduction stages.
 """
 
 from dataclasses import dataclass
+from typing import cast
 
 import cupy as xp
 import numpy as np
@@ -592,7 +593,7 @@ def run_coherent_field_accumulation_kernel(
     if use_medium:
         if int(L_esc.size) != n_seg:
             raise ValueError("L_esc must have one entry per segment")
-        if int(delta_omega.size) != n_energies:
+        if int(cast(np.ndarray, delta_omega).size) != n_energies:
             raise ValueError("delta_omega must have one entry per energy bin")
     else:
         L_esc = delta_omega = _dummy()

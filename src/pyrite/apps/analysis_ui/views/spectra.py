@@ -80,6 +80,16 @@ def _fallback_note(mo, selected):
 
 
 _BANDS = (("narrow", "Narrowband"), ("broad", "Broadband"))
+# Spectrum and temporal figure heights (px): 4/3 of the library defaults.
+_SPECTRUM_HEIGHT = 480
+_TEMPORAL_HEIGHT = 400
+
+
+def _sampling_caption(mo, chart):
+    """Display-sampling note under a chart; the figure itself carries none."""
+    meta = getattr(getattr(chart, "layout", None), "meta", None)
+    note = meta.get("sampling_note") if isinstance(meta, dict) else None
+    return mo.md(f"<small>{note}</small>") if note else None
 
 
 @dataclass(frozen=True)
@@ -182,7 +192,9 @@ def render_spectra(
             viewport=viewport,
             x_type=band_axes.x_type,
             y_type=band_axes.y_type,
+            height=_SPECTRUM_HEIGHT,
         )
+        caption = _sampling_caption(mo, chart)
         chart = context.title_for_face(themed_chart(chart, theme))
         chart = _band_chart(mo, chart, band=band, x_type=band_axes.x_type, zoom=zoom)
         parts.extend(
@@ -191,10 +203,11 @@ def render_spectra(
                 chart
                 if chart is not None
                 else mo.md(f"*No {heading.lower()} spectra for this slice.*"),
+                *((caption,) if caption is not None else ()),
             ]
         )
     # Opt-in line I(t) (#292): shown only when the checkpoint stored it.
-    temporal = temporal_chart(prep.selected, hue=spec.varying_key)
+    temporal = temporal_chart(prep.selected, hue=spec.varying_key, height=_TEMPORAL_HEIGHT)
     if temporal is not None:
         parts.extend(
             [
