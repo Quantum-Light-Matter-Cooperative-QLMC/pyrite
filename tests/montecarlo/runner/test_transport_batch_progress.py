@@ -364,3 +364,34 @@ def test_adaptive_stop_reports_realized_count_before_spectrum(monkeypatch, case)
     assert (7, 30) in counts
     assert counts[-1] == (8, 8)
     assert activity[-2]["phase"] == "spectrum"
+    # One monitored pass, no energy spread: no replay to name.
+    passes = {
+        (e["transport_pass"], e["transport_pass_index"])
+        for e in activity
+        if "transport_electrons_done" in e
+    }
+    assert passes == {("stopping", 1)}
+    assert "transport_pass" not in activity[-2]
+
+
+def test_announced_passes_number_and_label_each_report(monkeypatch):
+    monkeypatch.setattr(scheduling, "perf_counter", lambda: 0.0)
+    events = []
+    sink = scheduling._TransportProgress(
+        False, lambda done, total: events.append(sink.pass_fields())
+    )
+    sink(1, 10)  # unannounced (fixed-count) transport carries no pass
+    token = runner._TRANSPORT_PROGRESS.set(sink)
+    try:
+        for label in ("stopping", "grid", "scoring"):
+            runner._announce_transport_pass(label)
+            sink(1, 10)
+    finally:
+        runner._TRANSPORT_PROGRESS.reset(token)
+    runner._announce_transport_pass("scoring")  # no sink installed: a no-op
+    assert events == [
+        {},
+        {"transport_pass": "stopping", "transport_pass_index": 1},
+        {"transport_pass": "grid", "transport_pass_index": 2},
+        {"transport_pass": "scoring", "transport_pass_index": 3},
+    ]

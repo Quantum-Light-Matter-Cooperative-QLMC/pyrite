@@ -719,6 +719,9 @@ def _transport_case_blocks(
     measure_only = consume is not None
 
     def monitored(n, recheck=False):
+        from . import _announce_transport_pass
+
+        _announce_transport_pass("energy-range replay" if recheck else "stopping")
         sink = consume
         begin = getattr(consume, "begin_pass", None)
         if begin is not None:
@@ -756,6 +759,9 @@ def _transport_case_blocks(
                 break
             realized = min(monitor.next_point() or n_electrons, n_electrons)
     if cascade and not measure_only:
+        from . import _announce_transport_pass
+
+        _announce_transport_pass("cascade")
         return _fixed_cascade(simulate, keep, monitor, realized, E_cut_by_electrons, case)
     result.update(recovery.metrics())
     return result

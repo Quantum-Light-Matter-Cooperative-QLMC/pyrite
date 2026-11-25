@@ -551,10 +551,11 @@ def _score_streamed_pass(case, inputs, block_electrons, transport_core, grid_rec
     axis's truncation audit refuses it.
     """
     from ..spectrum.cxr._coverage import collect_line_data_coverage
-    from . import _transport_case
+    from . import _announce_transport_pass, _transport_case
     from .streamed_selection import block_scorer
 
     scorer = block_scorer(case, inputs)
+    _announce_transport_pass("scoring")
     with collect_line_data_coverage() as line_coverage:
         tp = _transport_case(
             case,

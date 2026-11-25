@@ -3,6 +3,7 @@
 import json
 import math
 import re
+import shutil
 import sys
 import textwrap
 
@@ -36,23 +37,76 @@ def _encode_sections(sections):
     return _state._encode_sections(sections)
 
 
-def format_table(headers, rows, *, indent=""):
-    """Render plain aligned columns; wrapping remains the terminal's choice."""
-    string_rows = [tuple(str(value) for value in row) for row in rows]
-    widths = [
-        max(len(str(header)), *(len(row[index]) for row in string_rows))
-        for index, header in enumerate(headers)
+_SGR_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _plain(text):
+    return _SGR_RE.sub("", text)
+
+
+def _wrap_cell(text, width):
+    """Wrap long cells, without counting or splitting SGR color sequences."""
+    lines = []
+    for line in text.split("\n"):
+        plain = _plain(line)
+        if len(plain) <= width:
+            lines.append(line)
+        else:
+            # Wrapped cells are plain; state labels are recolored after layout.
+            lines.extend(textwrap.wrap(plain, width, break_on_hyphens=False) or [""])
+    return lines
+
+
+def _table_widths(headers, rows, available):
+    natural = [
+        max(len(_plain(line)) for row in (headers, *rows) for line in row[i].split("\n"))
+        for i in range(len(headers))
     ]
+    if available is None or sum(natural) <= available:
+        return natural
+    # Preserve short numeric cells and header words before squeezing long text.
+    minimum = [
+        min(size, max([5, *(len(word) for word in header.split())]))
+        for size, header in zip(natural, headers, strict=True)
+    ]
+    if sum(minimum) > available:
+        return None
+    widths = natural.copy()
+    while sum(widths) > available:
+        i = max(range(len(widths)), key=lambda i: widths[i] - minimum[i])
+        widths[i] -= 1
+    return widths
 
-    def render(row):
-        return indent + "  ".join(
-            value.ljust(width) if index < len(row) - 1 else value
-            for index, (value, width) in enumerate(zip(row, widths, strict=True))
+
+def _table_row(row, widths, indent):
+    cells = [_wrap_cell(value, width) for value, width in zip(row, widths, strict=True)]
+    lines = []
+    for index in range(max(map(len, cells))):
+        values = [cell[index] if index < len(cell) else "" for cell in cells]
+        padded = [
+            value + " " * (width - len(_plain(value)))
+            for value, width in zip(values, widths, strict=True)
+        ]
+        lines.append((indent + "  ".join(padded)).rstrip())
+    return lines
+
+
+def format_table(headers, rows, *, indent="", width=None):
+    """Aligned columns with hanging cell wraps and a narrow-screen fallback."""
+    headers = tuple(str(header) for header in headers)
+    string_rows = [tuple(str(value) for value in row) for row in rows]
+    available = None if width is None else width - len(indent) - 2 * (len(headers) - 1)
+    widths = _table_widths(headers, string_rows, available)
+    if widths is None:
+        return "\n\n".join(
+            format_fields(list(zip(headers, row, strict=True)), indent=indent, width=width)
+            for row in string_rows
         )
-
-    return "\n".join(
-        [render(tuple(headers)), render(tuple("-" * w for w in widths)), *map(render, string_rows)]
-    )
+    lines = _table_row(headers, widths, indent)
+    lines.extend(_table_row(tuple("-" * w for w in widths), widths, indent))
+    for row in string_rows:
+        lines.extend(_table_row(row, widths, indent))
+    return "\n".join(lines)
 
 
 def style_states(text):
@@ -98,15 +152,27 @@ def paint(text, group):
     return _cli_core.paint(text, group, stream=sys.stdout)
 
 
-def format_fields(rows, *, indent="  "):
-    """Aligned ``label  value`` block; a value with embedded newlines wraps with
-    its continuation lines hanging under the value column."""
-    width = max(len(str(label)) for label, _value in rows)
-    pad = indent + " " * (width + 2)
+def format_fields(rows, *, indent="  ", width=None):
+    """Aligned labels and values with hanging continuation lines."""
+    if not rows:
+        return ""
+    label_width = max(len(str(label)) for label, _value in rows)
+    pad = indent + " " * (label_width + 2)
+    available = None if width is None else width - len(pad)
     lines = []
     for label, value in rows:
-        head, *rest = str(value).split("\n")
-        lines.append(f"{indent}{label:<{width}}  {head}")
+        if width is not None and available is not None and available < 12:
+            lines.extend(
+                indent + line for line in _wrap_cell(str(label), max(1, width - len(indent)))
+            )
+            lines.extend(
+                indent + "  " + line
+                for line in _wrap_cell(str(value), max(1, width - len(indent) - 2))
+            )
+            continue
+        wrapped = str(value).split("\n") if available is None else _wrap_cell(str(value), available)
+        head, *rest = wrapped
+        lines.append(f"{indent}{label:<{label_width}}  {head}")
         lines.extend(f"{pad}{extra}" for extra in rest)
     return "\n".join(lines)
 
@@ -488,10 +554,18 @@ def _format_electron_progress(record):
     total = record.get("transport_electrons_total")
     if not isinstance(done, int) or not isinstance(total, int) or total <= 0:
         return ""
-    return f"histories {done:,}/{total:,} ({round(100 * done / total)}%)"
+    label = record.get("transport_pass")
+    if label == "stopping":
+        # The stopping pass counts against max_histories, not a target.
+        counts = f"histories {done:,} (max {total:,})"
+    else:
+        counts = f"histories {done:,}/{total:,} ({round(100 * done / total)}%)"
+    if label is None:
+        return counts
+    return f"pass {record.get('transport_pass_index')} · {label} · {counts}"
 
 
-def _format_case_progress(records, materials=()):
+def _format_case_progress(records, materials=(), *, width=None):
     """Render the latest validated atomic case snapshots."""
     if not records:
         return "  No case progress reported yet. Use `pyrite remote job logs` for diagnostics."
@@ -499,52 +573,130 @@ def _format_case_progress(records, materials=()):
     for material in materials:
         order.extend(key for key, record in records.items() if record["material"] == material)
     order.extend(key for key in records if key not in order)
-    labels = {}
+    rows = []
     for key in order:
-        record = records[key]
-        label = _material_label(record["material"])
-        if record.get("phase") == "cpu":
-            label += " [CPU]"
-        labels[key] = label
-    label_width = max(len("MATERIAL"), *(len(label) for label in labels.values()))
-    lines = [
-        f"  {'MATERIAL':<{label_width}}  {'PROGRESS':<16}  CASES  DONE  STATE    ACTIVITY / NOW TESTING"
+        rows.append(_case_progress_row(records[key], width))
+    return format_table(
+        ("MATERIAL", "PROGRESS", "CASES", "DONE", "STATE", "ACTIVITY / NOW TESTING"),
+        rows,
+        indent="  ",
+        width=width,
+    )
+
+
+def _case_progress_row(record, width):
+    label = _material_label(record["material"])
+    if record.get("phase") == "cpu":
+        label += " [CPU]"
+    completed = record["cached_cases"] + record["completed_new_cases"]
+    total = record["total_cases"]
+    percent = 100 if total == 0 else round(100 * completed / total)
+    state = record["state"]
+    glyph = _STATE_GLYPHS.get(state, "●")
+    track = _progress_track(completed, total, width=10 if width is not None and width < 100 else 16)
+    accent = paint(f"{glyph} {track}", _progress_group(state))
+    activity = record.get("activity")
+    computing = state == "running" and activity in {"computing", "spectrum"}
+    now = _format_now_testing(record.get("current")) if computing else ""
+    electrons = _format_electron_progress(record) if computing else ""
+    if electrons:
+        now = f"{now} · {electrons}" if now else electrons
+    activity_label = {
+        "loading": "loading checkpoint",
+        "saving": "saving checkpoint",
+        "handoff": "handoff",
+    }.get(activity, "")
+    tail = (
+        activity_label
+        or now
+        or f"{record['cached_cases']} cached · {record['completed_new_cases']} new"
+    )
+    return label, accent, f"{completed}/{total}", f"{percent:>3}%", state, tail
+
+
+def _adaptive_value(row, key, fmt=".3g"):
+    number = row.get(key)
+    return "—" if number is None else format(number, fmt)
+
+
+_ADAPTIVE_SUMMARY = (
+    ("Histories", "n_electrons", ",.0f"),
+    ("RSE", "relative_se", ".3%"),
+    ("RSE target", "target_rse", ".3%"),
+    ("VOV", "variance_of_variance", ".3%"),
+    ("ESS", "effective_sample_size", ",.0f"),
+    ("Max share", "max_electron_share", ".3%"),
+    ("Stability", "stability", ".3g"),
+    ("Stability limit", "stability_limit", ".3g"),
+)
+_ADAPTIVE_POLICY = (
+    ("Min histories", "min_electrons", ",.0f"),
+    ("Max histories", "max_electrons", ",.0f"),
+    ("Next check", "next_point", ",.0f"),
+    ("Pilot projection", "projected_electrons", ",.0f"),
+    ("Checks", "checks", ",.0f"),
+    ("VOV guard", "max_variance_of_variance", ".3%"),
+    ("ESS min", "min_effective_histories", ",.0f"),
+    ("Share cap", "max_history_share", ".3%"),
+)
+_ADAPTIVE_DIAGNOSTICS = (
+    ("CV", "coefficient_of_variation", ".3g"),
+    ("VOV slope", "vov_trend_slope", ".3g"),
+    ("Tail slope", "tail_slope", ".3g"),
+    ("Shift/SE", "shift_over_se", ".3g"),
+    ("FOM", "figure_of_merit", ".3g"),
+)
+_ADAPTIVE_BATCH = (
+    ("Last block", "block_histories"),
+    ("Chunk floor", "chunk_floor"),
+    ("Budget MiB", "chunk_budget_mib"),
+    ("Max rows/history", "rows_per_electron"),
+    ("Decision growth", "decision_growth"),
+    ("Stability checks", "stability_checks"),
+    ("Stability fraction", "stability_fraction"),
+)
+
+
+def _adaptive_metric_table(populations, metrics, width):
+    headers = ("POP", *(label for label, _, _ in metrics))
+    rows = [
+        (name.upper(), *(_adaptive_value(row, key, fmt) for _, key, fmt in metrics))
+        for name, row in populations.items()
     ]
-    for material in order:
-        record = records[material]
-        completed = record["cached_cases"] + record["completed_new_cases"]
-        total = record["total_cases"]
-        percent = 100 if total == 0 else round(100 * completed / total)
-        state = record["state"]
-        glyph = _STATE_GLYPHS.get(state, "●")
-        track = _progress_track(completed, total)
-        accent = paint(f"{glyph} {track}", _progress_group(state))
-        activity = record.get("activity")
-        computing = state == "running" and activity in {"computing", "spectrum"}
-        now = _format_now_testing(record.get("current")) if computing else ""
-        electrons = _format_electron_progress(record) if computing else ""
-        if electrons:
-            now = f"{now} · {electrons}" if now else electrons
-        activity_label = {
-            "loading": "loading checkpoint",
-            "saving": "saving checkpoint",
-            "handoff": "handoff",
-        }.get(activity, "")
-        tail = (
-            activity_label
-            or now
-            or f"{record['cached_cases']} cached · {record['completed_new_cases']} new"
-        )
-        lines.append(
-            f"  {labels[material]:<{label_width}}  {accent}  "
-            f"{completed:>{len(str(total))}}/{total}  {percent:>3}%  {state:<7}  {tail}"
-        )
-    return "\n".join(lines)
+    # Transpose a wide table instead of squeezing nine numbers into narrow columns.
+    natural = _table_widths(headers, rows, None)
+    if width is not None and natural is not None and sum(natural) + 2 * len(headers) > width:
+        headers = ("METRIC", *(name.upper() for name in populations))
+        rows = [
+            (label, *(_adaptive_value(row, key, fmt) for row in populations.values()))
+            for label, key, fmt in metrics
+        ]
+    return format_table(headers, rows, indent="  ", width=width)
 
 
-def _format_adaptive_progress(records, detail):
+def _adaptive_status(populations, width):
+    rows = []
+    for name, row in populations.items():
+        failed = ", ".join(key for key, passed in row.get("passes", {}).items() if not passed)
+        status = row.get("stop_reason") or ("waiting: " + failed if failed else "checking")
+        rows.append((name.upper(), status))
+    return format_fields(rows, indent="  ", width=width)
+
+
+def _adaptive_batch(data, width):
+    rows = [(label, f"{data[key]:.5g}") for label, key in _ADAPTIVE_BATCH if key in data]
+    if not rows:
+        return ""
+    headers, values = zip(*rows, strict=True)
+    natural = _table_widths(headers, [values], None)
+    if width is None or (natural is not None and sum(natural) + 2 * len(headers) <= width):
+        return format_table(headers, [values], indent="  ", width=width)
+    return format_fields(rows, indent="  ", width=width)
+
+
+def _format_adaptive_progress(records, detail, *, width=None):
     """Latest folded estimates; never label unmeasured histories as samples."""
-    lines = []
+    sections = []
     for record in records.values():
         data = record.get("adaptive_progress")
         if (
@@ -556,74 +708,57 @@ def _format_adaptive_progress(records, detail):
         label = _material_label(record["material"])
         if record.get("phase") == "cpu":
             label += " [CPU]"
-        lines.append(f"  {label} · latest stopping check")
-        for name, row in data["populations"].items():
-
-            def value(key, fmt=".3g", *, row=row):
-                number = row.get(key)
-                return "—" if number is None else format(number, fmt)
-
-            passes = row.get("passes", {})
-            failed = ", ".join(key for key, passed in passes.items() if not passed)
-            status = row.get("stop_reason") or ("waiting: " + failed if failed else "checking")
-            lines.append(
-                f"    {name.upper():<4} n {value('n_electrons', ',.0f')} · "
-                f"RSE {value('relative_se', '.3%')} / {value('target_rse', '.3%')} · "
-                f"VOV {value('variance_of_variance', '.3%')} · "
-                f"ESS {value('effective_sample_size', ',.0f')} · "
-                f"max share {value('max_electron_share', '.3%')} · "
-                f"stability {value('stability', '.3g')} / {value('stability_limit', '.3g')}"
-            )
-            lines.append(f"         {status}")
-            if detail >= 2:
-                lines.append(
-                    f"         min/max {value('min_electrons', ',.0f')}/{value('max_electrons', ',.0f')} · "
-                    f"next {value('next_point', ',.0f')} · pilot projection {value('projected_electrons', ',.0f')} · "
-                    f"checks {value('checks', ',.0f')}"
-                )
-                lines.append(
-                    f"         VOV guard {value('max_variance_of_variance', '.3%')} · "
-                    f"ESS min {value('min_effective_histories', ',.0f')} · "
-                    f"share cap {value('max_history_share', '.3%')} · "
-                    f"CV {value('coefficient_of_variation', '.3g')} · "
-                    f"VOV slope {value('vov_trend_slope')} · tail slope {value('tail_slope')} · "
-                    f"shift/SE {value('shift_over_se')} · FOM {value('figure_of_merit')}"
-                )
+        populations = data["populations"]
+        # Past the stopping pass the decision is fixed; later passes rerun it.
+        final = record.get("transport_pass") in {"grid", "scoring", "cascade"}
+        heading = (
+            "stopped (later passes rerun the realized population)"
+            if final
+            else "latest stopping check"
+        )
+        lines = [
+            f"  {label} · {heading}",
+            _adaptive_metric_table(populations, _ADAPTIVE_SUMMARY, width),
+            _adaptive_status(populations, width),
+        ]
         if detail >= 2:
-            fields = (
-                ("block_histories", "last block"),
-                ("chunk_floor", "chunk floor"),
-                ("chunk_budget_mib", "chunk budget MiB"),
-                ("rows_per_electron", "max rows/history"),
-                ("decision_growth", "decision growth"),
-                ("stability_checks", "stability checks"),
-                ("stability_fraction", "stability fraction"),
+            lines.extend(
+                [
+                    "  Policy / next decision",
+                    _adaptive_metric_table(populations, _ADAPTIVE_POLICY, width),
+                    "  Diagnostics",
+                    _adaptive_metric_table(populations, _ADAPTIVE_DIAGNOSTICS, width),
+                ]
             )
-            plan = " · ".join(f"{label} {data[key]:.5g}" for key, label in fields if key in data)
-            if plan:
-                lines.append(f"    {plan}")
-    return "\n".join(lines)
+            if batch := _adaptive_batch(data, width):
+                lines.extend(["  Batch plan", batch])
+        sections.append("\n".join(lines))
+    return "\n\n".join(sections)
 
 
-def _format_case_numerics(records):
-    lines = []
+def _format_case_numerics(records, *, width=None):
+    rows = []
     for record in records.values():
         current = record.get("current")
         if record["state"] != "running" or not isinstance(current, dict):
             continue
         fields = []
-        for key, label in (
-            ("spec_chunk", "CXR chunk"),
-            ("brem_chunk", "brem chunk"),
-            ("line_grid_bins", "line bins"),
-            ("brem_grid_bins", "brem bins"),
-        ):
+        for key in ("spec_chunk", "brem_chunk", "line_grid_bins", "brem_grid_bins"):
             value = current.get(key)
-            if type(value) is int and 0 <= value < 10**18:
-                fields.append(f"{label} {value:,}")
-        if fields:
-            lines.append(f"  {_material_label(record['material'])} · " + " · ".join(fields))
-    return "\n".join(lines)
+            fields.append(f"{value:,}" if type(value) is int and 0 <= value < 10**18 else "—")
+        if any(value != "—" for value in fields):
+            label = _material_label(record["material"])
+            if record.get("phase") == "cpu":
+                label += " [CPU]"
+            rows.append((label, *fields))
+    if not rows:
+        return ""
+    return format_table(
+        ("MATERIAL", "CXR chunk", "Brem chunk", "Line bins", "Brem bins"),
+        rows,
+        indent="  ",
+        width=width,
+    )
 
 
 def _format_compute_usage(payload):
@@ -660,7 +795,7 @@ def _format_compute_usage(payload):
     return "\n".join(lines) if lines else "  Resource metrics unavailable."
 
 
-def _format_performance_profiles(payload):
+def _format_performance_profiles(payload, *, width=None):
     """Render latest persisted resource sample beside case-progress ticks."""
     records = []
     for line in payload.splitlines():
@@ -699,20 +834,29 @@ def _format_performance_profiles(payload):
             return "-"
         return f"{value / 1024**3:.1f} GiB"
 
-    lines = []
+    rows = []
     for record in sorted(records, key=lambda item: str(item["material"])):
         workers = record.get("effective_workers", "-")
         chunks = f"{record.get('spec_chunk', '-')}/{record.get('brem_chunk', '-')}"
-        lines.append(
-            f"  {_material_label(record['material']):<16} "
-            f"CPU {percent(record, 'cpu_percent'):>4} · "
-            f"RAM {percent(record, 'memory_percent'):>4} · "
-            f"RSS {gib(record, 'process_rss_bytes'):>8} · "
-            f"GPU {percent(record, 'gpu_percent'):>4} · "
-            f"VRAM {percent(record, 'vram_percent'):>4} · "
-            f"workers {workers} · chunks {chunks} · profile {record['profile']}"
+        rows.append(
+            (
+                _material_label(record["material"]),
+                percent(record, "cpu_percent"),
+                percent(record, "memory_percent"),
+                gib(record, "process_rss_bytes"),
+                percent(record, "gpu_percent"),
+                percent(record, "vram_percent"),
+                workers,
+                chunks,
+                record["profile"],
+            )
         )
-    return "\n".join(lines)
+    return format_table(
+        ("MATERIAL", "CPU", "RAM", "RSS", "GPU", "VRAM", "WORKERS", "CHUNKS", "PROFILE"),
+        rows,
+        indent="  ",
+        width=width,
+    )
 
 
 def _active_work_label(state):
@@ -969,24 +1113,26 @@ def _status_allocation_rows(context):
     ]
 
 
-def _status_detail_sections(sections, context, detail):
+def _status_detail_sections(sections, context, detail, width=None):
     """Assemble optional sections in the original CLI ordering and verbosity."""
     output = []
     if not context["diagnostic"]:
         records = context["records"]
-        progress = _format_case_progress(records, context["materials"])
+        progress = _format_case_progress(records, context["materials"], width=width)
         if not records and detail >= 2:
             progress = _legacy_progress(sections.get("LOG", ""), context["state_text"]) or progress
         output.extend(["", "CASE PROGRESS", progress])
-        if detail >= 1 and (adaptive := _format_adaptive_progress(records, detail)):
+        if detail >= 1 and (adaptive := _format_adaptive_progress(records, detail, width=width)):
             output.extend(["", "ADAPTIVE STOPPING", adaptive])
-        if detail >= 2 and (numerics := _format_case_numerics(records)):
+        if detail >= 2 and (numerics := _format_case_numerics(records, width=width)):
             output.extend(["", "CASE NUMERICS (runtime plan)", numerics])
-        performance = _format_performance_profiles(sections.get("PERFORMANCE", ""))
+        performance = _format_performance_profiles(sections.get("PERFORMANCE", ""), width=width)
         if performance is not None:
             output.extend(["", "PERFORMANCE PROFILE", performance])
     if detail >= 1:
-        output.extend(["", "ALLOCATION", format_fields(_status_allocation_rows(context))])
+        output.extend(
+            ["", "ALLOCATION", format_fields(_status_allocation_rows(context), width=width)]
+        )
     if detail >= 2:
         output.extend(["", "COMPUTE USAGE", _format_compute_usage(sections.get("RESOURCES", ""))])
         output.extend(
@@ -995,12 +1141,14 @@ def _status_detail_sections(sections, context, detail):
     return output
 
 
-def format_job_status(sections, detail):
-    """Render local and remote job status using shared presentation sections."""
+def format_job_status(sections, detail, *, width=None):
+    """Render shared status, fitting tables to the current terminal width."""
+    if width is None and sys.stdout.isatty():
+        width = shutil.get_terminal_size((100, 24)).columns
     context = _status_context(sections)
     rows = _status_header_rows(sections, context, detail)
-    output = [f"JOB {context['jobid']}", format_fields(rows)]
-    output.extend(_status_detail_sections(sections, context, detail))
+    output = [f"JOB {context['jobid']}", format_fields(rows, width=width)]
+    output.extend(_status_detail_sections(sections, context, detail, width))
     return "\n".join(output)
 
 

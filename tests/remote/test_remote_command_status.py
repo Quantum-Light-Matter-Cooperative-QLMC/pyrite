@@ -64,10 +64,10 @@ def test_status_formats_latest_performance_profile():
     output = presentation.format_job_status(sections, 0)
 
     assert "PERFORMANCE PROFILE" in output
-    assert "CPU  80%" in output
-    assert "GPU  90%" in output
-    assert "workers 4" in output
-    assert "chunks 2000/4000" in output
+    assert "CPU" in output and "80%" in output
+    assert "GPU" in output and "90%" in output
+    assert "WORKERS" in output and "CHUNKS" in output
+    assert "2000/4000" in output
 
 
 def test_status_snapshot_uses_one_partition_bounded_squeue_query():

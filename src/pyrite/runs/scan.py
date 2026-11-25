@@ -176,14 +176,20 @@ _dashboard_stop = threading.Event()
 
 def _dashboard_loop(args, materials, job_records, detail):
     keys = _dashboard.KeyListener()
+    frozen = False
     try:
         while not _dashboard_stop.is_set():
+            was_frozen = frozen
             for key in keys.poll():
-                if key.lower() == "v":
+                if key.lower() == "f":
+                    frozen = not frozen
+                elif not frozen and key.lower() == "v":
                     detail = (detail + 1) % 3
-            sections = _build_sections(args, materials, job_records, detail)
-            frame = _dashboard.style_states(_dashboard.format_job_status(sections, detail))
-            _dashboard.render_frame(frame, tty=True)
+            if not frozen or not was_frozen:
+                sections = _build_sections(args, materials, job_records, detail)
+                frame = _dashboard.style_states(_dashboard.format_job_status(sections, detail))
+                hint = "DISPLAY FROZEN · f resumes" if frozen else "v detail · f freeze/copy"
+                _dashboard.render_frame(f"{hint}\n\n{frame}", tty=True)
             _dashboard_stop.wait(1.0)
     finally:
         keys.stop()

@@ -4,6 +4,8 @@ import json
 import subprocess
 from types import SimpleNamespace
 
+import pytest
+
 from pyrite._adaptive_progress import adaptive_snapshot
 from pyrite.console.dashboard import format_job_status, parse_progress_records
 from pyrite.remote import lifecycle, scripts, viewer
@@ -42,12 +44,15 @@ def test_adaptive_dashboard_detail_and_invalid_fields():
     sections = {"PROGRESS": json.dumps(record)}
     assert "ADAPTIVE STOPPING" not in format_job_status(sections, 0)
     verbose = format_job_status(sections, 1)
-    assert "RSE 2.000% / 1.000%" in verbose
-    assert "VOV 30.000%" in verbose and "ESS 120" in verbose
-    assert "last block" not in verbose
+    assert "RSE" in verbose and "2.000%" in verbose and "1.000%" in verbose
+    assert "VOV" in verbose and "30.000%" in verbose and "ESS" in verbose and "120" in verbose
+    assert "Last block" not in verbose
     detailed = format_job_status(sections, 2)
-    assert "last block 512" in detailed and "BAD" not in detailed
+    assert "Last block" in detailed and "512" in detailed and "BAD" not in detailed
     assert "ADAPTIVE STOPPING" not in format_job_status({"PROGRESS": json.dumps(_record())}, 2)
+    narrow = format_job_status(sections, 2, width=72)
+    assert "METRIC" in narrow and "CXR" in narrow and "2.000%" in narrow
+    assert all(len(line) <= 72 for line in narrow.splitlines())
 
 
 def test_actual_monitor_snapshot_uses_population_specific_policy():
@@ -107,3 +112,75 @@ def test_written_probe_requires_index(monkeypatch, tmp_path):
         "unwritten hopg",
         "written hbn",
     ]
+
+
+def test_transport_pass_label_reaches_the_dashboard(tmp_path):
+    from pyrite._progress import _electron_progress_fields, _write_progress_record
+
+    activity = {
+        "transport_electrons_done": 745_136,
+        "transport_electrons_total": 914_620,
+        "transport_pass": "scoring",
+        "transport_pass_index": 3,
+    }
+    fields = _electron_progress_fields(activity)
+    assert fields == activity
+    # A pass name never travels without electron counts.
+    assert _electron_progress_fields({"transport_pass": "grid", "transport_pass_index": 2}) == {}
+    path = tmp_path / "progress.json"
+    stopped = {"populations": {"cxr": {"n_electrons": 914_620, "stop_reason": "converged"}}}
+    _write_progress_record(
+        path,
+        material="mos2",
+        total_cases=15,
+        cached_cases=0,
+        completed_new_cases=1,
+        state="running",
+        activity="computing",
+        adaptive_progress=stopped,
+        **fields,
+    )
+    records = parse_progress_records(path.read_text())
+    output = format_job_status({"PROGRESS": path.read_text()}, 1)
+    assert records["mos2"]["transport_pass"] == "scoring"
+    assert "pass 3 · scoring · histories 745,136/914,620 (81%)" in output
+    assert "stopped (later passes rerun the realized population)" in output
+
+
+def test_stopping_pass_counts_against_the_maximum():
+    record = _record(
+        transport_electrons_done=745_136,
+        transport_electrons_total=100_000_000,
+        transport_pass="stopping",
+        transport_pass_index=1,
+    )
+    output = format_job_status({"PROGRESS": json.dumps(record)}, 0)
+    assert "pass 1 · stopping · histories 745,136 (max 100,000,000)" in output
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"transport_pass": "\x1b[31mBAD", "transport_pass_index": 1},
+        {"transport_pass": "scoring", "transport_pass_index": 0},
+        {"transport_pass": "scoring", "transport_pass_index": True},
+        {"transport_pass": "scoring"},
+    ],
+)
+def test_invalid_transport_pass_fields_are_dropped(fields):
+    record = _record(transport_electrons_done=1, transport_electrons_total=10, **fields)
+    parsed = parse_progress_records(json.dumps(record))["hopg"]
+    assert "transport_pass" not in parsed and "transport_pass_index" not in parsed
+    assert parsed["transport_electrons_done"] == 1
+    assert "histories 1/10 (10%)" in format_job_status({"PROGRESS": json.dumps(record)}, 0)
+
+
+def test_transport_pass_needs_valid_counts():
+    record = _record(
+        transport_electrons_done=11,
+        transport_electrons_total=10,
+        transport_pass="grid",
+        transport_pass_index=2,
+    )
+    parsed = parse_progress_records(json.dumps(record))["hopg"]
+    assert not any(key.startswith("transport_") for key in parsed)

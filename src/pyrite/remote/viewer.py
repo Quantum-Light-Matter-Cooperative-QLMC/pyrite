@@ -388,8 +388,14 @@ _CANCEL_CONFIRM_KEY = "y"
 _CANCEL_ARM_SECONDS = 6.0
 
 
-def _attach_header(refresh, *, armed=False, cancel_hint=True):
-    """One-line banner above each live frame; the counter proves it's polling."""
+def _attach_header(refresh, *, armed=False, cancel_hint=True, frozen=False):
+    """Banner above each live frame; the counter proves it's polling."""
+    if frozen:
+        return presentation.paint(
+            f"DISPLAY FROZEN · {config.remote_host()} · refresh {refresh}\n"
+            "  Copy text freely · f resumes updates · Ctrl-C detaches (job keeps running)",
+            "warning",
+        )
     if armed:
         action = "PULL" if armed == "pull" else "CANCEL"
         return presentation.paint(
@@ -398,8 +404,8 @@ def _attach_header(refresh, *, armed=False, cancel_hint=True):
             "warning",
         )
     hint = (
-        f" · v cycles detail · {_CANCEL_ARM_KEY} cancels job"
-        f" · {_PULL_ARM_KEY} pulls progress (confirm)"
+        "\n  v cycles detail · f freeze/copy\n"
+        f"  {_PULL_ARM_KEY} pulls progress · {_CANCEL_ARM_KEY} cancels job (confirm)"
         if cancel_hint
         else ""
     )
@@ -408,6 +414,52 @@ def _attach_header(refresh, *, armed=False, cancel_hint=True):
         f"Ctrl-C detaches (job keeps running){hint}",
         "inactive",
     )
+
+
+class _AttachControls:
+    """Viewer-only key state; a frozen display cannot arm destructive actions."""
+
+    def __init__(self, detail):
+        self.detail = detail
+        self.frozen = False
+        self.armed_until: float | None = None
+        self.armed_action: str | None = None
+        self.cancelled = False
+        self.pull_requested = False
+
+    def _disarm(self):
+        self.armed_until = None
+        self.armed_action = None
+
+    def _handle_key(self, key):
+        if self.armed_until is not None:
+            action = self.armed_action
+            self._disarm()
+            if key == _CANCEL_CONFIRM_KEY:
+                self.cancelled = action == "cancel"
+                self.pull_requested = action == "pull"
+        elif key == "v":
+            self.detail = (self.detail + 1) % 3
+        elif key in (_CANCEL_ARM_KEY, _PULL_ARM_KEY):
+            self.armed_until = time.monotonic() + _CANCEL_ARM_SECONDS
+            self.armed_action = "cancel" if key == _CANCEL_ARM_KEY else "pull"
+
+    def poll(self, keys):
+        """Apply buffered keys and report whether the stream detail changed."""
+        previous = self.detail
+        if self.armed_until is not None and time.monotonic() >= self.armed_until:
+            self._disarm()
+        for key in keys:
+            key = key.lower()
+            if key == "f":
+                self.frozen = not self.frozen
+                self._disarm()
+                break
+            if not self.frozen:
+                self._handle_key(key)
+            if self.cancelled:
+                break
+        return self.detail != previous
 
 
 def _pull_attached_progress(jobid, sections):
@@ -459,12 +511,9 @@ def _live_status(jobid, detail):
     missed = 0
     state_ = ""
     broken = False
-    cancelled = False
-    pull_requested = False
+    controls = _AttachControls(detail)
     stream = None
     keys = KeyListener()
-    armed_until = None
-    armed_action = None
     try:
         while True:
             restart_requested = False
@@ -479,57 +528,47 @@ def _live_status(jobid, detail):
                 scheduler = presentation.scheduler_fields(sections.get("SQUEUE", ""))
                 live = scheduler.get("state", "") not in ("", "NOT_QUEUED")
 
-                if armed_until is not None and time.monotonic() >= armed_until:
-                    armed_until = None  # confirm window lapsed; disarm silently
-                    armed_action = None
-                for key in keys.poll():
-                    if armed_until is not None:
-                        confirmed = key.lower() == _CANCEL_CONFIRM_KEY
-                        armed_until = None
-                        action = armed_action
-                        armed_action = None
-                        if confirmed:
-                            if action == "cancel":
-                                cancelled = True
-                                break
-                            if action == "pull":
-                                pull_requested = True
-                    elif key.lower() == "v":
-                        detail = (detail + 1) % 3
-                        remote = _status_remote_command(scripts._job_assign(jobid), detail)
-                        restart_requested = True
-                    elif key.lower() == _CANCEL_ARM_KEY:
-                        armed_until = time.monotonic() + _CANCEL_ARM_SECONDS
-                        armed_action = "cancel"
-                    elif key.lower() == _PULL_ARM_KEY:
-                        armed_until = time.monotonic() + _CANCEL_ARM_SECONDS
-                        armed_action = "pull"
+                was_frozen = controls.frozen
+                restart_requested = controls.poll(keys.poll())
+                detail = controls.detail
+                if restart_requested:
+                    remote = _status_remote_command(scripts._job_assign(jobid), detail)
+                if controls.frozen and was_frozen:
+                    # Keep draining SSH snapshots, but do not touch the terminal.
+                    missed = 0
+                    continue
 
                 frame = (
                     _attach_header(
                         refresh,
-                        armed=armed_action if armed_until is not None else False,
+                        armed=controls.armed_action or False,
                         cancel_hint=keys.active,
+                        frozen=controls.frozen,
                     )
                     + "\n\n"
                     + presentation.style_states(presentation.format_job_status(sections, detail))
                 )
                 render_frame(frame, tty=tty)
-                if pull_requested:
-                    pull_requested = False
+                if controls.pull_requested:
+                    controls.pull_requested = False
                     try:
                         _pull_attached_progress(jobid, sections)
                     except (SystemExit, ValueError) as error:
                         print(f"\nPARTIAL PULL FAILED · job {jobid}\n  {error}")
-                if cancelled or _is_terminal_state(state_):
+                if controls.cancelled or restart_requested:
                     break
-                if restart_requested:
+                if controls.frozen:
+                    missed = 0
+                    continue
+                if _is_terminal_state(state_):
                     break
                 missed = 0 if live else missed + 1
                 if missed >= _POLL_GRACE_POLLS:
                     broken = True
                     break
-            if not restart_requested or cancelled or broken or _is_terminal_state(state_):
+            if not restart_requested or controls.cancelled or broken:
+                break
+            if not controls.frozen and _is_terminal_state(state_):
                 break
             close = getattr(stream, "close", None)
             if close is not None:
@@ -543,7 +582,7 @@ def _live_status(jobid, detail):
         close = getattr(stream, "close", None)
         if close is not None:
             close()
-    if cancelled:
+    if controls.cancelled:
         try:
             lifecycle._stop_jobid(jobid)
         except SystemExit as error:

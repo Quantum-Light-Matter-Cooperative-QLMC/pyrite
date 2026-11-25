@@ -417,3 +417,15 @@ for _exported in (
     _exported.__module__ = __name__
 
 del _exported
+
+
+def _announce_transport_pass(label: str) -> None:
+    """Name the next full-population transport of the active case for live progress.
+
+    One adaptive case may transport its population several times (stopping
+    pass, energy-range replay, grid pass, scoring pass); the dashboard shows
+    which one is running. A no-op without an in-process progress sink.
+    """
+    announce = getattr(_TRANSPORT_PROGRESS.get(), "transport_pass", None)
+    if announce is not None:
+        announce(label)

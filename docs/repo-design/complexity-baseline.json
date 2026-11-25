@@ -694,7 +694,7 @@
     {
       "path": "src/pyrite/remote/viewer.py",
       "name": "_live_status",
-      "cc": 33
+      "cc": 28
     },
     {
       "path": "src/pyrite/results/selection.py",

@@ -459,3 +459,33 @@ def test_policy_grid_keeps_the_measure_route(monkeypatch):
     assert hit["line_grid_resolved"]["cache"] == "hit"
     np.testing.assert_array_equal(hit["E_grid"], missed["E_grid"])
     _assert_spectra(hit, missed)
+
+
+@pytest.mark.slow
+def test_measure_route_names_each_transport_pass():
+    """Live progress names every full-population pass, energy-range replay included."""
+    from pyrite.montecarlo.runner import scheduling
+
+    class PassLog(scheduling._TransportProgress):
+        def __init__(self):
+            super().__init__(False, None)
+            self.labels = []
+
+        def transport_pass(self, label):
+            super().transport_pass(label)
+            self.labels.append(label)
+
+    case = _measured(_requested(0.001))
+    _clear_grid_cache()
+    for expected in (
+        ["stopping", "energy-range replay", "grid", "scoring"],
+        ["stopping", "energy-range replay", "scoring"],  # grid cache hit
+    ):
+        log = PassLog()
+        token = runner._TRANSPORT_PROGRESS.set(log)
+        try:
+            out = run_case_streamed(case, 13, transport_core="per-electron")
+        finally:
+            runner._TRANSPORT_PROGRESS.reset(token)
+        assert log.labels == expected
+        assert out["_adaptive_route"]["transports"] == len(expected)

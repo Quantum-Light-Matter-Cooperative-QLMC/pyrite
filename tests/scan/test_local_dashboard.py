@@ -118,5 +118,5 @@ def test_dashboard_loop_cycles_detail_and_wraps(monkeypatch):
 
     scan._dashboard_loop(MockArgs(), ["hopg"], {}, detail=0)
 
-    assert rendered == [(1, True), (2, True), (0, True)]
+    assert rendered == [(f"v detail · f freeze/copy\n\n{detail}", True) for detail in (1, 2, 0)]
     assert fake_keys.stopped is True

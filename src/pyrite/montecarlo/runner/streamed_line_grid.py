@@ -339,7 +339,7 @@ def resolve_streamed_line_grid(
     memory, under the output cache); spilled files are removed however the
     pass ends.
     """
-    from . import _transport_case
+    from . import _announce_transport_pass, _transport_case
     from .cxr_grid import _auditable_policy, _resolve_policy_grid, cached_policy_cxr_grid
     from .line_grid_spill import GridSpillPolicy
 
@@ -355,6 +355,7 @@ def resolve_streamed_line_grid(
     abs_layers = case.get("abs_layers")
     spill = GridSpillPolicy() if spill is None else spill
     evidence = BlockGridEvidence(case, payload, n_hat, case["Ne"], abs_layers, groove, spill=spill)
+    _announce_transport_pass("grid")
     try:
         _transport_case(
             case,

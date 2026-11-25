@@ -8,6 +8,8 @@ import unicodedata
 
 SHELL_TOKEN_RE = re.compile(r"^[A-Za-z0-9_@-]+$")
 _FRAME_PREFIX = "CXR_REMOTE_V1"
+#: Full-population transport passes a case may report (``_announce_transport_pass``).
+TRANSPORT_PASSES = frozenset({"stopping", "energy-range replay", "grid", "scoring", "cascade"})
 _FRAME_SECTIONS = frozenset(
     {
         "JOB",
@@ -283,9 +285,20 @@ def _sanitize_electron_fields(record):
     """Drop invalid optional within-case electron progress fields in place.
 
     Both or neither: integer ``0 <= transport_electrons_done <=
-    transport_electrons_total`` with a positive total.
+    transport_electrons_total`` with a positive total. The pass name must be a
+    known label with a positive integer ordinal, and needs valid counts.
     """
     keys = ("transport_electrons_done", "transport_electrons_total")
+    pass_keys = ("transport_pass", "transport_pass_index")
+    index = record.get(pass_keys[1])
+    if not (
+        record.get(pass_keys[0]) in TRANSPORT_PASSES
+        and type(index) is int
+        and 0 < index < 1000
+        and all(key in record for key in keys)
+    ):
+        for key in pass_keys:
+            record.pop(key, None)
     if not any(key in record for key in keys):
         return
     done = record.get(keys[0])
@@ -299,5 +312,5 @@ def _sanitize_electron_fields(record):
         and total > 0
     )
     if not valid:
-        for key in keys:
+        for key in (*keys, *pass_keys):
             record.pop(key, None)

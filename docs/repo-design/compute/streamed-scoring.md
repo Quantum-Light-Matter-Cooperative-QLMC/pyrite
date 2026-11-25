@@ -190,6 +190,14 @@ changes to `spectrum`. The progress JSON and `pyrite remote job status` show
 that phase and clear the transport history counter; spectrum work can continue
 without appearing to be stalled transport.
 
+A case may transport its population several times (see "Adaptive cases"), so
+each full-population pass names itself (`runner._announce_transport_pass`):
+`stopping` (the monitored pass, counted against `max_histories`),
+`energy-range replay`, `grid`, `scoring` or `cascade`. Reports then carry
+`transport_pass` and its 1-based `transport_pass_index`, and the dashboard
+shows `pass N · <label>`. A pass after `stopping` reruns the realized
+population, so the adaptive panel marks the stopping decision as final.
+
 ### Adaptive cases
 
 Adaptive cases stream since #1280, with memory bounded by the chunk size

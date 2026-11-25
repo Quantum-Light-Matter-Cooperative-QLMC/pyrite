@@ -125,8 +125,28 @@ def test_attach_header_shows_cancel_hint_only_when_keys_are_active():
     assert f"{viewer._CANCEL_ARM_KEY} cancels job" in viewer._attach_header(1, cancel_hint=True)
     assert f"{viewer._PULL_ARM_KEY} pulls progress" in viewer._attach_header(1, cancel_hint=True)
     assert "v cycles detail" in viewer._attach_header(1, cancel_hint=True)
+    assert "f freeze/copy" in viewer._attach_header(1, cancel_hint=True)
     assert "cancels job" not in viewer._attach_header(1, cancel_hint=False)
     assert "cycles detail" not in viewer._attach_header(1, cancel_hint=False)
+
+
+def test_attach_freezes_display_until_resumed_even_if_job_finishes(monkeypatch):
+    running = _status_output("running hopg [1/1] since now", squeue_state="RUNNING")
+    done = _status_output("done now", squeue_state="NOT_QUEUED")
+    monkeypatch.setattr(
+        viewer, "_status_stream", lambda _command: iter([running, running, done, done])
+    )
+    fake_keys = _FakeKeyListener([["f"], ["x", "y"], [], ["f"]])
+    monkeypatch.setattr(viewer, "KeyListener", lambda: fake_keys)
+    frames = []
+    monkeypatch.setattr(viewer, "render_frame", lambda frame, *, tty: frames.append(frame))
+    stopped = []
+    monkeypatch.setattr(viewer.lifecycle, "_stop_jobid", stopped.append)
+    assert remote.attach("20260101-000000") is True
+    assert len(frames) == 2
+    assert "DISPLAY FROZEN" in frames[0]
+    assert "ATTACHED" in frames[1] and "done now" in frames[1]
+    assert stopped == [] and fake_keys.stopped
 
 
 def test_attach_verbosity_key_cycles_restarts_stream_and_wraps(monkeypatch):

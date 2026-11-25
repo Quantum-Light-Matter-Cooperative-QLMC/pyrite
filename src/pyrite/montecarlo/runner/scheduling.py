@@ -203,6 +203,8 @@ class _TransportProgress:
         self._interval = interval
         self.adaptive_progress = {}
         self._last_adaptive_report = None
+        self.pass_label = None
+        self.pass_index = 0
         self._bar = None
         self._done = 0
         self._total = None
@@ -236,6 +238,19 @@ class _TransportProgress:
             ):
                 self._last_report = now
                 self._report(done, total)
+
+    def transport_pass(self, label):
+        """Name the next full-population transport (``_announce_transport_pass``)."""
+        self.pass_label = label
+        self.pass_index += 1
+        # The pass's first report starts a new pass and bypasses the throttle.
+        self._total = None
+
+    def pass_fields(self):
+        """``transport_pass``/``transport_pass_index`` once a pass was announced."""
+        if self.pass_label is None:
+            return {}
+        return {"transport_pass": self.pass_label, "transport_pass_index": self.pass_index}
 
     def boundary(self, done, total):
         """Report a completed block even when its last batch was throttled."""
@@ -318,7 +333,10 @@ def run_cases(
         Optional callback receiving driver phase-transition mappings. While a
         case is transported in this process, throttled ``serial_case`` updates
         also carry ``transport_electrons_done``/``transport_electrons_total``
-        for the current transport pass. Chunk boundaries bypass the throttle;
+        for the current transport pass and, once a pass is named,
+        ``transport_pass`` (``stopping``, ``energy-range replay``, ``grid``,
+        ``scoring`` or ``cascade``) with its 1-based ``transport_pass_index``
+        within the case. Chunk boundaries bypass the throttle;
         completion reports the realized population, then ``spectrum`` marks
         the handoff before grid resolution.
     transport_only
@@ -704,6 +722,7 @@ class _CaseRun:
                 transport_electrons_done=done,
                 transport_electrons_total=total,
                 **_adaptive_fields(),
+                **sink.pass_fields(),
             )
 
         sink = _TransportProgress(

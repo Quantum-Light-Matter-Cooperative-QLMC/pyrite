@@ -101,6 +101,9 @@ def _electron_progress_fields(activity):
         if all(activity.get(key) is not None for key in keys)
         else {}
     )
+    if fields and activity.get("transport_pass") is not None:
+        fields["transport_pass"] = activity["transport_pass"]
+        fields["transport_pass_index"] = activity.get("transport_pass_index")
     if activity.get("adaptive_progress"):
         fields["adaptive_progress"] = activity["adaptive_progress"]
     return fields
@@ -128,6 +131,8 @@ def _write_progress_record(
     sample_new_cost=None,
     transport_electrons_done=None,
     transport_electrons_total=None,
+    transport_pass=None,
+    transport_pass_index=None,
     adaptive_progress=None,
     checkpoint_stems=None,
 ):
@@ -144,7 +149,8 @@ def _write_progress_record(
     keep writing the same record shape as before.
     ``transport_electrons_done``/``transport_electrons_total`` (optional) are
     the active case's within-case electron-batch progress for its current
-    transport pass; omitted unless both are given.
+    transport pass; omitted unless both are given. ``transport_pass`` and
+    ``transport_pass_index`` name that pass and its ordinal within the case.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -182,6 +188,9 @@ def _write_progress_record(
     if transport_electrons_done is not None and transport_electrons_total is not None:
         record["transport_electrons_done"] = transport_electrons_done
         record["transport_electrons_total"] = transport_electrons_total
+        if transport_pass is not None and transport_pass_index is not None:
+            record["transport_pass"] = transport_pass
+            record["transport_pass_index"] = transport_pass_index
     if adaptive_progress:
         record["adaptive_progress"] = adaptive_progress
     if checkpoint_stems is not None:
