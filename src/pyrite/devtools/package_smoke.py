@@ -15,8 +15,9 @@ from pathlib import Path
 from pyrite.devtools import repo_root
 
 ROOT = repo_root()
-EXPECTED_EXTRAS = {"amd", "apps", "external-db", "intel", "nvidia", "plots"}
 PROJECT_DOCUMENT = tomllib.loads((ROOT / "pyproject.toml").read_text())
+#: The wheel must publish exactly the extras ``pyproject.toml`` declares.
+EXPECTED_EXTRAS = set(PROJECT_DOCUMENT["project"]["optional-dependencies"])
 PROJECT_VERSION = PROJECT_DOCUMENT["project"]["version"]
 
 

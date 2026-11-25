@@ -174,7 +174,7 @@ def test_deadline_stops_launcher_and_child(tmp_path):
     assert not marker.exists()
 
 
-def test_deadline_stops_uv_launched_python(tmp_path):
+def test_deadline_stops_pixi_launched_python(tmp_path):
     import os
     import runpy
     import shutil
@@ -182,17 +182,17 @@ def test_deadline_stops_uv_launched_python(tmp_path):
     import time
     from pathlib import Path
 
-    uv = shutil.which("uv")
-    if os.name != "posix" or uv is None:
+    pixi = shutil.which("pixi")
+    if os.name != "posix" or pixi is None:
         pytest.skip("requires the POSIX project runner")
-    marker = tmp_path / "uv-child-was-not-stopped"
+    marker = tmp_path / "pixi-child-was-not-stopped"
     child = "import sys,time; from pathlib import Path; time.sleep(0.5); Path(sys.argv[1]).write_text('late')"
     script = Path(__file__).resolve().parents[2] / "checks/equal_precision/run_pilot.py"
     run_command = runpy.run_path(str(script))["run_command"]
-    with (tmp_path / "uv.log").open("w") as log:
+    with (tmp_path / "pixi.log").open("w") as log:
         with pytest.raises(subprocess.TimeoutExpired):
             run_command(
-                [uv, "run", "--no-sync", "python", "-c", child, str(marker)],
+                [pixi, "run", "--as-is", "python", "-c", child, str(marker)],
                 os.environ.copy(),
                 log,
                 0.3,

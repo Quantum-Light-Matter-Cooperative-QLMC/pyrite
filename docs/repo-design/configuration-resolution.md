@@ -108,7 +108,7 @@ output.
 | variable | purpose, values, and default | owner | effect |
 |---|---|---|---|
 | `PYRITE_REMOTE_DIR` | Absolute POSIX path to the remote checkout, or `~/...` (expanded to the remote login home over one cached ssh call); unset is `~/pyrite`. | `remote.config` | remote destination |
-| `PYRITE_REMOTE_UV` | Executable name, absolute POSIX path, or `~/...` path for `uv` on the remote host; unset is `~/.local/bin/uv`. | `remote.config` | remote execution |
+| `PYRITE_REMOTE_PIXI` | Executable name, absolute POSIX path, or `~/...` path for `pixi` on the remote host; unset is `~/.pixi/bin/pixi`. | `remote.config` | remote execution |
 | `PYRITE_SYNC_TRANSPORT` | `auto`, `rsync`, or `tar`; unset is `auto`. `auto` uses rsync when both ends have it and the tree is LF-clean, else tar+scp; `rsync` fails instead of falling back. | `remote.transport` | remote transfer |
 | `PYRITE_REMOTE_GPU_VENDOR` | `nvidia`, `amd`, or `intel`; unset is `nvidia`. Selects the batch-script prelude and `pixi install --extra`; `intel` fails before batch-script generation. | Environment > config store (`remote.gpu_vendor`); `console.config`, `remote.config`. | remote resources |
 | `PYRITE_REMOTE_PARTITION` | SLURM partition name for new jobs; unset is `gpu`. | Environment > config store (`remote.partition`); `console.config`, `remote.config`. | remote resources |
@@ -190,7 +190,7 @@ configuration.
 runtime setting. `PYRITE_PI` is a constant inside generated kernel source, not
 an environment read. Standard/external variables such as `NO_COLOR`, `TERM`,
 `SLURM_*`, `NUMBA_DISABLE_JIT`, `MPLBACKEND`, `MPLCONFIGDIR`, `PATH`,
-`MP_API_KEY`, `UV_CACHE_DIR`, and `UV_PROJECT_ENVIRONMENT` belong to their
+`MP_API_KEY`, `PIXI_CACHE_DIR`, and the `PIXI_*` activation variables belong to their
 owning tools or execution environment.
 
 ## Catalog-profile resolution
@@ -302,8 +302,10 @@ parity evidence.
 
 `pyrite remote target add|edit|remove|list|show|use` owns `[remote.targets.NAME]`
 and `remote.default_target` in the user config store. Each entry has `host`,
-`remote_dir`, `uv`, `gpu_vendor`, `partition`, `nodelist`, `gres`, and optional
-`description`. Names follow execution-profile identifiers (letter first, at most
+`remote_dir`, `pixi`, `gpu_vendor`, `partition`, `nodelist`, `gres`, and optional
+`description` and `environment` (a pixi environment; empty means the GPU
+vendor's). Entries stored before #1462 with `uv` or `extras` still load; those
+keys are dropped with a warning. Names follow execution-profile identifiers (letter first, at most
 64 letters/digits/underscores/dots/hyphens). Values are validated before storage.
 
 Selection: explicit `--target NAME` > `PYRITE_REMOTE_TARGET` >

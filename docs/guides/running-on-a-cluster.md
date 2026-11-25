@@ -129,20 +129,20 @@ rather than a checkpoint pull.
 (new-remote-host)=
 ### Set up a new remote host
 
-The helper needs SSH access to a SLURM login node, `uv` on that host, and a
+The helper needs SSH access to a SLURM login node, `pixi` on that host, and a
 home or project directory that compute nodes also see. Do not install PyRITE
-or fetch tables there yourself: each batch job runs `pixi install` (and downloads
-a supported Python if needed) on its compute node, and `pyrite remote sync`
-ships your local tables.
+or fetch tables there yourself: each batch job runs
+`pixi install --locked -e ENV` from the synced `pixi.lock` (Python included)
+on its compute node, and `pyrite remote sync` ships your local tables.
 
-1. On the host, install `uv`, a single binary:
+1. On the host, install `pixi`, a single binary:
 
    ```bash
-   curl -LsSf https://astral.sh/uv/install.sh | sh   # ~/.local/bin/uv
+   curl -fsSL https://pixi.sh/install.sh | bash   # ~/.pixi/bin/pixi
    ```
 
-   A different `uv` location goes in `--uv PATH`. `pyrite remote sync`
-   refuses when it cannot find `uv`.
+   A different `pixi` location goes in `--pixi PATH`. `pyrite remote sync`
+   refuses when it cannot find `pixi`.
 2. Choose the remote directory against the site's quotas. Checkpoints and the
    job environment live under it, so prefer a backed-up home or project space
    over purged scratch.
@@ -171,9 +171,10 @@ ships your local tables.
    pyrite remote sync --target campus
    ```
 
-   Each job runs an exact `pixi install` of the vendor extra, which removes
-   other extras from the shared environment. To keep the Dask backend there,
-   add `--extras dask` (comma-separated for several).
+   Each job installs the target's pixi environment: by default the GPU
+   vendor's (`nvidia` or `amd`), which already carries the Dask and
+   optimization extras. `--environment NAME` selects another environment
+   from the workspace's `[tool.pixi.environments]`.
 
    Simulations always run as `sbatch` jobs. Sync, job status, logs and stop
    are file and scheduler operations on the login node. `pull`, `remote gc`
@@ -247,11 +248,10 @@ ships your local tables.
    ```
 
    The job log header names the node. Compute nodes must reach the package
-   index for the first `pixi install`; on a site without outbound access, fill
-   uv's cache once from an interactive allocation
-   (`srun --time=01:00:00 --cpus-per-task=4 --mem=8G --pty $SHELL -l`) by
-   running `pixi install --package pyrite-mc --no-default-groups --extra nvidia`
-   in the remote directory.
+   index and conda channels for the first `pixi install`; on a site without
+   outbound access, fill pixi's package cache once from an interactive
+   allocation (`srun --time=01:00:00 --cpus-per-task=4 --mem=8G --pty $SHELL -l`)
+   by running `pixi install --locked -e nvidia` in the remote directory.
 
 (amd-rocm-nodes)=
 ### AMD (ROCm) nodes
@@ -276,7 +276,7 @@ Use distinct remote directories when GPU vendors differ; shared directories also
 share job bookkeeping. New jobs record their target remotely and locally; job
 commands recover it by ID. If an ID exists on multiple targets, pass `--target`.
 
-AMD jobs keep their own `.venv-amd`, build CuPy for HIP on the first sync (about
+AMD jobs use the `amd` pixi environment (`.pixi/envs/amd`), build CuPy for HIP on the first install (about
 9 minutes on `qlmc-ace`), and pin `PYRITE_MC_BACKEND=rocm` so a broken HIP stack fails
 instead of running on the CPU. The prelude finds the ROCm root and the GPU
 architecture itself. On a distribution ROCm without a host C++ compiler it
@@ -320,7 +320,7 @@ To use a destination without storing it in config:
 destination = RemoteTarget(
     host="MY_SSH_ALIAS",
     remote_dir="/srv/pyrite",
-    uv="uv",
+    pixi="pixi",
     gpu_vendor="amd",
     partition="gpu-amd",
 )

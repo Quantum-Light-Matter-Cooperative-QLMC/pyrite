@@ -22,7 +22,7 @@ tables derived or resampled from their output.
 - **Source and license**: [upstream Gemmi repository](https://github.com/project-gemmi/gemmi),
   [0.7.5 source](https://github.com/project-gemmi/gemmi/tree/v0.7.5),
   [MPL-2.0 text](https://github.com/project-gemmi/gemmi/blob/v0.7.5/LICENSE.txt).
-  `uv.lock` identifies the installed release; upstream provides its source.
+  `pixi.lock` identifies the installed release; upstream provides its source.
 - **Nature of PyRITE's use**: an unmodified runtime dependency for CIF parsing,
   crystallographic symmetry expansion, lattice parameters, and cell volume.
   PyRITE's scattering and transport implementations remain in PyRITE.
@@ -38,7 +38,7 @@ tables derived or resampled from their output.
 - **License**: Apache License 2.0.
 - **Source and license**: [upstream FINUFFT repository](https://github.com/flatironinstitute/finufft)
   (includes cuFINUFFT), [Apache-2.0 text](https://github.com/flatironinstitute/finufft/blob/master/LICENSE).
-  `uv.lock` identifies the installed release.
+  `pixi.lock` identifies the installed release.
 - **Nature of PyRITE's use**: an unmodified optional runtime dependency (the
   `nvidia` extra) for type-1 non-uniform FFTs in the default CUDA incoherent
   CXR bin-mean reduction (#1192). PyRITE's own line-shape physics, mode

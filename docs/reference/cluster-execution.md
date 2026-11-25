@@ -173,7 +173,7 @@ jobqueue:
   slurm:
     account: MY_ACCOUNT
     walltime: "04:00:00"
-    python: /shared/pyrite/.venv/bin/python    # same path on every node
+    python: /shared/pyrite/.pixi/envs/default/bin/python    # same path on every node
     interface: null           # e.g. ib0 if the default route is not the cluster network
     local-directory: /tmp     # node-local disk for worker spill files
     log-directory: /shared/pyrite-output/dask-logs
@@ -346,7 +346,7 @@ cores plus a 2-core coordinator fit:
 jobqueue:
   slurm:
     account: MY_ACCOUNT
-    python: /u/home/USER/pyrite/.venv/bin/python
+    python: /u/home/USER/pyrite/.pixi/envs/nvidia/bin/python
     local-directory: /tmp
     job-script-prologue:
       - ". /u/local/Modules/default/init/modules.sh"
