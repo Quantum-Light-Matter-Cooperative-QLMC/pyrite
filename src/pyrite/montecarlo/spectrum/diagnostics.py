@@ -196,6 +196,23 @@ def _flight_order(owner, flight):
     return np.lexsort((flight, owner))
 
 
+def sinc_spacing_sort_bytes(rows, width_itemsize=8, weight_itemsize=8):
+    """Bytes :func:`sinc_spacing_from_samples` allocates beyond its input samples (#1453).
+
+    The peak is the larger of two phases, with ``I`` the index itemsize:
+
+    - :func:`_stable_argsort`: the bucket grouping and the sort order
+      (``2 I`` per row) plus the buckets the sort threads hold at once, at
+      most a quarter of the rows' values and indices (``(width + I) / 4``).
+    - the gather: the order, the sorted widths and the sorted weights
+      (``I + width + weight``; the unsorted weights are the input).
+    """
+    index = np.dtype(np.intp).itemsize
+    argsort = 2 * index + (int(width_itemsize) + index + 3) // 4
+    gather = index + int(width_itemsize) + int(weight_itemsize)
+    return int(rows) * max(argsort, gather)
+
+
 def sinc_spacing_from_samples(samples, *, aliased_weight_limit=0.01):
     """The :func:`sinc_feature_spacing` quantile of valid ``[width, weight]`` samples.
 

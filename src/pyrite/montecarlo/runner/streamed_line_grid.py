@@ -219,15 +219,40 @@ class BlockGridEvidence:
         from ..spectrum.diagnostics import sinc_spacing_from_samples
 
         self._check_direction(n_hat)
-        width, weight = self._width, self._weight
-        if width is None or weight is None:
+        if self._width is None or self._weight is None:
             raise RuntimeError("streamed sinc evidence was already reduced")
+        if self._store is None and self._sort_refused():
+            self._start_spill(self._seen)
+        width, weight = self._width, self._weight
         self._width = self._weight = None
         if self._store is not None:
             return self._spilled_sinc_spacing(self._store, aliased_weight_limit)
         samples = [_drain(width), _drain(weight)]
         del width, weight
         return sinc_spacing_from_samples(samples, aliased_weight_limit=aliased_weight_limit)
+
+    def _sort_refused(self) -> bool:
+        """Whether host admission refuses the in-memory spacing sort (#1453).
+
+        The sort allocates :func:`.diagnostics.sinc_spacing_sort_bytes` beyond
+        the held samples, whose bytes headroom already excludes. A refusal
+        moves the held evidence to disk instead; a policy that never spills
+        (``threshold_bytes=None``) has nowhere to go and keeps the sort.
+        """
+        from ..spectrum.diagnostics import sinc_spacing_sort_bytes
+        from ..transport import host_memory
+
+        if self.policy.threshold_bytes is None or self._dtypes is None:
+            return False
+        width, weight = (np.dtype(dtype).itemsize for dtype in self._dtypes)
+        rows = self._seen[1] // (width + weight)
+        try:
+            host_memory.admit_host_allocation(
+                sinc_spacing_sort_bytes(rows, width, weight), "streamed line-grid spacing sort"
+            )
+        except host_memory.HostMemoryResourceError:
+            return True
+        return False
 
     def _spilled_sinc_spacing(self, store, aliased_weight_limit):
         from .line_grid_spill import external_stable_sort, sorted_sinc_spacing

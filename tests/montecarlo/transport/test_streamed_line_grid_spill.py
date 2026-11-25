@@ -454,3 +454,58 @@ def test_forced_small_threshold_is_bitwise_the_in_memory_spacing(tmp_path, small
     ordered = external_stable_sort(store, runs, (width.dtype, weight.dtype))
     assert sorted_sinc_spacing(ordered, aliased_weight_limit=0.01) == expected
     store.close()
+
+
+# --- host admission of the in-memory spacing sort (#1453) -----------------
+
+
+def _refuse_sort(monkeypatch):
+    """Admission that refuses the spacing sort only; returns the asked sorts."""
+    from pyrite.montecarlo.transport import host_memory
+
+    asked = []
+    admit = host_memory.admit_host_allocation
+
+    def refuse(required, phase):
+        if phase != "streamed line-grid spacing sort":
+            return admit(required, phase)
+        asked.append((required, phase))
+        raise host_memory.HostMemoryResourceError(phase, required, 0)
+
+    monkeypatch.setattr(host_memory, "admit_host_allocation", refuse)
+    return asked
+
+
+def test_refused_sort_admission_spills_to_the_same_grid(monkeypatch):
+    from pyrite.montecarlo.spectrum.diagnostics import sinc_spacing_sort_bytes
+
+    case = _case(_measured_policy(_case()))
+    kwargs = dict(transport_core="per-electron", n_hat=_n_hat(case), groove=None)
+    held_policy = GridSpillPolicy(threshold_bytes=1 << 40)  # never reached by size
+    _clear_grid_cache()
+    held, held_record, held_pass = resolve_streamed_line_grid(case, 4, spill=held_policy, **kwargs)
+    assert not held_pass["spilled"]
+
+    asked = _refuse_sort(monkeypatch)
+    _clear_grid_cache()
+    spilled, record, grid_pass = resolve_streamed_line_grid(case, 4, spill=held_policy, **kwargs)
+    assert grid_pass["spilled"] and grid_pass["spill_peak_bytes"] > 0
+    rows = grid_pass["evidence_bytes"]  # sinc bytes only: this policy keeps lines too
+    assert len(asked) == 1 and asked[0][1] == "streamed line-grid spacing sort"
+    assert 0 < asked[0][0] <= sinc_spacing_sort_bytes(rows // 16 + 1)
+    np.testing.assert_array_equal(spilled, held)
+    assert {k: v for k, v in record.items() if k != "cache"} == {
+        k: v for k, v in held_record.items() if k != "cache"
+    }
+    assert list((cache_dir() / "line-grid-spill").iterdir()) == []
+
+
+def test_refused_sort_admission_cannot_spill_when_spilling_is_off(monkeypatch):
+    case = _case()
+    kwargs = dict(transport_core="per-electron", n_hat=_n_hat(case), groove=None)
+    asked = _refuse_sort(monkeypatch)
+    _clear_grid_cache()
+    _, _, grid_pass = resolve_streamed_line_grid(
+        case, 4, spill=GridSpillPolicy(threshold_bytes=None), **kwargs
+    )
+    assert not grid_pass["spilled"] and asked == []
