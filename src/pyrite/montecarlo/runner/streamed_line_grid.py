@@ -294,8 +294,9 @@ def resolve_streamed_line_grid(
     first pass (``transported``, ``evidence_bytes``, ``spilled``,
     ``spill_peak_bytes``). ``spill`` is a
     :class:`.line_grid_spill.GridSpillPolicy` (default: spill above
-    ``DEFAULT_SPILL_THRESHOLD_BYTES`` under the output cache); spilled files
-    are removed however the pass ends.
+    :func:`.line_grid_spill.default_spill_threshold_bytes`, a share of host
+    memory, under the output cache); spilled files are removed however the
+    pass ends.
     """
     from . import _transport_case
     from .cxr_grid import _auditable_policy, _resolve_policy_grid, cached_policy_cxr_grid

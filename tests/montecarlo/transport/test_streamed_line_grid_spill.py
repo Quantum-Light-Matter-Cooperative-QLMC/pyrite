@@ -30,6 +30,7 @@ from pyrite.montecarlo.runner.streamed_line_grid import (
 )
 from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed
 from pyrite.montecarlo.spectrum.diagnostics import sinc_spacing_from_samples
+from pyrite.paths import cache_dir
 
 from .test_streamed_line_grid import (
     _assert_matches,
@@ -305,3 +306,151 @@ def test_the_pivot_scan_releases_each_chunk(tmp_path, monkeypatch):
     lowest, highest, sample = line_grid_spill._scan(runs, 300)
     assert max(alive) <= 1  # only the loop variable's previous chunk
     assert lowest <= sample.min() and sample.max() <= highest
+
+
+# --- memory-aware default threshold (#1453) -------------------------------
+
+GIB = 1024**3
+
+
+def _host(monkeypatch, *, available, cgroup=None):
+    """A host with mocked ``MemAvailable`` and cgroup headroom, in bytes."""
+    from pyrite.montecarlo.transport import host_memory
+
+    monkeypatch.delenv("PYRITE_MC_HOST_LIMIT_BYTES", raising=False)
+    monkeypatch.setattr(
+        host_memory.psutil, "virtual_memory", lambda: type("VM", (), {"available": available})()
+    )
+    monkeypatch.setattr(host_memory, "_cgroup_headroom_bytes", lambda: cgroup)
+
+
+@pytest.mark.parametrize(
+    ("available", "cgroup", "expected"),
+    [
+        (64 * GIB, None, int(0.25 * (62 * GIB))),  # roomy host: a quarter of headroom
+        (64 * GIB, 16 * GIB, int(0.25 * (16 * GIB - 1.6 * GIB))),  # tighter cgroup wins
+        (4 * GIB, None, 2 * GIB),  # constrained host: the 2 GiB floor
+        (64 * GIB, 1 * GIB, 2 * GIB),  # tiny cgroup: floor
+        (0, None, 2 * GIB),
+    ],
+)
+def test_default_threshold_follows_available_memory(monkeypatch, available, cgroup, expected):
+    _host(monkeypatch, available=available, cgroup=cgroup)
+    assert line_grid_spill.default_spill_threshold_bytes() == expected
+    assert GridSpillPolicy().threshold_bytes == expected
+    assert expected >= line_grid_spill.MIN_SPILL_THRESHOLD_BYTES == 2 * GIB
+
+
+def test_default_threshold_honors_the_host_limit_env(monkeypatch):
+    _host(monkeypatch, available=64 * GIB)
+    monkeypatch.setenv("PYRITE_MC_HOST_LIMIT_BYTES", str(24 * GIB))
+    threshold = line_grid_spill.default_spill_threshold_bytes()
+    assert line_grid_spill.MIN_SPILL_THRESHOLD_BYTES < threshold <= 0.25 * 24 * GIB
+
+
+@pytest.mark.parametrize(
+    "failure", [OSError("no /proc/meminfo"), FileNotFoundError(), ValueError()]
+)
+def test_unreadable_memory_falls_back_to_the_floor(monkeypatch, failure):
+    from pyrite.montecarlo.transport import host_memory
+
+    def broken(*args, **kwargs):
+        raise failure
+
+    monkeypatch.setattr(host_memory.psutil, "virtual_memory", broken)
+    assert line_grid_spill.default_spill_threshold_bytes() == 2 * GIB
+
+
+def test_malformed_host_limit_env_falls_back_to_the_floor(monkeypatch):
+    _host(monkeypatch, available=64 * GIB)
+    monkeypatch.setenv("PYRITE_MC_HOST_LIMIT_BYTES", "not-a-number")
+    assert line_grid_spill.default_spill_threshold_bytes() == 2 * GIB
+
+
+def test_missing_cgroup_files_leave_meminfo_alone(monkeypatch, tmp_path):
+    from pyrite.montecarlo.transport import host_memory
+
+    _host(monkeypatch, available=64 * GIB)
+    monkeypatch.undo()  # keep the cgroup reader real, over a root that is absent
+    monkeypatch.delenv("PYRITE_MC_HOST_LIMIT_BYTES", raising=False)
+    monkeypatch.setattr(host_memory, "Path", lambda *parts: tmp_path / "absent")
+    monkeypatch.setattr(
+        host_memory.psutil, "virtual_memory", lambda: type("VM", (), {"available": 40 * GIB})()
+    )
+    assert host_memory._cgroup_headroom_bytes() is None
+    assert line_grid_spill.default_spill_threshold_bytes() == int(0.25 * 38 * GIB)
+
+
+@pytest.mark.parametrize(
+    ("mib", "directory", "expected"),
+    [(0, "d", 0), (7, "d", 7 * 1024**2), (7, None, 7 * 1024**2), (None, "d", "default")],
+)
+def test_explicit_spill_settings_override_the_memory_default(
+    monkeypatch, tmp_path, mib, directory, expected
+):
+    import pyrite as pr
+    from pyrite.montecarlo.runner.transport_options import stream_spill_policy
+
+    _host(monkeypatch, available=512 * GIB)  # a huge host changes nothing explicit
+    directory = None if directory is None else str(tmp_path / directory)
+    numerics = pr.Numerics(
+        execution=pr.config.KernelTuning(
+            stream_block_electrons=5, stream_spill_dir=directory, stream_spill_mib=mib
+        )
+    )
+    policy = stream_spill_policy(numerics)
+    assert policy.threshold_bytes == (
+        line_grid_spill.default_spill_threshold_bytes() if expected == "default" else expected
+    )
+    assert policy.directory == directory
+
+
+def test_no_spill_settings_keep_the_default_policy():
+    import pyrite as pr
+    from pyrite.montecarlo.runner.transport_options import stream_spill_policy
+
+    assert stream_spill_policy(pr.Numerics(execution=pr.config.KernelTuning())) is None
+
+
+def test_default_spills_on_a_constrained_host_and_not_on_a_roomy_one(monkeypatch):
+    """Same evidence, same grid: it stays in memory only where the host has room.
+
+    The floor is scaled down so a few kilobytes of evidence stand in for the
+    gigabytes of a low-tilt run. The default policy is built under a mocked
+    memory probe; transport itself runs on the real host.
+    """
+    monkeypatch.setattr(line_grid_spill, "MIN_SPILL_THRESHOLD_BYTES", 2048)
+    case = _case(_measured_policy(_case()))
+    kwargs = dict(transport_core="per-electron", n_hat=_n_hat(case), groove=None)
+
+    def resolve(available):
+        with monkeypatch.context() as mocked:
+            _host(mocked, available=available)
+            policy = GridSpillPolicy()  # what a ``spill=None`` pass builds
+        _clear_grid_cache()
+        return resolve_streamed_line_grid(case, 4, spill=policy, **kwargs)
+
+    tight, tight_record, tight_pass = resolve(1 << 12)  # headroom below the floor
+    assert tight_pass["spilled"] and tight_pass["evidence_bytes"] > 2048
+    assert list((cache_dir() / "line-grid-spill").iterdir()) == []  # removed on success
+    roomy, roomy_record, roomy_pass = resolve(64 * GIB)  # same evidence, held
+    assert not roomy_pass["spilled"] and roomy_pass["spill_peak_bytes"] == 0
+    assert roomy_pass["evidence_bytes"] == tight_pass["evidence_bytes"]
+
+    np.testing.assert_array_equal(tight, roomy)
+    assert {k: v for k, v in tight_record.items() if k != "cache"} == {
+        k: v for k, v in roomy_record.items() if k != "cache"
+    }
+    assert not any((cache_dir() / "line-grid-spill").rglob("*"))
+
+
+def test_forced_small_threshold_is_bitwise_the_in_memory_spacing(tmp_path, small_sort):
+    """A forced tiny threshold sends the pass through the external sort."""
+    rng = np.random.default_rng(1453)
+    width, weight = _adversarial(rng, "ties", 500)
+    expected = sinc_spacing_from_samples([width.copy(), weight.copy()], aliased_weight_limit=0.01)
+    store = SpillStore(tmp_path)
+    runs = [write_run(store, width[a:b], weight[a:b]) for a, b in [(0, 200), (200, 500)]]
+    ordered = external_stable_sort(store, runs, (width.dtype, weight.dtype))
+    assert sorted_sinc_spacing(ordered, aliased_weight_limit=0.01) == expected
+    store.close()

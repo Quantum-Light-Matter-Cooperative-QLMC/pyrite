@@ -95,10 +95,10 @@ def stream_spill_policy(numerics):
         execution.stream_spill_dir is None and execution.stream_spill_mib is None
     ):
         return None
-    from .line_grid_spill import DEFAULT_SPILL_THRESHOLD_BYTES, GridSpillPolicy
+    from .line_grid_spill import GridSpillPolicy, default_spill_threshold_bytes
 
     mib = execution.stream_spill_mib
-    threshold = DEFAULT_SPILL_THRESHOLD_BYTES if mib is None else mib * 1024**2
+    threshold = default_spill_threshold_bytes() if mib is None else mib * 1024**2
     return GridSpillPolicy(threshold_bytes=threshold, directory=execution.stream_spill_dir)
 
 

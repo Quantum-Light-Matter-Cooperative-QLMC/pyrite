@@ -47,8 +47,12 @@ skips it. That pass's data grows with the electron count, at about 16 bytes
 per line segment, plus about 12 bytes per production line under the
 `resonance-population` bandwidth (24 with `PYRITE_FP64=1`).
 
-Once that data passes 2 GiB, or is projected to over the run, it moves to
-disk, so host memory stays bounded and the grid is unchanged. It goes under
+Once that data passes the spill threshold, or is projected to over the run, it
+moves to disk, so host memory stays bounded and the grid is unchanged. The
+default threshold is a quarter of the host memory available to the run (the
+tighter of `MemAvailable` and the cgroup limit, less a reserve), never below
+2 GiB, and 2 GiB where memory cannot be read; a host with room therefore sorts
+in memory and skips the disk. It goes under
 `<user cache>/line-grid-spill/` (`PYRITE_CACHE_DIR` moves it) and is deleted when the
 pass ends, however it ends. Peak disk use is about twice the line-segment data
 plus the production lines: roughly 170 kB per electron for h-BN at 5 MeV, 1 mm,
@@ -59,7 +63,7 @@ needed; free space there or point the spill at a larger disk. Explicit
 
 To spill to a large scratch file system, or at a different size, set
 `KernelTuning.stream_spill_dir` (a path) and `stream_spill_mib` (MiB of held
-or projected evidence; `0` always spills; default 2048) next to the streaming
+or projected evidence; `0` always spills; default as above) next to the streaming
 option:
 
 <!-- verify: skip (illustrative; runs a full simulation) -->

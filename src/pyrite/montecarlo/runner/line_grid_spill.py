@@ -32,14 +32,21 @@ import shutil
 import socket
 import tempfile
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
 
-#: Evidence bytes above which the grid pass spills to disk (projected over the
-#: run, or held). ``None`` never spills; ``0`` always does.
-DEFAULT_SPILL_THRESHOLD_BYTES = 2 * 1024**3
+#: Floor of the default spill threshold: evidence bytes above which the grid
+#: pass spills to disk (projected over the run, or held). A host with less
+#: headroom than this still uses it.
+MIN_SPILL_THRESHOLD_BYTES = 2 * 1024**3
+#: Share of host headroom the default threshold allows the held evidence (#1453).
+#: The in-memory spacing sort peaks near twice the sinc evidence (samples, the
+#: argsort order and its bucket grouping, then the sorted copy), so a quarter
+#: keeps that peak near half the headroom, beside the transport block and the
+#: production lines the same threshold already counts.
+SPILL_HEADROOM_FRACTION = 0.25
 #: Rows one in-memory stable sort takes; larger runs split into value buckets.
 SORT_ROWS = 1 << 24
 #: Rows read or reduced per chunk.
@@ -51,6 +58,25 @@ SAMPLE_ROWS = 1 << 16
 SPILL_DIRNAME = "line-grid-spill"
 
 
+def default_spill_threshold_bytes() -> int:
+    """The default spill threshold for this host, probed now (#1453).
+
+    ``SPILL_HEADROOM_FRACTION`` of the allocatable host memory that transport
+    admission uses (:func:`.host_memory.host_headroom_bytes`: the tighter of
+    ``MemAvailable`` and the cgroup v2 headroom, less a reserve, and
+    ``PYRITE_MC_HOST_LIMIT_BYTES``), never below ``MIN_SPILL_THRESHOLD_BYTES``.
+    A host whose memory cannot be read gets that floor. Only the in-memory or
+    spilled route changes; both give the same grid bit for bit.
+    """
+    try:
+        from ..transport.host_memory import host_headroom_bytes
+
+        headroom = int(host_headroom_bytes())
+    except Exception:  # unreadable /proc or cgroup files, malformed limit env
+        return MIN_SPILL_THRESHOLD_BYTES
+    return max(MIN_SPILL_THRESHOLD_BYTES, int(SPILL_HEADROOM_FRACTION * headroom))
+
+
 class LineGridSpillError(RuntimeError):
     """The scratch disk cannot hold the projected grid-pass evidence."""
 
@@ -60,11 +86,13 @@ class GridSpillPolicy:
     """When and where the streamed grid pass spills its evidence.
 
     ``threshold_bytes``: spill once the evidence held or projected over the
-    run exceeds this; ``None`` never spills. ``directory``: parent of the
+    run exceeds this; ``None`` never spills; ``0`` always does. Unset, it is
+    :func:`default_spill_threshold_bytes`, probed when the policy is built.
+    ``directory``: parent of the
     per-run scratch directory, default ``<output>/cache/line-grid-spill``.
     """
 
-    threshold_bytes: int | None = DEFAULT_SPILL_THRESHOLD_BYTES
+    threshold_bytes: int | None = field(default_factory=default_spill_threshold_bytes)
     directory: str | os.PathLike[str] | None = None
 
     def parent(self) -> Path:

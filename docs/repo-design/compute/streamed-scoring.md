@@ -115,8 +115,9 @@ path to summation order.
 
 Memory: segment rows still follow the block size, but the grid-pass evidence
 grows with the electron count. Above `GridSpillPolicy.threshold_bytes`
-(default 2 GiB of evidence held, or projected over the run from the blocks
-so far), `runner/line_grid_spill.py` moves it to a per-run scratch directory
+(default `default_spill_threshold_bytes()`, #1453: a quarter of
+`host_memory.host_headroom_bytes()`, floor 2 GiB, 2 GiB if unreadable; evidence
+held, or projected over the run from the blocks so far), `runner/line_grid_spill.py` moves it to a per-run scratch directory
 under the output `cache/line-grid-spill/`, and later blocks are written there
 as they arrive (#1141). Host memory is then bounded independent of N; disk is
 not. `KernelTuning.stream_spill_dir` / `stream_spill_mib` (#1283) set the

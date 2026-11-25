@@ -161,7 +161,8 @@ class ExecutionConfig:
     ``stream_block_electrons`` and never enters case identity.
     ``stream_spill_dir`` (experimental, #1283; ``None``: the output
     ``cache/line-grid-spill/``) and ``stream_spill_mib`` (experimental;
-    ``None``: 2048 MiB; ``0``: always) choose where, and above how many MiB of
+    ``None``: a quarter of host headroom, at least 2048 MiB, #1453; ``0``:
+    always) choose where, and above how many MiB of
     held or projected evidence, the streamed automatic line-grid pass spills
     to disk. They require ``stream_block_electrons`` or ``stream_memory_mib``,
     leave the grid bitwise unchanged and never enter case identity. A path is
