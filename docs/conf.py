@@ -4,7 +4,7 @@ Lightweight by design: MyST renders the existing Markdown design notes and
 autosummary/autodoc pull the curated API from package docstrings. Build
 with::
 
-    uv run --group docs sphinx-build -b html docs docs/_build/html
+    uv run --group docs sphinx-build -j auto -b html docs docs/_build/html
 
 then open ``docs/_build/html/index.html``.
 """
@@ -180,7 +180,10 @@ html_theme_options = {
     "navbar_end": ["theme-switcher"],
     "navigation_depth": 4,
     "show_nav_level": 1,
-    "collapse_navigation": False,
+    # Render only the active branch below the top-level sections. The full
+    # tree (~1000 entries) made every page ~170 kB of sidebar and dominated
+    # HTML write time, above all for the viewcode source pages.
+    "collapse_navigation": True,
     "logo": {
         "alt_text": "PyRITE — Home",
         "image_light": "_static/pyrite-wordmark.png",

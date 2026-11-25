@@ -556,7 +556,7 @@ and acquiring reference tables, is explicit:
 uv lock
 uv run --group docs --extra optimization python docs/_notebooks.py --regenerate-all
 uv run --group docs python docs/_notebooks.py --check
-uv run --group docs sphinx-build -b html -W --keep-going docs docs/_build/html
+uv run --group docs sphinx-build -j auto -b html -W --keep-going docs docs/_build/html
 ```
 
 The `optimization` extra supplies Optuna for notebook 11. Regeneration uses the

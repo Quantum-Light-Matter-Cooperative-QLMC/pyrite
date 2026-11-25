@@ -11,6 +11,11 @@ build:
     install:
       # Install into Read the Docs' environment for its Sphinx build step.
       - UV_PROJECT_ENVIRONMENT=$READTHEDOCS_VIRTUALENV_PATH uv sync --locked --no-default-groups --group docs
+    build:
+      # The default Sphinx step cannot pass -j; the docs extensions are
+      # parallel-safe and a parallel build is several times faster.
+      html:
+        - $READTHEDOCS_VIRTUALENV_PATH/bin/python -m sphinx -T -W --keep-going -j auto -b html -d docs/_build/doctrees docs $READTHEDOCS_OUTPUT/html
 
 sphinx:
   builder: html

@@ -101,6 +101,8 @@ def test_docs_cleans_generated_trees_and_runs_strict_build(
                 "-a",
                 "-W",
                 "--keep-going",
+                "-j",
+                "auto",
                 "-b",
                 builder,
                 str(docs),
