@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Iterator, Mapping
+from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import asdict, dataclass, replace
@@ -43,7 +43,7 @@ _SOURCE: ContextVar[str | None] = ContextVar("pyrite_precision_source", default=
 
 
 @contextmanager
-def policy_source(source: str | None) -> Iterator[None]:
+def policy_source(source: str | None) -> Generator[None]:
     """Name *source* in any deprecation warning raised while a policy is built."""
     token = _SOURCE.set(source)
     try:

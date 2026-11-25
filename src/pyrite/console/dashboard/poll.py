@@ -40,8 +40,8 @@ class KeyListener:
         import msvcrt
 
         while not self._stop_event.is_set():
-            if msvcrt.kbhit():  # ty: ignore[unresolved-attribute]
-                self._keys.put(msvcrt.getwch())  # ty: ignore[unresolved-attribute]
+            if msvcrt.kbhit():  # ty: ignore[missing-attribute]
+                self._keys.put(msvcrt.getwch())  # ty: ignore[missing-attribute]
             else:
                 self._stop_event.wait(0.1)
 
