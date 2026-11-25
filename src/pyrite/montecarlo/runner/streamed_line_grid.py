@@ -217,6 +217,7 @@ class BlockGridEvidence:
     def sinc_spacing(self, n_hat, aliased_weight_limit):
         """:func:`.diagnostics.sinc_feature_spacing` of the accumulated rows."""
         from ..spectrum.diagnostics import sinc_spacing_from_samples
+        from ..spectrum.spacing_selection import sinc_spacing_by_selection
 
         self._check_direction(n_hat)
         if self._width is None or self._weight is None:
@@ -227,9 +228,14 @@ class BlockGridEvidence:
         self._width = self._weight = None
         if self._store is not None:
             return self._spilled_sinc_spacing(self._store, aliased_weight_limit)
+        selected = sinc_spacing_by_selection(_paired(width, weight), aliased_weight_limit)
+        if selected is not None:
+            return selected
         samples = [_drain(width), _drain(weight)]
         del width, weight
-        return sinc_spacing_from_samples(samples, aliased_weight_limit=aliased_weight_limit)
+        return sinc_spacing_from_samples(
+            samples, aliased_weight_limit=aliased_weight_limit, select=False
+        )
 
     def _sort_refused(self) -> bool:
         """Whether host admission refuses the in-memory spacing sort (#1453).
@@ -255,9 +261,14 @@ class BlockGridEvidence:
         return False
 
     def _spilled_sinc_spacing(self, store, aliased_weight_limit):
-        from .line_grid_spill import external_stable_sort, sorted_sinc_spacing
+        from ..spectrum.spacing_selection import sinc_spacing_by_selection
+        from .line_grid_spill import external_stable_sort, iter_run_chunks, sorted_sinc_spacing
 
         runs = self._runs
+        selected = sinc_spacing_by_selection(lambda: iter_run_chunks(runs), aliased_weight_limit)
+        if selected is not None:
+            self._runs = []
+            return selected
         self._runs = []
         ordered = external_stable_sort(store, runs, self._dtypes or (np.dtype(float),) * 2)
         self._track_peak()
@@ -290,6 +301,11 @@ def _write_run(store, width, weight):
     from .line_grid_spill import write_run
 
     return write_run(store, width, weight)
+
+
+def _paired(width: list[np.ndarray], weight: list[np.ndarray]):
+    """A re-iterable source of the held ``(width, weight)`` blocks, in order."""
+    return lambda: zip(width, weight, strict=True)
 
 
 def _drain(blocks: list[np.ndarray]) -> np.ndarray:

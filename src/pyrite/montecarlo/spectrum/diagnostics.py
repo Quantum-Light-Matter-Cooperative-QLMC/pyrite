@@ -206,19 +206,28 @@ def sinc_spacing_sort_bytes(rows, width_itemsize=8, weight_itemsize=8):
       most a quarter of the rows' values and indices (``(width + I) / 4``).
     - the gather: the order, the sorted widths and the sorted weights
       (``I + width + weight``; the unsorted weights are the input).
+
+    This is the sort's worst case, which :func:`sinc_spacing_from_samples`
+    reaches only when selection (:mod:`.spacing_selection`) falls back to it.
     """
     index = np.dtype(np.intp).itemsize
     argsort = 2 * index + (int(width_itemsize) + index + 3) // 4
     gather = index + int(width_itemsize) + int(weight_itemsize)
-    return int(rows) * max(argsort, gather)
+    # A sixteenth more covers the bucket ids, pivots and thread bookkeeping.
+    return int(rows) * max(argsort, gather) * 17 // 16
 
 
-def sinc_spacing_from_samples(samples, *, aliased_weight_limit=0.01):
+def sinc_spacing_from_samples(samples, *, aliased_weight_limit=0.01, select=True):
     """The :func:`sinc_feature_spacing` quantile of valid ``[width, weight]`` samples.
 
-    Consumes ``samples`` (emptied in place): each input array is released as
-    soon as its sorted copy exists, so the peak is the samples plus one sort
-    order and one sorted array (#1001). The arithmetic is unchanged.
+    Consumes ``samples`` (emptied in place). Large float64 populations take
+    :func:`.spacing_selection.sinc_spacing_by_selection` first (``select``),
+    which sorts only the rows around the quantile; its spacing is within
+    ``SPACING_RTOL`` (1e-6, relative) of the full sort's and bitwise equal
+    unless the quantile lies within float summation error of a change in
+    width (#1453). Otherwise each input array is released as soon as its
+    sorted copy exists, so the peak is the samples plus one sort order and one
+    sorted array (#1001), and the arithmetic is the stable sort's.
     """
     if not 0.0 <= float(aliased_weight_limit) < 1.0:
         raise ValueError("aliased_weight_limit must be in [0, 1)")
@@ -226,6 +235,12 @@ def sinc_spacing_from_samples(samples, *, aliased_weight_limit=0.01):
     samples.clear()
     if width.size == 0:
         raise ValueError("cannot derive sinc spacing: diagnostic transport has no valid segments")
+    if select:
+        from .spacing_selection import sinc_spacing_by_selection
+
+        selected = sinc_spacing_by_selection(lambda: iter([(width, weight)]), aliased_weight_limit)
+        if selected is not None:
+            return selected
 
     order = _stable_argsort(width)
     width = width[order]

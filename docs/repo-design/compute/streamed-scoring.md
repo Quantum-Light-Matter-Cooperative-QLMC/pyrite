@@ -130,7 +130,24 @@ policy's directory and threshold from `pyrite.simulate`
   back on a failed block) and served after transport as views of a single
   read-only memory map, in the in-memory block layout. One map per array ran
   out of file descriptors at 64 h-BN blocks (job 13610).
-- **Exact quantile.** `external_stable_sort` distributes rows into value
+- **Selection first (#1453).** For float64 populations of at least
+  `SELECT_MIN_ROWS` rows, `spectrum/spacing_selection.sinc_spacing_by_selection`
+  finds the 1 % weighted quantile without sorting: a strided sample picks two
+  pivots, one pass sums the weight below the lower pivot and keeps the rows
+  between them, and only those are sorted. It reads fixed-size chunks of the
+  row stream, so held blocks, a joined array and spilled runs (any block
+  layout) give the same bits, and a spill needs no sorted copy on disk. The
+  reference's float summation error bounds its quantile index to a weight band
+  of `4 * rows * u * total`; the quantile at both band edges is computed, and
+  when they are the same width the spacing equals the stable sort's bit for
+  bit. When they are adjacent distinct widths the spacing is returned only if
+  they differ by at most `SPACING_RTOL = 1e-6` (relative), so it is within
+  1e-6 of the sort's, always. Ties, float32, an unclosed bracket or a wider
+  jump return None and the exact sort below runs. The aliased fraction is
+  summed in another order, so it agrees to rounding (absolute <= 1e-12 in the
+  tests), not bitwise. Admission still charges the sort's worst case
+  (`sinc_spacing_sort_bytes`) because the fallback may run.
+- **Exact quantile (fallback).** `external_stable_sort` distributes rows into value
   buckets at sampled pivots, each bucket in row order, and sorts every bucket
   that fits `SORT_ROWS` with the same stable argsort; larger buckets recurse.
   Equal widths share a bucket, so the result is the global stable order

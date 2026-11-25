@@ -509,3 +509,38 @@ def test_refused_sort_admission_cannot_spill_when_spilling_is_off(monkeypatch):
         case, 4, spill=GridSpillPolicy(threshold_bytes=None), **kwargs
     )
     assert not grid_pass["spilled"] and asked == []
+
+
+def test_selection_route_gives_the_joined_grid_held_and_spilled(monkeypatch, tmp_path):
+    """Spacing by selection (#1453) feeds the same grid on held blocks and spilled runs."""
+    from pyrite.montecarlo.spectrum import spacing_selection
+
+    monkeypatch.setattr(spacing_selection, "SELECT_MIN_ROWS", 1)
+    monkeypatch.setattr(spacing_selection, "SELECT_CHUNK_ROWS", 64)
+    monkeypatch.setattr(spacing_selection, "SAMPLE_STRIDE", 1)
+    taken = []
+    select = spacing_selection.sinc_spacing_by_selection
+
+    def spy(source, limit):
+        result = select(source, limit)
+        taken.append(result is not None)
+        return result
+
+    monkeypatch.setattr(spacing_selection, "sinc_spacing_by_selection", spy)
+    case = _case()
+    kwargs = dict(transport_core="per-electron", n_hat=_n_hat(case), groove=None)
+    _clear_grid_cache()
+    reference = _joined(case)  # the joined resolver also reduces by selection
+    _clear_grid_cache()
+    held, _, held_pass = resolve_streamed_line_grid(
+        case, 4, spill=GridSpillPolicy(threshold_bytes=None), **kwargs
+    )
+    _clear_grid_cache()
+    spilled, _, spill_pass = resolve_streamed_line_grid(
+        case, 4, spill=GridSpillPolicy(threshold_bytes=0, directory=tmp_path), **kwargs
+    )
+    assert not held_pass["spilled"] and spill_pass["spilled"]
+    assert taken and all(taken)  # selection answered every reduction, no sort fallback
+    np.testing.assert_array_equal(held, spilled)
+    np.testing.assert_array_equal(held, reference["E_grid"])
+    assert not any(tmp_path.rglob("*.raw"))
