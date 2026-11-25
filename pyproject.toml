@@ -142,7 +142,7 @@ lint = [
     "grimp>=3.12",
     "import-linter>=2.9",
     "ruff>=0.15.19",
-    "ty>=0.0.63",
+    "ty>=0.0.109",
     "pre-commit>=4.6.0",
     "nbqa>=1.9.1",
     "nbstripout>=0.9.1",
@@ -298,7 +298,7 @@ allowed-unresolved-imports = [
 ]
 
 [tool.ty.overrides.rules]
-unresolved-attribute = "ignore"
+missing-attribute = "ignore"
 
 [[tool.ty.overrides]]
 include = [
@@ -309,7 +309,7 @@ include = [
 
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
-invalid-return-type = "ignore"
+invalid-explicit-return = "ignore"
 no-matching-overload = "ignore"
 
 [tool.importlinter]

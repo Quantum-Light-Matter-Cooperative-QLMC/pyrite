@@ -99,9 +99,11 @@ def _mixture(r, var0, q_perp, mu, d):
 
 
 def _brem_kernel(x, d, u2, s_cut=S_FIT_MAX):
-    row = next(r for r in xraydb.get_xraydb().get_cache("Waasmaier") if r.ion == "Si")
-    amp = np.array(json.loads(row.scale))
-    expo = np.array(json.loads(row.exponents))
+    db = xraydb.get_xraydb()
+    unpack = getattr(db, "unpack", json.loads)  # xraydb >= 4.6 xz-compresses arrays
+    row = next(r for r in db.get_cache("Waasmaier") if r.ion == "Si")
+    amp = np.array(unpack(row.scale))
+    expo = np.array(unpack(row.exponents))
     q_top = MC2_EV / HBARC_EV_ANG  # mc/hbar
     q_cut = min(4.0 * np.pi * (s_cut or np.inf), q_top)
     parts = [_log_nodes(1e-6, q_cut, N_Q)] + (

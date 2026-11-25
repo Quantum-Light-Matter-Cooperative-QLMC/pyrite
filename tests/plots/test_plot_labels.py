@@ -44,8 +44,8 @@ def test_slice_title_omits_varying_and_differing_fields():
     ]
     title = slice_title(cases, varying="tilt_deg")
     assert title == (
-        r"$\mathrm{2H}\text{-}\mathrm{MoS_{2}},\ 1\,\mu\mathrm{m},\ E_0 = 300\,\mathrm{keV},"
-        r"\ \phi_{\mathrm{azim}} = 180^\circ$"
+        r"$\Large{\mathrm{2H}\text{-}\mathrm{MoS_{2}},\ 1\,\mu\mathrm{m},\ E_0 = 300\,\mathrm{keV},"
+        r"\ \phi_{\mathrm{tilt}} = 180^\circ}$"
     )
 
 

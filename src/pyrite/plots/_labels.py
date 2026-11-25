@@ -26,7 +26,9 @@ _LEGEND_UNITS = {"E0_keV": r"\mathrm{keV}", "tilt_deg": r"^\circ", "tilt_azim_de
 
 #: Spectrum axis titles (Plotly/MathJax and matplotlib mathtext both typeset these).
 PHOTON_ENERGY_TITLE = r"$\large{\mathrm{Photon\ energy}\ (\mathrm{eV})}$"
-SPECTRAL_INTENSITY_TITLE = r"$\large{\mathrm{Intensity}\ (\mathrm{ph\,s^{-1}\,eV^{-1}\,\mu A^{-1}})}$"
+SPECTRAL_INTENSITY_TITLE = (
+    r"$\large{\mathrm{Intensity}\ (\mathrm{ph\,s^{-1}\,eV^{-1}\,\mu A^{-1}})}$"
+)
 
 
 def _latex_word(word: str) -> str:

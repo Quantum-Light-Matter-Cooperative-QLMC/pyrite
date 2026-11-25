@@ -371,7 +371,7 @@ _DEFAULT_CATALOG_LOCK = Lock()
 
 
 # Test hook: clear the parse cache (e.g. after monkeypatching CIF loaders).
-load_material_catalog.cache_clear = _load_material_catalog_cached.cache_clear  # ty: ignore[unresolved-attribute]
+load_material_catalog.cache_clear = _load_material_catalog_cached.cache_clear  # ty: ignore[missing-attribute]
 
 
 def _get_default_catalog() -> MaterialCatalog:
