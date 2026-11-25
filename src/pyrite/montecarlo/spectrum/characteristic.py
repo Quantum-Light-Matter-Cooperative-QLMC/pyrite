@@ -873,7 +873,7 @@ def _accumulate_line_yields(
         mu_by_line=mu_by_line,
         shell_weight=shell_weight,
     )
-    if fused is not None:  # one launch per chunk (#1455), opt-in
+    if fused is not None:  # one launch per chunk (#1455); gate in fused_selected
         return fused
     n_lines = int(response.shape[1])
     # FP64 across chunks, so the chunk split changes only FP64 order (#1313).

@@ -31,10 +31,27 @@ HIP wavefront needs no special case. :func:`host_chunk_line_yields` runs the
 same algorithm and reduction tree in NumPy: the CPU twin used by tests and
 the GPU check script.
 
-The route is opt-in while it awaits device validation:
-``PYRITE_MC_CHARACTERISTIC_KERNEL=fused`` selects it, anything else keeps the
-grouped chain. It also declines (returns ``None``) off the CuPy float32 path,
-without packed shell tables, or above :data:`MAX_SHELLS` subshells.
+Route choice (:func:`fused_selected`): by default the fused kernel runs when
+the chunk holds at least :data:`FUSED_MIN_CHUNK_ROWS` rows and the grouped
+chain below that. ``PYRITE_MC_CHARACTERISTIC_KERNEL=fused`` forces the kernel
+at any chunk, ``grouped`` forces the chain; unset, empty or ``auto`` keeps
+the gate, and any other value keeps the chain. The route still declines
+(returns ``None``) off the CuPy float32 path, without packed shell tables, or
+above :data:`MAX_SHELLS` subshells, so CPU and FP64 runs always use the chain.
+
+Gate evidence (qlmc job 15970, RTX 5080, ~2M segments, warm wall grouped ->
+fused; every gate passed: fused vs grouped <= 4.2e-16 relative, fused vs twin
+<= 1.1e-15, bitwise reruns):
+
+    case                     auto chunk (2^20)     chunk 997
+    W on W/Si, 95 lines      0.238 -> 0.055 s      0.35 -> 1.28 s
+    Si on W/Si, 11 lines     0.030 -> 0.0054 s     0.37 -> 0.14 s
+    C slab, 2 lines          0.0017 -> 0.0011 s    0.36 -> 0.060 s
+
+Kernels per call at the automatic chunk: grouped 33-610, fused 10-12. Small
+chunks fill only a few blocks per launch while every thread loops over all
+lines, so (not profiled) the fused kernel loses on many-line elements there; the gate keeps
+the grouped chain below 64k rows.
 """
 
 import numpy as np
@@ -46,8 +63,10 @@ from ..._util.env import env_value
 BLOCK_ROWS = 256
 #: Largest subshell count one thread holds (EEDL MF=23 has at most 39).
 MAX_SHELLS = 40
-#: Environment switch between the fused kernel and the grouped chain.
+#: Environment override of the route: ``fused``, ``grouped`` or ``auto``.
 KERNEL_ENV = "PYRITE_MC_CHARACTERISTIC_KERNEL"
+#: Smallest chunk (rows) for which the default takes the fused kernel (job 15970).
+FUSED_MIN_CHUNK_ROWS = 1 << 16
 
 SOURCE = r"""
 __device__ __forceinline__ double _nan_f64() { return __longlong_as_double(0x7ff8000000000000LL); }
@@ -171,9 +190,19 @@ extern "C" __global__ void characteristic_chunk_yield(
 _KERNELS: dict[int, object] = {}
 
 
-def fused_requested() -> bool:
-    """Whether ``PYRITE_MC_CHARACTERISTIC_KERNEL`` selects the fused route."""
-    return env_value(KERNEL_ENV, "").strip().lower() == "fused"
+def fused_selected(chunk: int) -> bool:
+    """Whether the fused route is chosen for ``chunk``-row chunks.
+
+    ``PYRITE_MC_CHARACTERISTIC_KERNEL=fused`` forces it and ``grouped`` (or
+    any other unrecognised value) declines it; unset, empty or ``auto``
+    applies the :data:`FUSED_MIN_CHUNK_ROWS` gate.
+    """
+    mode = env_value(KERNEL_ENV, "").strip().lower()
+    if mode == "fused":
+        return True
+    if mode not in ("", "auto"):
+        return False
+    return int(chunk) >= FUSED_MIN_CHUNK_ROWS
 
 
 def _kernel(cp):
@@ -217,10 +246,11 @@ def chunk_line_yields(
     """FP64 ``(n_line,)`` segment-summed line yields, or ``None`` to keep the chain.
 
     Arguments are those of :func:`.characteristic._accumulate_line_yields`.
-    Declines unless selected by :data:`KERNEL_ENV`, on the CuPy float32 path
-    with packed shell tables and at most :data:`MAX_SHELLS` subshells.
+    Declines unless :func:`fused_selected` picks it for ``chunk``, on the CuPy
+    float32 path with packed shell tables and at most :data:`MAX_SHELLS`
+    subshells.
     """
-    if not fused_requested() or packed_shells is None:
+    if packed_shells is None or not fused_selected(chunk):
         return None
     if not _is_cupy(seg_E, seg_L) or seg_E.dtype != np.float32:
         return None

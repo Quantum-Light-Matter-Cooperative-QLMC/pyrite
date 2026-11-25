@@ -135,6 +135,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/characteristic_scoring_1005.py": (),
     "checks/characteristic_nsys_1005.py": (),
     "checks/characteristic_chunk_kernel_1455.py": (),
+    "checks/characteristic_device_memory_1455.py": (),
     "checks/axial_mcwf_precision_cuda.py": (),
     "checks/axial_split_step_precision_cuda.py": (),
     "checks/axial_mcwf_return_flux.py": (),

@@ -153,22 +153,94 @@ def test_block_tree_sum_is_the_kernel_reduction_order():
     assert fused._block_tree_sum(block)[0, 0] == 1.0 + 2.0**-60
 
 
-def test_fused_route_is_opt_in_and_declines_off_device(monkeypatch):
-    inputs = _scoring_inputs("Si")
-    args = dict(
-        chunk=1_000,
+@pytest.mark.parametrize(
+    ("mode", "chunk", "expected"),
+    [
+        (None, fused.FUSED_MIN_CHUNK_ROWS, True),
+        (None, fused.FUSED_MIN_CHUNK_ROWS - 1, False),
+        ("auto", 1 << 20, True),
+        ("", 997, False),
+        ("fused", 997, True),
+        ("FUSED", 1 << 20, True),
+        ("grouped", 1 << 20, False),
+        ("grouped", 997, False),
+        ("unknown", 1 << 20, False),
+    ],
+)
+def test_route_gate_and_env_overrides(monkeypatch, mode, chunk, expected):
+    """Job 15970: fused by default from 64k-row chunks; the env var overrides."""
+    if mode is None:
+        monkeypatch.delenv(fused.KERNEL_ENV, raising=False)
+    else:
+        monkeypatch.setenv(fused.KERNEL_ENV, mode)
+    assert fused.FUSED_MIN_CHUNK_ROWS == 65_536
+    assert fused.fused_selected(chunk) is expected
+
+
+class _FakeKernel:
+    """Stands in for the RawKernel: counts launches, writes zero partials."""
+
+    def __init__(self):
+        self.launches = 0
+
+    def __call__(self, grid, block, args):
+        self.launches += 1
+        args[-1][...] = 0.0
+
+
+def _route_args(inputs, chunk, packed_shells):
+    positional = (inputs["seg_E"], inputs["seg_L"], inputs["path_start"], inputs["path_end"])
+    keywords = dict(
+        chunk=chunk,
         number_density_ang3=inputs["number_density_ang3"],
-        packed_shells=inputs["packed_shells"],
+        packed_shells=packed_shells,
         response=inputs["response"],
         mu_by_line=inputs["mu_by_line"],
     )
-    positional = (inputs["seg_E"], inputs["seg_L"], inputs["path_start"], inputs["path_end"])
-    monkeypatch.delenv(fused.KERNEL_ENV, raising=False)
-    assert fused.chunk_line_yields(*positional, **args) is None
-    monkeypatch.setenv(fused.KERNEL_ENV, "fused")
-    assert fused.fused_requested()
+    return positional, keywords
+
+
+@pytest.mark.parametrize(
+    ("mode", "chunk", "launches"),
+    [
+        (None, fused.FUSED_MIN_CHUNK_ROWS, 1),
+        (None, fused.FUSED_MIN_CHUNK_ROWS - 1, 0),
+        ("fused", 997, 7),
+        ("grouped", fused.FUSED_MIN_CHUNK_ROWS, 0),
+    ],
+)
+def test_cupy_float32_path_dispatches_by_gate(monkeypatch, mode, chunk, launches):
+    """On the CuPy float32 path the gate picks the kernel (B) or the chain (A)."""
+    inputs = _scoring_inputs("Si")
+    inputs["seg_E"] = np.asarray(characteristic._to_cpu(inputs["seg_E"]), dtype=np.float32)
+    n_shell = int(inputs["response"].shape[0])
+    packed = (None, None, np.arange(n_shell + 1))
+    kernel = _FakeKernel()
+    monkeypatch.setattr(fused, "_is_cupy", lambda *arrays: True)
+    monkeypatch.setattr(fused, "_kernel", lambda cp: kernel)
+    if mode is None:
+        monkeypatch.delenv(fused.KERNEL_ENV, raising=False)
+    else:
+        monkeypatch.setenv(fused.KERNEL_ENV, mode)
+    positional, keywords = _route_args(inputs, chunk, packed)
+    result = fused.chunk_line_yields(*positional, **keywords)
+    assert kernel.launches == launches  # 6000 rows: one chunk, or 7 of 997
+    assert (result is None) is (launches == 0)
+
+
+@pytest.mark.parametrize("mode", [None, "fused", "auto"])
+def test_cpu_and_fp64_runs_always_take_the_grouped_chain(monkeypatch, mode):
+    inputs = _scoring_inputs("Si")
+    if mode is None:
+        monkeypatch.delenv(fused.KERNEL_ENV, raising=False)
+    else:
+        monkeypatch.setenv(fused.KERNEL_ENV, mode)
+    positional, keywords = _route_args(inputs, 1 << 20, inputs["packed_shells"])
     if not ON_DEVICE:
-        assert fused.chunk_line_yields(*positional, **args) is None
+        assert fused.chunk_line_yields(*positional, **keywords) is None
+    # Without packed float32 tables (the FP64 and CPU paths) it always declines.
+    positional, keywords = _route_args(inputs, 1 << 20, None)
+    assert fused.chunk_line_yields(*positional, **keywords) is None
 
 
 @pytest.mark.skipif(not ON_DEVICE, reason="needs a CuPy float32 device")
@@ -176,7 +248,7 @@ def test_fused_route_is_opt_in_and_declines_off_device(monkeypatch):
 @pytest.mark.parametrize("weighted", [False, True])
 def test_device_kernel_matches_grouped_chain_and_twin(monkeypatch, element, weighted):
     inputs = _scoring_inputs(element, weighted=weighted)
-    monkeypatch.delenv(fused.KERNEL_ENV, raising=False)
+    monkeypatch.setenv(fused.KERNEL_ENV, "grouped")
     reference = _grouped(inputs, 997)
     monkeypatch.setenv(fused.KERNEL_ENV, "fused")
     kernel = _grouped(inputs, 997)

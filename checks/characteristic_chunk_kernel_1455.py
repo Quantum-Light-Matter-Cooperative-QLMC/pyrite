@@ -8,7 +8,7 @@ Usage:
 tungsten and silicon emitting from a 100 A W film on a 900 A Si substrate, each
 with and without channeling flux weights, plus carbon in a single slab. For
 each it scores ``_accumulate_line_yields`` with the grouped chain (A,
-``PYRITE_MC_CHARACTERISTIC_KERNEL`` unset) and with the fused kernel (B,
+``PYRITE_MC_CHARACTERISTIC_KERNEL=grouped``) and with the fused kernel (B,
 ``=fused``) at a small multi-chunk size (997) and at the runner's automatic
 device chunk. It records the largest relative line-yield difference B vs A
 (gate: 1e-12), B's bitwise rerun determinism, B against the NumPy twin
@@ -96,10 +96,7 @@ def _score(inputs, chunk, arm, rows=None):
     from pyrite.montecarlo.spectrum import _characteristic_chunk_kernel as fused
     from pyrite.montecarlo.spectrum import characteristic
 
-    if arm == "B":
-        os.environ[fused.KERNEL_ENV] = "fused"
-    else:
-        os.environ.pop(fused.KERNEL_ENV, None)
+    os.environ[fused.KERNEL_ENV] = "fused" if arm == "B" else "grouped"
     p = inputs["prepared"]
     cut = slice(None) if rows is None else slice(0, rows)
 
