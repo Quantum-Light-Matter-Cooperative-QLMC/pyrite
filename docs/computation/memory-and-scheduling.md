@@ -178,6 +178,12 @@ n_{\max} = \frac{\min\bigl(\text{MemAvailable},\ 0.9 \times \text{MemTotal}\bigr
                 {\text{per-worker budget}} .
 ```
 
+Inside a batch job or container, the job's cgroup v2 limit binds instead of
+the node's RAM: MemTotal is capped at the tightest `memory.max` of the
+process's cgroup and its ancestors, and MemAvailable at that limit minus
+`memory.current` (less reclaimable `inactive_file` page cache). Only cgroup v2
+is read; on a cgroup v1 host the node's figures still apply.
+
 The pools use different per-worker budgets:
 
 * Full-case CPU workers: 6144 MB for transport and spectrum calculations.

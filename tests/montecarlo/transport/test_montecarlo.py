@@ -764,6 +764,16 @@ def test_mem_worker_cap_is_bounded_by_cgroup_memory_max(monkeypatch, tmp_path):
     assert runner._mem_worker_cap() == expected == 18
 
 
+def test_cgroup_headroom_does_not_count_reclaimable_page_cache(monkeypatch, tmp_path):
+    from pyrite.montecarlo.transport import host_memory
+
+    _fake_cgroup(monkeypatch, tmp_path, 120 * _GIB)
+    job = tmp_path / "cgroup" / "job"
+    (job / "memory.current").write_text(f"{119 * _GIB}\n")
+    (job / "memory.stat").write_text(f"anon {9 * _GIB}\ninactive_file {100 * _GIB}\n")
+    assert host_memory._cgroup_headroom_bytes() == 101 * _GIB
+
+
 def test_mem_worker_cap_unlimited_cgroup_keeps_host_figures(monkeypatch, tmp_path):
     runner = _fake_cgroup(monkeypatch, tmp_path, "max")
     expected = min(480 * _GIB // 1_000_000, int(500 * _GIB // 1_000_000 * 0.9)) // 6_144

@@ -81,14 +81,32 @@ def _cgroup_limit_bytes() -> int | None:
     return min(maximum for maximum, _ in limits) if limits else None
 
 
+def _reclaimable_file_bytes(folder: Path) -> int:
+    """``inactive_file`` from ``memory.stat``: page cache the kernel reclaims first."""
+    try:
+        for line in (folder / "memory.stat").read_text().splitlines():
+            key, _, value = line.partition(" ")
+            if key == "inactive_file":
+                return int(value)
+    except (OSError, ValueError):
+        pass
+    return 0
+
+
 def _cgroup_headroom_bytes() -> int | None:
-    """Free space under the tightest visible cgroup v2 ancestor (if any)."""
+    """Free space under the tightest visible cgroup v2 ancestor (if any).
+
+    ``memory.current`` counts page cache, which a cgroup keeps until it nears
+    ``memory.max``; like kubelet's working set, inactive file pages are
+    subtracted so cached catalog/checkpoint reads do not read as exhaustion.
+    """
     remaining = []
     for maximum, folder in _cgroup_limits():
         try:
             used = int((folder / "memory.current").read_text().strip())
         except (OSError, ValueError):
             continue
+        used = max(0, used - _reclaimable_file_bytes(folder))
         remaining.append(max(0, maximum - used))
     return min(remaining) if remaining else None
 
