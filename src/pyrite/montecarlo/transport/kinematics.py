@@ -272,7 +272,7 @@ def counter_uniforms(root, n_electrons, n_draws, *, start=0):
     """
     start = int(start)
     if start < 0 or n_electrons < 0:
-        raise ValueError("stream_keys needs a non-negative start and count")
+        raise ValueError("counter_uniforms needs a non-negative start and count")
     return _counter_uniforms_kernel(
         np.uint64(root), int(n_electrons), max(0, int(n_draws)), np.uint64(start)
     )

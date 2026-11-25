@@ -6,11 +6,13 @@ of one population draw for every block split, hit or miss.
 """
 
 from dataclasses import asdict
+from functools import partial
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
+from pyrite.montecarlo.bunch_front import BunchFrontTilt
 from pyrite.montecarlo.transport.beam_entry import initial_beam_positions
 from pyrite.montecarlo.transport.beam_prefetch import BeamEntryPrefetch, sample_beam_positions
 from pyrite.montecarlo.transport.kinematics import counter_uniforms, stream_keys
@@ -128,3 +130,30 @@ def test_without_prefetcher_samples_directly():
     p = SimpleNamespace(seed=11, Ne=10, gdf_source=None)
     got = sample_beam_positions(initial_beam_positions, p, "cuda", start=5, **kw)
     np.testing.assert_array_equal(got[0], initial_beam_positions(11, 10, start=5, **kw)[0])
+
+
+def test_replaced_entry_passes_bypass_and_keep_the_pending_block():
+    """A secondary-launch pass between primary blocks must not steal their prefetch."""
+    kw = _beam("spot")
+    with BeamEntryPrefetch(40) as prefetch:
+        p = SimpleNamespace(seed=11, Ne=20, gdf_source=None)
+        run = partial(prefetch.run, sample_beam_positions, initial_beam_positions)
+        run(p, "cuda", start=0, **kw)
+        run(SimpleNamespace(seed=11, Ne=5, gdf_source=None), "cuda", replaced=True, start=0, **kw)
+        got = run(p, "cuda", start=20, **kw)
+    np.testing.assert_array_equal(got[0], initial_beam_positions(11, 20, start=20, **kw)[0])
+    assert (prefetch.hits, prefetch.misses) == (1, 1)
+
+
+def test_equal_fresh_bunch_front_objects_still_hit():
+    """Each pass re-resolves the front tilt into a new frozen dataclass."""
+    kw = _beam("spot")
+    with BeamEntryPrefetch(40) as prefetch:
+        p = SimpleNamespace(seed=11, Ne=20, gdf_source=None)
+        for start in (0, 20):
+            front = BunchFrontTilt(tilt_deg=10.0, azimuth_deg=0.0)
+            kw_block = kw | dict(bunch_front_tilt=front)
+            prefetch.run(
+                sample_beam_positions, initial_beam_positions, p, "cuda", start=start, **kw_block
+            )
+    assert prefetch.hits == 1

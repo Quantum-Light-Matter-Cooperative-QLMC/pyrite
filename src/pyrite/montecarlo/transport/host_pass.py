@@ -478,6 +478,7 @@ def _sample_entry(p, c, stack, launch, electron_start):
         initial_beam_positions,
         p,
         c.transport_core,
+        replaced=launch is not None or p.gdf_source is not None,
         transverse_distribution=p.transverse_distribution,
         beam_fwhm_mm=p.beam_fwhm_mm,
         beam_fwhm_y_mm=p.beam_fwhm_y_mm,

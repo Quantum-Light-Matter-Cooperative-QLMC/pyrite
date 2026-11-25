@@ -561,7 +561,12 @@ def transport_case_blocks(
     monitor=None,
     consume=None,
 ):
-    """Own the host entry worker for one block run, including recovery/stop."""
+    """Own the host entry worker for one block run, including recovery/stop.
+
+    Contract and stopping behavior: :func:`_transport_case_blocks`.
+
+    Validation: adaptive-sample-size-stopping
+    """
     limit = (
         block_electrons.stop
         if isinstance(block_electrons, ElectronShard)

@@ -18,6 +18,7 @@ are never reused, so downstream in-place edits cannot leak between blocks.
 import contextvars
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import ContextVar
+from dataclasses import fields, is_dataclass
 
 _ACTIVE: ContextVar["BeamEntryPrefetch | None"] = ContextVar(
     "pyrite_beam_entry_prefetch", default=None
@@ -25,29 +26,43 @@ _ACTIVE: ContextVar["BeamEntryPrefetch | None"] = ContextVar(
 _SCALARS = (bool, int, float, str, type(None))
 
 
-def sample_beam_positions(sample, p, transport_core, **kwargs):
-    """``sample(p.seed, p.Ne, **kwargs)``, served by the active prefetcher if any."""
+def sample_beam_positions(sample, p, transport_core, *, replaced=False, **kwargs):
+    """``sample(p.seed, p.Ne, **kwargs)``, served by the active prefetcher if any.
+
+    ``replaced`` marks a pass whose entrance comes from elsewhere (a secondary
+    launch or a GDF beam): it bypasses the prefetcher so it neither consumes
+    nor displaces the primary block's pending sample.
+    """
     prefetch = _ACTIVE.get()
-    if prefetch is None:
+    if prefetch is None or replaced:
         return sample(p.seed, p.Ne, **kwargs)
     return prefetch.take(sample, p, transport_core, kwargs)
 
 
 def _same(a, b) -> bool:
-    return a is b or (type(a) in _SCALARS and type(a) is type(b) and a == b)
+    """Identical objects, equal scalars, or frozen dataclasses with ``_same`` fields."""
+    if a is b:
+        return True
+    if type(a) is not type(b):
+        return False
+    if type(a) in _SCALARS:
+        return a == b
+    if is_dataclass(a) and type(a).__dataclass_params__.frozen:
+        return all(_same(getattr(a, f.name), getattr(b, f.name)) for f in fields(a))
+    return False
 
 
 def _prefetchable(p, transport_core, kwargs) -> bool:
-    """CUDA blocks with a real counter-addressed sample, not overwritten later."""
+    """CUDA blocks with a real counter-addressed sample, in the sampler's branch order."""
     if transport_core != "cuda" or getattr(p, "gdf_source", None) is not None:
         return False
-    if kwargs.get("groove") is not None:
-        return bool(kwargs.get("counter_groove_phase"))
-    return bool(
+    if (
         kwargs.get("transverse_distribution") is not None
         or kwargs.get("beam_fwhm_mm")
         or kwargs.get("beam_fwhm_y_mm")
-    )
+    ):
+        return True
+    return kwargs.get("groove") is not None and bool(kwargs.get("counter_groove_phase"))
 
 
 class BeamEntryPrefetch:
