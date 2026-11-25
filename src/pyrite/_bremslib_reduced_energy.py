@@ -36,12 +36,13 @@ nodes.
 A non-positive or non-finite Born value (BremsLib v2.0.8 has a zero at
 ``Z = 5``, ``T1 = 3 MeV``, ``k/T1 = 0.0046``) is replaced as the program
 does (``exclude_zero``): that ``k/T1`` column's ``ln B`` is interpolated in
-``ln T1`` by a not-a-knot cubic spline through the column's valid rows.
+``ln T1`` by a not-a-knot cubic spline through the column's valid rows,
+when valid rows lie on both sides of it.
 
 Rows above 0.999 MeV with no usable Born row use the sub-1 MeV SDCS spline.
 These are the extension rows above 30 MeV, tables staged without Born data,
-and a Born column with fewer than two valid rows, which cannot be repaired
-and warns. At the sub-nodes this fallback is within 3.0 % of the Born-ratio
+and a Born value not bracketed by valid rows of its column, which is not
+extrapolated and warns. At the sub-nodes this fallback is within 3.0 % of the Born-ratio
 scheme over all Z at 1-30 MeV (1.5 % below 25 MeV).
 
 Validation: bremslib-electron-electron
@@ -122,9 +123,11 @@ def _repair_born(born: Mapping[str, np.ndarray] | None):
 
     Interpolate_DCS excludes a non-positive Born value from its column's
     not-a-knot spline of ``ln B`` against ``ln T1``, so the value is read off
-    the spline through the column's other rows. A column with fewer than two
-    valid rows is left as is; :func:`_born_row` then falls back for the rows
-    it touches.
+    the spline through the column's other rows. Only values bracketed by
+    valid rows are repaired: a cubic extrapolated past the column's ends is
+    unbounded, and a staging ``T1`` cap can make an interior row the last.
+    Unrepaired values stay bad, and :func:`_born_row` falls back for their
+    rows with a warning.
 
     Validation: bremslib-electron-electron
     """
@@ -138,10 +141,15 @@ def _repair_born(born: Mapping[str, np.ndarray] | None):
     repaired = values.copy()
     for column in np.flatnonzero(bad.any(axis=0)):
         good = ~bad[:, column]
-        if good.sum() < 2:
+        valid = np.flatnonzero(good)
+        if valid.size < 2:
+            continue
+        inside = bad[:, column].copy()
+        inside[: valid[0]] = inside[valid[-1] + 1 :] = False
+        if not inside.any():
             continue
         spline = CubicSpline(log_t1[good], np.log(values[good, column]), bc_type="not-a-knot")
-        repaired[~good, column] = np.exp(spline(log_t1[~good]))
+        repaired[inside, column] = np.exp(spline(log_t1[inside]))
     return {**born, "born_sdcs_mb": repaired}
 
 
