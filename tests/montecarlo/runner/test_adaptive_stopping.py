@@ -850,7 +850,8 @@ def test_energy_range_replay_rechecks_statistics_before_accepting_stop(monkeypat
         return {"Ne": n}
 
     monkeypatch.setattr(block_transport, "transport_monitored_blocks", run_chunks)
-    monkeypatch.setattr(block_transport, "initial_energies_keV", lambda *_: np.arange(1.0, 81.0))
+    # The largest energy of electrons [0, n) grows with n, so the realized range differs.
+    monkeypatch.setattr(block_transport, "_prefix_max_energy", lambda *_: float)
     monkeypatch.setattr(runner, "_case_radiative_kwargs", lambda _case: {})
     result = block_transport.transport_case_blocks(
         False,

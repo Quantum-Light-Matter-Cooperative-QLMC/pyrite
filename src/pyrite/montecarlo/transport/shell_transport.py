@@ -15,6 +15,9 @@ stopping table, and each hard channel's rate is ``S sigma_h,k^(0) /
 ``S`` whatever density the transport table uses.
 """
 
+import hashlib
+import threading
+from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import cache
@@ -31,6 +34,7 @@ __all__ = [
     "HardChannel",
     "ShellInelasticTables",
     "build_shell_inelastic_tables",
+    "cached_shell_inelastic_tables",
     "hard_event_energy_accounting",
     "validate_shell_cutoff",
 ]
@@ -336,6 +340,59 @@ def build_shell_inelastic_tables(
         tuple(row[3] for row in layer_rows),
         projectile,
     )
+
+
+# Tables of the last few distinct (layers, cutoff, range, stopping) requests.
+# A transport block recomputes the same request once per block (73-141 per
+# adaptive case, #1452); the tables are a few KiB, so a small LRU bounds memory.
+_TABLE_CACHE_SIZE = 4
+_table_cache: OrderedDict[tuple, ShellInelasticTables] = OrderedDict()
+_table_cache_lock = threading.Lock()
+
+
+def cached_shell_inelastic_tables(
+    materials: str | Sequence[str],
+    cutoff_eV: float,
+    stopping_tables: Sequence[tuple[np.ndarray, np.ndarray]],
+    E_min_keV: float,
+    E_max_keV: float,
+    *,
+    projectile: str = "electron",
+) -> ShellInelasticTables:
+    """:func:`build_shell_inelastic_tables`, built once per distinct request.
+
+    The key holds the materials, cutoff, energy range, projectile and a digest
+    of every stopping-table value, so a hit returns exactly the tables a fresh
+    build would. The cores only read the arrays; callers must not mutate them.
+    """
+    keys = (materials,) if isinstance(materials, str) else tuple(materials)
+    digest = hashlib.sha256()
+    for log_e, log_s in stopping_tables:
+        for array in (log_e, log_s):
+            array = np.ascontiguousarray(array, dtype=np.float64)
+            digest.update(str(array.shape).encode())
+            digest.update(array.tobytes())
+    key = (
+        tuple(str(k) for k in keys),
+        float(cutoff_eV),
+        float(E_min_keV),
+        float(E_max_keV),
+        str(projectile),
+        digest.digest(),
+    )
+    with _table_cache_lock:
+        hit = _table_cache.get(key)
+        if hit is not None:
+            _table_cache.move_to_end(key)
+            return hit
+    tables = build_shell_inelastic_tables(
+        materials, cutoff_eV, stopping_tables, E_min_keV, E_max_keV, projectile=projectile
+    )
+    with _table_cache_lock:
+        _table_cache[key] = tables
+        while len(_table_cache) > _TABLE_CACHE_SIZE:
+            _table_cache.popitem(last=False)
+    return tables
 
 
 def hard_event_energy_accounting(result: dict, *, production_threshold_eV: float = 0.0) -> dict:

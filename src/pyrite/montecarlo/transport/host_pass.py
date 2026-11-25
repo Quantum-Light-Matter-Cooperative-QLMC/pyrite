@@ -613,7 +613,7 @@ def _shell_tables(p, c, stack, table_lo, table_hi):
     if not c.shell_mode:
         return None, stack.stopping_tables
     # Lazy: the host shell model pulls in catalog and EEDL data.
-    from .shell_transport import build_shell_inelastic_tables
+    from .shell_transport import cached_shell_inelastic_tables
 
     # Checked by validate_inelastic_args, which also requires stopping_tables.
     assert p.inelastic_materials is not None and p.inelastic_cutoff_eV is not None
@@ -623,7 +623,7 @@ def _shell_tables(p, c, stack, table_lo, table_hi):
     if p._secondary is not None:  # one table set for every generation
         lo, hi = p._secondary.table_range_keV
         E_range_keV = (min(lo, E_range_keV[0]), max(hi, E_range_keV[1]))
-    shell_tables = build_shell_inelastic_tables(
+    shell_tables = cached_shell_inelastic_tables(
         p.inelastic_materials, float(p.inelastic_cutoff_eV), stack.stopping_tables, *E_range_keV,
         projectile=getattr(p._secondary, "projectile", "electron"),
     )  # fmt: skip

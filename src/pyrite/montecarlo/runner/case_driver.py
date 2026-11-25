@@ -55,6 +55,7 @@ from .case_tables import (
     _case_stopping_tables,
 )
 from .chunking import _RESOURCE_POLICY, _adaptive_chunk, _admit_chunk
+from .cutoffs import electron_cutoffs
 from .cxr_grid import check_cxr_truncation, cxr_truncation_audit, resolve_cxr_grid
 from .cxr_grid import coherent_flat_omission_limit as _coherent_flat_omission_limit
 from .cxr_grid import longitudinal_rms_fs as _longitudinal_rms_fs
@@ -308,7 +309,9 @@ def _transport_case(
     Ne_transport = max(Ne, Ne_brem)
 
     E_cut_lines = case.get("E_cut_lines_keV", 5.0)
-    E_cut_by_electrons = electron_cutoffs(case)
+    # A monitored (adaptive) case sizes Ne by max_histories: keep the cutoffs as
+    # runs and slice per block rather than allocate ~1e8 doubles (#1452).
+    E_cut_by_electrons = electron_cutoffs(case, piecewise=block_monitor is not None)
 
     core = _pkg._case_transport_core(case, transport_core)
     core, zone_transport = _zone_transport(case, core)
@@ -425,8 +428,8 @@ def _transport_case(
         Ne = Ne_transport = int(segs_all["Ne"])
         Ne_brem = getattr(block_monitor, "brem_count", None) or Ne
         case = {**case, "Ne": Ne, "Ne_brem": Ne_brem}
-        E_cut_by_electrons = E_cut_by_electrons[:Ne_transport]
-        E_cut_by_electrons[Ne_brem:] = E_cut_lines
+        # Line cutoffs past the brem prefix: the realized pair's own runs.
+        E_cut_by_electrons = electron_cutoffs(case, piecewise=True)
 
     report_transport_finished(transport_progress, Ne_transport)
 
@@ -451,7 +454,7 @@ def _transport_case(
                 "transport_core": core,
                 "segments_on_device": not isinstance(segs_all["L_ang"], np.ndarray),
                 "Ne_transport": Ne_transport,
-                "E_cut_by_electrons": E_cut_by_electrons,
+                "E_cut_by_electrons": np.asarray(E_cut_by_electrons),
                 "beam_dir": beam,
                 "n_hat": n_hat,
                 "stopping_tables": stopping_tables is not None,
@@ -470,25 +473,6 @@ def _transport_case(
         tp["_t_worker_return"] = perf_counter()
 
     return tp
-
-
-def electron_cutoffs(case) -> np.ndarray:
-    """Per-history termination energies (keV) of ``case``'s transport population.
-
-    Line-only histories stop at ``E_cut_lines_keV`` (default 5), continuum-only
-    ones at ``E_cut_brem_keV`` (default 1), and shared histories at the lower.
-    """
-    Ne, Ne_brem = case["Ne"], case["Ne_brem"]
-    electron_ids = np.arange(max(Ne, Ne_brem))
-    cxr_mask = electron_ids < Ne
-    brem_mask = electron_ids < Ne_brem
-    E_cut_lines = case.get("E_cut_lines_keV", 5.0)
-    E_cut_brem = case.get("E_cut_brem_keV", 1.0)
-    cutoffs = np.empty(electron_ids.size, dtype=np.float64)
-    cutoffs[cxr_mask & ~brem_mask] = E_cut_lines
-    cutoffs[brem_mask & ~cxr_mask] = E_cut_brem
-    cutoffs[cxr_mask & brem_mask] = min(E_cut_lines, E_cut_brem)
-    return cutoffs
 
 
 def case_spectrum_inputs(case, segs, Ne, Ne_brem, *, resolve_grid=True) -> dict[str, Any]:

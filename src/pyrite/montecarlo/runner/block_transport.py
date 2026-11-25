@@ -42,6 +42,7 @@ from ..transport.beam_entry import (
 )
 from ..transport.kinematics import _sample_bunch_offsets
 from .case_tables import _case_radiative_kwargs
+from .cutoffs import cutoff_floor
 from .step_budget import retry_step_budget
 
 #: Integer result fields that add across disjoint electron blocks.
@@ -512,6 +513,41 @@ class _TrackBudget:
         return consume_block
 
 
+_ENERGY_SCAN_CHUNK = 1 << 20
+
+
+def _prefix_max_energy(E0_keV, seed, beam_kw):
+    """``max_energy(n)``: the largest incident energy of electrons ``[0, n)``.
+
+    Energies are counter-addressed, so scanning chunks reproduces the dense
+    ``initial_energies_keV(.., n_electrons)`` values bit for bit while the
+    host holds one chunk, not a ``max_histories`` array (#1452). A monoenergetic
+    beam needs no draws. Chunk maxima are cached across the replay calls.
+    """
+    spread = beam_kw.get("energy_spread_frac")
+    if not spread:
+        return lambda n: float(E0_keV)
+    chunk_max: dict[int, float] = {}
+
+    def block_max(start, stop):
+        return float(np.max(initial_energies_keV(E0_keV, stop - start, seed, spread, start=start)))
+
+    def max_energy(n):
+        best, start = -np.inf, 0
+        while start < n:
+            stop = min(start + _ENERGY_SCAN_CHUNK, n)
+            if stop - start == _ENERGY_SCAN_CHUNK:
+                if start not in chunk_max:
+                    chunk_max[start] = block_max(start, stop)
+                best = max(best, chunk_max[start])
+            else:
+                best = max(best, block_max(start, stop))
+            start = stop
+        return best
+
+    return max_energy
+
+
 def transport_case_blocks(
     keep,
     *,
@@ -578,12 +614,10 @@ def transport_case_blocks(
     budgets = [] if budget is None else [budget]
     no_bunch = {"bunch_length_fs": None, "long_shape": "gaussian"}
     no_bunch |= {"long_offsets_fs": None, "longitudinal_distribution": None}
-    energies = initial_energies_keV(
-        case["E0_keV"], n_electrons, case["seed"], beam_kw.get("energy_spread_frac")
-    )
+    max_energy_of = _prefix_max_energy(case["E0_keV"], case["seed"], beam_kw)
 
     def energy_range_of(n):
-        return (float(np.min(E_cut_by_electrons[:n])), float(np.max(energies[:n])))
+        return (cutoff_floor(E_cut_by_electrons, n), max_energy_of(n))
 
     energy_range = energy_range_of(n_electrons)
 
