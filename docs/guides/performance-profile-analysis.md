@@ -125,6 +125,22 @@ option also exists to run the primary profiling pass followed by a CPU pass.
 Both options require remote execution; `--cpu-only` cannot be combined with
 `--nsys` or GPU chunk pins.
 
+To see where a production run spends wall time across the coordinator and
+every pool worker, sample the whole run with py-spy (local, or add `--remote`):
+
+```bash
+pyrite-dev perf mos2_heavy -m mos2 --py-spy
+```
+
+This writes `<material>.py-spy.json`; open it in
+[speedscope](https://www.speedscope.app/). Python 3.15's built-in sampler
+(`python -m profiling.sampling`, "Tachyon") is not a substitute here: it
+profiles child processes by attaching to them, which `kernel.yama.ptrace_scope=1`
+forbids on the workstation and lab nodes, so pool workers are silently
+missing from its output. It can still profile a serial `--workers 0` run on a
+Python 3.15 environment. Neither sampler shows CUDA/ROCm device time; use
+Nsight for that.
+
 ## Understand memory recovery
 
 When a profile slows down after an OOM or changes its effective chunks,
