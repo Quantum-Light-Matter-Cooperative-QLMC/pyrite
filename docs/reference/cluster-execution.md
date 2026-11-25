@@ -181,6 +181,21 @@ zeroes every multi-MiB array temporary. One worker scored 3.5× slower, with
 most of its time in the kernel (#1395). A value other than Dask's default is
 left as set.
 
+### Memory limits
+
+A `local` cluster sizes each worker from the job's memory allocation, not the
+host's RAM. PyRITE takes the smallest of the host's RAM, the `memory.max` of
+the process's cgroup and its ancestors (cgroup v2), and the SLURM request in
+the environment. Without a `memory_bytes` in `resources`, the workers share 90%
+of it, so the nanny restarts a worker that overruns its share before the
+kernel kills the whole job. With `memory_bytes`, that total is split evenly,
+and a total above the allocation raises `ValueError` before any work is
+staged. Dask's stock default splits the host's RAM, which on a shared node is
+several times a batch job's limit. SLURM clusters already request
+`resources.memory_bytes` per job as `--mem`, and dask-jobqueue limits the
+workers to it. For `existing` clusters, start workers with `--memory-limit`
+inside the allocation yourself.
+
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `cluster` | `"local"` | `"local"`, `"slurm"`, or `"existing"` |

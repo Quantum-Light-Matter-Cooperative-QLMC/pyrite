@@ -19,6 +19,7 @@ from threading import Event, Lock
 from typing import Any, Literal
 
 from . import _dask_slurm
+from ._memory import local_worker_memory
 from .artifacts import (
     CaseArtifactStore,
     DirectionalArtifactRef,
@@ -284,8 +285,15 @@ class DaskExecutor:
         if cfg.cluster == "local":
             import dask
 
+            # Dask's default splits the host's RAM, ignoring the batch job's limit.
+            limit = local_worker_memory(cfg.workers, self.resources.memory_bytes)
             with dask.config.set(_dask_slurm.worker_malloc_override()):
-                cluster = LocalCluster(n_workers=cfg.workers, threads_per_worker=1, processes=True)
+                cluster = LocalCluster(
+                    n_workers=cfg.workers,
+                    threads_per_worker=1,
+                    processes=True,
+                    memory_limit=limit,
+                )
             return Client(cluster), cluster
         from dask_jobqueue import SLURMCluster
 
@@ -388,6 +396,9 @@ class DaskExecutor:
             raise ValueError("Dask GPU requires explicit cuda or rocm accelerator")
         if self.resources.gpu_count and self.config.cluster == "local":
             raise ValueError("local Dask cluster has no GPU isolation; use existing scheduler")
+        if self.config.cluster == "local" and self._client is None:
+            # A request above the job's memory allocation fails before staging.
+            local_worker_memory(self.config.workers, self.resources.memory_bytes)
         if self.config.cluster == "slurm" and self._client is None:
             # Unknown keywords, a missing config_name section, or a GPU job
             # without a site GPU directive fail here, before staging.
