@@ -1,0 +1,42 @@
+{
+  "job_id": 15945,
+  "state": "COMPLETED",
+  "elapsed_s": 826,
+  "node": "qlmc-queen (cpu partition)",
+  "requested_cpus": 4,
+  "requested_memory_MiB": 3072,
+  "producer_revision": "c51030eeb7adc26a1137b939e6435228f585f677",
+  "numerical_baseline": "147400d356812d1f1d0ad39834de347ca1d8555f",
+  "command": "sbatch --dependency=afterany:15944 --time=00:45:00 --job-name=ax1432c8-c51030eeb checks/native_cpu_audit/axial.sbatch axial-prod-cache8 axial-prod",
+  "arms": {
+    "axial-prod-cache8": {
+      "warm_s": {
+        "median": 43.283392783254385,
+        "min": 43.1658836370334,
+        "max": 43.40090192947537
+      },
+      "first_s": 44.40034709125757,
+      "solver_builds": 6,
+      "peak_rss_MiB": 463.015625
+    },
+    "axial-prod": {
+      "warm_s": {
+        "median": 84.12363885808736,
+        "min": 84.00639038812369,
+        "max": 84.24088732805103
+      },
+      "first_s": 85.22139921970665,
+      "solver_builds": 308,
+      "peak_rss_MiB": 438.578125
+    }
+  },
+  "outputs_bit_identical_between_arms": true,
+  "qualification": "Same node/job, sequential arms (cache8 first), bound CPUs 8-11, one native thread. Existing public option only; no source change. 9 quadrature nodes, 6 distinct energies sampled in 1000 histories.",
+  "path_sanitization": "isolated checkout path replaced with <checkout>",
+  "files": {
+    "axial-prod-cache8-t1.json": "eec6ddefa691d5e64d2eaf5a0be1975d279bced1115a739712e3e986af8f3641",
+    "axial-prod-t1.json": "c8787202fcc81da8da148dae87850e1d5d670cced772fdac6a21fae327309239",
+    "job-log.txt": "0c27e6293745616778c7dc84aae006004522f0e0b9b37f3a0b4338e009315d21"
+  },
+  "dropped_sha256": {}
+}

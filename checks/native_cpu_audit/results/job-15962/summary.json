@@ -1,0 +1,224 @@
+{
+  "case": "cleo_sub hopg 300 keV 500 nm tilt 60 deg azim 180, adaptive (target RSE 1e-3), policy grid resonance-population/sinc-oversampled/bin-mean",
+  "device": "NVIDIA GeForce RTX 5080 (gpu partition, king), CUDA backend, 8 OS-bound CPUs, Numba 8 threads",
+  "realized_electrons": 6702356,
+  "stop_reason": "converged",
+  "n_segments": 24347733,
+  "first_s": 60.40340434899554,
+  "warm_wall_s": {
+    "median": 23.83518976275809,
+    "min": 23.717027857899666,
+    "max": 23.953351667616516,
+    "n": 2
+  },
+  "warm_process_cpu_s": {
+    "median": 37.403188847500004,
+    "min": 37.246190822,
+    "max": 37.560186873,
+    "n": 2
+  },
+  "gpu_util_mean_percent": {
+    "median": 32.118044884476305,
+    "min": 31.916230366492147,
+    "max": 32.31985940246046,
+    "n": 2
+  },
+  "gpu_idle_fraction_of_samples_lt10pct": {
+    "median": 0.36658722612336436,
+    "min": 0.36646499567847884,
+    "max": 0.3667094565682499,
+    "n": 2
+  },
+  "host_peak_MiB": {
+    "median": 5865.39453125,
+    "min": 5856.76171875,
+    "max": 5874.02734375,
+    "n": 2
+  },
+  "profiled_wall_s": 26.745928016025573,
+  "output_digests": {
+    "identical_across_arms": [
+      "E_grid",
+      "spec_characteristic",
+      "brem",
+      "E_grid_brem",
+      "brem_wide"
+    ],
+    "vary_across_arms": [
+      "spec"
+    ],
+    "note": "CXR spec varies: documented FP64 atomic summation order in cxr/_fourier_cuda.py; brem/characteristic/grids bit-identical"
+  },
+  "host_hotspots_cprofile": {
+    "montecarlo/spectrum/diagnostics.py:sinc_feature_samples": {
+      "cumulative_s": 1.654181938,
+      "exclusive_s": 1.201378132,
+      "calls": 2
+    },
+    "montecarlo/spectrum/diagnostics.py:sinc_spacing_from_samples": {
+      "cumulative_s": 1.616978435,
+      "exclusive_s": 0.480389975,
+      "calls": 1
+    },
+    "montecarlo/runner/case_driver.py:electron_cutoffs": {
+      "cumulative_s": 1.189610971,
+      "exclusive_s": 0.894534656,
+      "calls": 4
+    },
+    "montecarlo/transport/beam_entry.py:initial_beam_positions": {
+      "cumulative_s": 1.695986146,
+      "exclusive_s": 0.12457217000000001,
+      "calls": 73
+    },
+    "montecarlo/transport/shell_transport.py:build_shell_inelastic_tables": {
+      "cumulative_s": 1.079828322,
+      "exclusive_s": 0.015628014000000003,
+      "calls": 73
+    },
+    "xsgen/store.py:arrays": {
+      "cumulative_s": 1.06796362,
+      "exclusive_s": 0.009164925,
+      "calls": 379
+    },
+    "montecarlo/spectrum/segment_escape.py:segment_escape_pieces": {
+      "cumulative_s": 1.046218077,
+      "exclusive_s": 0.27229939000000003,
+      "calls": 79
+    },
+    "montecarlo/spectrum/cxr/_fourier_cuda.py:cuda_fourier_bin_mean_reduce": {
+      "cumulative_s": 4.026025579000001,
+      "exclusive_s": 1.626607394,
+      "calls": 12
+    },
+    "montecarlo/spectrum/_population_tail.py:block_tail_sums": null
+  },
+  "s1_gpu_idle_by_range": [
+    {
+      "where": "_transport_case",
+      "samples": 408,
+      "seconds": 4.08
+    },
+    {
+      "where": "setup",
+      "samples": 210,
+      "seconds": 2.1
+    },
+    {
+      "where": "pyrite.transport.sample",
+      "samples": 106,
+      "seconds": 1.06
+    },
+    {
+      "where": "pyrite.transport.inelastic",
+      "samples": 41,
+      "seconds": 0.41000000000000003
+    },
+    {
+      "where": "pyrite.transport.continuation.stage",
+      "samples": 30,
+      "seconds": 0.3
+    },
+    {
+      "where": "pyrite.transport.upload",
+      "samples": 21,
+      "seconds": 0.21
+    },
+    {
+      "where": "pyrite.transport.continuation.launch",
+      "samples": 13,
+      "seconds": 0.13
+    },
+    {
+      "where": "pyrite.transport.core",
+      "samples": 11,
+      "seconds": 0.11
+    },
+    {
+      "where": "pyrite.transport.alloc",
+      "samples": 7,
+      "seconds": 0.07
+    },
+    {
+      "where": "pyrite.transport.tables",
+      "samples": 1,
+      "seconds": 0.01
+    }
+  ],
+  "s1_gpu_idle_by_pyrite_stack": [
+    {
+      "where": "montecarlo/spectrum/_population_tail.py:block_tail_sums:86 < montecarlo/spectrum/cxr_seeds.py:numerator:310 < montecarlo/spectrum/cxr_seeds.py:lost:341",
+      "samples": 51,
+      "seconds": 0.51
+    },
+    {
+      "where": "montecarlo/runner/case_driver.py:electron_cutoffs:490 < montecarlo/runner/case_driver.py:_transport_case:311 < montecarlo/realization.py:call:188",
+      "samples": 50,
+      "seconds": 0.5
+    },
+    {
+      "where": "montecarlo/spectrum/diagnostics.py:_stable_argsort:251 < montecarlo/spectrum/diagnostics.py:sinc_spacing_from_samples:213 < montecarlo/runner/streamed_line_grid.py:sinc_spacing:230",
+      "samples": 38,
+      "seconds": 0.38
+    },
+    {
+      "where": "montecarlo/spectrum/diagnostics.py:_stable_argsort:263 < montecarlo/spectrum/diagnostics.py:sinc_spacing_from_samples:213 < montecarlo/runner/streamed_line_grid.py:sinc_spacing:230",
+      "samples": 24,
+      "seconds": 0.24
+    },
+    {
+      "where": "montecarlo/spectrum/diagnostics.py:sinc_spacing_from_samples:214 < montecarlo/runner/streamed_line_grid.py:sinc_spacing:230 < montecarlo/runner/cxr_grid.py:_resolve_policy_grid:872",
+      "samples": 24,
+      "seconds": 0.24
+    },
+    {
+      "where": "montecarlo/spectrum/diagnostics.py:sinc_spacing_from_samples:215 < montecarlo/runner/streamed_line_grid.py:sinc_spacing:230 < montecarlo/runner/cxr_grid.py:_resolve_policy_grid:872",
+      "samples": 23,
+      "seconds": 0.23
+    },
+    {
+      "where": "montecarlo/transport/continuation.py:_gather_index:396 < montecarlo/transport/continuation.py:_drive_continuation_rounds:569 < montecarlo/transport/batching.py:_run_per_electron_transport:946",
+      "samples": 21,
+      "seconds": 0.21
+    },
+    {
+      "where": "_backend.py:to_cpu:177 < montecarlo/runner/recovery.py:_host_arrays:44 < montecarlo/runner/recovery.py:_host_block:191",
+      "samples": 21,
+      "seconds": 0.21
+    },
+    {
+      "where": "montecarlo/runner/case_driver.py:electron_cutoffs:482 < montecarlo/runner/case_driver.py:_transport_case:311 < montecarlo/realization.py:call:188",
+      "samples": 20,
+      "seconds": 0.2
+    },
+    {
+      "where": "montecarlo/spectrum/brem_lattice_share.py:load:234 < montecarlo/runner/lattice_share.py:_kernel:69 < montecarlo/runner/lattice_share.py:_corrected_tables:224",
+      "samples": 20,
+      "seconds": 0.2
+    },
+    {
+      "where": "montecarlo/spectrum/diagnostics.py:sinc_feature_samples:124 < montecarlo/runner/streamed_line_grid.py:add:99 < montecarlo/runner/block_transport.py:score_block:300",
+      "samples": 20,
+      "seconds": 0.2
+    },
+    {
+      "where": "montecarlo/spectrum/diagnostics.py:_stable_argsort:252 < montecarlo/spectrum/diagnostics.py:sinc_spacing_from_samples:213 < montecarlo/runner/streamed_line_grid.py:sinc_spacing:230",
+      "samples": 20,
+      "seconds": 0.2
+    },
+    {
+      "where": "montecarlo/spectrum/diagnostics.py:sinc_feature_samples:148 < montecarlo/runner/streamed_line_grid.py:add:99 < montecarlo/runner/block_transport.py:score_block:300",
+      "samples": 17,
+      "seconds": 0.17
+    },
+    {
+      "where": "montecarlo/transport/kinematics.py:counter_normals:291 < montecarlo/transport/beam_entry.py:initial_beam_positions:83 < montecarlo/transport/host_pass.py:_sample_entry:476",
+      "samples": 15,
+      "seconds": 0.15
+    },
+    {
+      "where": "xsgen/store.py:arrays:456 < montecarlo/transport/shell_rates.py:adopted_stopping_cs:263 < montecarlo/transport/shell_rates.py:catalog_shell_rate_closure:323",
+      "samples": 13,
+      "seconds": 0.13
+    }
+  ]
+}

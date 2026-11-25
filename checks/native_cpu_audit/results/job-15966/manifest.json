@@ -1,0 +1,35 @@
+{
+  "job_id": 15966,
+  "state": "COMPLETED",
+  "elapsed_s": 493,
+  "node": "king (gpu partition, RTX 5080)",
+  "requested_cpus": 8,
+  "requested_memory_MiB": 30720,
+  "producer_revision": "0ae722442 (main 3ab6857a5 plus this harness)",
+  "path_sanitization": "isolated checkout path -> <checkout>, home -> <home>, hostname -> king",
+  "note": "sampler arms only, no nsys; baseline for the #1452-#1455 stack comparison",
+  "files": {
+    "summary.json": "97a95cf02b3922a462dfba6439c8f5865837c4e43aefeb74960706c9bea06969"
+  },
+  "dropped_sha256": {
+    "gpu-info.txt": "e19c08778160cdbffea98864b6dc9db998e2ec70860a9ac69c300b37268381dd",
+    "hopg-300-15-sampler.json": "ebd625b02baf394aa92ef47f3b6ea6091f33a10b352a45ad669ae4751ea939fc",
+    "hopg-300-15-sampler.log": "08e0273f1541d488350bf2bae61a3650ba379325103c46953a593e6228760f90",
+    "hopg-300-25-sampler.json": "364c86f7625c02dbe0a5557d6148dc822f498c1f33b57e8302319330212ae4ec",
+    "hopg-300-25-sampler.log": "39176c4f7c4151a1a1f1cf11c5cb797a2e3e5033653710693890f5ca7d6d20cd",
+    "hopg-300-35-sampler.json": "5d8523f066f3f66322f8d1f48326c941b46682184b060dda7e0463944c2352bc",
+    "hopg-300-35-sampler.log": "53c8127cd5fba926394c9928d2e2505db1da7889ad3fd2dc826c62d25e4fb8e3",
+    "hopg-300-5-sampler.json": "b685208912cbc9736b0d86b1b6a2326b71b6db3e0fedcdc747b83303b1240488",
+    "hopg-300-5-sampler.log": "64bbf3c91c99d5ea50391835e1ecd6530b57c6ce0e06ddaccff05cd9f724edac",
+    "hopg-300-5-warm.json": "485d103d2097064c1d0ca440422e93d91c65dcf401cdc663623f443845d6e6d5",
+    "hopg-300-5-warm.log": "eaae78d859eff08fcce01f87032b9fe75587f4ea9d8eb34d201fe156740fa00d",
+    "hopg-300-55-sampler.json": "c95dae4e105ff2ee3735f318530704b20bf1ba59bb7a55b9b39559cb552163ae",
+    "hopg-300-55-sampler.log": "604f6cbfa98f525030f337185eb0bbc697af3d0a3d1abf26c6294aaf5835f292",
+    "hopg-300-65-sampler.json": "330a97d630353f2d87257492c180f6b5d0092b3b339abd5316246b4106c21709",
+    "hopg-300-65-sampler.log": "0315726f96b26e6abbb313b5b9205f69552fd1f10ffcfa565e85f9cf470abe72",
+    "hopg-300-75-sampler.json": "5b75aaf4aa846541dd84c3ec488e89da1fc02381fc72746c1ee16e9508706c40",
+    "hopg-300-75-sampler.log": "25497e850d14f8b828870057d2fdf83fcc2d727e62ce3cac28a065f49fa82c30",
+    "hopg-300-85-sampler.json": "9f3b30fc6432d344ab0bdbabf07a4625bbd4cae1b922b74d708fa48275edcceb",
+    "hopg-300-85-sampler.log": "f6af26407e20c6bb1e936e14dd998a9d4852b5e33950df24344f3e206db84ec7"
+  }
+}

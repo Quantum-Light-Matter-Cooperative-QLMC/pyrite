@@ -1,0 +1,627 @@
+{
+ "schema": "pyrite.native-cpu-audit.nsys-gaps.v1",
+ "run_wall_s": 65.681393008,
+ "device_busy_s": 19.426746807,
+ "device_idle_s": 46.254646201,
+ "device_busy_fraction": 0.2957724542266304,
+ "idle_gaps": 392586,
+ "idle_by_gap_size_s": {
+  "<0.01ms": 0.702620026,
+  "<0.1ms": 4.648584196,
+  "<100ms": 7.176873269,
+  "<10ms": 3.931357003,
+  "<1ms": 4.067428791,
+  ">=100ms": 25.727782916
+ },
+ "idle_by_innermost_range_s": {
+  "gpuhost._resolve_policy_grid": 11.089476978,
+  "gpuhost._transport_case": 9.426155549,
+  "gpuhost.initial_beam_positions": 7.891502937,
+  "pyrite.transport.continuation.stage": 2.406221549,
+  "pyrite.transport.continuation.assemble": 2.228149226,
+  "gpuhost.block_tail_sums": 2.212115236,
+  "pyrite.transport.continuation.launch": 1.877482214,
+  "gpuhost.electron_cutoffs": 1.839960493,
+  "pyrite.transport.sample": 1.808721113,
+  "pyrite.transport.core": 1.727222214,
+  "gpuhost.build_shell_inelastic_tables": 0.872354167,
+  "pyrite.transport.upload": 0.826184734,
+  "pyrite.transport.alloc": 0.499280194,
+  "gpuhost.run": 0.370764248,
+  "gpuhost._corrected_tables": 0.346635413,
+  "gpuhost.segment_escape_pieces": 0.34511057,
+  "pyrite.transport.tables": 0.220649225,
+  "pyrite.lines.tab": 0.192396073,
+  "pyrite.transport.output": 0.072058644,
+  "pyrite.transport.inelastic": 0.002205424
+ },
+ "per_range": {
+  "gpuhost.run": {
+   "calls": 1,
+   "wall_s": 65.681393008,
+   "device_busy_s": 19.426746807
+  },
+  "gpuhost._transport_case": {
+   "calls": 4,
+   "wall_s": 51.977665830999996,
+   "device_busy_s": 19.395376092
+  },
+  "pyrite.transport.core": {
+   "calls": 141,
+   "wall_s": 15.366749696,
+   "device_busy_s": 6.301489759
+  },
+  "pyrite.transport.sample": {
+   "calls": 141,
+   "wall_s": 14.594505417,
+   "device_busy_s": 4.019721776
+  },
+  "gpuhost._resolve_policy_grid": {
+   "calls": 1,
+   "wall_s": 13.301592214,
+   "device_busy_s": 0.0
+  },
+  "gpuhost.initial_beam_positions": {
+   "calls": 141,
+   "wall_s": 10.385806586000003,
+   "device_busy_s": 2.494303649
+  },
+  "pyrite.transport.continuation.stage": {
+   "calls": 1065,
+   "wall_s": 5.432578130999998,
+   "device_busy_s": 3.026356581999997
+  },
+  "pyrite.transport.continuation.assemble": {
+   "calls": 141,
+   "wall_s": 3.238802798,
+   "device_busy_s": 1.010653572
+  },
+  "pyrite.transport.continuation.launch": {
+   "calls": 1065,
+   "wall_s": 2.7914282889999966,
+   "device_busy_s": 0.9139460750000001
+  },
+  "gpuhost.block_tail_sums": {
+   "calls": 13,
+   "wall_s": 2.2121152360000003,
+   "device_busy_s": 0.0
+  },
+  "gpuhost.electron_cutoffs": {
+   "calls": 4,
+   "wall_s": 1.839960493,
+   "device_busy_s": 0.0
+  },
+  "pyrite.transport.upload": {
+   "calls": 141,
+   "wall_s": 1.376171384,
+   "device_busy_s": 0.54998665
+  },
+  "gpuhost.segment_escape_pieces": {
+   "calls": 125,
+   "wall_s": 1.0163663459999999,
+   "device_busy_s": 0.671255776
+  },
+  "pyrite.transport.inelastic": {
+   "calls": 141,
+   "wall_s": 0.9102896819999998,
+   "device_busy_s": 0.035730091
+  },
+  "gpuhost.build_shell_inelastic_tables": {
+   "calls": 141,
+   "wall_s": 0.9077118859999996,
+   "device_busy_s": 0.035357719
+  },
+  "pyrite.transport.alloc": {
+   "calls": 141,
+   "wall_s": 0.8067880879999999,
+   "device_busy_s": 0.30750789400000006
+  },
+  "gpuhost._corrected_tables": {
+   "calls": 1,
+   "wall_s": 0.346635413,
+   "device_busy_s": 0.0
+  },
+  "pyrite.transport.tables": {
+   "calls": 141,
+   "wall_s": 0.23905436200000005,
+   "device_busy_s": 0.018405137000000002
+  },
+  "pyrite.lines.tab": {
+   "calls": 125,
+   "wall_s": 0.19863446600000004,
+   "device_busy_s": 0.006238393000000002
+  },
+  "pyrite.transport.output": {
+   "calls": 141,
+   "wall_s": 0.08844822599999999,
+   "device_busy_s": 0.016389582
+  }
+ },
+ "largest_idle_gaps": [
+  {
+   "offset_s": 31.454298221,
+   "duration_s": 15.157457569,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._resolve_policy_grid"
+   ]
+  },
+  {
+   "offset_s": 1.83046483,
+   "duration_s": 1.201702994,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case",
+    "gpuhost.electron_cutoffs"
+   ]
+  },
+  {
+   "offset_s": 17.428670251,
+   "duration_s": 1.076241523,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case",
+    "pyrite.transport.sample",
+    "gpuhost.initial_beam_positions"
+   ]
+  },
+  {
+   "offset_s": 0.0,
+   "duration_s": 0.976588119,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case",
+    "pyrite.transport.sample",
+    "pyrite.transport.inelastic",
+    "gpuhost.build_shell_inelastic_tables"
+   ]
+  },
+  {
+   "offset_s": 30.648343535,
+   "duration_s": 0.713994206,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case"
+   ]
+  },
+  {
+   "offset_s": 19.432974635,
+   "duration_s": 0.674081759,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case",
+    "pyrite.transport.sample",
+    "gpuhost.initial_beam_positions"
+   ]
+  },
+  {
+   "offset_s": 27.76414492,
+   "duration_s": 0.586512013,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case",
+    "pyrite.transport.sample",
+    "gpuhost.initial_beam_positions"
+   ]
+  },
+  {
+   "offset_s": 23.874507945,
+   "duration_s": 0.580361707,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case",
+    "pyrite.transport.sample",
+    "gpuhost.initial_beam_positions"
+   ]
+  },
+  {
+   "offset_s": 21.865281418,
+   "duration_s": 0.573392615,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case",
+    "pyrite.transport.sample",
+    "gpuhost.initial_beam_positions"
+   ]
+  },
+  {
+   "offset_s": 25.875301018,
+   "duration_s": 0.569558485,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case",
+    "pyrite.transport.sample",
+    "gpuhost.initial_beam_positions"
+   ]
+  },
+  {
+   "offset_s": 29.779082251,
+   "duration_s": 0.442668488,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case"
+   ]
+  },
+  {
+   "offset_s": 1.371302307,
+   "duration_s": 0.372862712,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case",
+    "gpuhost._corrected_tables"
+   ]
+  },
+  {
+   "offset_s": 21.541333972,
+   "duration_s": 0.204121448,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case"
+   ]
+  },
+  {
+   "offset_s": 18.989129316,
+   "duration_s": 0.200445257,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case",
+    "pyrite.transport.core",
+    "pyrite.transport.continuation.assemble"
+   ]
+  },
+  {
+   "offset_s": 29.452789078,
+   "duration_s": 0.195878983,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case"
+   ]
+  },
+  {
+   "offset_s": 25.42369668,
+   "duration_s": 0.162157535,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case",
+    "pyrite.transport.core",
+    "pyrite.transport.continuation.assemble"
+   ]
+  },
+  {
+   "offset_s": 27.317404045,
+   "duration_s": 0.161299034,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case",
+    "pyrite.transport.core",
+    "pyrite.transport.continuation.assemble"
+   ]
+  },
+  {
+   "offset_s": 21.315402538,
+   "duration_s": 0.161120984,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case",
+    "pyrite.transport.core",
+    "pyrite.transport.continuation.assemble"
+   ]
+  },
+  {
+   "offset_s": 23.419781602,
+   "duration_s": 0.160711025,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case",
+    "pyrite.transport.core",
+    "pyrite.transport.continuation.assemble"
+   ]
+  },
+  {
+   "offset_s": 29.227986259,
+   "duration_s": 0.159955791,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case",
+    "pyrite.transport.core",
+    "pyrite.transport.continuation.assemble"
+   ]
+  },
+  {
+   "offset_s": 65.429944639,
+   "duration_s": 0.14077302,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case"
+   ]
+  },
+  {
+   "offset_s": 47.133291607,
+   "duration_s": 0.126198134,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case",
+    "pyrite.transport.core",
+    "pyrite.transport.continuation.assemble"
+   ]
+  },
+  {
+   "offset_s": 62.978076486,
+   "duration_s": 0.123820401,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case"
+   ]
+  },
+  {
+   "offset_s": 57.463410132,
+   "duration_s": 0.120633072,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case"
+   ]
+  },
+  {
+   "offset_s": 60.187514374,
+   "duration_s": 0.119687883,
+   "stack": [
+    "gpuhost.run",
+    "gpuhost._transport_case"
+   ]
+  }
+ ],
+ "top_kernels": [
+  {
+   "name": "rectangles",
+   "calls": 25,
+   "total_s": 3.363517602
+  },
+  {
+   "name": "_transport_kernel",
+   "calls": 1065,
+   "total_s": 2.141005376
+  },
+  {
+   "name": "DeviceHistogramSweepKernel",
+   "calls": 918,
+   "total_s": 1.549521926
+  },
+  {
+   "name": "es_gather",
+   "calls": 109,
+   "total_s": 0.863140687
+  },
+  {
+   "name": "cupy_take",
+   "calls": 42769,
+   "total_s": 0.838804774
+  },
+  {
+   "name": "cupy_add__float64_float64_float64",
+   "calls": 6622,
+   "total_s": 0.534688175
+  },
+  {
+   "name": "DeviceMergeSortMergeKernel",
+   "calls": 5374,
+   "total_s": 0.479463438
+  },
+  {
+   "name": "copy_runs",
+   "calls": 2256,
+   "total_s": 0.428110876
+  },
+  {
+   "name": "DeviceRadixSortOnesweepKernel",
+   "calls": 11000,
+   "total_s": 0.427583316
+  },
+  {
+   "name": "cupy_searchsorted_kernel",
+   "calls": 2885,
+   "total_s": 0.307634526
+  },
+  {
+   "name": "pyrite_ordered_bincount",
+   "calls": 1094,
+   "total_s": 0.268379902
+  },
+  {
+   "name": "envelope_nodes",
+   "calls": 25,
+   "total_s": 0.253107543
+  },
+  {
+   "name": "cupy_max",
+   "calls": 296,
+   "total_s": 0.245476622
+  },
+  {
+   "name": "cupy_subtract__float_float64_float64",
+   "calls": 5153,
+   "total_s": 0.203362824
+  },
+  {
+   "name": "vector_fft",
+   "calls": 5370,
+   "total_s": 0.20115733
+  },
+  {
+   "name": "cupy_copy__float64_float64",
+   "calls": 5895,
+   "total_s": 0.178620488
+  },
+  {
+   "name": "_cxr_amp_sq_total_core",
+   "calls": 624,
+   "total_s": 0.176692896
+  },
+  {
+   "name": "cupy_multiply__float64_float64_float64",
+   "calls": 3906,
+   "total_s": 0.148972815
+  },
+  {
+   "name": "DeviceReduceKernel",
+   "calls": 5274,
+   "total_s": 0.143862076
+  },
+  {
+   "name": "cupy_subtract__float64_float64_float64",
+   "calls": 3299,
+   "total_s": 0.141389736
+  },
+  {
+   "name": "regular_fft_factor",
+   "calls": 2151,
+   "total_s": 0.124885659
+  },
+  {
+   "name": "cupy_arange__int_int_int64",
+   "calls": 9798,
+   "total_s": 0.12408792
+  },
+  {
+   "name": "cupy_true_divide__float64_float32_float64",
+   "calls": 3809,
+   "total_s": 0.119642575
+  },
+  {
+   "name": "es_batch_sources",
+   "calls": 109,
+   "total_s": 0.118841253
+  },
+  {
+   "name": "cupy_min",
+   "calls": 904,
+   "total_s": 0.112231915
+  }
+ ],
+ "top_cuda_api": [
+  {
+   "name": "cudaMemcpyAsync_v3020",
+   "calls": 33957,
+   "total_s": 16.740688235
+  },
+  {
+   "name": "cuLaunchKernel",
+   "calls": 295826,
+   "total_s": 3.912070829
+  },
+  {
+   "name": "cudaMalloc_v3020",
+   "calls": 3679,
+   "total_s": 2.229860006
+  },
+  {
+   "name": "cudaFree_v3020",
+   "calls": 3635,
+   "total_s": 1.320391626
+  },
+  {
+   "name": "cudaEventDestroy_v3020",
+   "calls": 19165,
+   "total_s": 0.595984208
+  },
+  {
+   "name": "cudaMemsetAsync_v3020",
+   "calls": 24904,
+   "total_s": 0.459988752
+  },
+  {
+   "name": "cuModuleLoadData",
+   "calls": 302,
+   "total_s": 0.393373854
+  },
+  {
+   "name": "cudaHostAlloc_v3020",
+   "calls": 76,
+   "total_s": 0.336844943
+  },
+  {
+   "name": "cudaLaunchKernel_v7000",
+   "calls": 32683,
+   "total_s": 0.324386115
+  },
+  {
+   "name": "cudaEventRecord_v3020",
+   "calls": 19258,
+   "total_s": 0.258763557
+  },
+  {
+   "name": "cudaEventCreateWithFlags_v3020",
+   "calls": 19166,
+   "total_s": 0.154697737
+  },
+  {
+   "name": "cudaMemGetInfo_v3020",
+   "calls": 324,
+   "total_s": 0.153024122
+  },
+  {
+   "name": "cudaLaunchKernelExC_v11060",
+   "calls": 11340,
+   "total_s": 0.113340549
+  },
+  {
+   "name": "cudaEventQuery_v3020",
+   "calls": 56580,
+   "total_s": 0.050685315
+  },
+  {
+   "name": "cudaStreamSynchronize_v3020",
+   "calls": 14587,
+   "total_s": 0.041089416
+  },
+  {
+   "name": "cuModuleUnload",
+   "calls": 201,
+   "total_s": 0.038238518
+  },
+  {
+   "name": "cuLibraryLoadData",
+   "calls": 16,
+   "total_s": 0.031403888
+  },
+  {
+   "name": "cudaStreamIsCapturing_v10000",
+   "calls": 34370,
+   "total_s": 0.025957917
+  },
+  {
+   "name": "cuKernelGetName",
+   "calls": 32683,
+   "total_s": 0.006084141
+  },
+  {
+   "name": "cuMemGetInfo_v2",
+   "calls": 31,
+   "total_s": 0.004080669
+  },
+  {
+   "name": "cudaFreeHost_v3020",
+   "calls": 2,
+   "total_s": 0.003980063
+  },
+  {
+   "name": "cudaEventSynchronize_v3020",
+   "calls": 124,
+   "total_s": 0.003190059
+  },
+  {
+   "name": "cuMemcpyHtoD_v2",
+   "calls": 73,
+   "total_s": 0.001898762
+  },
+  {
+   "name": "cuKernelGetFunction",
+   "calls": 31,
+   "total_s": 0.001213509
+  },
+  {
+   "name": "cuStreamGetGreenCtx",
+   "calls": 2211,
+   "total_s": 0.000553493
+  }
+ ]
+}

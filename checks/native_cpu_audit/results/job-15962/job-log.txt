@@ -1,0 +1,13 @@
+pid 3864908's current affinity list: 0-31
+pid 3864908's new affinity list: 0-7
+code 63b4dff432215907945fbcfc201c902feb83d232 host king backend cuda profile cleo_sub
+== 2026-11-24T18:53:12-08:00 runs/hopg-300-60-warm
+rc=0 {"material": "hopg", "tilt_deg": 60.0, "mode": "sampler", "wall_s": 60.40340434899554, "error": null, "idle": 0.7211864406779661}
+== 2026-11-24T18:54:21-08:00 runs/hopg-300-60-s1
+rc=0 {"material": "hopg", "tilt_deg": 60.0, "mode": "sampler", "wall_s": 23.717027857899666, "error": null, "idle": 0.36646499567847884}
+== 2026-11-24T18:54:47-08:00 runs/hopg-300-60-s2
+rc=0 {"material": "hopg", "tilt_deg": 60.0, "mode": "sampler", "wall_s": 23.953351667616516, "error": null, "idle": 0.3667094565682499}
+== 2026-11-24T18:55:13-08:00 runs/hopg-300-60-prof
+rc=0 {"material": "hopg", "tilt_deg": 60.0, "mode": "cprofile", "wall_s": 26.745928016025573, "error": null, "idle": null}
+== 2026-11-24T18:55:43-08:00 runs/hbn-300-60-warm
+[2026-11-24T18:55:53.548] error: *** JOB 15962 ON king CANCELLED AT 2026-11-24T18:55:53 DUE to SIGNAL Terminated ***

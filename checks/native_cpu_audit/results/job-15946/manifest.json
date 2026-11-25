@@ -1,0 +1,69 @@
+{
+  "job_id": 15946,
+  "state": "COMPLETED",
+  "elapsed_s": 678,
+  "node": "qlmc-queen (cpu partition)",
+  "requested_cpus": 4,
+  "requested_memory_MiB": 3072,
+  "producer_revision": "c550bc701a47c3ce7477ec364f23c73762009f91",
+  "numerical_baseline": "147400d356812d1f1d0ad39834de347ca1d8555f",
+  "command": "sbatch --dependency=afterany:15945 --job-name=axp1432-c550bc701 checks/native_cpu_audit/axial_prototypes.sbatch",
+  "arms": {
+    "cache2-base": {
+      "wall_s": [
+        86.94311314914376,
+        85.46967303566635
+      ],
+      "speedup_vs_cache2_base_median": 1.0,
+      "identical_to_cache2_base": true,
+      "max_relative_to_max_diff": [
+        0.0,
+        null
+      ]
+    },
+    "cache8-base": {
+      "wall_s": [
+        41.3027750775218,
+        42.5881582275033
+      ],
+      "speedup_vs_cache2_base_median": 2.05520166950488,
+      "identical_to_cache2_base": true,
+      "max_relative_to_max_diff": [
+        0.0,
+        null
+      ]
+    },
+    "cache8-A-basis": {
+      "wall_s": [
+        24.18788331747055,
+        24.1439946629107
+      ],
+      "speedup_vs_cache2_base_median": 3.567268506611629,
+      "identical_to_cache2_base": true,
+      "max_relative_to_max_diff": [
+        0.0,
+        null
+      ]
+    },
+    "cache8-B-basis-matmul": {
+      "wall_s": [
+        10.6753333453089,
+        10.709164212457836
+      ],
+      "speedup_vs_cache2_base_median": 8.062512842261786,
+      "identical_to_cache2_base": false,
+      "max_relative_to_max_diff": [
+        1.2870562989546678e-16,
+        "oam_populations_by_bin"
+      ]
+    }
+  },
+  "peak_rss_MiB_process_max_all_arms": 478.2265625,
+  "qualification": "In-process monkeypatch prototypes; production source/defaults unchanged. Bound CPUs 8-11, one native thread, 2 rounds alternating arm order after one prime. Complete energy-resolved MCWF call including solver construction, propagation, jumps and all observables.",
+  "path_sanitization": "isolated checkout path replaced with <checkout>",
+  "files": {
+    "axial-prototypes.json": "62e738d989e134428ad7bcfd0481de34eb8dd3322fc86add7b45da66f8b50349",
+    "job-log.txt": "8d5db59e91360d5d70721e4afd022ffc5cd82cba37d0092be0345d3a997af552"
+  },
+  "dropped_sha256": {}
+}

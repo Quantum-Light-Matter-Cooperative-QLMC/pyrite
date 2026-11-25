@@ -1,0 +1,34 @@
+{
+  "job_id": 15937,
+  "state": "COMPLETED",
+  "elapsed_s": 511,
+  "requested_cpus": 4,
+  "requested_memory_MiB": 8192,
+  "producer_revision": "36352a5348777c8081432bc898bb80e988339d64",
+  "numerical_baseline": "147400d356812d1f1d0ad39834de347ca1d8555f",
+  "sync_code_digest": "f776040cffa7bd57f2200e3585168e99747d3e35f4f1f75ef34de4f9cf954560",
+  "sync_tables_digest": "08bfc386651213994f9dc150d2cbfee28cdf7682909c0fd8a3ae9a934396343d",
+  "scheduler_step_max_rss_KiB": {
+    "batch": 13732,
+    "0": 1878424,
+    "1": 985920,
+    "2": 910624
+  },
+  "qualification": "Unbound co-tenant evidence. Case arms report affinity 0..31; srun binding ineffective. Startup workers inherit that unbound step; affinity not recorded separately in startup JSON. No four-core/node throughput qualification.",
+  "failed_arms": {
+    "layered": "Corrected silicon key; timeout after 180 s (exit 124), no result/timing accepted."
+  },
+  "command": "sbatch --nodelist=<cpu-node> --job-name=qual1432-36352a534 checks/native_cpu_audit/qualify.sbatch",
+  "files": {
+    "job-log.txt": "f2d94887245a26ea18c76d350f404f7a3269dec11babbf644e0bfb749d0551c2",
+    "startup-cold.json": "302ebf6d02116ddf826d19162237f0e9993769aebeec0ebd42e5b675ebe1f29a",
+    "startup-warm.json": "881a58960e4f5ae50b2852517ae3d6250bc398fd1a76b04cf4df551ef6efcdff",
+    "summary.json": "9fab0f63f0d098b035bcfb19b8eefef1e3af17ae035d8c0f28745828079e74ed"
+  },
+  "dropped_sha256": {
+    "crystal300-t1.json": "0feaa7edf10c28272e5a60990a95959c1482b01ac80baefbb397c09e5c96de45",
+    "crystal300-t4.json": "13d60710c0f1f4739d03bdd4cd2c82be378869156850eb59cc1e2c7d29b9a70a",
+    "thin30-t1.json": "332f5d050b0c9a2d0a4d6c884f6d5ae7d1b50fc373744514903c96cbc4c2dada",
+    "thin30-t4.json": "93073859b977f0358f7cdfbb24d98ed7fc631958a0bc6309454998dbeddf1a62"
+  }
+}

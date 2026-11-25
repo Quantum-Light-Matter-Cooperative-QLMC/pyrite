@@ -1,0 +1,49 @@
+{
+  "photon-case-t4": {
+    "first_s": 31.03305381676182,
+    "first_compile_s": 14.46092903893441,
+    "warm_s": {
+      "median": 15.158277782378718,
+      "min": 15.125404034741223,
+      "max": 15.191151530016214,
+      "n": 2
+    },
+    "profile_wall_s": 15.539718192070723,
+    "peak_rss_MiB": 1249.07421875,
+    "affinity": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "numba_threads": {
+      "NUMBA_NUM_THREADS": "4",
+      "NUMBA_THREADING_LAYER": null,
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "PYRITE_FFT_THREADS": null
+    },
+    "threading_layer": "omp",
+    "phases_warm": {
+      "_t_spectrum": 14.957207828760147,
+      "_t_transport": 0.02091822912916541
+    },
+    "repeat_and_profile_hashes_identical": true,
+    "array_sha256": {
+      "E_grid": "3debf775590043f05b6ee0fcab6889dfb69bda14d976b7b7e598959555569085",
+      "spec": "5e93771445a9a3c2f7562ffb659c5ac01dfcc4a75d002f8fb06c7f4e81baee3f",
+      "spec_characteristic": "5f1cc6a6ad7f4ac5fe906c07fb755f9f664e56e487e659be3ac33e11b4d4127d",
+      "brem": "93082fe4eea6db1f4fe243aa775e22b9c2768e57896abd5ed05f2c7066b2e439",
+      "E_grid_brem": "7946d1ef861aaebd147c837a547d5bb92927320af93ddb1651edfdd318fe77eb",
+      "brem_wide": "7c9f8ad3c4d03d638281bd987daea3cc13148ebe35bc6cf6abd01c63c0161112"
+    },
+    "profile_cumulative_s": {
+      "select_reflection_cutoff": 14.473976806000001,
+      "accumulate_sincsq_windowed": 8.171319395000001,
+      "_batched_block": 3.7318080050000004,
+      "_corrected_group": 0.670730326,
+      "score_photon_aperture": 0.346897901
+    }
+  }
+}

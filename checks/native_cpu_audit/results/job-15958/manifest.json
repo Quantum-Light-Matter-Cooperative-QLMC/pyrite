@@ -1,0 +1,25 @@
+{
+  "job_id": 15958,
+  "state": "COMPLETED",
+  "elapsed_s": 42,
+  "node": "king (cpu partition)",
+  "requested_cpus": 4,
+  "requested_memory_MiB": 8192,
+  "producer_revision": "28670e572",
+  "numerical_baseline": "main 51a928b25",
+  "sync_code_digest_py": "a3f1eaa77e596640b4ea7e0420ca01637d725371a5cdc00558ffa51c36e3b43c",
+  "scheduler_step_max_rss_KiB": {
+    "batch": 768688
+  },
+  "command": "sbatch --dependency=afterany:15957 --nodelist=<cpu-node> --job-name=cxr1432-28670e572 checks/native_cpu_audit/rebaseline.sbatch crystal300 crystal300-binmean crystal300-coherent crystal300-coherent-hr",
+  "path_sanitization": "isolated checkout path replaced with <checkout>, home with <home>",
+  "files": {
+    "crystal300-binmean-t1.json": "9cf8dccb0eda4de3cf655d638756fd6e93a290feb7c19631c446cbd18fc4fe9b",
+    "crystal300-coherent-hr-t1.json": "81e53014166b0f5dc72eed4fc8bb2988498c98cc0dd2d3309b83c2d0be5314e8",
+    "crystal300-coherent-t1.json": "a72137ada6402478bc26284ce083c6019ac99d14f2236f7c367c54b231457db8",
+    "crystal300-t1.json": "8dde417e5c1091608ecce2305613f9fd6e2075de94deb36b8f7ff1da22b50669",
+    "job-log.txt": "2a4ba2ccb78e8fa316db0d8f18639823ef719e51e6f19425888c3b9559c0a242",
+    "summary.json": "3402746a8060287bd8bcab299d730c2dcba3383ffbf81708e0376b12ab9220ec"
+  },
+  "dropped_sha256": {}
+}

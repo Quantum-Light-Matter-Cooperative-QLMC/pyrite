@@ -1,0 +1,496 @@
+{
+  "schema": "pyrite.numba-pool-budget.v1",
+  "environment": {
+    "revision": "4ae34de80c6bcd07dd98ed552e35debfacbd42c2",
+    "python": "3.14.6",
+    "versions": {
+      "numpy": "2.5.4",
+      "numba": "0.68.1",
+      "scipy": "1.18.1",
+      "llvmlite": "0.50.0",
+      "dask": "2026.8.0",
+      "distributed": "2026.8.0",
+      "pyfftw": "0.15.1"
+    },
+    "machine": "x86_64",
+    "cpu": "AMD Ryzen 9 9950X3D 16-Core Processor",
+    "affinity": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "gil_enabled": true,
+    "numba_threads": 4,
+    "numba_threading_layer": "omp",
+    "backend": "<pyrite._backend.NumPyBackend object at 0x7094eca94c20>",
+    "precision": "float64",
+    "native_pools": [
+      {
+        "user_api": "blas",
+        "internal_api": "openblas",
+        "num_threads": 1,
+        "prefix": "libscipy_openblas",
+        "filepath": "<checkout>/.venv/lib/python3.14/site-packages/numpy.libs/libscipy_openblas64_-f48b354e.so",
+        "version": "0.3.34.106.0",
+        "threading_layer": "pthreads",
+        "architecture": "SkylakeX"
+      },
+      {
+        "user_api": "blas",
+        "internal_api": "openblas",
+        "num_threads": 1,
+        "prefix": "libscipy_openblas",
+        "filepath": "<checkout>/.venv/lib/python3.14/site-packages/scipy.libs/libscipy_openblas-5f890258.so",
+        "version": "0.3.31.dev",
+        "threading_layer": "pthreads",
+        "architecture": "SkylakeX"
+      },
+      {
+        "user_api": "openmp",
+        "internal_api": "openmp",
+        "num_threads": 4,
+        "prefix": "libgomp",
+        "filepath": "/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0",
+        "version": null
+      }
+    ],
+    "threads": {
+      "NUMBA_NUM_THREADS": "4",
+      "NUMBA_THREADING_LAYER": null,
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "PYRITE_FFT_THREADS": null
+    },
+    "cache": {
+      "NUMBA_CACHE_DIR": "<checkout>/runs/cache-pools",
+      "CUPY_CACHE_DIR": "<home>/.cache/pyrite/cupy"
+    },
+    "numpy_config": {
+      "Compilers": {
+        "c": {
+          "name": "gcc",
+          "linker": "ld.bfd",
+          "version": "14.2.1",
+          "commands": "cc"
+        },
+        "cython": {
+          "name": "cython",
+          "linker": "cython",
+          "version": "3.3.0",
+          "commands": "cython"
+        },
+        "c++": {
+          "name": "gcc",
+          "linker": "ld.bfd",
+          "version": "14.2.1",
+          "commands": "c++"
+        }
+      },
+      "Machine Information": {
+        "host": {
+          "cpu": "x86_64",
+          "family": "x86_64",
+          "endian": "little",
+          "system": "linux"
+        },
+        "build": {
+          "cpu": "x86_64",
+          "family": "x86_64",
+          "endian": "little",
+          "system": "linux"
+        }
+      },
+      "Build Dependencies": {
+        "blas": {
+          "name": "scipy-openblas",
+          "found": true,
+          "version": "0.3.34.106.0",
+          "detection method": "pkgconfig",
+          "include directory": "/opt/_internal/cpython-3.14.6/lib/python3.14/site-packages/scipy_openblas64/include",
+          "lib directory": "/opt/_internal/cpython-3.14.6/lib/python3.14/site-packages/scipy_openblas64/lib",
+          "openblas configuration": "OpenBLAS 0.3.34.106.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64",
+          "pc file directory": "/project/.openblas"
+        },
+        "lapack": {
+          "name": "scipy-openblas",
+          "found": true,
+          "version": "0.3.34.106.0",
+          "detection method": "pkgconfig",
+          "include directory": "/opt/_internal/cpython-3.14.6/lib/python3.14/site-packages/scipy_openblas64/include",
+          "lib directory": "/opt/_internal/cpython-3.14.6/lib/python3.14/site-packages/scipy_openblas64/lib",
+          "openblas configuration": "OpenBLAS 0.3.34.106.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64",
+          "pc file directory": "/project/.openblas"
+        }
+      },
+      "Python Information": {
+        "path": "/tmp/build-env-c90f47zn/bin/python",
+        "version": "3.14"
+      },
+      "SIMD Extensions": {
+        "baseline": [
+          "X86_V2"
+        ],
+        "found": [
+          "X86_V3",
+          "X86_V4",
+          "AVX512_ICL"
+        ],
+        "not found": [
+          "AVX512_SPR"
+        ]
+      }
+    },
+    "allocation": {
+      "SLURM_JOB_ID": "15941",
+      "SLURM_CPUS_PER_TASK": "4",
+      "SLURM_MEM_PER_NODE": "2048"
+    }
+  },
+  "input": {
+    "nodes": 2048,
+    "lines": 2048,
+    "energy_eV": [
+      1000.0,
+      20000.0
+    ],
+    "width_per_eV": 0.005,
+    "three_weight_rows": "all ones"
+  },
+  "samples": [
+    {
+      "mode": "base-before",
+      "wall_s": 0.011741112917661667,
+      "cpu_s": 0.03491613399999993,
+      "numba_mask": 4,
+      "native_pools": [
+        {
+          "user_api": "blas",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libscipy_openblas",
+          "filepath": "<checkout>/.venv/lib/python3.14/site-packages/numpy.libs/libscipy_openblas64_-f48b354e.so",
+          "version": "0.3.34.106.0",
+          "threading_layer": "pthreads",
+          "architecture": "SkylakeX"
+        },
+        {
+          "user_api": "blas",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libscipy_openblas",
+          "filepath": "<checkout>/.venv/lib/python3.14/site-packages/scipy.libs/libscipy_openblas-5f890258.so",
+          "version": "0.3.31.dev",
+          "threading_layer": "pthreads",
+          "architecture": "SkylakeX"
+        },
+        {
+          "user_api": "openmp",
+          "internal_api": "openmp",
+          "num_threads": 4,
+          "prefix": "libgomp",
+          "filepath": "/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0",
+          "version": null
+        }
+      ],
+      "output_sha256": "efea0696621d50282e8f1df0102f9e0b4ef66e5859bfc7919efc739c7c6f9608"
+    },
+    {
+      "mode": "limited",
+      "wall_s": 0.01175649301148951,
+      "cpu_s": 0.047750178000000254,
+      "numba_mask": 4,
+      "native_pools": [
+        {
+          "user_api": "blas",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libscipy_openblas",
+          "filepath": "<checkout>/.venv/lib/python3.14/site-packages/numpy.libs/libscipy_openblas64_-f48b354e.so",
+          "version": "0.3.34.106.0",
+          "threading_layer": "pthreads",
+          "architecture": "SkylakeX"
+        },
+        {
+          "user_api": "blas",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libscipy_openblas",
+          "filepath": "<checkout>/.venv/lib/python3.14/site-packages/scipy.libs/libscipy_openblas-5f890258.so",
+          "version": "0.3.31.dev",
+          "threading_layer": "pthreads",
+          "architecture": "SkylakeX"
+        },
+        {
+          "user_api": "openmp",
+          "internal_api": "openmp",
+          "num_threads": 1,
+          "prefix": "libgomp",
+          "filepath": "/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0",
+          "version": null
+        }
+      ],
+      "output_sha256": "efea0696621d50282e8f1df0102f9e0b4ef66e5859bfc7919efc739c7c6f9608"
+    },
+    {
+      "mode": "base-after",
+      "wall_s": 0.011781753972172737,
+      "cpu_s": 0.04776308699999987,
+      "numba_mask": 4,
+      "native_pools": [
+        {
+          "user_api": "blas",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libscipy_openblas",
+          "filepath": "<checkout>/.venv/lib/python3.14/site-packages/numpy.libs/libscipy_openblas64_-f48b354e.so",
+          "version": "0.3.34.106.0",
+          "threading_layer": "pthreads",
+          "architecture": "SkylakeX"
+        },
+        {
+          "user_api": "blas",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libscipy_openblas",
+          "filepath": "<checkout>/.venv/lib/python3.14/site-packages/scipy.libs/libscipy_openblas-5f890258.so",
+          "version": "0.3.31.dev",
+          "threading_layer": "pthreads",
+          "architecture": "SkylakeX"
+        },
+        {
+          "user_api": "openmp",
+          "internal_api": "openmp",
+          "num_threads": 4,
+          "prefix": "libgomp",
+          "filepath": "/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0",
+          "version": null
+        }
+      ],
+      "output_sha256": "efea0696621d50282e8f1df0102f9e0b4ef66e5859bfc7919efc739c7c6f9608"
+    },
+    {
+      "mode": "base-before",
+      "wall_s": 0.011815633159130812,
+      "cpu_s": 0.04781667899999986,
+      "numba_mask": 4,
+      "native_pools": [
+        {
+          "user_api": "blas",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libscipy_openblas",
+          "filepath": "<checkout>/.venv/lib/python3.14/site-packages/numpy.libs/libscipy_openblas64_-f48b354e.so",
+          "version": "0.3.34.106.0",
+          "threading_layer": "pthreads",
+          "architecture": "SkylakeX"
+        },
+        {
+          "user_api": "blas",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libscipy_openblas",
+          "filepath": "<checkout>/.venv/lib/python3.14/site-packages/scipy.libs/libscipy_openblas-5f890258.so",
+          "version": "0.3.31.dev",
+          "threading_layer": "pthreads",
+          "architecture": "SkylakeX"
+        },
+        {
+          "user_api": "openmp",
+          "internal_api": "openmp",
+          "num_threads": 4,
+          "prefix": "libgomp",
+          "filepath": "/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0",
+          "version": null
+        }
+      ],
+      "output_sha256": "efea0696621d50282e8f1df0102f9e0b4ef66e5859bfc7919efc739c7c6f9608"
+    },
+    {
+      "mode": "limited",
+      "wall_s": 0.012278767069801688,
+      "cpu_s": 0.04777818700000003,
+      "numba_mask": 4,
+      "native_pools": [
+        {
+          "user_api": "blas",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libscipy_openblas",
+          "filepath": "<checkout>/.venv/lib/python3.14/site-packages/numpy.libs/libscipy_openblas64_-f48b354e.so",
+          "version": "0.3.34.106.0",
+          "threading_layer": "pthreads",
+          "architecture": "SkylakeX"
+        },
+        {
+          "user_api": "blas",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libscipy_openblas",
+          "filepath": "<checkout>/.venv/lib/python3.14/site-packages/scipy.libs/libscipy_openblas-5f890258.so",
+          "version": "0.3.31.dev",
+          "threading_layer": "pthreads",
+          "architecture": "SkylakeX"
+        },
+        {
+          "user_api": "openmp",
+          "internal_api": "openmp",
+          "num_threads": 1,
+          "prefix": "libgomp",
+          "filepath": "/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0",
+          "version": null
+        }
+      ],
+      "output_sha256": "efea0696621d50282e8f1df0102f9e0b4ef66e5859bfc7919efc739c7c6f9608"
+    },
+    {
+      "mode": "base-after",
+      "wall_s": 0.011789633892476559,
+      "cpu_s": 0.03578951400000019,
+      "numba_mask": 4,
+      "native_pools": [
+        {
+          "user_api": "blas",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libscipy_openblas",
+          "filepath": "<checkout>/.venv/lib/python3.14/site-packages/numpy.libs/libscipy_openblas64_-f48b354e.so",
+          "version": "0.3.34.106.0",
+          "threading_layer": "pthreads",
+          "architecture": "SkylakeX"
+        },
+        {
+          "user_api": "blas",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libscipy_openblas",
+          "filepath": "<checkout>/.venv/lib/python3.14/site-packages/scipy.libs/libscipy_openblas-5f890258.so",
+          "version": "0.3.31.dev",
+          "threading_layer": "pthreads",
+          "architecture": "SkylakeX"
+        },
+        {
+          "user_api": "openmp",
+          "internal_api": "openmp",
+          "num_threads": 4,
+          "prefix": "libgomp",
+          "filepath": "/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0",
+          "version": null
+        }
+      ],
+      "output_sha256": "efea0696621d50282e8f1df0102f9e0b4ef66e5859bfc7919efc739c7c6f9608"
+    },
+    {
+      "mode": "base-before",
+      "wall_s": 0.011798263993114233,
+      "cpu_s": 0.04779945800000007,
+      "numba_mask": 4,
+      "native_pools": [
+        {
+          "user_api": "blas",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libscipy_openblas",
+          "filepath": "<checkout>/.venv/lib/python3.14/site-packages/numpy.libs/libscipy_openblas64_-f48b354e.so",
+          "version": "0.3.34.106.0",
+          "threading_layer": "pthreads",
+          "architecture": "SkylakeX"
+        },
+        {
+          "user_api": "blas",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libscipy_openblas",
+          "filepath": "<checkout>/.venv/lib/python3.14/site-packages/scipy.libs/libscipy_openblas-5f890258.so",
+          "version": "0.3.31.dev",
+          "threading_layer": "pthreads",
+          "architecture": "SkylakeX"
+        },
+        {
+          "user_api": "openmp",
+          "internal_api": "openmp",
+          "num_threads": 4,
+          "prefix": "libgomp",
+          "filepath": "/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0",
+          "version": null
+        }
+      ],
+      "output_sha256": "efea0696621d50282e8f1df0102f9e0b4ef66e5859bfc7919efc739c7c6f9608"
+    },
+    {
+      "mode": "limited",
+      "wall_s": 0.011826853035017848,
+      "cpu_s": 0.047827390000000136,
+      "numba_mask": 4,
+      "native_pools": [
+        {
+          "user_api": "blas",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libscipy_openblas",
+          "filepath": "<checkout>/.venv/lib/python3.14/site-packages/numpy.libs/libscipy_openblas64_-f48b354e.so",
+          "version": "0.3.34.106.0",
+          "threading_layer": "pthreads",
+          "architecture": "SkylakeX"
+        },
+        {
+          "user_api": "blas",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libscipy_openblas",
+          "filepath": "<checkout>/.venv/lib/python3.14/site-packages/scipy.libs/libscipy_openblas-5f890258.so",
+          "version": "0.3.31.dev",
+          "threading_layer": "pthreads",
+          "architecture": "SkylakeX"
+        },
+        {
+          "user_api": "openmp",
+          "internal_api": "openmp",
+          "num_threads": 1,
+          "prefix": "libgomp",
+          "filepath": "/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0",
+          "version": null
+        }
+      ],
+      "output_sha256": "efea0696621d50282e8f1df0102f9e0b4ef66e5859bfc7919efc739c7c6f9608"
+    },
+    {
+      "mode": "base-after",
+      "wall_s": 0.011830332921817899,
+      "cpu_s": 0.04783495800000015,
+      "numba_mask": 4,
+      "native_pools": [
+        {
+          "user_api": "blas",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libscipy_openblas",
+          "filepath": "<checkout>/.venv/lib/python3.14/site-packages/numpy.libs/libscipy_openblas64_-f48b354e.so",
+          "version": "0.3.34.106.0",
+          "threading_layer": "pthreads",
+          "architecture": "SkylakeX"
+        },
+        {
+          "user_api": "blas",
+          "internal_api": "openblas",
+          "num_threads": 1,
+          "prefix": "libscipy_openblas",
+          "filepath": "<checkout>/.venv/lib/python3.14/site-packages/scipy.libs/libscipy_openblas-5f890258.so",
+          "version": "0.3.31.dev",
+          "threading_layer": "pthreads",
+          "architecture": "SkylakeX"
+        },
+        {
+          "user_api": "openmp",
+          "internal_api": "openmp",
+          "num_threads": 4,
+          "prefix": "libgomp",
+          "filepath": "/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0",
+          "version": null
+        }
+      ],
+      "output_sha256": "efea0696621d50282e8f1df0102f9e0b4ef66e5859bfc7919efc739c7c6f9608"
+    }
+  ]
+}

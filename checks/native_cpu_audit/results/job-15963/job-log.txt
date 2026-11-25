@@ -1,0 +1,50 @@
+pid 3866704's current affinity list: 0-31
+pid 3866704's new affinity list: 0-7
+code c80e5374a5f2dae4aea85b26d731da71376f6b92 host king backend cuda profile cleo_test nsys NVIDIA Nsight Systems version 2025.6.3.541-256337736014v0
+== 2026-11-24T19:05:34-08:00 runs/hopg-300-5-warm
+rc=0 {"material": "hopg", "tilt_deg": 5.0, "mode": "sampler", "wall_s": 97.41224453318864, "error": null, "idle": 0.5943306083448349}
+== 2026-11-24T19:07:20-08:00 runs/hopg-300-5-sampler
+rc=0 {"material": "hopg", "tilt_deg": 5.0, "mode": "sampler", "wall_s": 59.52101049106568, "error": null, "idle": 0.39542996685853826}
+== 2026-11-24T19:08:22-08:00 runs/hopg-300-5-nsys
+rc=0 	<checkout>/runs/hopg-300-5.nsys-rep
+gaps rc=0 {"run_wall_s": 65.681393008, "device_busy_s": 19.426746807, "device_busy_fraction": 0.2957724542266304, "top_idle": [["gpuhost._resolve_policy_grid", 11.089476978], ["gpuhost._transport_case", 9.426155549], ["gpuhost.initial_beam_positions", 7.891502937], ["pyrite.transport.continuation.stage", 2.406221549], ["pyrite.transport.continuation.assemble", 2.228149226]]}
+== 2026-11-24T19:09:53-08:00 runs/hopg-300-15-sampler
+rc=0 {"material": "hopg", "tilt_deg": 15.0, "mode": "sampler", "wall_s": 101.63073221268132, "error": null, "idle": 0.3490056093829679}
+== 2026-11-24T19:11:37-08:00 runs/hopg-300-15-nsys
+rc=0 	<checkout>/runs/hopg-300-15.nsys-rep
+gaps rc=0 {"run_wall_s": 108.059260872, "device_busy_s": 37.201970835, "device_busy_fraction": 0.34427378583559853, "top_idle": [["gpuhost._resolve_policy_grid", 18.886048776], ["gpuhost._transport_case", 14.648539913], ["gpuhost.initial_beam_positions", 12.257656656], ["pyrite.transport.continuation.stage", 4.070482164], ["pyrite.transport.continuation.launch", 3.363986646]]}
+== 2026-11-24T19:14:02-08:00 runs/hopg-300-25-sampler
+rc=0 {"material": "hopg", "tilt_deg": 25.0, "mode": "sampler", "wall_s": 61.416026804130524, "error": null, "idle": 0.38784492974437107}
+== 2026-11-24T19:15:06-08:00 runs/hopg-300-25-nsys
+rc=0 	<checkout>/runs/hopg-300-25.nsys-rep
+gaps rc=0 {"run_wall_s": 65.034177828, "device_busy_s": 20.881611488, "device_busy_fraction": 0.32108672986113423, "top_idle": [["gpuhost._resolve_policy_grid", 10.42717601], ["gpuhost._transport_case", 10.091148704], ["gpuhost.initial_beam_positions", 7.264976946], ["gpuhost.block_tail_sums", 2.178289442], ["pyrite.transport.continuation.assemble", 1.96447552]]}
+== 2026-11-24T19:16:35-08:00 runs/hopg-300-35-sampler
+rc=0 {"material": "hopg", "tilt_deg": 35.0, "mode": "sampler", "wall_s": 69.88860106794164, "error": null, "idle": 0.3721654068474878}
+== 2026-11-24T19:17:47-08:00 runs/hopg-300-35-nsys
+rc=0 	<checkout>/runs/hopg-300-35.nsys-rep
+gaps rc=0 {"run_wall_s": 74.189714552, "device_busy_s": 23.841411414, "device_busy_fraction": 0.32135736817385135, "top_idle": [["gpuhost._resolve_policy_grid", 12.367551295], ["gpuhost._transport_case", 11.1738851], ["gpuhost.initial_beam_positions", 7.962660908], ["gpuhost.block_tail_sums", 2.498141534], ["pyrite.transport.continuation.stage", 2.429085487]]}
+== 2026-11-24T19:19:29-08:00 runs/hopg-300-45-sampler
+rc=1 {"material": "hopg", "tilt_deg": 45.0, "mode": "sampler", "wall_s": 6.8331963759846985, "error": "CxrGridToleranceError: hopg 500nm pol=45 az=180 footprint=5x5mm at 300 keV: the measured line bandwidth [50, 30000] eV may truncate 0.00499 of the line yield above its edge with production weights, abov
+== 2026-11-24T19:19:38-08:00 runs/hopg-300-45-nsys
+rc=1 	<checkout>/runs/hopg-300-45.nsys-rep
+gaps rc=0 {"run_wall_s": 6.546071028, "device_busy_s": 0.507727423, "device_busy_fraction": 0.07756216222345579, "top_idle": [["gpuhost._transport_case", 1.790138528], ["gpuhost.electron_cutoffs", 1.356431835], ["gpuhost._corrected_tables", 0.877396916], ["gpuhost.build_shell_inelastic_tables", 0.526857964], ["gpuhost.cuda_fourier_bin_mean_reduce", 0.290586209]]}
+== 2026-11-24T19:19:53-08:00 runs/hopg-300-55-sampler
+rc=0 {"material": "hopg", "tilt_deg": 55.0, "mode": "sampler", "wall_s": 12.466495383996516, "error": null, "idle": 0.46957236842105265}
+== 2026-11-24T19:20:08-08:00 runs/hopg-300-55-nsys
+rc=0 	<checkout>/runs/hopg-300-55.nsys-rep
+gaps rc=0 {"run_wall_s": 13.619941922, "device_busy_s": 3.108994724, "device_busy_fraction": 0.22826784003961922, "top_idle": [["gpuhost._transport_case", 3.32515714], ["gpuhost.electron_cutoffs", 1.28675908], ["gpuhost.initial_beam_positions", 0.776820848], ["gpuhost.sinc_spacing_from_samples", 0.648227452], ["gpuhost.build_shell_inelastic_tables", 0.59653856]]}
+== 2026-11-24T19:20:31-08:00 runs/hopg-300-65-sampler
+rc=0 {"material": "hopg", "tilt_deg": 65.0, "mode": "sampler", "wall_s": 8.002977165859193, "error": null, "idle": 0.4922879177377892}
+== 2026-11-24T19:20:42-08:00 runs/hopg-300-65-nsys
+rc=0 	<checkout>/runs/hopg-300-65.nsys-rep
+gaps rc=0 {"run_wall_s": 8.858512768, "device_busy_s": 1.371152932, "device_busy_fraction": 0.15478364911919262, "top_idle": [["gpuhost._transport_case", 2.521249843], ["gpuhost.electron_cutoffs", 1.387615608], ["gpuhost._corrected_tables", 0.825172118], ["gpuhost.build_shell_inelastic_tables", 0.551596639], ["gpuhost.cuda_fourier_bin_mean_reduce", 0.345283484]]}
+== 2026-11-24T19:20:59-08:00 runs/hopg-300-75-sampler
+rc=0 {"material": "hopg", "tilt_deg": 75.0, "mode": "sampler", "wall_s": 10.175917139742523, "error": null, "idle": 0.46727089627391744}
+== 2026-11-24T19:21:12-08:00 runs/hopg-300-75-nsys
+rc=0 	<checkout>/runs/hopg-300-75.nsys-rep
+gaps rc=0 {"run_wall_s": 11.018582398, "device_busy_s": 2.1622073, "device_busy_fraction": 0.1962328021790231, "top_idle": [["gpuhost._transport_case", 3.744093291], ["gpuhost.electron_cutoffs", 1.493810388], ["gpuhost._corrected_tables", 0.605833821], ["gpuhost.build_shell_inelastic_tables", 0.550914206], ["gpuhost.cuda_fourier_bin_mean_reduce", 0.377497937]]}
+== 2026-11-24T19:21:34-08:00 runs/hopg-300-85-sampler
+rc=0 {"material": "hopg", "tilt_deg": 85.0, "mode": "sampler", "wall_s": 34.98802505293861, "error": null, "idle": 0.2644146767617938}
+== 2026-11-24T19:22:12-08:00 runs/hopg-300-85-nsys
+rc=0 	<checkout>/runs/hopg-300-85.nsys-rep
+gaps rc=0 {"run_wall_s": 41.525479894, "device_busy_s": 12.850109213, "device_busy_fraction": 0.30945119107116464, "top_idle": [["gpuhost._transport_case", 16.598917286], ["gpuhost.sinc_spacing_from_samples", 1.853696407], ["gpuhost.electron_cutoffs", 1.594994441], ["gpuhost.sinc_feature_samples", 1.31995754], ["gpuhost.cuda_fourier_bin_mean_reduce", 1.175196954]]}

@@ -1,0 +1,140 @@
+{
+  "workload": "four identical complete crystal300 (16-history HOPG 300 keV) cases per round, 3 rounds per arm",
+  "timing_scope": "four warm complete run_case calls incl. identical result hashing and parent dispatch/20ms polling; excludes worker setup/prime",
+  "arms": {
+    "1x1": {
+      "round_wall_s": {
+        "median": 5.75347140384838,
+        "min": 5.686810135142878,
+        "max": 5.812778986059129
+      },
+      "cases_per_s": {
+        "median": 0.6952324465060313,
+        "min": 0.688139013988534,
+        "max": 0.7033820199624974
+      },
+      "process_cpu_s": {
+        "median": 4.874668162,
+        "min": 4.811868450999999,
+        "max": 4.952441135999999
+      },
+      "sampled_peak_pss_MiB": {
+        "median": 715.1181640625,
+        "min": 715.0810546875,
+        "max": 715.1201171875
+      },
+      "sampled_peak_os_threads": {
+        "median": 3,
+        "min": 3,
+        "max": 3
+      }
+    },
+    "4x1": {
+      "round_wall_s": {
+        "median": 4.7380532620009035,
+        "min": 4.331137430854142,
+        "max": 4.799384651938453
+      },
+      "cases_per_s": {
+        "median": 0.8442285847818393,
+        "min": 0.8334401782912764,
+        "max": 0.9235449264446827
+      },
+      "process_cpu_s": {
+        "median": 14.714399446999998,
+        "min": 13.257608115999998,
+        "max": 14.877754263999998
+      },
+      "sampled_peak_pss_MiB": {
+        "median": 2228.3818359375,
+        "min": 2181.306640625,
+        "max": 2268.1953125
+      },
+      "sampled_peak_os_threads": {
+        "median": 9,
+        "min": 9,
+        "max": 9
+      }
+    },
+    "1x4": {
+      "round_wall_s": {
+        "median": 6.290204308927059,
+        "min": 6.128304530167952,
+        "max": 6.314790145959705
+      },
+      "cases_per_s": {
+        "median": 0.6359093923742984,
+        "min": 0.6334335595553018,
+        "max": 0.6527090780670418
+      },
+      "process_cpu_s": {
+        "median": 5.853947818000001,
+        "min": 5.784615758000001,
+        "max": 5.9195626180000005
+      },
+      "sampled_peak_pss_MiB": {
+        "median": 715.568359375,
+        "min": 715.5654296875,
+        "max": 715.568359375
+      },
+      "sampled_peak_os_threads": {
+        "median": 6,
+        "min": 6,
+        "max": 6
+      }
+    },
+    "2x2": {
+      "round_wall_s": {
+        "median": 4.952996124979109,
+        "min": 3.940127484034747,
+        "max": 5.518673535902053
+      },
+      "cases_per_s": {
+        "median": 0.8075919905987957,
+        "min": 0.7248118545113724,
+        "max": 1.0151955783684294
+      },
+      "process_cpu_s": {
+        "median": 8.268375341,
+        "min": 6.901224518000001,
+        "max": 9.688805523000001
+      },
+      "sampled_peak_pss_MiB": {
+        "median": 1269.40625,
+        "min": 1246.2568359375,
+        "max": 1270.0673828125
+      },
+      "sampled_peak_os_threads": {
+        "median": 7,
+        "min": 7,
+        "max": 7
+      }
+    }
+  },
+  "all_worker_array_hashes_identical": true,
+  "characteristic_scorer": {
+    "char-multi-t1": {
+      "warm_wall_ms": {
+        "median": 4.304487025365233,
+        "min": 4.2888568714261055,
+        "max": 4.351276904344559
+      },
+      "setup_s": 0.7836704710498452,
+      "peak_rss_MiB": 272.640625,
+      "repeat_spectrum_hashes_identical": true,
+      "threading_layer": null
+    },
+    "char-layered-t1": {
+      "warm_wall_ms": {
+        "median": 2.892754040658474,
+        "min": 2.800262998789549,
+        "max": 3.070947015658021
+      },
+      "setup_s": 0.8283162270672619,
+      "peak_rss_MiB": 278.26953125,
+      "repeat_spectrum_hashes_identical": true,
+      "threading_layer": null
+    }
+  },
+  "qualification": "OS taskset bound to assigned CPUs 0-3 with fail-fast affinity check; Numba masks verified. Co-tenant node (GPU allocation present), fixed arm order, 20 ms PSS polling: small deltas are not stable rankings. Characteristic arms are synthetic scorer microbenchmarks, not full cases."
+}

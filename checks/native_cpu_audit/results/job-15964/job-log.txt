@@ -1,0 +1,15 @@
+pid 3877898's current affinity list: 0-31
+pid 3877898's new affinity list: 0-7
+code bf54315e929442833787aaacb5fc19c8206a5bd9 host king backend cuda profile cleo_test nsys NVIDIA Nsight Systems version 2025.6.3.541-256337736014v0
+== 2026-11-24T21:32:51-08:00 runs-fine/hopg-300-5-warm
+rc=0 {"material": "hopg", "tilt_deg": 5.0, "mode": "sampler", "wall_s": 94.57259891508147, "error": null, "idle": 0.5886338797814208}
+== 2026-11-24T21:34:31-08:00 runs-fine/hopg-300-5-sampler
+rc=0 {"material": "hopg", "tilt_deg": 5.0, "mode": "sampler", "wall_s": 59.75297932000831, "error": null, "idle": 0.3871696801112656}
+== 2026-11-24T21:35:34-08:00 runs-fine/hopg-300-5-nsys
+rc=0 	<checkout>/runs-fine/hopg-300-5.nsys-rep
+gaps rc=0 {"run_wall_s": 64.836842645, "device_busy_s": 19.549530932, "device_busy_fraction": 0.30151886079708096, "top_idle": [["gpuhost._resolve_policy_grid", 10.674282675], ["gpuhost.initial_beam_positions", 7.818866939], ["gpuhost._transport_case", 4.762520608], ["gpuhost.StoppingMonitor.on_block", 2.628465549], ["gpuhost.block_tail_sums", 2.480526418]]}
+== 2026-11-24T21:37:03-08:00 runs-fine/hopg-300-85-sampler
+rc=0 {"material": "hopg", "tilt_deg": 85.0, "mode": "sampler", "wall_s": 35.065953901037574, "error": null, "idle": 0.2689514957885565}
+== 2026-11-24T21:37:40-08:00 runs-fine/hopg-300-85-nsys
+rc=0 	<checkout>/runs-fine/hopg-300-85.nsys-rep
+gaps rc=0 {"run_wall_s": 40.854180278, "device_busy_s": 12.560927058, "device_busy_fraction": 0.3074575716004285, "top_idle": [["gpuhost._transport_case", 12.908046487], ["gpuhost.StoppingMonitor.on_block", 2.423040483], ["gpuhost.sinc_spacing_from_samples", 1.819321125], ["gpuhost.electron_cutoffs", 1.571008467], ["gpuhost.sinc_feature_samples", 1.339152524]]}

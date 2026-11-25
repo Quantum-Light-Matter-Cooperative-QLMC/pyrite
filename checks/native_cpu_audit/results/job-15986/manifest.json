@@ -1,0 +1,40 @@
+{
+  "job_id": 15986,
+  "state": "COMPLETED",
+  "elapsed_s": 379,
+  "node": "king (gpu partition, RTX 5080)",
+  "requested_cpus": 8,
+  "requested_memory_MiB": 30720,
+  "scheduler_step_max_rss_KiB": {
+    "batch": 10430444
+  },
+  "producer_revision": "29f9a65fc (origin/main 42413c99c + audit dir)",
+  "co_tenant": "queued 70 min behind a CPU-only #1041 job; not running during the arms",
+  "path_sanitization": "isolated checkout -> <checkout>, home -> <home>, hostname -> king",
+  "not_retained": "raw per-arm sampler JSON and logs (kept locally in ~/dev/pyrite-benches/issue-1432/job-15986)",
+  "files": {
+    "summary.json": "f8f9e29ea1196b62d2a078c96877431a34bc77e49f65b68126c352e9119752c3"
+  },
+  "dropped_sha256": {
+    "gpu-info.txt": "82a18caf07fcee95eb0e9ec65d4ecae0fb4eacd1d165777aa9a1b29f35710da0",
+    "hopg-300-15-sampler.json": "cea796a9dcae68f48ca9d5b8883ba711ea09b1310a28ec8393ae29e0d415d025",
+    "hopg-300-15-sampler.log": "184ca348606598c3688f28c3ca3d1889990f67bcac2361199a58eeae35279f19",
+    "hopg-300-25-sampler.json": "77a31ba71c46be9d420749d7431a16a444a89cc9f04ed0b279c28da83271d1e0",
+    "hopg-300-25-sampler.log": "dbdace738442591ead3de0241a436814d461e2ba89dea6db4c5510035fe0d3d8",
+    "hopg-300-35-sampler.json": "926ed74fdba658516c4ef27a55e25dc5bec01df13d31a9b21bf3cc8ab29c33f5",
+    "hopg-300-35-sampler.log": "21305db338298c75381792fdbd393b8e09a2a722a2a6ef0abcbcb5fc8da53f2b",
+    "hopg-300-5-sampler.json": "684f9ee25d2d09f96695b293dc6aca837223774c2488933c5db8e50b156a0a59",
+    "hopg-300-5-sampler.log": "c95f57e005503e3e8dc2fabca80421241fe696b02ed2dc890dc635871517fc7f",
+    "hopg-300-5-warm.json": "e81c100a6b6ef4f0cc841bf02d3c0a64aae0a52d5e05b66ed9e13cc6d84a5494",
+    "hopg-300-5-warm.log": "12fa32aa1bf1e7b185e8013e19d9b3794a89b20ea7cd77295cfbf0d81d65bffc",
+    "hopg-300-55-sampler.json": "36f6097fc21a32192c2407b1c8b19c94f59595656bb2a1bd12c74c1e955c9f97",
+    "hopg-300-55-sampler.log": "471c4525c93aeaa44806a56cb3297e5b08fbad827624f7ff4ff38374f7c350f8",
+    "hopg-300-65-sampler.json": "cb472bc8d681f0491872e79f133db45d5e486b5d8dc70630652a8b96032cb13d",
+    "hopg-300-65-sampler.log": "7d13f1307d5dcb707b1ca06af4d8095fccb5099fd9e31b539842a12f1667988f",
+    "hopg-300-75-sampler.json": "243d1f87c793a9e7779f5f172baffa3f8478e60fea160d6ec2e3f39d51b469c5",
+    "hopg-300-75-sampler.log": "92243e68410cef249476e42967a6e75b82ae47d157995999a99aa01834effc7a",
+    "hopg-300-85-sampler.json": "3a76eb1c2f3f078817b42f17583e549c12494b702901885232ba74c205019dd6",
+    "hopg-300-85-sampler.log": "46d57270c9567f77a9e3f5b6b0b2315c7fffc41ef3c6e52775429ace34a088e4",
+    "job-log.raw": "62c7c4495e8f35d944d263c408547c116993dd24ebf263a8d870476566b33701"
+  }
+}

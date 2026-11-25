@@ -1,0 +1,24 @@
+{
+  "job_id": 15959,
+  "state": "COMPLETED",
+  "elapsed_s": 84,
+  "node": "king (cpu partition)",
+  "requested_cpus": 4,
+  "requested_memory_MiB": 8192,
+  "producer_revision": "4e8a9ae77",
+  "numerical_baseline": "main 51a928b25",
+  "numba_threads": 4,
+  "sync_code_digest_py_sbatch_sh": "24fe749e8a8b6f12edd521f5616f4f7f565205d9eb58182ba39c87ec0ea6550e",
+  "scheduler_step_max_rss_KiB": {
+    "batch": 1179140
+  },
+  "command": "sbatch --export=ALL,AUDIT1432_NUMBA_THREADS=4 --dependency=afterany:15958 --nodelist=<cpu-node> --job-name=ph4-1432-4e8a9ae77 checks/native_cpu_audit/rebaseline.sbatch photon-case",
+  "comparison": "job-15957/photon-case-t1.json: identical first-call array hashes",
+  "path_sanitization": "isolated checkout path replaced with <checkout>, home with <home>",
+  "files": {
+    "job-log.txt": "a887d619dd4d85be5368f9d1786773ce67640357c514927227d75f71c0461937",
+    "photon-case-t4.json": "5254a58aa8d3d7840387cd45980e2e02a0fe3a02513f926632ccbf44f61a1586",
+    "summary.json": "54f9d895db815ae043d551263ac7238071672e10c6b4300266af9538e8200a25"
+  },
+  "dropped_sha256": {}
+}

@@ -1,0 +1,112 @@
+pid 3861479's current affinity list: 0-31
+pid 3861479's new affinity list: 0-3
+Using CPython 3.14.6
+Creating virtual environment at: .venv
+   Building pyrite-mc @ file://<checkout>
+      Built pyrite-mc @ file://<checkout>
+Installed 270 packages in 347ms
+28670e5728d804ac2775a0ad417600aa25008809
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+{"case": "crystal300", "wall_s": [18.42391478223726, 0.21803673030808568, 0.2042521871626377]}
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+{"case": "crystal300-binmean", "wall_s": [3.100834630895406, 0.7623076541349292, 0.7506492882966995]}
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/montecarlo/spectrum/cxr/_batched.py:622: RuntimeWarning: invalid value encountered in divide
+  pol_A.append(chi / detuning * pxr_num + eUg_over_m * f_cbs)
+<checkout>/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:297: CoherentSamplingWarning: physical coherent power is unresolved: negative pair estimate; spectral_power: 238 finite negative of 400; first negative index 0; the cross-electron excess is weighted by (N-1)/(M-1) = 4.16e+05 (N = 6.242e+06 bunch electrons, M = 16 trials), so its sampling noise swamps a near-zero coherent excess; remove sampled offsets (transverse=PointSpot(), longitudinal=PointBunch()), lower bunch_charge_pc until N <= M, use a finite Slab footprint with a Gaussian LongitudinalDistribution so offsets are averaged analytically, or raise cxr_histories toward N; negative bins are returned unclipped
+  require_resolved_power(
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/montecarlo/spectrum/cxr/_batched.py:622: RuntimeWarning: invalid value encountered in divide
+  pol_A.append(chi / detuning * pxr_num + eUg_over_m * f_cbs)
+<checkout>/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:297: CoherentSamplingWarning: physical coherent power is unresolved: negative pair estimate; spectral_power: 238 finite negative of 400; first negative index 0; the cross-electron excess is weighted by (N-1)/(M-1) = 4.16e+05 (N = 6.242e+06 bunch electrons, M = 16 trials), so its sampling noise swamps a near-zero coherent excess; remove sampled offsets (transverse=PointSpot(), longitudinal=PointBunch()), lower bunch_charge_pc until N <= M, use a finite Slab footprint with a Gaussian LongitudinalDistribution so offsets are averaged analytically, or raise cxr_histories toward N; negative bins are returned unclipped
+  require_resolved_power(
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/montecarlo/spectrum/cxr/_batched.py:622: RuntimeWarning: invalid value encountered in divide
+  pol_A.append(chi / detuning * pxr_num + eUg_over_m * f_cbs)
+<checkout>/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:297: CoherentSamplingWarning: physical coherent power is unresolved: negative pair estimate; spectral_power: 238 finite negative of 400; first negative index 0; the cross-electron excess is weighted by (N-1)/(M-1) = 4.16e+05 (N = 6.242e+06 bunch electrons, M = 16 trials), so its sampling noise swamps a near-zero coherent excess; remove sampled offsets (transverse=PointSpot(), longitudinal=PointBunch()), lower bunch_charge_pc until N <= M, use a finite Slab footprint with a Gaussian LongitudinalDistribution so offsets are averaged analytically, or raise cxr_histories toward N; negative bins are returned unclipped
+  require_resolved_power(
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/montecarlo/spectrum/cxr/_batched.py:622: RuntimeWarning: invalid value encountered in divide
+  pol_A.append(chi / detuning * pxr_num + eUg_over_m * f_cbs)
+<checkout>/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:297: CoherentSamplingWarning: physical coherent power is unresolved: negative pair estimate; spectral_power: 238 finite negative of 400; first negative index 0; the cross-electron excess is weighted by (N-1)/(M-1) = 4.16e+05 (N = 6.242e+06 bunch electrons, M = 16 trials), so its sampling noise swamps a near-zero coherent excess; remove sampled offsets (transverse=PointSpot(), longitudinal=PointBunch()), lower bunch_charge_pc until N <= M, use a finite Slab footprint with a Gaussian LongitudinalDistribution so offsets are averaged analytically, or raise cxr_histories toward N; negative bins are returned unclipped
+  require_resolved_power(
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+{"case": "crystal300-coherent", "wall_s": [0.9966341387480497, 0.03817553399130702, 0.03626440931111574]}
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/montecarlo/spectrum/cxr/_batched.py:622: RuntimeWarning: invalid value encountered in divide
+  pol_A.append(chi / detuning * pxr_num + eUg_over_m * f_cbs)
+<checkout>/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:297: CoherentSamplingWarning: physical coherent power is unresolved: negative pair estimate; spectral_power: 11160 finite negative of 19001; first negative index 0; the cross-electron excess is weighted by (N-1)/(M-1) = 4.16e+05 (N = 6.242e+06 bunch electrons, M = 16 trials), so its sampling noise swamps a near-zero coherent excess; remove sampled offsets (transverse=PointSpot(), longitudinal=PointBunch()), lower bunch_charge_pc until N <= M, use a finite Slab footprint with a Gaussian LongitudinalDistribution so offsets are averaged analytically, or raise cxr_histories toward N; negative bins are returned unclipped
+  require_resolved_power(
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/montecarlo/spectrum/cxr/_batched.py:622: RuntimeWarning: invalid value encountered in divide
+  pol_A.append(chi / detuning * pxr_num + eUg_over_m * f_cbs)
+<checkout>/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:297: CoherentSamplingWarning: physical coherent power is unresolved: negative pair estimate; spectral_power: 11160 finite negative of 19001; first negative index 0; the cross-electron excess is weighted by (N-1)/(M-1) = 4.16e+05 (N = 6.242e+06 bunch electrons, M = 16 trials), so its sampling noise swamps a near-zero coherent excess; remove sampled offsets (transverse=PointSpot(), longitudinal=PointBunch()), lower bunch_charge_pc until N <= M, use a finite Slab footprint with a Gaussian LongitudinalDistribution so offsets are averaged analytically, or raise cxr_histories toward N; negative bins are returned unclipped
+  require_resolved_power(
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/montecarlo/spectrum/cxr/_batched.py:622: RuntimeWarning: invalid value encountered in divide
+  pol_A.append(chi / detuning * pxr_num + eUg_over_m * f_cbs)
+<checkout>/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:297: CoherentSamplingWarning: physical coherent power is unresolved: negative pair estimate; spectral_power: 11160 finite negative of 19001; first negative index 0; the cross-electron excess is weighted by (N-1)/(M-1) = 4.16e+05 (N = 6.242e+06 bunch electrons, M = 16 trials), so its sampling noise swamps a near-zero coherent excess; remove sampled offsets (transverse=PointSpot(), longitudinal=PointBunch()), lower bunch_charge_pc until N <= M, use a finite Slab footprint with a Gaussian LongitudinalDistribution so offsets are averaged analytically, or raise cxr_histories toward N; negative bins are returned unclipped
+  require_resolved_power(
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/montecarlo/spectrum/cxr/_batched.py:622: RuntimeWarning: invalid value encountered in divide
+  pol_A.append(chi / detuning * pxr_num + eUg_over_m * f_cbs)
+<checkout>/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:297: CoherentSamplingWarning: physical coherent power is unresolved: negative pair estimate; spectral_power: 11160 finite negative of 19001; first negative index 0; the cross-electron excess is weighted by (N-1)/(M-1) = 4.16e+05 (N = 6.242e+06 bunch electrons, M = 16 trials), so its sampling noise swamps a near-zero coherent excess; remove sampled offsets (transverse=PointSpot(), longitudinal=PointBunch()), lower bunch_charge_pc until N <= M, use a finite Slab footprint with a Gaussian LongitudinalDistribution so offsets are averaged analytically, or raise cxr_histories toward N; negative bins are returned unclipped
+  require_resolved_power(
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+{"case": "crystal300-coherent-hr", "wall_s": [2.2896633790805936, 0.6018584426492453, 0.5754063106141984]}

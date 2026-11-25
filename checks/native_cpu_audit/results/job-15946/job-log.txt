@@ -1,0 +1,12 @@
+pid 976772's current affinity list: 0-31
+pid 976772's new affinity list: 8-11
+Using CPython 3.14.6
+Creating virtual environment at: .venv
+   Building pyrite-mc @ file://<checkout>
+      Built pyrite-mc @ file://<checkout>
+warning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.
+         If the cache and target directories are on different filesystems, hardlinking may not be supported.
+         If this is intentional, set `export UV_LINK_MODE=copy` or use `--link-mode=copy` to suppress this warning.
+Installed 270 packages in 4m 31s
+c550bc701a47c3ce7477ec364f23c73762009f91
+{"cache2-base": [86.94311314914376, 85.46967303566635], "cache8-base": [41.3027750775218, 42.5881582275033], "cache8-A-basis": [24.18788331747055, 24.1439946629107], "cache8-B-basis-matmul": [10.6753333453089, 10.709164212457836]}

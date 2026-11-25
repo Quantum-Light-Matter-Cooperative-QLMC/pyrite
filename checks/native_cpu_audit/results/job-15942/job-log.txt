@@ -1,0 +1,26 @@
+pid 976458's current affinity list: 0-31
+pid 976458's new affinity list: 8-11
+4ae34de80c6bcd07dd98ed552e35debfacbd42c2
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+{"case": "crystal300", "wall_s": [16.72574288584292, 0.9598493194207549, 0.9376227343454957, 0.955617094412446]}

@@ -1,0 +1,25 @@
+{
+  "job_id": 15936,
+  "state": "COMPLETED",
+  "elapsed_s": 266,
+  "node": "king (CPU partition), co-tenant, affinity unbound (all 32 CPUs)",
+  "requested_cpus": 4,
+  "requested_memory_MiB": 8192,
+  "producer_revision": "c0a09186e (pre-rewrite SHA)",
+  "note": "unbound pilot; raw arm JSONs not retained (pre-#1281 and unbound affinity); numbers reduced here",
+  "files": {
+    "summary.json": "9aa9f28799ea858e1d53b5f8d6425fb31b43780e5ea30bb8a0f7976231e79801"
+  },
+  "dropped_sha256": {
+    "thin30-t1.json": "0b3054b569716943b2b8bb173e7db67ffed20062de74066ca9292fb1aecde313",
+    "thin100-t1.json": "a2e42643bc476fdb191e0fd40fbda76139b3ae513ae178dca959ac23004a5c2c",
+    "crystal300-t1.json": "3236f01ca1c4249e6c29a137864f9230759b8b980b25087e877fb6202c478ee9",
+    "thin30-t4.json": "ed257302968b3ed2791d5d6a0a29861050832eaeab4c752d0c46bb5f167481ba",
+    "crystal300-t4.json": "d8ddb91fcad86e4d336b85519c19b6c8361199711959b6cad2e5135318dbcb62",
+    "photon-t1.json": "18f554314166ff0b95d6fdeb7dc34748403f14120c8a11132a071105189b717a",
+    "pair-t1.json": "b836d1d3590bd10e4a1318939537a269c6429c81304a5694c0ca98bf9bf82fa7",
+    "axial-t1.json": "2f33c1c2d9fabe74becac1162e9d604bd4447e8f60ee03dc518a1be10ce9d87d",
+    "eedl-t1.json": "c78222794c0119134e254f937df3964d1c941b3cfe162a65bf427ad46d2cf3aa",
+    "bh-t1.json": "50c6b55c9bad53c48f6efdff2e60d4e6e0b5a825077d240ce0c3e0ff176ce6d6"
+  }
+}

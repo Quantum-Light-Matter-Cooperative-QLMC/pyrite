@@ -1,0 +1,31 @@
+{
+  "job_id": 15962,
+  "state": "CANCELLED by user after the hopg arms (hBN blocked on #1449; its warm-up arm was killed after 10 s, no hBN evidence)",
+  "elapsed_s": 166,
+  "node": "king (gpu partition, RTX 5080)",
+  "requested_cpus": 8,
+  "requested_memory_MiB": 30720,
+  "producer_revision": "63b4dff43",
+  "sync_code_digest_py": "dce87774157eb273ad02b149797b4685c1005c5fdc269fae639ef09e157cace1 (LC_ALL=C sorted sha256sum of src+checks *.py)",
+  "scheduler_step_max_rss_KiB": {
+    "batch": 6225776
+  },
+  "command": "sbatch -J gpuhost1432-63b4dff43 checks/native_cpu_audit/gpu_host.sbatch runs \"hopg:300:60 hbn:300:60\" 2400",
+  "path_sanitization": "isolated checkout path replaced with <checkout>, home with <home>, node hostname with king",
+  "tables_note": "box read legacy workspace tables (RuntimeWarning in arm logs)",
+  "files": {
+    "hopg-300-60-prof.json": "aa1eebf9b8731287fe4c1838e9d7bced60cfd05b546c36a5e0755ba4d692105b",
+    "hopg-300-60-s1.json": "20f610ccdbb7a9e97ce9473cbe5d61640c0412b05030677e87b70219635ddc9a",
+    "job-log.txt": "8cef720a53d34c5d46c23f9aac264b02ec5e5a3ff6af9b727bc32f30c487aee9",
+    "summary.json": "59a3fe6ca509ade40a8bc2eb2f60b38a99cc604d7dfe5464f63f42f3f93f9792"
+  },
+  "dropped_sha256": {
+    "gpu-info.txt": "c7bb8987be731ca1b44d691e3cd6e385f028403317fd2f70f9b738457b179112",
+    "hopg-300-60-prof.log": "fdef3f785b7b6f4c8a559fef43a2bda24cb3b862e660d90dd525be99fea4618a",
+    "hopg-300-60-s1.log": "fd7a016ff91a81cdba3b777c309f3f8c7e2b33ebede631c63260dd816a50a63d",
+    "hopg-300-60-s2.json": "1c919dce974e64a78165cbfd50bd015947e3d7a8af1df34b42fdb53e981acc34",
+    "hopg-300-60-s2.log": "0ecdaeb9a7d2e77eacb1f9c3df33315a9a184b0c73193bc10963ace66f86ef4e",
+    "hopg-300-60-warm.json": "bd68f28251cc5e107994d7d97fa42a4ba74bbc30e509736402e35615145baacb",
+    "hopg-300-60-warm.log": "a85868286e27e42dcacc251ff92092953536dac514c14098604b65dd4d00ebbe"
+  }
+}

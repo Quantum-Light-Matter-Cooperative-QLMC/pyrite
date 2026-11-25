@@ -1,0 +1,1616 @@
+{
+  "schema": "pyrite.native-cpu-audit.v1",
+  "case": "crystal300-coherent-hr",
+  "environment": {
+    "revision": "28670e5728d804ac2775a0ad417600aa25008809",
+    "python": "3.14.6",
+    "versions": {
+      "numpy": "2.5.5",
+      "numba": "0.68.1",
+      "scipy": "1.18.1",
+      "llvmlite": "0.50.0",
+      "dask": "2026.11.0",
+      "distributed": "2026.11.0",
+      "pyfftw": "0.15.1"
+    },
+    "machine": "x86_64",
+    "cpu": "AMD Ryzen 9 9950X3D 16-Core Processor",
+    "affinity": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "gil_enabled": true,
+    "numba_threads": 1,
+    "numba_threading_layer": "omp",
+    "backend": "<pyrite._backend.NumPyBackend object at 0x7ab8aa1963c0>",
+    "precision": "float64",
+    "native_pools": [
+      {
+        "user_api": "blas",
+        "internal_api": "openblas",
+        "num_threads": 1,
+        "prefix": "libscipy_openblas",
+        "filepath": "<checkout>/.venv/lib/python3.14/site-packages/scipy.libs/libscipy_openblas-5f890258.so",
+        "version": "0.3.31.dev",
+        "threading_layer": "pthreads",
+        "architecture": "SkylakeX"
+      },
+      {
+        "user_api": "blas",
+        "internal_api": "openblas",
+        "num_threads": 1,
+        "prefix": "libscipy_openblas",
+        "filepath": "<checkout>/.venv/lib/python3.14/site-packages/numpy.libs/libscipy_openblas64_-4b78795a.so",
+        "version": "0.3.34.237.2",
+        "threading_layer": "pthreads",
+        "architecture": "SkylakeX"
+      },
+      {
+        "user_api": "openmp",
+        "internal_api": "openmp",
+        "num_threads": 1,
+        "prefix": "libgomp",
+        "filepath": "/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0",
+        "version": null
+      }
+    ],
+    "threads": {
+      "NUMBA_NUM_THREADS": "1",
+      "NUMBA_THREADING_LAYER": null,
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "PYRITE_FFT_THREADS": null
+    },
+    "cache": {
+      "NUMBA_CACHE_DIR": "<checkout>/runs/cache-1",
+      "CUPY_CACHE_DIR": "<home>/.cache/pyrite/cupy"
+    },
+    "numpy_config": {
+      "Compilers": {
+        "c": {
+          "name": "gcc",
+          "linker": "ld.bfd",
+          "version": "14.2.1",
+          "commands": "cc"
+        },
+        "cython": {
+          "name": "cython",
+          "linker": "cython",
+          "version": "3.3.1",
+          "commands": "cython"
+        },
+        "c++": {
+          "name": "gcc",
+          "linker": "ld.bfd",
+          "version": "14.2.1",
+          "commands": "c++"
+        }
+      },
+      "Machine Information": {
+        "host": {
+          "cpu": "x86_64",
+          "family": "x86_64",
+          "endian": "little",
+          "system": "linux"
+        },
+        "build": {
+          "cpu": "x86_64",
+          "family": "x86_64",
+          "endian": "little",
+          "system": "linux"
+        }
+      },
+      "Build Dependencies": {
+        "blas": {
+          "name": "scipy-openblas",
+          "found": true,
+          "version": "0.3.34.237.2",
+          "detection method": "pkgconfig",
+          "include directory": "/opt/_internal/cpython-3.14.10/lib/python3.14/site-packages/scipy_openblas64/include",
+          "lib directory": "/opt/_internal/cpython-3.14.10/lib/python3.14/site-packages/scipy_openblas64/lib",
+          "openblas configuration": "OpenBLAS 0.3.34.237.2  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64",
+          "pc file directory": "/project/.openblas"
+        },
+        "lapack": {
+          "name": "scipy-openblas",
+          "found": true,
+          "version": "0.3.34.237.2",
+          "detection method": "pkgconfig",
+          "include directory": "/opt/_internal/cpython-3.14.10/lib/python3.14/site-packages/scipy_openblas64/include",
+          "lib directory": "/opt/_internal/cpython-3.14.10/lib/python3.14/site-packages/scipy_openblas64/lib",
+          "openblas configuration": "OpenBLAS 0.3.34.237.2  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64",
+          "pc file directory": "/project/.openblas"
+        }
+      },
+      "Python Information": {
+        "path": "/tmp/build-env-k5w_ds7z/bin/python",
+        "version": "3.14"
+      },
+      "SIMD Extensions": {
+        "baseline": [
+          "X86_V2"
+        ],
+        "found": [
+          "X86_V3",
+          "X86_V4",
+          "AVX512_ICL"
+        ],
+        "not found": [
+          "AVX512_SPR"
+        ]
+      }
+    },
+    "allocation": {
+      "SLURM_JOB_ID": "15958",
+      "SLURM_CPUS_PER_TASK": "4",
+      "SLURM_MEM_PER_NODE": "8192"
+    }
+  },
+  "parameters": {
+    "kind": "complete-case",
+    "case": {
+      "name": "hopg 1um pol=30 az=0",
+      "crystal": "hopg",
+      "composition": [
+        [
+          "C",
+          0.11363677327755675
+        ]
+      ],
+      "hkl_list": [
+        [
+          0,
+          0,
+          -2
+        ],
+        [
+          0,
+          0,
+          2
+        ],
+        [
+          0,
+          0,
+          -4
+        ],
+        [
+          0,
+          0,
+          4
+        ],
+        [
+          0,
+          0,
+          -6
+        ],
+        [
+          0,
+          0,
+          6
+        ],
+        [
+          0,
+          0,
+          -8
+        ],
+        [
+          0,
+          0,
+          8
+        ]
+      ],
+      "B_ang2": 1.3,
+      "E0_keV": 300.0,
+      "thickness_ang": 10000.0,
+      "crystal_width_mm": null,
+      "crystal_height_mm": null,
+      "beam_fwhm_mm": 1.0,
+      "E_grid": [
+        1000.0,
+        20001.0,
+        1.0
+      ],
+      "E_grid_line": [
+        1000.0,
+        20001.0,
+        1.0
+      ],
+      "E_grid_brem": [
+        1000.0,
+        300000.0,
+        1000.0
+      ],
+      "theta_obs_rad": 1.5707963267948966,
+      "tilt_deg": 30.0,
+      "tilt_azim_deg": 0.0,
+      "coherent_emission": true,
+      "straggling": true,
+      "energy_model": "midpoint",
+      "inelastic_model": "shell-soft-hard",
+      "inelastic_cutoff_eV": 50.0,
+      "elastic_model": "elsepa",
+      "bremsstrahlung_model": "bremslib",
+      "radiative_model": "bremslib-soft-hard",
+      "radiative_moment_model": "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+      "radiative_cutoff_eV": 1000.0,
+      "atomic_electron_deflection": "kawrakow",
+      "beam_uvw": null,
+      "surface_hkl": [
+        0,
+        0,
+        1
+      ],
+      "mosaic_fwhm_rad": null,
+      "mosaic_mc_fwhm_rad": null,
+      "mosaic_mc_nodes": 5,
+      "abs_layers": null,
+      "layer_radiators": null,
+      "brem_file": null,
+      "Ne": 16,
+      "Ne_brem": 16,
+      "seed": 1432,
+      "spec_chunk": null,
+      "brem_chunk": null,
+      "dtheta_obs_rad": 0.0351963661580141,
+      "domega_sr": 0.0012390399999999998,
+      "E_cut_lines_keV": 5.0,
+      "E_cut_brem_keV": 5.0
+    },
+    "table_markers": {
+      "918b1a9013e4c19c584e2cf4eb8b605f0063a7237b8b0d67749867a4c6804832": "c3f8eab1f03c1c66cfe0355b68f312e0ca450cbacaabe4f72eebecefe8d1e08d",
+      "ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb": "beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f",
+      "44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3": "3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2",
+      "cf22a43f41ff95443ee6cd4fddf33221c8648174185ab5c5730ab4e0044e290d": "96e2249059332f64229281bbf65eb61509b12ad96b69c39567527d394ddc9f91"
+    }
+  },
+  "setup_s": 1.1811073198914528,
+  "samples": [
+    {
+      "wall_s": 2.2896633790805936,
+      "process_cpu_s": 2.288742012,
+      "first": true,
+      "compile_s": 0.7283713459037244,
+      "compile_by_kernel": [
+        {
+          "kernel": "pyrite.montecarlo.spectrum.cxr._node_window._sincsq_window_reduce",
+          "compiles": 1,
+          "self_s": 0.7283713459037244
+        }
+      ],
+      "arrays": {
+        "E_grid": {
+          "shape": [
+            19001
+          ],
+          "dtype": "<f8",
+          "sha256": "ce4adbc86fef0a5520d3a0d6cf09c3476b30f0c5f526cc014f001b18941d5151"
+        },
+        "spec": {
+          "shape": [
+            19001
+          ],
+          "dtype": "<f8",
+          "sha256": "8c3f68fac8ea4c3fd4b4254b201c8848798e90c846447e4ed30c5407bd96d5c6"
+        },
+        "spec_characteristic": {
+          "shape": [
+            19001
+          ],
+          "dtype": "<f8",
+          "sha256": "a2c830078dbcc0c2d73dc34bff1342568fa0e2f331124d7e113b48b8d952b30c"
+        },
+        "brem": {
+          "shape": [
+            19001
+          ],
+          "dtype": "<f8",
+          "sha256": "2e62297a2e9cac53b0cb104b7dba8f7aab88088aa955f79e32a46d7f8f5b0c4f"
+        },
+        "E_grid_brem": {
+          "shape": [
+            299
+          ],
+          "dtype": "<f8",
+          "sha256": "17a64aca7fbbbfcaacc83a4a78c0112cd455beb0e003ec1ac8931239541efa19"
+        },
+        "brem_wide": {
+          "shape": [
+            299
+          ],
+          "dtype": "<f8",
+          "sha256": "4daaef679f0592c59a13b8257d1ac46fed1f47fef25a415109baeb0adbc42408"
+        },
+        "spec_coherent": {
+          "shape": [
+            19001
+          ],
+          "dtype": "<f8",
+          "sha256": "c84842504efe65591be2ad35298e1c839a1b79eb280bb00ba5d06591b49e4117"
+        }
+      },
+      "phases": {
+        "_t_spectrum": 1.7846881048753858,
+        "_t_transport": 0.5012767938897014
+      },
+      "n_segments": 55,
+      "fallbacks": {}
+    },
+    {
+      "wall_s": 0.6018584426492453,
+      "process_cpu_s": 0.6018685370000001,
+      "first": false,
+      "compile_s": 0,
+      "compile_by_kernel": [],
+      "arrays": {
+        "E_grid": {
+          "shape": [
+            19001
+          ],
+          "dtype": "<f8",
+          "sha256": "ce4adbc86fef0a5520d3a0d6cf09c3476b30f0c5f526cc014f001b18941d5151"
+        },
+        "spec": {
+          "shape": [
+            19001
+          ],
+          "dtype": "<f8",
+          "sha256": "8c3f68fac8ea4c3fd4b4254b201c8848798e90c846447e4ed30c5407bd96d5c6"
+        },
+        "spec_characteristic": {
+          "shape": [
+            19001
+          ],
+          "dtype": "<f8",
+          "sha256": "a2c830078dbcc0c2d73dc34bff1342568fa0e2f331124d7e113b48b8d952b30c"
+        },
+        "brem": {
+          "shape": [
+            19001
+          ],
+          "dtype": "<f8",
+          "sha256": "2e62297a2e9cac53b0cb104b7dba8f7aab88088aa955f79e32a46d7f8f5b0c4f"
+        },
+        "E_grid_brem": {
+          "shape": [
+            299
+          ],
+          "dtype": "<f8",
+          "sha256": "17a64aca7fbbbfcaacc83a4a78c0112cd455beb0e003ec1ac8931239541efa19"
+        },
+        "brem_wide": {
+          "shape": [
+            299
+          ],
+          "dtype": "<f8",
+          "sha256": "4daaef679f0592c59a13b8257d1ac46fed1f47fef25a415109baeb0adbc42408"
+        },
+        "spec_coherent": {
+          "shape": [
+            19001
+          ],
+          "dtype": "<f8",
+          "sha256": "c84842504efe65591be2ad35298e1c839a1b79eb280bb00ba5d06591b49e4117"
+        }
+      },
+      "phases": {
+        "_t_spectrum": 0.5845597730949521,
+        "_t_transport": 0.016609364189207554
+      },
+      "n_segments": 55,
+      "fallbacks": {}
+    },
+    {
+      "wall_s": 0.5754063106141984,
+      "process_cpu_s": 0.5753905050000006,
+      "first": false,
+      "compile_s": 0,
+      "compile_by_kernel": [],
+      "arrays": {
+        "E_grid": {
+          "shape": [
+            19001
+          ],
+          "dtype": "<f8",
+          "sha256": "ce4adbc86fef0a5520d3a0d6cf09c3476b30f0c5f526cc014f001b18941d5151"
+        },
+        "spec": {
+          "shape": [
+            19001
+          ],
+          "dtype": "<f8",
+          "sha256": "8c3f68fac8ea4c3fd4b4254b201c8848798e90c846447e4ed30c5407bd96d5c6"
+        },
+        "spec_characteristic": {
+          "shape": [
+            19001
+          ],
+          "dtype": "<f8",
+          "sha256": "a2c830078dbcc0c2d73dc34bff1342568fa0e2f331124d7e113b48b8d952b30c"
+        },
+        "brem": {
+          "shape": [
+            19001
+          ],
+          "dtype": "<f8",
+          "sha256": "2e62297a2e9cac53b0cb104b7dba8f7aab88088aa955f79e32a46d7f8f5b0c4f"
+        },
+        "E_grid_brem": {
+          "shape": [
+            299
+          ],
+          "dtype": "<f8",
+          "sha256": "17a64aca7fbbbfcaacc83a4a78c0112cd455beb0e003ec1ac8931239541efa19"
+        },
+        "brem_wide": {
+          "shape": [
+            299
+          ],
+          "dtype": "<f8",
+          "sha256": "4daaef679f0592c59a13b8257d1ac46fed1f47fef25a415109baeb0adbc42408"
+        },
+        "spec_coherent": {
+          "shape": [
+            19001
+          ],
+          "dtype": "<f8",
+          "sha256": "c84842504efe65591be2ad35298e1c839a1b79eb280bb00ba5d06591b49e4117"
+        }
+      },
+      "phases": {
+        "_t_spectrum": 0.558635903056711,
+        "_t_transport": 0.01607828075066209
+      },
+      "n_segments": 55,
+      "fallbacks": {}
+    }
+  ],
+  "profile_wall_s": 0.5847471761517227,
+  "profile": [
+    {
+      "file": "native_cpu_audit.py",
+      "line": 240,
+      "function": "run",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 3.279e-05,
+      "cumulative_s": 0.584684756
+    },
+    {
+      "file": "src/pyrite/montecarlo/realization.py",
+      "line": 185,
+      "function": "call",
+      "calls": 3,
+      "primitive_calls": 1,
+      "exclusive_s": 4.6490000000000004e-05,
+      "cumulative_s": 0.5842939530000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/case_driver.py",
+      "line": 94,
+      "function": "run_case",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 9.03e-06,
+      "cumulative_s": 0.5842348430000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/recovery.py",
+      "line": 331,
+      "function": "_spectrum_with_recovery",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.018e-05,
+      "cumulative_s": 0.560718472
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/case_driver.py",
+      "line": 895,
+      "function": "_spectrum_case",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.8650000000000002e-05,
+      "cumulative_s": 0.560682612
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/bandwidth_fallback.py",
+      "line": 172,
+      "function": "spectrum_with_bandwidth_fallback",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.7600000000000003e-06,
+      "cumulative_s": 0.5604778100000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/case_driver.py",
+      "line": 910,
+      "function": "<lambda>",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.0340000000000002e-05,
+      "cumulative_s": 0.56047395
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/case_driver.py",
+      "line": 1025,
+      "function": "_spectrum_case_impl",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 9.862300000000001e-05,
+      "cumulative_s": 0.56045361
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/emission_adapters.py",
+      "line": 89,
+      "function": "evaluate",
+      "calls": 5,
+      "primitive_calls": 4,
+      "exclusive_s": 2.3760000000000003e-05,
+      "cumulative_s": 0.5582783920000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/case_driver.py",
+      "line": 927,
+      "function": "_finished_or_run",
+      "calls": 4,
+      "primitive_calls": 4,
+      "exclusive_s": 1.794e-05,
+      "cumulative_s": 0.552747856
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/case_driver.py",
+      "line": 1108,
+      "function": "<lambda>",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 3.920000000000001e-06,
+      "cumulative_s": 0.5506029490000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/case_driver.py",
+      "line": 936,
+      "function": "_line_phase",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.647e-05,
+      "cumulative_s": 0.550599029
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/emission_adapters.py",
+      "line": 275,
+      "function": "_cxr",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 2.659e-05,
+      "cumulative_s": 0.5505211990000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/case_driver.py",
+      "line": 519,
+      "function": "_cxr_for_segments",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 3.408e-05,
+      "cumulative_s": 0.550486869
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/case_driver.py",
+      "line": 651,
+      "function": "_cxr_for_segments_once",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 3.633e-05,
+      "cumulative_s": 0.550433088
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_spectrum.py",
+      "line": 24,
+      "function": "mc_cxr_spectrum",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 5.1781000000000004e-05,
+      "cumulative_s": 0.5503376680000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_spectrum.py",
+      "line": 361,
+      "function": "_mc_spectrum",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 6.409100000000001e-05,
+      "cumulative_s": 0.550271586
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_batched.py",
+      "line": 930,
+      "function": "_accumulate_batched",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 0.001005739,
+      "cumulative_s": 0.5309481890000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_batched_finalize.py",
+      "line": 23,
+      "function": "_batched_coherent_finalize",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 0.09373332300000001,
+      "cumulative_s": 0.49037809000000004
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_per_hkl.py",
+      "line": 457,
+      "function": "_coherent_electron_grouped_row",
+      "calls": 4,
+      "primitive_calls": 4,
+      "exclusive_s": 0.097098604,
+      "cumulative_s": 0.269083852
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_formation.py",
+      "line": 123,
+      "function": "formation_profile",
+      "calls": 8,
+      "primitive_calls": 8,
+      "exclusive_s": 0.000147922,
+      "cumulative_s": 0.241028286
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_formation.py",
+      "line": 86,
+      "function": "formation_factor",
+      "calls": 8,
+      "primitive_calls": 8,
+      "exclusive_s": 0.23186746200000002,
+      "cumulative_s": 0.23189942200000002
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_per_hkl.py",
+      "line": 99,
+      "function": "_formation_SP",
+      "calls": 4,
+      "primitive_calls": 4,
+      "exclusive_s": 6.2791e-05,
+      "cumulative_s": 0.12297737800000001
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'reduceat' of 'numpy.ufunc' objects>",
+      "calls": 8,
+      "primitive_calls": 8,
+      "exclusive_s": 0.04801483,
+      "cumulative_s": 0.04801483
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_batched.py",
+      "line": 825,
+      "function": "_batched_incoherent_block",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 3.9951000000000004e-05,
+      "cumulative_s": 0.037514184
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_node_window.py",
+      "line": 496,
+      "function": "accumulate_sincsq_windowed",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 0.036761218000000005,
+      "cumulative_s": 0.037252292
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/case_driver.py",
+      "line": 218,
+      "function": "_transport_case",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 3.3581e-05,
+      "cumulative_s": 0.023481661
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/recovery.py",
+      "line": 48,
+      "function": "transport_with_recovery",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.1241000000000001e-05,
+      "cumulative_s": 0.019787391
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/case_driver.py",
+      "line": 332,
+      "function": "_transport",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.7700000000000002e-06,
+      "cumulative_s": 0.01977107
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/step_budget.py",
+      "line": 32,
+      "function": "retry_step_budget",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 4.56e-06,
+      "cumulative_s": 0.0197693
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/case_driver.py",
+      "line": 350,
+      "function": "_simulate",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.2570000000000002e-05,
+      "cumulative_s": 0.01975899
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_node_window.py",
+      "line": 123,
+      "function": "apply",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.173e-05,
+      "cumulative_s": 0.015858199
+    },
+    {
+      "file": "src/pyrite/xsgen/store.py",
+      "line": 439,
+      "function": "arrays",
+      "calls": 4,
+      "primitive_calls": 4,
+      "exclusive_s": 0.00011790100000000001,
+      "cumulative_s": 0.01242082
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_node_window.py",
+      "line": 136,
+      "function": "_kernel_spectra",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 0.00864141,
+      "cumulative_s": 0.011738986
+    },
+    {
+      "file": "_npyio_impl.py",
+      "line": 239,
+      "function": "__getitem__",
+      "calls": 64,
+      "primitive_calls": 64,
+      "exclusive_s": 0.000165171,
+      "cumulative_s": 0.011302941
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/case_tables.py",
+      "line": 139,
+      "function": "_case_elastic_kwargs",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.4190000000000001e-05,
+      "cumulative_s": 0.010584326
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/case_tables.py",
+      "line": 130,
+      "function": "_case_elastic_entries",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.093e-05,
+      "cumulative_s": 0.010560876
+    },
+    {
+      "file": "src/pyrite/xsgen/elsepa/catalog.py",
+      "line": 228,
+      "function": "resolve_layer_tables",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.907e-05,
+      "cumulative_s": 0.010545356
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_formation.py",
+      "line": 111,
+      "function": "formation_argument",
+      "calls": 8,
+      "primitive_calls": 8,
+      "exclusive_s": 0.008980942,
+      "cumulative_s": 0.008980942
+    },
+    {
+      "file": "_format_impl.py",
+      "line": 780,
+      "function": "read_array",
+      "calls": 64,
+      "primitive_calls": 64,
+      "exclusive_s": 0.000431974,
+      "cumulative_s": 0.008507384
+    },
+    {
+      "file": "src/pyrite/montecarlo/transport/api.py",
+      "line": 19,
+      "function": "_simulate_trajectories",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.02e-05,
+      "cumulative_s": 0.008485238
+    },
+    {
+      "file": "src/pyrite/montecarlo/transport/host_pass.py",
+      "line": 234,
+      "function": "run_transport_pass",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.463e-05,
+      "cumulative_s": 0.008449168
+    },
+    {
+      "file": "src/pyrite/montecarlo/transport/host_pass.py",
+      "line": 244,
+      "function": "_run_validated_pass",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 8.455100000000001e-05,
+      "cumulative_s": 0.008364217
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/electron_blocks.py",
+      "line": 145,
+      "function": "score_in_electron_blocks",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 6.5000000000000004e-06,
+      "cumulative_s": 0.0076313330000000006
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'astype' of 'numpy.ndarray' objects>",
+      "calls": 41,
+      "primitive_calls": 41,
+      "exclusive_s": 0.007551811,
+      "cumulative_s": 0.007551811
+    },
+    {
+      "file": "__init__.py",
+      "line": 1080,
+      "function": "read",
+      "calls": 325,
+      "primitive_calls": 325,
+      "exclusive_s": 0.000308614,
+      "cumulative_s": 0.006919746
+    },
+    {
+      "file": "_backend.py",
+      "line": 19,
+      "function": "__ua_function__",
+      "calls": 7,
+      "primitive_calls": 7,
+      "exclusive_s": 1.541e-05,
+      "cumulative_s": 0.006806367000000001
+    },
+    {
+      "file": "_basic_backend.py",
+      "line": 27,
+      "function": "_execute_1D",
+      "calls": 7,
+      "primitive_calls": 7,
+      "exclusive_s": 2.9371e-05,
+      "cumulative_s": 0.006778567
+    },
+    {
+      "file": "__init__.py",
+      "line": 1162,
+      "function": "_read1",
+      "calls": 103,
+      "primitive_calls": 103,
+      "exclusive_s": 0.00028944,
+      "cumulative_s": 0.006562592000000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/emission_adapters.py",
+      "line": 332,
+      "function": "_continuum",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 9.3e-06,
+      "cumulative_s": 0.006395072000000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/emission.py",
+      "line": 15,
+      "function": "_brem_wide_from_segments",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.06e-05,
+      "cumulative_s": 0.006383622
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/emission.py",
+      "line": 77,
+      "function": "score",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.16e-06,
+      "cumulative_s": 0.006348492000000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/emission_adapters.py",
+      "line": 384,
+      "function": "_coupled",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.292e-05,
+      "cumulative_s": 0.006329272
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/emission.py",
+      "line": 168,
+      "function": "_coupled_brem_from_segments",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.799e-05,
+      "cumulative_s": 0.006313372
+    },
+    {
+      "file": "_format_impl.py",
+      "line": 1000,
+      "function": "_read_bytes",
+      "calls": 261,
+      "primitive_calls": 261,
+      "exclusive_s": 0.000198623,
+      "cumulative_s": 0.00595515
+    },
+    {
+      "file": "_basic_backend.py",
+      "line": 89,
+      "function": "rfft",
+      "calls": 6,
+      "primitive_calls": 6,
+      "exclusive_s": 7.73e-06,
+      "cumulative_s": 0.005860899
+    },
+    {
+      "file": "basic.py",
+      "line": 40,
+      "function": "r2c",
+      "calls": 6,
+      "primitive_calls": 6,
+      "exclusive_s": 3.0440000000000003e-05,
+      "cumulative_s": 0.005824738
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method scipy.fft._duccfft.pyduccfft.r2c>",
+      "calls": 6,
+      "primitive_calls": 6,
+      "exclusive_s": 0.005536724000000001,
+      "cumulative_s": 0.005536724000000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/brem_events.py",
+      "line": 109,
+      "function": "mc_coupled_brem_spectrum",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.8180000000000002e-05,
+      "cumulative_s": 0.005338844000000001
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'decompress' of 'zlib.Decompress' objects>",
+      "calls": 103,
+      "primitive_calls": 103,
+      "exclusive_s": 0.005259096,
+      "cumulative_s": 0.005259096
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/brem.py",
+      "line": 834,
+      "function": "mc_brem_spectrum",
+      "calls": 2,
+      "primitive_calls": 1,
+      "exclusive_s": 0.000146591,
+      "cumulative_s": 0.005220193000000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/brem_blocks.py",
+      "line": 36,
+      "function": "blocked_brem_spectrum",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.2891e-05,
+      "cumulative_s": 0.005205393
+    },
+    {
+      "file": "src/pyrite/montecarlo/transport/host_pass.py",
+      "line": 462,
+      "function": "_sample_entry",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 4.0861e-05,
+      "cumulative_s": 0.004605696
+    },
+    {
+      "file": "src/pyrite/montecarlo/transport/host_pass.py",
+      "line": 611,
+      "function": "_shell_tables",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.6190000000000003e-05,
+      "cumulative_s": 0.004099922000000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/transport/shell_transport.py",
+      "line": 196,
+      "function": "build_shell_inelastic_tables",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 0.00019039100000000001,
+      "cumulative_s": 0.004074652000000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_node_window.py",
+      "line": 147,
+      "function": "_convolve",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 0.000235431,
+      "cumulative_s": 0.004059503
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/brem_bremslib.py",
+      "line": 350,
+      "function": "stage_bremslib_elements",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.2801000000000002e-05,
+      "cumulative_s": 0.003898022
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/brem_bremslib.py",
+      "line": 74,
+      "function": "stage_bremslib_table",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 3.1910000000000004e-05,
+      "cumulative_s": 0.0038496410000000004
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method numpy.ascontiguousarray>",
+      "calls": 73,
+      "primitive_calls": 73,
+      "exclusive_s": 0.003823232,
+      "cumulative_s": 0.003823232
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/brem_bremslib.py",
+      "line": 86,
+      "function": "staged",
+      "calls": 7,
+      "primitive_calls": 7,
+      "exclusive_s": 5.8700000000000005e-06,
+      "cumulative_s": 0.0038021310000000003
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/case_tables.py",
+      "line": 118,
+      "function": "_case_stopping_tables",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.2731e-05,
+      "cumulative_s": 0.0033263760000000002
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_setup.py",
+      "line": 791,
+      "function": "_prepare_spectrum",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 0.000188681,
+      "cumulative_s": 0.003011653
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/case_tables.py",
+      "line": 165,
+      "function": "_case_bremslib_tables",
+      "calls": 3,
+      "primitive_calls": 3,
+      "exclusive_s": 3.109e-05,
+      "cumulative_s": 0.0024089800000000002
+    },
+    {
+      "file": "src/pyrite/xsgen/bremslib/tables.py",
+      "line": 61,
+      "function": "load_bremsstrahlung_tables",
+      "calls": 3,
+      "primitive_calls": 3,
+      "exclusive_s": 2.4650000000000003e-05,
+      "cumulative_s": 0.002360959
+    },
+    {
+      "file": "src/pyrite/xsgen/bremslib/tables.py",
+      "line": 45,
+      "function": "resolve_element_table",
+      "calls": 3,
+      "primitive_calls": 3,
+      "exclusive_s": 1.7500000000000002e-05,
+      "cumulative_s": 0.002332748
+    },
+    {
+      "file": "src/pyrite/xsgen/store.py",
+      "line": 476,
+      "function": "resolve",
+      "calls": 7,
+      "primitive_calls": 7,
+      "exclusive_s": 5.5240000000000006e-05,
+      "cumulative_s": 0.0022556570000000003
+    },
+    {
+      "file": "_format_impl.py",
+      "line": 621,
+      "function": "_read_array_header",
+      "calls": 64,
+      "primitive_calls": 64,
+      "exclusive_s": 0.00031004400000000004,
+      "cumulative_s": 0.001943527
+    },
+    {
+      "file": "src/pyrite/montecarlo/transport/host_pass.py",
+      "line": 447,
+      "function": "_layer_stack",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.4390000000000001e-05,
+      "cumulative_s": 0.0017382040000000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/transport/layer_tables.py",
+      "line": 24,
+      "function": "build_layer_tables",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 4.4781000000000004e-05,
+      "cumulative_s": 0.001666254
+    },
+    {
+      "file": "src/pyrite/xsgen/sbethe/catalog.py",
+      "line": 116,
+      "function": "resolve_composition_table",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 1.7290000000000002e-05,
+      "cumulative_s": 0.0016132420000000002
+    },
+    {
+      "file": "src/pyrite/xsgen/sources.py",
+      "line": 427,
+      "function": "code_version",
+      "calls": 4,
+      "primitive_calls": 4,
+      "exclusive_s": 1.2591e-05,
+      "cumulative_s": 0.001583411
+    },
+    {
+      "file": "src/pyrite/xsgen/bremslib/release.py",
+      "line": 317,
+      "function": "catalogue_table",
+      "calls": 3,
+      "primitive_calls": 3,
+      "exclusive_s": 1.2280000000000001e-05,
+      "cumulative_s": 0.001534682
+    },
+    {
+      "file": "src/pyrite/montecarlo/transport/scattering.py",
+      "line": 398,
+      "function": "pack_elsepa_tables",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 3.0571e-05,
+      "cumulative_s": 0.001512583
+    },
+    {
+      "file": "fromnumeric.py",
+      "line": 48,
+      "function": "_wrapfunc",
+      "calls": 137,
+      "primitive_calls": 137,
+      "exclusive_s": 0.000104431,
+      "cumulative_s": 0.001489391
+    },
+    {
+      "file": "src/pyrite/xsgen/store.py",
+      "line": 388,
+      "function": "search_dirs",
+      "calls": 7,
+      "primitive_calls": 7,
+      "exclusive_s": 5.1580000000000004e-05,
+      "cumulative_s": 0.0014501820000000002
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/case_driver.py",
+      "line": 1129,
+      "function": "<lambda>",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.4100000000000002e-06,
+      "cumulative_s": 0.001391372
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/case_driver.py",
+      "line": 1010,
+      "function": "_characteristic_phase",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.2280000000000001e-05,
+      "cumulative_s": 0.001388962
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/emission_adapters.py",
+      "line": 316,
+      "function": "_characteristic",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.517e-05,
+      "cumulative_s": 0.001341601
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/emission.py",
+      "line": 320,
+      "function": "_characteristic_from_segments",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.059e-05,
+      "cumulative_s": 0.0013210910000000001
+    },
+    {
+      "file": "ast.py",
+      "line": 50,
+      "function": "literal_eval",
+      "calls": 64,
+      "primitive_calls": 64,
+      "exclusive_s": 0.000128291,
+      "cumulative_s": 0.00130908
+    },
+    {
+      "file": "src/pyrite/montecarlo/runner/emission.py",
+      "line": 357,
+      "function": "score",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.253e-05,
+      "cumulative_s": 0.0012740310000000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/characteristic.py",
+      "line": 969,
+      "function": "mc_characteristic_spectrum",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 6.4862e-05,
+      "cumulative_s": 0.0012591710000000001
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'reduce' of 'numpy.ufunc' objects>",
+      "calls": 242,
+      "primitive_calls": 242,
+      "exclusive_s": 0.001236628,
+      "cumulative_s": 0.001236628
+    },
+    {
+      "file": "src/pyrite/xsgen/bremslib/release.py",
+      "line": 207,
+      "function": "load_release_index",
+      "calls": 6,
+      "primitive_calls": 6,
+      "exclusive_s": 3.883e-05,
+      "cumulative_s": 0.001157999
+    },
+    {
+      "file": "src/pyrite/montecarlo/transport/scattering.py",
+      "line": 366,
+      "function": "elsepa_guide_table",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 0.00015678100000000002,
+      "cumulative_s": 0.0011467600000000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/transport/shell_rates.py",
+      "line": 271,
+      "function": "catalog_shell_oscillators",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 2.1470000000000003e-05,
+      "cumulative_s": 0.001138549
+    },
+    {
+      "file": "src/pyrite/montecarlo/transport/host_pass.py",
+      "line": 721,
+      "function": "_dispatch_core",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 5.150000000000001e-06,
+      "cumulative_s": 0.0011266800000000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/transport/host_pass.py",
+      "line": 795,
+      "function": "_run_per_electron",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.6791e-05,
+      "cumulative_s": 0.0011215300000000001
+    },
+    {
+      "file": "__init__.py",
+      "line": 1693,
+      "function": "open",
+      "calls": 64,
+      "primitive_calls": 64,
+      "exclusive_s": 0.000269921,
+      "cumulative_s": 0.001095016
+    },
+    {
+      "file": "src/pyrite/montecarlo/transport/batching.py",
+      "line": 785,
+      "function": "_run_per_electron_transport",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.8720000000000003e-05,
+      "cumulative_s": 0.001044578
+    }
+  ],
+  "dispatchers": {
+    "cache_stats": [
+      {
+        "kernel": "pyrite.montecarlo.spectrum._brem_cpu_fused._spectrum_tile",
+        "cached": true,
+        "signatures": 1,
+        "hits": 1,
+        "misses": 0
+      },
+      {
+        "kernel": "pyrite.montecarlo.spectrum.cxr._node_window._sincsq_window_reduce",
+        "cached": true,
+        "signatures": 1,
+        "hits": 0,
+        "misses": 1
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.core_adapters.adapt_cpu_transport_core.<locals>.core",
+        "cached": true,
+        "signatures": 1,
+        "hits": 1,
+        "misses": 0
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.hard_inelastic._hard_stream_key_scalar",
+        "cached": true,
+        "signatures": 1,
+        "hits": 1,
+        "misses": 0
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.kinematics._splitmix64",
+        "cached": true,
+        "signatures": 1,
+        "hits": 1,
+        "misses": 0
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.kinematics._stream_key_scalar",
+        "cached": true,
+        "signatures": 1,
+        "hits": 1,
+        "misses": 0
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.kinematics._stream_uniform_scalar",
+        "cached": true,
+        "signatures": 1,
+        "hits": 1,
+        "misses": 0
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.radiative_moments._exact_layer",
+        "cached": true,
+        "signatures": 2,
+        "hits": 2,
+        "misses": 0
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.straggling._urban_flight_key_scalar",
+        "cached": true,
+        "signatures": 1,
+        "hits": 1,
+        "misses": 0
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.straggling._urban_stream_key_scalar",
+        "cached": true,
+        "signatures": 1,
+        "hits": 1,
+        "misses": 0
+      }
+    ],
+    "active": [
+      {
+        "kernel": "pyrite.montecarlo.spectrum._brem_cpu_fused._spectrum_tile",
+        "signatures": [
+          "(Tuple((Array(float64, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True))), Array(float64, 2, 'C', False, aligned=True), int64, int64, Array(float64, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Tuple((Array(float64, 2, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), float64)), Array(float64, 1, 'C', False, aligned=True))"
+        ],
+        "nopython_signatures": [
+          "(Tuple((Array(float64, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True))), Array(float64, 2, 'C', False, aligned=True), int64, int64, Array(float64, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Tuple((Array(float64, 2, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), float64)), Array(float64, 1, 'C', False, aligned=True)) -> none"
+        ],
+        "targetoptions": {
+          "parallel": true,
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          false
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.spectrum.cxr._node_window._sincsq_window_reduce",
+        "signatures": [
+          "(Array(float64, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(int64, 1, 'C', False, aligned=True), Array(int64, 1, 'C', False, aligned=True), Array(int64, 1, 'C', False, aligned=True), Array(int64, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), float64, Array(int64, 1, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True))"
+        ],
+        "nopython_signatures": [
+          "(Array(float64, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(int64, 1, 'C', False, aligned=True), Array(int64, 1, 'C', False, aligned=True), Array(int64, 1, 'C', False, aligned=True), Array(int64, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), float64, Array(int64, 1, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True)) -> none"
+        ],
+        "targetoptions": {
+          "parallel": true,
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          true
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.core_adapters.adapt_cpu_transport_core.<locals>.core",
+        "signatures": [
+          "(Tuple((int64, int64, int64, Array(uint64, 1, 'C', False, aligned=True))), Tuple((int64, int64, int64, int64, float64)), Tuple((int64, Array(float64, 1, 'C', False, aligned=True), float64, bool, float64, float64, Array(int32, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True))), Tuple((Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), bool, Array(int32, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True))), Tuple((Array(bool, 2, 'C', False, aligned=True), Array(int64, 2, 'C', False, aligned=True), Array(int64, 2, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(bool, 2, 'C', False, aligned=True), Array(int64, 2, 'C', False, aligned=True), Array(int64, 2, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(int32, 2, 'C', False, aligned=True))), Tuple((Array(bool, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True))), Tuple((Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(int64, 1, 'C', False, aligned=True), Array(int16, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(int64, 1, 'C', False, aligned=True), Array(int64, 1, 'C', False, aligned=True), Array(int8, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(int16, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(int16, 1, 'C', False, aligned=True))), Tuple((Array(int64, 1, 'C', False, aligned=True), Array(int8, 1, 'C', False, aligned=True))), Tuple((bool, Array(float64, 1, 'C', False, aligned=True))), Tuple((Array(uint64, 1, 'C', False, aligned=True), float64, Array(int32, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(int32, 1, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(int64, 2, 'C', False, aligned=True), Array(int16, 2, 'C', False, aligned=True))), Tuple((Array(uint64, 1, 'C', False, aligned=True), float64, Array(int32, 1, 'C', False, aligned=True), Array(int32, 2, 'C', False, aligned=True), Array(int32, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 4, 'C', False, aligned=True), Array(float64, 1, 'C', True, aligned=True))))"
+        ],
+        "nopython_signatures": [
+          "(Tuple((int64, int64, int64, Array(uint64, 1, 'C', False, aligned=True))), Tuple((int64, int64, int64, int64, float64)), Tuple((int64, Array(float64, 1, 'C', False, aligned=True), float64, bool, float64, float64, Array(int32, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True))), Tuple((Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), bool, Array(int32, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True))), Tuple((Array(bool, 2, 'C', False, aligned=True), Array(int64, 2, 'C', False, aligned=True), Array(int64, 2, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(bool, 2, 'C', False, aligned=True), Array(int64, 2, 'C', False, aligned=True), Array(int64, 2, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(int32, 2, 'C', False, aligned=True))), Tuple((Array(bool, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True))), Tuple((Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(int64, 1, 'C', False, aligned=True), Array(int16, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(int64, 1, 'C', False, aligned=True), Array(int64, 1, 'C', False, aligned=True), Array(int8, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(int16, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(int16, 1, 'C', False, aligned=True))), Tuple((Array(int64, 1, 'C', False, aligned=True), Array(int8, 1, 'C', False, aligned=True))), Tuple((bool, Array(float64, 1, 'C', False, aligned=True))), Tuple((Array(uint64, 1, 'C', False, aligned=True), float64, Array(int32, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(int32, 1, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(int64, 2, 'C', False, aligned=True), Array(int16, 2, 'C', False, aligned=True))), Tuple((Array(uint64, 1, 'C', False, aligned=True), float64, Array(int32, 1, 'C', False, aligned=True), Array(int32, 2, 'C', False, aligned=True), Array(int32, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 4, 'C', False, aligned=True), Array(float64, 1, 'C', True, aligned=True)))) -> none"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          false
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.hard_inelastic._hard_stream_key_scalar",
+        "signatures": [
+          "(uint64,)"
+        ],
+        "nopython_signatures": [
+          "(uint64,) -> uint64"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          false
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.kinematics._splitmix64",
+        "signatures": [
+          "(uint64,)"
+        ],
+        "nopython_signatures": [
+          "(uint64,) -> uint64"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          false
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.kinematics._stream_key_scalar",
+        "signatures": [
+          "(int64, int64)"
+        ],
+        "nopython_signatures": [
+          "(int64, int64) -> uint64"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          false
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.kinematics._stream_uniform_scalar",
+        "signatures": [
+          "(uint64, uint64)"
+        ],
+        "nopython_signatures": [
+          "(uint64, uint64) -> float64"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          false
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.radiative_moments._exact_layer",
+        "signatures": [
+          "(Tuple((Array(int32, 1, 'C', False, aligned=True), Array(int32, 2, 'C', False, aligned=True), Array(int32, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 4, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True))), int64, Array(float64, 1, 'C', False, aligned=True), float64, omitted(default=False))",
+          "(Tuple((Array(int32, 1, 'C', False, aligned=True), Array(int32, 2, 'C', False, aligned=True), Array(int32, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 4, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True))), int64, Array(float64, 1, 'C', False, aligned=True), float64, bool)"
+        ],
+        "nopython_signatures": [
+          "(Tuple((Array(int32, 1, 'C', False, aligned=True), Array(int32, 2, 'C', False, aligned=True), Array(int32, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 4, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True))), int64, Array(float64, 1, 'C', False, aligned=True), float64, omitted(default=False)) -> array(float64, 2d, C)",
+          "(Tuple((Array(int32, 1, 'C', False, aligned=True), Array(int32, 2, 'C', False, aligned=True), Array(int32, 2, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 3, 'C', False, aligned=True), Array(float64, 4, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True))), int64, Array(float64, 1, 'C', False, aligned=True), float64, bool) -> array(float64, 2d, C)"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          false,
+          false
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.straggling._urban_flight_key_scalar",
+        "signatures": [
+          "(uint64, int64, int64)"
+        ],
+        "nopython_signatures": [
+          "(uint64, int64, int64) -> uint64"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          false
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.straggling._urban_stream_key_scalar",
+        "signatures": [
+          "(uint64,)"
+        ],
+        "nopython_signatures": [
+          "(uint64,) -> uint64"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          false
+        ]
+      }
+    ]
+  },
+  "threading_layer": "omp",
+  "peak_rss_bytes": 801923072
+}

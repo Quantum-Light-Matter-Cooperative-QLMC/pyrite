@@ -1,0 +1,45 @@
+pid 3976838's current affinity list: 0-31
+pid 3976838's new affinity list: 0-7
+code 9035c313b5fa153062e0ea7763fe8abb2f1958a6 host king backend cuda profile cleo_test nsys NVIDIA Nsight Systems version 2025.6.3.541-256337736014v0
+== 2026-11-25T07:40:23-08:00 runs/nsys/hopg-300-5-warm
+rc=0 {"material": "hopg", "tilt_deg": 5.0, "mode": "sampler", "wall_s": 81.15733431186527, "error": null, "idle": 0.4992987377279102}
+== 2026-11-25T07:41:53-08:00 runs/nsys/hopg-300-5-sampler
+rc=0 {"material": "hopg", "tilt_deg": 5.0, "mode": "sampler", "wall_s": 46.88173786038533, "error": null, "idle": 0.1864594894561598}
+== 2026-11-25T07:42:42-08:00 runs/nsys/hopg-300-5-nsys
+rc=0 	<checkout>/runs/nsys/hopg-300-5.nsys-rep
+gaps rc=0 {"run_wall_s": 51.709160321, "device_busy_s": 19.441711407, "device_busy_fraction": 0.3759819592178599, "top_idle": [["gpuhost._transport_case", 7.128050268], ["pyrite.transport.sample", 3.254685128], ["pyrite.transport.continuation.stage", 2.784621108], ["gpuhost.StoppingMonitor.on_block", 2.654953151], ["pyrite.transport.continuation.launch", 2.237020413]]}
+== 2026-11-25T07:44:13-08:00 runs/nsys/hopg-300-15-sampler
+rc=0 {"material": "hopg", "tilt_deg": 15.0, "mode": "sampler", "wall_s": 79.67097326600924, "error": null, "idle": 0.14859228362878}
+== 2026-11-25T07:45:35-08:00 runs/nsys/hopg-300-15-nsys
+rc=0 	<checkout>/runs/nsys/hopg-300-15.nsys-rep
+gaps rc=0 {"run_wall_s": 84.450867885, "device_busy_s": 37.951894679, "device_busy_fraction": 0.44939614748164053, "top_idle": [["gpuhost._transport_case", 11.555426701], ["pyrite.transport.sample", 4.617147565], ["gpuhost.StoppingMonitor.on_block", 3.690195537], ["pyrite.transport.continuation.launch", 3.612814305], ["pyrite.transport.continuation.stage", 3.46912132]]}
+== 2026-11-25T07:47:42-08:00 runs/nsys/hopg-300-25-sampler
+rc=0 {"material": "hopg", "tilt_deg": 25.0, "mode": "sampler", "wall_s": 48.62052807118744, "error": null, "idle": 0.18565310492505355}
+== 2026-11-25T07:48:33-08:00 runs/nsys/hopg-300-25-nsys
+rc=0 	<checkout>/runs/nsys/hopg-300-25.nsys-rep
+gaps rc=0 {"run_wall_s": 51.452763535, "device_busy_s": 20.898107134, "device_busy_fraction": 0.4061610241748116, "top_idle": [["gpuhost._transport_case", 6.901328246], ["pyrite.transport.sample", 3.031686556], ["gpuhost.StoppingMonitor.on_block", 2.862169789], ["gpuhost.block_tail_sums", 2.208897155], ["pyrite.transport.continuation.assemble", 2.076818746]]}
+== 2026-11-25T07:49:52-08:00 runs/nsys/hopg-300-35-sampler
+rc=0 {"material": "hopg", "tilt_deg": 35.0, "mode": "sampler", "wall_s": 54.90375505387783, "error": null, "idle": 0.15917673716012085}
+== 2026-11-25T07:50:50-08:00 runs/nsys/hopg-300-35-nsys
+rc=0 	<checkout>/runs/nsys/hopg-300-35.nsys-rep
+gaps rc=0 {"run_wall_s": 57.455816434, "device_busy_s": 24.175336798, "device_busy_fraction": 0.42076395913319625, "top_idle": [["gpuhost._transport_case", 8.113430621], ["pyrite.transport.sample", 3.186917534], ["gpuhost.StoppingMonitor.on_block", 2.973056141], ["gpuhost.block_tail_sums", 2.561875491], ["pyrite.transport.continuation.launch", 2.267707185]]}
+== 2026-11-25T07:52:18-08:00 runs/nsys/hopg-300-55-sampler
+rc=0 {"material": "hopg", "tilt_deg": 55.0, "mode": "sampler", "wall_s": 10.359633361920714, "error": null, "idle": 0.3676907829534192}
+== 2026-11-25T07:52:31-08:00 runs/nsys/hopg-300-55-nsys
+rc=0 	<checkout>/runs/nsys/hopg-300-55.nsys-rep
+gaps rc=0 {"run_wall_s": 12.031567348, "device_busy_s": 3.314859665, "device_busy_fraction": 0.27551353611057394, "top_idle": [["gpuhost.StoppingMonitor.on_block", 1.41391771], ["gpuhost.BlockSpectrumScorer.add", 0.689514347], ["gpuhost._corrected_tables", 0.61136349], ["gpuhost.sinc_feature_samples", 0.543140505], ["gpuhost.initial_beam_positions", 0.526781611]]}
+== 2026-11-25T07:52:54-08:00 runs/nsys/hopg-300-65-sampler
+rc=0 {"material": "hopg", "tilt_deg": 65.0, "mode": "sampler", "wall_s": 6.180898797232658, "error": null, "idle": 0.4083333333333333}
+== 2026-11-25T07:53:03-08:00 runs/nsys/hopg-300-65-nsys
+rc=0 	<checkout>/runs/nsys/hopg-300-65.nsys-rep
+gaps rc=0 {"run_wall_s": 7.009780713, "device_busy_s": 1.477790961, "device_busy_fraction": 0.21081842949228932, "top_idle": [["gpuhost.StoppingMonitor.on_block", 1.055571216], ["gpuhost._corrected_tables", 0.856730262], ["gpuhost.build_shell_inelastic_tables", 0.448822222], ["gpuhost.ResidentBlockRecovery.simulate", 0.360250898], ["gpuhost.cuda_fourier_bin_mean_reduce", 0.35359187]]}
+== 2026-11-25T07:53:18-08:00 runs/nsys/hopg-300-75-sampler
+rc=0 {"material": "hopg", "tilt_deg": 75.0, "mode": "sampler", "wall_s": 7.525259832851589, "error": null, "idle": 0.4103967168262654}
+== 2026-11-25T07:53:28-08:00 runs/nsys/hopg-300-75-nsys
+rc=0 	<checkout>/runs/nsys/hopg-300-75.nsys-rep
+gaps rc=0 {"run_wall_s": 8.18200432, "device_busy_s": 2.285690992, "device_busy_fraction": 0.2793558769472759, "top_idle": [["gpuhost.StoppingMonitor.on_block", 1.237738025], ["gpuhost._corrected_tables", 0.679918568], ["gpuhost.build_shell_inelastic_tables", 0.447810315], ["gpuhost.cuda_fourier_bin_mean_reduce", 0.403473329], ["gpuhost.ResidentBlockRecovery.simulate", 0.366538898]]}
+== 2026-11-25T07:53:46-08:00 runs/nsys/hopg-300-85-sampler
+rc=0 {"material": "hopg", "tilt_deg": 85.0, "mode": "sampler", "wall_s": 23.881981960963458, "error": null, "idle": 0.22364489970123774}
+== 2026-11-25T07:54:12-08:00 runs/nsys/hopg-300-85-nsys
+rc=0 	<checkout>/runs/nsys/hopg-300-85.nsys-rep
+gaps rc=0 {"run_wall_s": 27.446573594, "device_busy_s": 12.180100834, "device_busy_fraction": 0.4437749139172202, "top_idle": [["gpuhost.StoppingMonitor.on_block", 2.46900134], ["gpuhost.sinc_feature_samples", 1.62562297], ["gpuhost.BlockSpectrumScorer.add", 1.592679465], ["gpuhost.cuda_fourier_bin_mean_reduce", 1.20590921], ["gpuhost.block_tail_sums", 0.832359005]]}

@@ -1,0 +1,321 @@
+{
+  "schema": "pyrite.axial-prototype-audit.v1",
+  "environment": {
+    "revision": "c550bc701a47c3ce7477ec364f23c73762009f91",
+    "python": "3.14.6",
+    "versions": {
+      "numpy": "2.5.4",
+      "numba": "0.68.1",
+      "scipy": "1.18.1",
+      "llvmlite": "0.50.0",
+      "dask": "2026.8.0",
+      "distributed": "2026.8.0",
+      "pyfftw": "0.15.1"
+    },
+    "machine": "x86_64",
+    "cpu": "AMD Ryzen 9 9950X3D 16-Core Processor",
+    "affinity": [
+      8,
+      9,
+      10,
+      11
+    ],
+    "gil_enabled": true,
+    "numba_threads": 1,
+    "numba_threading_layer": null,
+    "backend": "<pyrite._backend.NumPyBackend object at 0x7aa68fc9c2f0>",
+    "precision": "float64",
+    "native_pools": [
+      {
+        "user_api": "blas",
+        "internal_api": "openblas",
+        "num_threads": 1,
+        "prefix": "libscipy_openblas",
+        "filepath": "<checkout>/.venv/lib/python3.14/site-packages/numpy.libs/libscipy_openblas64_-f48b354e.so",
+        "version": "0.3.34.106.0",
+        "threading_layer": "pthreads",
+        "architecture": "SkylakeX"
+      },
+      {
+        "user_api": "openmp",
+        "internal_api": "openmp",
+        "num_threads": 1,
+        "prefix": "libgomp",
+        "filepath": "/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0",
+        "version": null
+      },
+      {
+        "user_api": "blas",
+        "internal_api": "openblas",
+        "num_threads": 1,
+        "prefix": "libscipy_openblas",
+        "filepath": "<checkout>/.venv/lib/python3.14/site-packages/scipy.libs/libscipy_openblas-5f890258.so",
+        "version": "0.3.31.dev",
+        "threading_layer": "pthreads",
+        "architecture": "SkylakeX"
+      }
+    ],
+    "threads": {
+      "NUMBA_NUM_THREADS": "1",
+      "NUMBA_THREADING_LAYER": null,
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "PYRITE_FFT_THREADS": null
+    },
+    "cache": {
+      "NUMBA_CACHE_DIR": "<checkout>/runs/cache-axial",
+      "CUPY_CACHE_DIR": "<home>/.cache/pyrite/cupy"
+    },
+    "numpy_config": {
+      "Compilers": {
+        "c": {
+          "name": "gcc",
+          "linker": "ld.bfd",
+          "version": "14.2.1",
+          "commands": "cc"
+        },
+        "cython": {
+          "name": "cython",
+          "linker": "cython",
+          "version": "3.3.0",
+          "commands": "cython"
+        },
+        "c++": {
+          "name": "gcc",
+          "linker": "ld.bfd",
+          "version": "14.2.1",
+          "commands": "c++"
+        }
+      },
+      "Machine Information": {
+        "host": {
+          "cpu": "x86_64",
+          "family": "x86_64",
+          "endian": "little",
+          "system": "linux"
+        },
+        "build": {
+          "cpu": "x86_64",
+          "family": "x86_64",
+          "endian": "little",
+          "system": "linux"
+        }
+      },
+      "Build Dependencies": {
+        "blas": {
+          "name": "scipy-openblas",
+          "found": true,
+          "version": "0.3.34.106.0",
+          "detection method": "pkgconfig",
+          "include directory": "/opt/_internal/cpython-3.14.6/lib/python3.14/site-packages/scipy_openblas64/include",
+          "lib directory": "/opt/_internal/cpython-3.14.6/lib/python3.14/site-packages/scipy_openblas64/lib",
+          "openblas configuration": "OpenBLAS 0.3.34.106.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64",
+          "pc file directory": "/project/.openblas"
+        },
+        "lapack": {
+          "name": "scipy-openblas",
+          "found": true,
+          "version": "0.3.34.106.0",
+          "detection method": "pkgconfig",
+          "include directory": "/opt/_internal/cpython-3.14.6/lib/python3.14/site-packages/scipy_openblas64/include",
+          "lib directory": "/opt/_internal/cpython-3.14.6/lib/python3.14/site-packages/scipy_openblas64/lib",
+          "openblas configuration": "OpenBLAS 0.3.34.106.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64",
+          "pc file directory": "/project/.openblas"
+        }
+      },
+      "Python Information": {
+        "path": "/tmp/build-env-c90f47zn/bin/python",
+        "version": "3.14"
+      },
+      "SIMD Extensions": {
+        "baseline": [
+          "X86_V2"
+        ],
+        "found": [
+          "X86_V3",
+          "X86_V4",
+          "AVX512_ICL"
+        ],
+        "not found": [
+          "AVX512_SPR"
+        ]
+      }
+    },
+    "allocation": {
+      "SLURM_JOB_ID": "15946",
+      "SLURM_CPUS_PER_TASK": "4",
+      "SLURM_MEM_PER_NODE": "3072"
+    }
+  },
+  "parameters": {
+    "kind": "production-depth-energy-resolved-mcwf",
+    "fixture": "docs/physics/radiation-physics/channeling-energy-resolved-mcwf.md example; depth 1000 A, step 5 A",
+    "config": {
+      "crystal": "silicon",
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "kinetic_energy_eV": 5000000.0,
+      "temperature_K": 293.15,
+      "cells": [
+        1,
+        1
+      ],
+      "shape": [
+        32,
+        32
+      ],
+      "depths_ang": [
+        0.0,
+        250.0,
+        500.0,
+        1000.0
+      ],
+      "step_ang": 5.0,
+      "tilt_rad": [
+        0.0,
+        0.0
+      ],
+      "mode": "mcwf",
+      "histories": 16,
+      "seed": 0,
+      "mechanisms": [
+        "tds",
+        "electronic"
+      ],
+      "oam_string": 0,
+      "oam_radius_ang": 0.5,
+      "backend": "cpu",
+      "spectral_states": 0,
+      "spectral_representation": "energy_bins",
+      "spectral_energy_bins": 8,
+      "spectral_cutoff_eV": null,
+      "record_coherence": false,
+      "coherence_reference_index": null,
+      "record_current": false,
+      "record_current_divergence": false,
+      "current_contour": null,
+      "oam_symmetry": "required"
+    },
+    "options": {
+      "histories": 1000,
+      "seed": 627,
+      "sampling": "binned",
+      "chunk_size": 25,
+      "max_bins": 32,
+      "max_cached_solvers": 2,
+      "max_distinct_energies": 2048,
+      "checkpoint_every": 0,
+      "work_limit": 1000000000,
+      "storage_limit_bytes": 134217728,
+      "backend": "cpu",
+      "memory_budget_bytes": null
+    },
+    "beam": {
+      "energy_eV": 5000000.0,
+      "energy_spread_frac": 0.002,
+      "order": 9
+    },
+    "coherence_pairs": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "photon_energy_edges_eV": "[  100.   133.   166.   199.   232.   265.   298.   331.   364.   397.\n   430.   463.   496.   529.   562.   595.   628.   661.   694.   727.\n   760.   793.   826.   859.   892.   925.   958.   991.  1024.  1057.\n  1090.  1123.  1156.  1189.  1222.  1255.  1288.  1321.  1354.  1387.\n  1420.  1453.  1486.  1519.  1552.  1585.  1618.  1651.  1684.  1717.\n  1750.  1783.  1816.  1849.  1882.  1915.  1948.  1981.  2014.  2047.\n  2080.  2113.  2146.  2179.  2212.  2245.  2278.  2311.  2344.  2377.\n  2410.  2443.  2476.  2509.  2542.  2575.  2608.  2641.  2674.  2707.\n  2740.  2773.  2806.  2839.  2872.  2905.  2938.  2971.  3004.  3037.\n  3070.  3103.  3136.  3169.  3202.  3235.  3268.  3301.  3334.  3367.\n  3400.  3433.  3466.  3499.  3532.  3565.  3598.  3631.  3664.  3697.\n  3730.  3763.  3796.  3829.  3862.  3895.  3928.  3961.  3994.  4027.\n  4060.  4093.  4126.  4159.  4192.  4225.  4258.  4291.  4324.  4357.\n  4390.  4423.  4456.  4489.  4522.  4555.  4588.  4621.  4654.  4687.\n  4720.  4753.  4786.  4819.  4852.  4885.  4918.  4951.  4984.  5017.\n  5050.  5083.  5116.  5149.  5182.  5215.  5248.  5281.  5314.  5347.\n  5380.  5413.  5446.  5479.  5512.  5545.  5578.  5611.  5644.  5677.\n  5710.  5743.  5776.  5809.  5842.  5875.  5908.  5941.  5974.  6007.\n  6040.  6073.  6106.  6139.  6172.  6205.  6238.  6271.  6304.  6337.\n  6370.  6403.  6436.  6469.  6502.  6535.  6568.  6601.  6634.  6667.\n  6700.  6733.  6766.  6799.  6832.  6865.  6898.  6931.  6964.  6997.\n  7030.  7063.  7096.  7129.  7162.  7195.  7228.  7261.  7294.  7327.\n  7360.  7393.  7426.  7459.  7492.  7525.  7558.  7591.  7624.  7657.\n  7690.  7723.  7756.  7789.  7822.  7855.  7888.  7921.  7954.  7987.\n  8020.  8053.  8086.  8119.  8152.  8185.  8218.  8251.  8284.  8317.\n  8350.  8383.  8416.  8449.  8482.  8515.  8548.  8581.  8614.  8647.\n  8680.  8713.  8746.  8779.  8812.  8845.  8878.  8911.  8944.  8977.\n  9010.  9043.  9076.  9109.  9142.  9175.  9208.  9241.  9274.  9307.\n  9340.  9373.  9406.  9439.  9472.  9505.  9538.  9571.  9604.  9637.\n  9670.  9703.  9736.  9769.  9802.  9835.  9868.  9901.  9934.  9967.\n 10000.]",
+    "split_steps": 200,
+    "histories": 1000,
+    "rounds": 2
+  },
+  "prime_s": 44.67403922136873,
+  "arms": {
+    "cache2-base": {
+      "max_cached_solvers": 2,
+      "harmonics": "CylindricalProjection.harmonics",
+      "samples": [
+        {
+          "wall_s": 86.94311314914376,
+          "process_cpu_s": 86.91181399399998
+        },
+        {
+          "wall_s": 85.46967303566635,
+          "process_cpu_s": 85.43954597600003
+        }
+      ],
+      "output_sha256": "abb13c30699be3efd7e2dc1811787628510e82589cdfe95f3b9784b9cff57ad8",
+      "identical_to_cache2_base": true,
+      "max_relative_to_max_diff": [
+        0.0,
+        null
+      ]
+    },
+    "cache8-base": {
+      "max_cached_solvers": 8,
+      "harmonics": "CylindricalProjection.harmonics",
+      "samples": [
+        {
+          "wall_s": 41.3027750775218,
+          "process_cpu_s": 41.295471201
+        },
+        {
+          "wall_s": 42.5881582275033,
+          "process_cpu_s": 42.581614715
+        }
+      ],
+      "output_sha256": "abb13c30699be3efd7e2dc1811787628510e82589cdfe95f3b9784b9cff57ad8",
+      "identical_to_cache2_base": true,
+      "max_relative_to_max_diff": [
+        0.0,
+        null
+      ]
+    },
+    "cache8-A-basis": {
+      "max_cached_solvers": 8,
+      "harmonics": "harmonics_cached",
+      "samples": [
+        {
+          "wall_s": 24.18788331747055,
+          "process_cpu_s": 24.179752485999984
+        },
+        {
+          "wall_s": 24.1439946629107,
+          "process_cpu_s": 24.136040989999998
+        }
+      ],
+      "output_sha256": "abb13c30699be3efd7e2dc1811787628510e82589cdfe95f3b9784b9cff57ad8",
+      "identical_to_cache2_base": true,
+      "max_relative_to_max_diff": [
+        0.0,
+        null
+      ]
+    },
+    "cache8-B-basis-matmul": {
+      "max_cached_solvers": 8,
+      "harmonics": "harmonics_cached_matmul",
+      "samples": [
+        {
+          "wall_s": 10.6753333453089,
+          "process_cpu_s": 10.674351462999994
+        },
+        {
+          "wall_s": 10.709164212457836,
+          "process_cpu_s": 10.708155949999991
+        }
+      ],
+      "output_sha256": "d83d78779208c597f61dd849ce68fe8801ea64a90266cc3d31f0791c68727adf",
+      "identical_to_cache2_base": false,
+      "max_relative_to_max_diff": [
+        1.2870562989546678e-16,
+        "oam_populations_by_bin"
+      ]
+    }
+  },
+  "peak_rss_bytes": 501456896
+}

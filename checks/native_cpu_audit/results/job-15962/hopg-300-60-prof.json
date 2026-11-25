@@ -1,0 +1,1410 @@
+{
+ "schema": "pyrite.native-cpu-audit.gpu-host.v1",
+ "issue": 1432,
+ "code_sha": "63b4dff432215907945fbcfc201c902feb83d232",
+ "profile": "cleo_sub",
+ "material": "hopg",
+ "E0_keV": 300.0,
+ "tilt_deg": 60.0,
+ "mode": "cprofile",
+ "backend": "cuda",
+ "affinity": [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7
+ ],
+ "threads": {
+  "NUMBA_NUM_THREADS": null,
+  "OMP_NUM_THREADS": null
+ },
+ "numba_threads": 8,
+ "precision": {
+  "target_rse": 0.001,
+  "min_electrons": 3000,
+  "max_electrons": 100000000,
+  "observables": [
+   "line",
+   "brem"
+  ],
+  "max_electron_share": 0.05,
+  "min_effective_electrons": 100.0,
+  "max_variance_of_variance": 0.01,
+  "stability_checks": 3,
+  "stability_fraction": 0.5,
+  "pilot_electrons": 3000,
+  "band_eV": null,
+  "batch_means_band_eV": null,
+  "brem_target_rse": 0.001,
+  "brem_min_electrons": 3000,
+  "brem_max_electrons": 100000000,
+  "decision_growth": 0.1
+ },
+ "error": null,
+ "setup_s": 0.7451083539053798,
+ "wall_s": 26.745928016025573,
+ "process_cpu_s": 39.450742074,
+ "phases_unsynced_s": {
+  "_transport_case": 24.145910979248583
+ },
+ "ranges": {
+  "pyrite.lines.reduce": {
+   "inclusive_s": 4.027383781969547,
+   "exclusive_s": 4.027383781969547,
+   "calls": 12
+  },
+  "pyrite.transport.core": {
+   "inclusive_s": 3.618243738077581,
+   "exclusive_s": 0.42403839295729995,
+   "calls": 73
+  },
+  "pyrite.transport.sample": {
+   "inclusive_s": 3.3845823821611702,
+   "exclusive_s": 2.3035258115269244,
+   "calls": 73
+  },
+  "pyrite.transport.continuation.stage": {
+   "inclusive_s": 1.2311050253920257,
+   "exclusive_s": 1.2311050253920257,
+   "calls": 339
+  },
+  "pyrite.transport.continuation.launch": {
+   "inclusive_s": 1.1443906491622329,
+   "exclusive_s": 1.1443906491622329,
+   "calls": 339
+  },
+  "pyrite.transport.inelastic": {
+   "inclusive_s": 1.0810565706342459,
+   "exclusive_s": 1.0810565706342459,
+   "calls": 73
+  },
+  "pyrite.transport.continuation.assemble": {
+   "inclusive_s": 0.4723933865316212,
+   "exclusive_s": 0.4723933865316212,
+   "calls": 73
+  },
+  "pyrite.transport.upload": {
+   "inclusive_s": 0.3463162840344012,
+   "exclusive_s": 0.3463162840344012,
+   "calls": 73
+  },
+  "pyrite.transport.tables": {
+   "inclusive_s": 0.12167607061564922,
+   "exclusive_s": 0.12167607061564922,
+   "calls": 73
+  },
+  "pyrite.lines.tab": {
+   "inclusive_s": 0.11732295993715525,
+   "exclusive_s": 0.11732295993715525,
+   "calls": 78
+  },
+  "pyrite.transport.alloc": {
+   "inclusive_s": 0.0933195548132062,
+   "exclusive_s": 0.0933195548132062,
+   "calls": 73
+  },
+  "pyrite.transport.output": {
+   "inclusive_s": 0.0205178945325315,
+   "exclusive_s": 0.0205178945325315,
+   "calls": 73
+  }
+ },
+ "sampler": {},
+ "runner_timing": [
+  {
+   "case_index": 0,
+   "timed_case_count": 0,
+   "transport_seconds": null,
+   "spectrum_seconds": null,
+   "driver_wait_seconds": null,
+   "transport_seconds_total": 0.0,
+   "spectrum_seconds_total": 0.0,
+   "driver_wait_seconds_total": 0.0,
+   "gpu_oom_retry_count": 0,
+   "continuation_rows_per_round": 16,
+   "continuation_lanes": 113816,
+   "continuation_rounds": 339,
+   "continuation_passes": 73
+  }
+ ],
+ "host_peak_MiB": 5873.42578125,
+ "realized_electrons": 6702356,
+ "stop_reason": "converged",
+ "n_segments": 24347733,
+ "arrays": {
+  "E_grid": "ec3a98c93ddb9654",
+  "spec": "9150455562da870f",
+  "spec_characteristic": "a70d24450dd76d03",
+  "brem": "da4d5779abf8e3cb",
+  "E_grid_brem": "a8f218c0e1fcfced",
+  "brem_wide": "b10823a5135273b6"
+ },
+ "profile_rows": [
+  {
+   "file": "src/pyrite/montecarlo/runner/scheduling.py",
+   "line": 256,
+   "function": "run_cases",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 2.652e-05,
+   "cumulative_s": 26.745826834000002
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/scheduling.py",
+   "line": 700,
+   "function": "serial",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 2.797e-05,
+   "cumulative_s": 26.737249296
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/scheduling.py",
+   "line": 733,
+   "function": "serial_case",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 6.1e-06,
+   "cumulative_s": 26.737168886000003
+  },
+  {
+   "file": "src/pyrite/montecarlo/realization.py",
+   "line": 185,
+   "function": "call",
+   "calls": 7,
+   "primitive_calls": 1,
+   "exclusive_s": 0.0018786750000000002,
+   "cumulative_s": 26.737161076000003
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/case_driver.py",
+   "line": 94,
+   "function": "run_case",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 1.377e-05,
+   "cumulative_s": 26.737135315000003
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/recovery.py",
+   "line": 331,
+   "function": "_spectrum_with_recovery",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 1.541e-05,
+   "cumulative_s": 24.615132929
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/recovery.py",
+   "line": 395,
+   "function": "_streamed_adaptive",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 1.7931e-05,
+   "cumulative_s": 24.615101518000003
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/streamed_scoring.py",
+   "line": 435,
+   "function": "run_case_streamed",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 1.361e-05,
+   "cumulative_s": 24.614895126
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/streamed_adaptive.py",
+   "line": 227,
+   "function": "run_adaptive_streamed",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 2.107e-05,
+   "cumulative_s": 24.614565193
+  },
+  {
+   "file": "gpu_host.py",
+   "line": 263,
+   "function": "timed",
+   "calls": 6,
+   "primitive_calls": 4,
+   "exclusive_s": 5.2981000000000007e-05,
+   "cumulative_s": 24.14592442
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/case_driver.py",
+   "line": 218,
+   "function": "_transport_case",
+   "calls": 6,
+   "primitive_calls": 4,
+   "exclusive_s": 0.0058092740000000006,
+   "cumulative_s": 24.145582488000002
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/recovery.py",
+   "line": 48,
+   "function": "transport_with_recovery",
+   "calls": 8,
+   "primitive_calls": 4,
+   "exclusive_s": 0.0038980800000000004,
+   "cumulative_s": 22.925276516
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/block_transport.py",
+   "line": 515,
+   "function": "transport_case_blocks",
+   "calls": 4,
+   "primitive_calls": 4,
+   "exclusive_s": 0.000252393,
+   "cumulative_s": 22.923537172000003
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/streamed_scoring.py",
+   "line": 479,
+   "function": "score_fixed_streamed",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 0.01498114,
+   "cumulative_s": 17.242894423000003
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/block_transport.py",
+   "line": 323,
+   "function": "transport_electron_blocks",
+   "calls": 2,
+   "primitive_calls": 2,
+   "exclusive_s": 2.003e-05,
+   "cumulative_s": 14.600639398
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/block_transport.py",
+   "line": 268,
+   "function": "_stream_electron_blocks",
+   "calls": 2,
+   "primitive_calls": 2,
+   "exclusive_s": 0.000111971,
+   "cumulative_s": 14.600619368
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/block_transport.py",
+   "line": 290,
+   "function": "score_block",
+   "calls": 4,
+   "primitive_calls": 4,
+   "exclusive_s": 0.000128021,
+   "cumulative_s": 14.213998741000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/emission_adapters.py",
+   "line": 89,
+   "function": "evaluate",
+   "calls": 157,
+   "primitive_calls": 117,
+   "exclusive_s": 0.0006236340000000001,
+   "cumulative_s": 9.755206555000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/streamed_scoring.py",
+   "line": 547,
+   "function": "_score_streamed_pass",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 5.0360000000000006e-05,
+   "cumulative_s": 9.650515586000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/adaptive.py",
+   "line": 1144,
+   "function": "transport_requested_precision",
+   "calls": 2,
+   "primitive_calls": 2,
+   "exclusive_s": 9.5291e-05,
+   "cumulative_s": 9.490301220000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/adaptive.py",
+   "line": 931,
+   "function": "transport_case_adaptive",
+   "calls": 2,
+   "primitive_calls": 2,
+   "exclusive_s": 6.31e-05,
+   "cumulative_s": 9.490037028
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/case_driver.py",
+   "line": 519,
+   "function": "_cxr_for_segments",
+   "calls": 78,
+   "primitive_calls": 78,
+   "exclusive_s": 0.00255002,
+   "cumulative_s": 8.978465555000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/case_driver.py",
+   "line": 651,
+   "function": "_cxr_for_segments_once",
+   "calls": 79,
+   "primitive_calls": 79,
+   "exclusive_s": 0.0014528100000000001,
+   "cumulative_s": 8.945796063000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_spectrum.py",
+   "line": 24,
+   "function": "mc_cxr_spectrum",
+   "calls": 79,
+   "primitive_calls": 79,
+   "exclusive_s": 0.0025762240000000002,
+   "cumulative_s": 8.941542899
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_spectrum.py",
+   "line": 361,
+   "function": "_mc_spectrum",
+   "calls": 79,
+   "primitive_calls": 79,
+   "exclusive_s": 0.0020422,
+   "cumulative_s": 8.937915957000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/block_transport.py",
+   "line": 590,
+   "function": "simulate_block",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.00038781000000000004,
+   "cumulative_s": 8.219529247
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/step_budget.py",
+   "line": 32,
+   "function": "retry_step_budget",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.00041193400000000003,
+   "cumulative_s": 8.219109626
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/case_driver.py",
+   "line": 350,
+   "function": "_simulate",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.001706093,
+   "cumulative_s": 8.217974537
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/block_transport.py",
+   "line": 644,
+   "function": "monitored",
+   "calls": 2,
+   "primitive_calls": 2,
+   "exclusive_s": 2.1850000000000003e-05,
+   "cumulative_s": 8.091460044
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/block_transport.py",
+   "line": 389,
+   "function": "transport_monitored_blocks",
+   "calls": 2,
+   "primitive_calls": 2,
+   "exclusive_s": 0.002273834,
+   "cumulative_s": 8.090464346000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/emission_adapters.py",
+   "line": 275,
+   "function": "_cxr",
+   "calls": 76,
+   "primitive_calls": 76,
+   "exclusive_s": 0.000871049,
+   "cumulative_s": 7.840127602000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/streamed_selection.py",
+   "line": 77,
+   "function": "add",
+   "calls": 2,
+   "primitive_calls": 2,
+   "exclusive_s": 0.004002502000000001,
+   "cumulative_s": 7.6151416030000005
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/streamed_line_grid.py",
+   "line": 287,
+   "function": "resolve_streamed_line_grid",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 5.292e-05,
+   "cumulative_s": 7.577103065
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/api.py",
+   "line": 19,
+   "function": "_simulate_trajectories",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.0012798640000000001,
+   "cumulative_s": 7.386213529000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/host_pass.py",
+   "line": 234,
+   "function": "run_transport_pass",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.0029615630000000004,
+   "cumulative_s": 7.383584178
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/streamed_adaptive.py",
+   "line": 207,
+   "function": "_monitored_pass",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 2.5140000000000003e-05,
+   "cumulative_s": 7.371642520000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/host_pass.py",
+   "line": 244,
+   "function": "_run_validated_pass",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.005255462000000001,
+   "cumulative_s": 7.367140119
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/fallbacks.py",
+   "line": 63,
+   "function": "measured",
+   "calls": 2,
+   "primitive_calls": 2,
+   "exclusive_s": 7.429000000000001e-05,
+   "cumulative_s": 6.30764353
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/streamed_scoring.py",
+   "line": 165,
+   "function": "add",
+   "calls": 2,
+   "primitive_calls": 2,
+   "exclusive_s": 0.000200172,
+   "cumulative_s": 6.3073917
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_batched.py",
+   "line": 930,
+   "function": "_accumulate_batched",
+   "calls": 79,
+   "primitive_calls": 79,
+   "exclusive_s": 0.0037161950000000003,
+   "cumulative_s": 6.003489547
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_batched.py",
+   "line": 825,
+   "function": "_batched_incoherent_block",
+   "calls": 139,
+   "primitive_calls": 139,
+   "exclusive_s": 0.014860569,
+   "cumulative_s": 5.429515272000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/streamed_scoring.py",
+   "line": 328,
+   "function": "_lines",
+   "calls": 2,
+   "primitive_calls": 2,
+   "exclusive_s": 4.1870000000000004e-05,
+   "cumulative_s": 5.132104086
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/reflection_cutoff.py",
+   "line": 557,
+   "function": "_selected_spectrum",
+   "calls": 2,
+   "primitive_calls": 2,
+   "exclusive_s": 0.00014220000000000001,
+   "cumulative_s": 5.132057646000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/streamed_scoring.py",
+   "line": 341,
+   "function": "<lambda>",
+   "calls": 2,
+   "primitive_calls": 2,
+   "exclusive_s": 5.3841e-05,
+   "cumulative_s": 5.130774157
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_batched.py",
+   "line": 771,
+   "function": "_queue_unit_lines",
+   "calls": 139,
+   "primitive_calls": 139,
+   "exclusive_s": 0.0050681960000000005,
+   "cumulative_s": 5.104674421
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/block_transport.py",
+   "line": 434,
+   "function": "simulate",
+   "calls": 69,
+   "primitive_calls": 69,
+   "exclusive_s": 0.000211262,
+   "cumulative_s": 4.421113045
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/recovery.py",
+   "line": 114,
+   "function": "simulate",
+   "calls": 69,
+   "primitive_calls": 69,
+   "exclusive_s": 0.000134682,
+   "cumulative_s": 4.420901783000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/streamed_selection.py",
+   "line": 92,
+   "function": "_select",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 3.337e-05,
+   "cumulative_s": 4.369835035
+  },
+  {
+   "file": "_base.py",
+   "line": 632,
+   "function": "result_iterator",
+   "calls": 5116,
+   "primitive_calls": 5116,
+   "exclusive_s": 0.017844541000000002,
+   "cumulative_s": 4.226704989
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_batched.py",
+   "line": 176,
+   "function": "flush",
+   "calls": 90,
+   "primitive_calls": 90,
+   "exclusive_s": 0.00031209200000000003,
+   "cumulative_s": 4.033519538
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_bin_quadrature.py",
+   "line": 1016,
+   "function": "run_bin_mean_reduction_kernel",
+   "calls": 12,
+   "primitive_calls": 12,
+   "exclusive_s": 0.0005319130000000001,
+   "cumulative_s": 4.02722115
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_fourier_cuda.py",
+   "line": 398,
+   "function": "cuda_fourier_bin_mean_reduce",
+   "calls": 12,
+   "primitive_calls": 12,
+   "exclusive_s": 1.626607394,
+   "cumulative_s": 4.026025579000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_batched.py",
+   "line": 167,
+   "function": "append",
+   "calls": 244,
+   "primitive_calls": 244,
+   "exclusive_s": 0.000343691,
+   "cumulative_s": 3.78157216
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/host_pass.py",
+   "line": 721,
+   "function": "_dispatch_core",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.00042564500000000005,
+   "cumulative_s": 3.617299549
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/host_pass.py",
+   "line": 795,
+   "function": "_run_per_electron",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.003433751,
+   "cumulative_s": 3.616873904
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/independent.py",
+   "line": 49,
+   "function": "on_block",
+   "calls": 69,
+   "primitive_calls": 69,
+   "exclusive_s": 0.000273702,
+   "cumulative_s": 3.616677661
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/adaptive.py",
+   "line": 387,
+   "function": "on_block",
+   "calls": 106,
+   "primitive_calls": 106,
+   "exclusive_s": 0.000607283,
+   "cumulative_s": 3.616296789
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/adaptive.py",
+   "line": 706,
+   "function": "measure",
+   "calls": 106,
+   "primitive_calls": 106,
+   "exclusive_s": 0.000307013,
+   "cumulative_s": 3.6084544760000004
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/adaptive.py",
+   "line": 716,
+   "function": "measure_rows",
+   "calls": 106,
+   "primitive_calls": 106,
+   "exclusive_s": 0.001080978,
+   "cumulative_s": 3.6081312530000003
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/batching.py",
+   "line": 785,
+   "function": "_run_per_electron_transport",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.003979393,
+   "cumulative_s": 3.60772992
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/host_pass.py",
+   "line": 462,
+   "function": "_sample_entry",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.051186520000000006,
+   "cumulative_s": 3.3788915960000003
+  },
+  {
+   "file": "_base.py",
+   "line": 309,
+   "function": "_result_or_cancel",
+   "calls": 5102,
+   "primitive_calls": 5102,
+   "exclusive_s": 0.011260884,
+   "cumulative_s": 3.336374798
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/continuation.py",
+   "line": 506,
+   "function": "_drive_continuation_rounds",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.09045483400000001,
+   "cumulative_s": 3.211114524
+  },
+  {
+   "file": "~",
+   "line": 0,
+   "function": "<method 'get' of 'cupy._core.core._ndarray_base' objects>",
+   "calls": 3204,
+   "primitive_calls": 3204,
+   "exclusive_s": 3.0650138740000004,
+   "cumulative_s": 3.0711440760000004
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_setup.py",
+   "line": 791,
+   "function": "_prepare_spectrum",
+   "calls": 79,
+   "primitive_calls": 79,
+   "exclusive_s": 0.012952920000000001,
+   "cumulative_s": 2.922508091
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/streamed_line_grid.py",
+   "line": 94,
+   "function": "add",
+   "calls": 2,
+   "primitive_calls": 2,
+   "exclusive_s": 0.004887657,
+   "cumulative_s": 2.799630989
+  },
+  {
+   "file": "__init__.py",
+   "line": 826,
+   "function": "asnumpy",
+   "calls": 3180,
+   "primitive_calls": 3180,
+   "exclusive_s": 0.002350137,
+   "cumulative_s": 2.758430428
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/cxr_grid.py",
+   "line": 837,
+   "function": "_resolve_policy_grid",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 7.840100000000001e-05,
+   "cumulative_s": 2.5514123150000003
+  },
+  {
+   "file": "src/pyrite/_backend.py",
+   "line": 176,
+   "function": "to_cpu",
+   "calls": 2543,
+   "primitive_calls": 2543,
+   "exclusive_s": 0.0024488540000000003,
+   "cumulative_s": 2.3977060540000004
+  },
+  {
+   "file": "threading.py",
+   "line": 1097,
+   "function": "join",
+   "calls": 16,
+   "primitive_calls": 16,
+   "exclusive_s": 7.3021e-05,
+   "cumulative_s": 2.2767298950000003
+  },
+  {
+   "file": "~",
+   "line": 0,
+   "function": "<method 'join' of '_thread._ThreadHandle' objects>",
+   "calls": 16,
+   "primitive_calls": 16,
+   "exclusive_s": 0.00038724100000000003,
+   "cumulative_s": 2.2764803230000004
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/electron_blocks.py",
+   "line": 145,
+   "function": "score_in_electron_blocks",
+   "calls": 47,
+   "primitive_calls": 47,
+   "exclusive_s": 0.0008937060000000001,
+   "cumulative_s": 2.026541442
+  },
+  {
+   "file": "_base.py",
+   "line": 424,
+   "function": "result",
+   "calls": 5102,
+   "primitive_calls": 5102,
+   "exclusive_s": 0.00798947,
+   "cumulative_s": 1.9006081570000002
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_fourier_cuda.py",
+   "line": 274,
+   "function": "cuda_positive_modes",
+   "calls": 12,
+   "primitive_calls": 12,
+   "exclusive_s": 0.291139739,
+   "cumulative_s": 1.8759373270000002
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/beam_entry.py",
+   "line": 23,
+   "function": "initial_beam_positions",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.12457217000000001,
+   "cumulative_s": 1.695986146
+  },
+  {
+   "file": "src/pyrite/_backend.py",
+   "line": 442,
+   "function": "_to_cpu",
+   "calls": 2525,
+   "primitive_calls": 2525,
+   "exclusive_s": 0.0013369150000000002,
+   "cumulative_s": 1.6904460030000001
+  },
+  {
+   "file": "threading.py",
+   "line": 337,
+   "function": "wait",
+   "calls": 6268,
+   "primitive_calls": 6268,
+   "exclusive_s": 0.010617742000000001,
+   "cumulative_s": 1.661857641
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/streamed_line_grid.py",
+   "line": 217,
+   "function": "sinc_spacing",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 0.001944446,
+   "cumulative_s": 1.661594982
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/diagnostics.py",
+   "line": 97,
+   "function": "sinc_feature_samples",
+   "calls": 2,
+   "primitive_calls": 2,
+   "exclusive_s": 1.201378132,
+   "cumulative_s": 1.654181938
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/diagnostics.py",
+   "line": 199,
+   "function": "sinc_spacing_from_samples",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 0.480389975,
+   "cumulative_s": 1.616978435
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/emission_adapters.py",
+   "line": 332,
+   "function": "_continuum",
+   "calls": 39,
+   "primitive_calls": 39,
+   "exclusive_s": 0.00030152200000000003,
+   "cumulative_s": 1.439052757
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/emission.py",
+   "line": 15,
+   "function": "_brem_wide_from_segments",
+   "calls": 39,
+   "primitive_calls": 39,
+   "exclusive_s": 0.00047322300000000005,
+   "cumulative_s": 1.438651802
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/emission.py",
+   "line": 77,
+   "function": "score",
+   "calls": 40,
+   "primitive_calls": 40,
+   "exclusive_s": 0.00013489100000000002,
+   "cumulative_s": 1.413656319
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/emission_adapters.py",
+   "line": 384,
+   "function": "_coupled",
+   "calls": 40,
+   "primitive_calls": 40,
+   "exclusive_s": 0.000335492,
+   "cumulative_s": 1.41250904
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/emission.py",
+   "line": 168,
+   "function": "_coupled_brem_from_segments",
+   "calls": 40,
+   "primitive_calls": 40,
+   "exclusive_s": 0.001702591,
+   "cumulative_s": 1.412069757
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_kernels.py",
+   "line": 129,
+   "function": "_accumulate_edge_truncation",
+   "calls": 678,
+   "primitive_calls": 678,
+   "exclusive_s": 0.11997871500000001,
+   "cumulative_s": 1.283426334
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/case_driver.py",
+   "line": 475,
+   "function": "electron_cutoffs",
+   "calls": 4,
+   "primitive_calls": 4,
+   "exclusive_s": 0.894534656,
+   "cumulative_s": 1.189610971
+  },
+  {
+   "file": "fromnumeric.py",
+   "line": 48,
+   "function": "_wrapfunc",
+   "calls": 12121,
+   "primitive_calls": 12093,
+   "exclusive_s": 0.016030118,
+   "cumulative_s": 1.1662497410000001
+  },
+  {
+   "file": "_npyio_impl.py",
+   "line": 239,
+   "function": "__getitem__",
+   "calls": 6420,
+   "primitive_calls": 6420,
+   "exclusive_s": 0.015614468000000001,
+   "cumulative_s": 1.157019202
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/cxr_grid.py",
+   "line": 401,
+   "function": "_direction_populations",
+   "calls": 2,
+   "primitive_calls": 2,
+   "exclusive_s": 0.000179072,
+   "cumulative_s": 1.1404028720000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/_jit_launch.py",
+   "line": 637,
+   "function": "core",
+   "calls": 339,
+   "primitive_calls": 339,
+   "exclusive_s": 0.0014992,
+   "cumulative_s": 1.120112231
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/_jit_launch.py",
+   "line": 234,
+   "function": "run_transport_kernel",
+   "calls": 339,
+   "primitive_calls": 339,
+   "exclusive_s": 0.012507366,
+   "cumulative_s": 1.118613031
+  },
+  {
+   "file": "_interface.py",
+   "line": 63,
+   "function": "__call__",
+   "calls": 472,
+   "primitive_calls": 472,
+   "exclusive_s": 0.053449471000000005,
+   "cumulative_s": 1.091519627
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/host_pass.py",
+   "line": 611,
+   "function": "_shell_tables",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.0012691170000000002,
+   "cumulative_s": 1.0825571900000002
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/shell_transport.py",
+   "line": 196,
+   "function": "build_shell_inelastic_tables",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.015628014000000003,
+   "cumulative_s": 1.079828322
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/diagnostics.py",
+   "line": 236,
+   "function": "_stable_argsort",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 0.041721055,
+   "cumulative_s": 1.0689288080000001
+  },
+  {
+   "file": "src/pyrite/xsgen/store.py",
+   "line": 439,
+   "function": "arrays",
+   "calls": 379,
+   "primitive_calls": 379,
+   "exclusive_s": 0.009164925,
+   "cumulative_s": 1.06796362
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/segment_escape.py",
+   "line": 305,
+   "function": "segment_escape_pieces",
+   "calls": 79,
+   "primitive_calls": 79,
+   "exclusive_s": 0.27229939000000003,
+   "cumulative_s": 1.046218077
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_fourier_spread.py",
+   "line": 295,
+   "function": "es_gather_moments",
+   "calls": 3616,
+   "primitive_calls": 3616,
+   "exclusive_s": 0.162356984,
+   "cumulative_s": 1.027009885
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/brem_events.py",
+   "line": 109,
+   "function": "mc_coupled_brem_spectrum",
+   "calls": 46,
+   "primitive_calls": 46,
+   "exclusive_s": 0.00035314600000000004,
+   "cumulative_s": 1.0074886060000001
+  }
+ ],
+ "profile_by_exclusive": [
+  {
+   "file": "~",
+   "line": 0,
+   "function": "<method 'get' of 'cupy._core.core._ndarray_base' objects>",
+   "calls": 3204,
+   "primitive_calls": 3204,
+   "exclusive_s": 3.0650138740000004,
+   "cumulative_s": 3.0711440760000004
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_fourier_cuda.py",
+   "line": 398,
+   "function": "cuda_fourier_bin_mean_reduce",
+   "calls": 12,
+   "primitive_calls": 12,
+   "exclusive_s": 1.626607394,
+   "cumulative_s": 4.026025579000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/diagnostics.py",
+   "line": 97,
+   "function": "sinc_feature_samples",
+   "calls": 2,
+   "primitive_calls": 2,
+   "exclusive_s": 1.201378132,
+   "cumulative_s": 1.654181938
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/case_driver.py",
+   "line": 475,
+   "function": "electron_cutoffs",
+   "calls": 4,
+   "primitive_calls": 4,
+   "exclusive_s": 0.894534656,
+   "cumulative_s": 1.189610971
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/diagnostics.py",
+   "line": 199,
+   "function": "sinc_spacing_from_samples",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 0.480389975,
+   "cumulative_s": 1.616978435
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_fourier_cuda.py",
+   "line": 274,
+   "function": "cuda_positive_modes",
+   "calls": 12,
+   "primitive_calls": 12,
+   "exclusive_s": 0.291139739,
+   "cumulative_s": 1.8759373270000002
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/segment_escape.py",
+   "line": 305,
+   "function": "segment_escape_pieces",
+   "calls": 79,
+   "primitive_calls": 79,
+   "exclusive_s": 0.27229939000000003,
+   "cumulative_s": 1.046218077
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_fourier_spread.py",
+   "line": 295,
+   "function": "es_gather_moments",
+   "calls": 3616,
+   "primitive_calls": 3616,
+   "exclusive_s": 0.162356984,
+   "cumulative_s": 1.027009885
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/beam_entry.py",
+   "line": 23,
+   "function": "initial_beam_positions",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.12457217000000001,
+   "cumulative_s": 1.695986146
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_kernels.py",
+   "line": 129,
+   "function": "_accumulate_edge_truncation",
+   "calls": 678,
+   "primitive_calls": 678,
+   "exclusive_s": 0.11997871500000001,
+   "cumulative_s": 1.283426334
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/continuation.py",
+   "line": 506,
+   "function": "_drive_continuation_rounds",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.09045483400000001,
+   "cumulative_s": 3.211114524
+  },
+  {
+   "file": "_interface.py",
+   "line": 63,
+   "function": "__call__",
+   "calls": 472,
+   "primitive_calls": 472,
+   "exclusive_s": 0.053449471000000005,
+   "cumulative_s": 1.091519627
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/host_pass.py",
+   "line": 462,
+   "function": "_sample_entry",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.051186520000000006,
+   "cumulative_s": 3.3788915960000003
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/diagnostics.py",
+   "line": 236,
+   "function": "_stable_argsort",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 0.041721055,
+   "cumulative_s": 1.0689288080000001
+  },
+  {
+   "file": "_base.py",
+   "line": 632,
+   "function": "result_iterator",
+   "calls": 5116,
+   "primitive_calls": 5116,
+   "exclusive_s": 0.017844541000000002,
+   "cumulative_s": 4.226704989
+  },
+  {
+   "file": "fromnumeric.py",
+   "line": 48,
+   "function": "_wrapfunc",
+   "calls": 12121,
+   "primitive_calls": 12093,
+   "exclusive_s": 0.016030118,
+   "cumulative_s": 1.1662497410000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/shell_transport.py",
+   "line": 196,
+   "function": "build_shell_inelastic_tables",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.015628014000000003,
+   "cumulative_s": 1.079828322
+  },
+  {
+   "file": "_npyio_impl.py",
+   "line": 239,
+   "function": "__getitem__",
+   "calls": 6420,
+   "primitive_calls": 6420,
+   "exclusive_s": 0.015614468000000001,
+   "cumulative_s": 1.157019202
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/streamed_scoring.py",
+   "line": 479,
+   "function": "score_fixed_streamed",
+   "calls": 1,
+   "primitive_calls": 1,
+   "exclusive_s": 0.01498114,
+   "cumulative_s": 17.242894423000003
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_batched.py",
+   "line": 825,
+   "function": "_batched_incoherent_block",
+   "calls": 139,
+   "primitive_calls": 139,
+   "exclusive_s": 0.014860569,
+   "cumulative_s": 5.429515272000001
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_setup.py",
+   "line": 791,
+   "function": "_prepare_spectrum",
+   "calls": 79,
+   "primitive_calls": 79,
+   "exclusive_s": 0.012952920000000001,
+   "cumulative_s": 2.922508091
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/_jit_launch.py",
+   "line": 234,
+   "function": "run_transport_kernel",
+   "calls": 339,
+   "primitive_calls": 339,
+   "exclusive_s": 0.012507366,
+   "cumulative_s": 1.118613031
+  },
+  {
+   "file": "_base.py",
+   "line": 309,
+   "function": "_result_or_cancel",
+   "calls": 5102,
+   "primitive_calls": 5102,
+   "exclusive_s": 0.011260884,
+   "cumulative_s": 3.336374798
+  },
+  {
+   "file": "threading.py",
+   "line": 337,
+   "function": "wait",
+   "calls": 6268,
+   "primitive_calls": 6268,
+   "exclusive_s": 0.010617742000000001,
+   "cumulative_s": 1.661857641
+  },
+  {
+   "file": "src/pyrite/xsgen/store.py",
+   "line": 439,
+   "function": "arrays",
+   "calls": 379,
+   "primitive_calls": 379,
+   "exclusive_s": 0.009164925,
+   "cumulative_s": 1.06796362
+  },
+  {
+   "file": "_base.py",
+   "line": 424,
+   "function": "result",
+   "calls": 5102,
+   "primitive_calls": 5102,
+   "exclusive_s": 0.00798947,
+   "cumulative_s": 1.9006081570000002
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/case_driver.py",
+   "line": 218,
+   "function": "_transport_case",
+   "calls": 6,
+   "primitive_calls": 4,
+   "exclusive_s": 0.0058092740000000006,
+   "cumulative_s": 24.145582488000002
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/host_pass.py",
+   "line": 244,
+   "function": "_run_validated_pass",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.005255462000000001,
+   "cumulative_s": 7.367140119
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_batched.py",
+   "line": 771,
+   "function": "_queue_unit_lines",
+   "calls": 139,
+   "primitive_calls": 139,
+   "exclusive_s": 0.0050681960000000005,
+   "cumulative_s": 5.104674421
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/streamed_line_grid.py",
+   "line": 94,
+   "function": "add",
+   "calls": 2,
+   "primitive_calls": 2,
+   "exclusive_s": 0.004887657,
+   "cumulative_s": 2.799630989
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/streamed_selection.py",
+   "line": 77,
+   "function": "add",
+   "calls": 2,
+   "primitive_calls": 2,
+   "exclusive_s": 0.004002502000000001,
+   "cumulative_s": 7.6151416030000005
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/batching.py",
+   "line": 785,
+   "function": "_run_per_electron_transport",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.003979393,
+   "cumulative_s": 3.60772992
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/recovery.py",
+   "line": 48,
+   "function": "transport_with_recovery",
+   "calls": 8,
+   "primitive_calls": 4,
+   "exclusive_s": 0.0038980800000000004,
+   "cumulative_s": 22.925276516
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_batched.py",
+   "line": 930,
+   "function": "_accumulate_batched",
+   "calls": 79,
+   "primitive_calls": 79,
+   "exclusive_s": 0.0037161950000000003,
+   "cumulative_s": 6.003489547
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/host_pass.py",
+   "line": 795,
+   "function": "_run_per_electron",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.003433751,
+   "cumulative_s": 3.616873904
+  },
+  {
+   "file": "src/pyrite/montecarlo/transport/host_pass.py",
+   "line": 234,
+   "function": "run_transport_pass",
+   "calls": 73,
+   "primitive_calls": 73,
+   "exclusive_s": 0.0029615630000000004,
+   "cumulative_s": 7.383584178
+  },
+  {
+   "file": "src/pyrite/montecarlo/spectrum/cxr/_spectrum.py",
+   "line": 24,
+   "function": "mc_cxr_spectrum",
+   "calls": 79,
+   "primitive_calls": 79,
+   "exclusive_s": 0.0025762240000000002,
+   "cumulative_s": 8.941542899
+  },
+  {
+   "file": "src/pyrite/montecarlo/runner/case_driver.py",
+   "line": 519,
+   "function": "_cxr_for_segments",
+   "calls": 78,
+   "primitive_calls": 78,
+   "exclusive_s": 0.00255002,
+   "cumulative_s": 8.978465555000001
+  },
+  {
+   "file": "src/pyrite/_backend.py",
+   "line": 176,
+   "function": "to_cpu",
+   "calls": 2543,
+   "primitive_calls": 2543,
+   "exclusive_s": 0.0024488540000000003,
+   "cumulative_s": 2.3977060540000004
+  },
+  {
+   "file": "__init__.py",
+   "line": 826,
+   "function": "asnumpy",
+   "calls": 3180,
+   "primitive_calls": 3180,
+   "exclusive_s": 0.002350137,
+   "cumulative_s": 2.758430428
+  }
+ ]
+}

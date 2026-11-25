@@ -1,0 +1,29 @@
+{
+  "job_id": 15957,
+  "state": "COMPLETED",
+  "elapsed_s": 1331,
+  "node": "king (cpu partition, idle at submission)",
+  "requested_cpus": 4,
+  "requested_memory_MiB": 8192,
+  "producer_revision": "86128404ca313b5189483b2cf44abdacd0912a16",
+  "numerical_baseline": "main 51a928b25 (includes #1281 lattice-share PR #1435)",
+  "sync_code_digest_py": "c222b253ba5920ccb30cc093acd4976a94eefd0ebd7949ab81f9cfd1078f8094",
+  "scheduler_step_max_rss_KiB": {
+    "batch": 2068456
+  },
+  "command": "sbatch --nodelist=<cpu-node> --job-name=reb1432-86128404c checks/native_cpu_audit/rebaseline.sbatch",
+  "failed_arms": {
+    "mos2_5mev": "timeout 600 s (exit 124); no result or timing accepted"
+  },
+  "path_sanitization": "isolated checkout path replaced with <checkout>, home with <home>",
+  "files": {
+    "crystal300-t1.json": "6a098175d0a85351c0a708834b28b31328f31e1ea8c5f0cd2b50bf9ff2fc0d66",
+    "job-log.txt": "af3af80343c34ba530082b5b9f56404aa19a9bb38a5acd812773d6bd2d01d2ee",
+    "layered-t1.json": "393721b8483d032f0dd46c4595e0498b7e4f77c40d6a19c9c2548af7cae320f5",
+    "photon-case-t1.json": "b37dc469d6e9b1bb6110820437e9f834e175e13a2730239c8152f536aa51dfe1",
+    "summary.json": "957ec2d8d7d4ec8ab869875254d1245d7f69e8fa86ea3d573a3aae9c0a0329e8",
+    "thin100-t1.json": "508d0847aca352c0f3371e7e51b3435a7346d29935c3782774ba80fcf456448c",
+    "thin30-t1.json": "0f9a3f4a3e3158640c14270585de9959b6ac0aa70c139eb65ab3209cb4d360c7"
+  },
+  "dropped_sha256": {}
+}

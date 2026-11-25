@@ -1,0 +1,1146 @@
+{
+ "schema": "pyrite.native-cpu-audit.gpu-host.v1",
+ "issue": 1432,
+ "code_sha": "9035c313b5fa153062e0ea7763fe8abb2f1958a6",
+ "profile": "cleo_test",
+ "material": "hopg",
+ "E0_keV": 300.0,
+ "tilt_deg": 25.0,
+ "mode": "sampler",
+ "host_spans": [
+  "electron_cutoffs",
+  "_resolve_policy_grid",
+  "sinc_feature_samples",
+  "sinc_spacing_from_samples",
+  "initial_beam_positions",
+  "build_shell_inelastic_tables",
+  "segment_escape_pieces",
+  "_corrected_tables",
+  "cuda_fourier_bin_mean_reduce",
+  "block_tail_sums",
+  "_simulate_trajectories",
+  "initial_energies_keV",
+  "StoppingMonitor.on_block",
+  "StoppingMonitor.should_stop",
+  "IndependentStoppingMonitor.on_block",
+  "IndependentStoppingMonitor.should_stop",
+  "AdaptiveChunkPlan.observe",
+  "AdaptiveHostAdmission.check",
+  "ResidentBlockRecovery.simulate",
+  "ResidentBlockRecovery.join",
+  "_globalize",
+  "merge_electron_blocks",
+  "finalize_population_fields",
+  "case_spectrum_inputs",
+  "BlockSpectrumScorer.add",
+  "BlockSpectrumScorer.result",
+  "PrefixSelectingScorer.add",
+  "PrefixSelectingScorer.result",
+  "MonitoredScoringSink.__call__",
+  "MonitoredScoringSink.finish",
+  "MonitoredScoringSink.result",
+  "BlockGridEvidence.add"
+ ],
+ "backend": "cuda",
+ "affinity": [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7
+ ],
+ "threads": {
+  "NUMBA_NUM_THREADS": null,
+  "OMP_NUM_THREADS": null
+ },
+ "numba_threads": 8,
+ "precision": {
+  "target_rse": 0.001,
+  "min_electrons": 3000,
+  "max_electrons": 100000000,
+  "observables": [
+   "line",
+   "brem"
+  ],
+  "max_electron_share": 0.05,
+  "min_effective_electrons": 100.0,
+  "max_variance_of_variance": 0.01,
+  "stability_checks": 3,
+  "stability_fraction": 0.5,
+  "pilot_electrons": 3000,
+  "band_eV": null,
+  "batch_means_band_eV": null,
+  "brem_target_rse": 0.001,
+  "brem_min_electrons": 3000,
+  "brem_max_electrons": 100000000,
+  "decision_growth": 0.1
+ },
+ "error": null,
+ "setup_s": 0.7700484627857804,
+ "wall_s": 48.62052807118744,
+ "process_cpu_s": 107.206027232,
+ "phases_unsynced_s": {
+  "_transport_case": 45.97321735136211
+ },
+ "ranges": {
+  "gpuhost.run": {
+   "inclusive_s": 48.619226060807705,
+   "exclusive_s": 0.008054905105382204,
+   "calls": 1
+  },
+  "gpuhost._transport_case": {
+   "inclusive_s": 45.973200200125575,
+   "exclusive_s": 1.0902126557193696,
+   "calls": 4
+  },
+  "gpuhost._simulate_trajectories": {
+   "inclusive_s": 24.68076946027577,
+   "exclusive_s": 2.473204609937966,
+   "calls": 137
+  },
+  "gpuhost.PrefixSelectingScorer.add": {
+   "inclusive_s": 20.006471606902778,
+   "exclusive_s": 0.014152626506984234,
+   "calls": 6
+  },
+  "pyrite.transport.sample": {
+   "inclusive_s": 17.10933986864984,
+   "exclusive_s": 1.111038218718022,
+   "calls": 137
+  },
+  "gpuhost.BlockSpectrumScorer.add": {
+   "inclusive_s": 15.473246414214373,
+   "exclusive_s": 3.614833965431899,
+   "calls": 6
+  },
+  "pyrite.lines.reduce": {
+   "inclusive_s": 11.164924994576722,
+   "exclusive_s": 0.22230779007077217,
+   "calls": 34
+  },
+  "pyrite.transport.core": {
+   "inclusive_s": 10.877443764358759,
+   "exclusive_s": 2.1802513487637043,
+   "calls": 137
+  },
+  "gpuhost.ResidentBlockRecovery.simulate": {
+   "inclusive_s": 10.225329024717212,
+   "exclusive_s": 1.2018534722737968,
+   "calls": 125
+  },
+  "gpuhost.cuda_fourier_bin_mean_reduce": {
+   "inclusive_s": 9.327031951863319,
+   "exclusive_s": 8.278983052354306,
+   "calls": 34
+  },
+  "gpuhost.BlockGridEvidence.add": {
+   "inclusive_s": 8.428563435561955,
+   "exclusive_s": 1.6963466317392886,
+   "calls": 6
+  },
+  "gpuhost.sinc_feature_samples": {
+   "inclusive_s": 6.4886065614409745,
+   "exclusive_s": 0.5829022987745702,
+   "calls": 6
+  },
+  "gpuhost.IndependentStoppingMonitor.on_block": {
+   "inclusive_s": 5.7969582146033645,
+   "exclusive_s": 1.9143493599258363,
+   "calls": 123
+  },
+  "pyrite.transport.continuation.stage": {
+   "inclusive_s": 4.795382424257696,
+   "exclusive_s": 4.724201826844364,
+   "calls": 998
+  },
+  "gpuhost.initial_beam_positions": {
+   "inclusive_s": 4.4949703784659505,
+   "exclusive_s": 3.4841702193953097,
+   "calls": 151
+  },
+  "gpuhost.StoppingMonitor.on_block": {
+   "inclusive_s": 3.3601298043504357,
+   "exclusive_s": 2.503531273920089,
+   "calls": 125
+  },
+  "pyrite.transport.continuation.launch": {
+   "inclusive_s": 2.5830644224770367,
+   "exclusive_s": 2.3376836706884205,
+   "calls": 998
+  },
+  "gpuhost._resolve_policy_grid": {
+   "inclusive_s": 2.544925965834409,
+   "exclusive_s": 0.8243089723400772,
+   "calls": 1
+  },
+  "pyrite.transport.continuation.assemble": {
+   "inclusive_s": 2.364632240962237,
+   "exclusive_s": 2.364632240962237,
+   "calls": 137
+  },
+  "gpuhost.block_tail_sums": {
+   "inclusive_s": 1.7206169934943318,
+   "exclusive_s": 1.7206169934943318,
+   "calls": 13
+  },
+  "gpuhost.segment_escape_pieces": {
+   "inclusive_s": 1.697552870027721,
+   "exclusive_s": 1.697552870027721,
+   "calls": 149
+  },
+  "pyrite.transport.upload": {
+   "inclusive_s": 1.0004637180827558,
+   "exclusive_s": 1.0004637180827558,
+   "calls": 137
+  },
+  "gpuhost.initial_energies_keV": {
+   "inclusive_s": 0.7960671312175691,
+   "exclusive_s": 0.751387792173773,
+   "calls": 137
+  },
+  "pyrite.transport.alloc": {
+   "inclusive_s": 0.7741691120900214,
+   "exclusive_s": 0.7741691120900214,
+   "calls": 137
+  },
+  "gpuhost._corrected_tables": {
+   "inclusive_s": 0.6495943726040423,
+   "exclusive_s": 0.4701832621358335,
+   "calls": 5
+  },
+  "pyrite.transport.inelastic": {
+   "inclusive_s": 0.43159484351053834,
+   "exclusive_s": 0.42836457770317793,
+   "calls": 137
+  },
+  "gpuhost.electron_cutoffs": {
+   "inclusive_s": 0.3501160638406873,
+   "exclusive_s": 0.3501160638406873,
+   "calls": 5
+  },
+  "pyrite.transport.tables": {
+   "inclusive_s": 0.21753383381292224,
+   "exclusive_s": 0.21753383381292224,
+   "calls": 137
+  },
+  "pyrite.lines.tab": {
+   "inclusive_s": 0.1944089657627046,
+   "exclusive_s": 0.1944089657627046,
+   "calls": 144
+  },
+  "gpuhost.IndependentStoppingMonitor.should_stop": {
+   "inclusive_s": 0.1882745511829853,
+   "exclusive_s": 0.0009216833859682083,
+   "calls": 123
+  },
+  "gpuhost.StoppingMonitor.should_stop": {
+   "inclusive_s": 0.1873528677970171,
+   "exclusive_s": 0.1873528677970171,
+   "calls": 110
+  },
+  "gpuhost.PrefixSelectingScorer.result": {
+   "inclusive_s": 0.09304498974233866,
+   "exclusive_s": 1.63298100233078e-05,
+   "calls": 1
+  },
+  "gpuhost.BlockSpectrumScorer.result": {
+   "inclusive_s": 0.09302865993231535,
+   "exclusive_s": 0.09302865993231535,
+   "calls": 1
+  },
+  "pyrite.transport.output": {
+   "inclusive_s": 0.09000948257744312,
+   "exclusive_s": 0.09000948257744312,
+   "calls": 137
+  },
+  "gpuhost._globalize": {
+   "inclusive_s": 0.012442201375961304,
+   "exclusive_s": 0.012442201375961304,
+   "calls": 135
+  },
+  "gpuhost.build_shell_inelastic_tables": {
+   "inclusive_s": 0.002273768652230501,
+   "exclusive_s": 0.002273768652230501,
+   "calls": 1
+  },
+  "gpuhost.case_spectrum_inputs": {
+   "inclusive_s": 0.0006062351167201996,
+   "exclusive_s": 0.0006062351167201996,
+   "calls": 3
+  },
+  "gpuhost.AdaptiveChunkPlan.observe": {
+   "inclusive_s": 0.0004426012746989727,
+   "exclusive_s": 0.0004426012746989727,
+   "calls": 123
+  },
+  "gpuhost.AdaptiveHostAdmission.check": {
+   "inclusive_s": 0.0003159022890031338,
+   "exclusive_s": 0.0003159022890031338,
+   "calls": 2
+  }
+ },
+ "sampler": {
+  "sample_s": 0.01,
+  "samples": 4670,
+  "nvml_samples": 2298,
+  "nvml_available": true,
+  "gpu_util_mean": 42.507832898172325,
+  "gpu_idle_fraction_of_samples": 0.18565310492505355,
+  "idle_threshold_percent": 10,
+  "by_range_all": [
+   {
+    "where": "gpuhost.cuda_fourier_bin_mean_reduce",
+    "samples": 814,
+    "seconds": 8.14
+   },
+   {
+    "where": "pyrite.transport.continuation.stage",
+    "samples": 461,
+    "seconds": 4.61
+   },
+   {
+    "where": "gpuhost.BlockSpectrumScorer.add",
+    "samples": 357,
+    "seconds": 3.5700000000000003
+   },
+   {
+    "where": "gpuhost.initial_beam_positions",
+    "samples": 338,
+    "seconds": 3.38
+   },
+   {
+    "where": "gpuhost.StoppingMonitor.on_block",
+    "samples": 248,
+    "seconds": 2.48
+   },
+   {
+    "where": "gpuhost._simulate_trajectories",
+    "samples": 239,
+    "seconds": 2.39
+   },
+   {
+    "where": "pyrite.transport.core",
+    "samples": 229,
+    "seconds": 2.29
+   },
+   {
+    "where": "pyrite.transport.continuation.assemble",
+    "samples": 229,
+    "seconds": 2.29
+   },
+   {
+    "where": "pyrite.transport.continuation.launch",
+    "samples": 210,
+    "seconds": 2.1
+   },
+   {
+    "where": "gpuhost.IndependentStoppingMonitor.on_block",
+    "samples": 185,
+    "seconds": 1.85
+   },
+   {
+    "where": "gpuhost.segment_escape_pieces",
+    "samples": 176,
+    "seconds": 1.76
+   },
+   {
+    "where": "gpuhost.BlockGridEvidence.add",
+    "samples": 168,
+    "seconds": 1.68
+   },
+   {
+    "where": "gpuhost.block_tail_sums",
+    "samples": 150,
+    "seconds": 1.5
+   },
+   {
+    "where": "gpuhost.ResidentBlockRecovery.simulate",
+    "samples": 111,
+    "seconds": 1.11
+   },
+   {
+    "where": "pyrite.transport.upload",
+    "samples": 97,
+    "seconds": 0.97
+   },
+   {
+    "where": "gpuhost._transport_case",
+    "samples": 96,
+    "seconds": 0.96
+   },
+   {
+    "where": "pyrite.transport.sample",
+    "samples": 83,
+    "seconds": 0.8300000000000001
+   },
+   {
+    "where": "gpuhost._resolve_policy_grid",
+    "samples": 81,
+    "seconds": 0.81
+   },
+   {
+    "where": "pyrite.transport.alloc",
+    "samples": 68,
+    "seconds": 0.68
+   },
+   {
+    "where": "gpuhost.initial_energies_keV",
+    "samples": 57,
+    "seconds": 0.5700000000000001
+   },
+   {
+    "where": "gpuhost.sinc_feature_samples",
+    "samples": 57,
+    "seconds": 0.5700000000000001
+   },
+   {
+    "where": "gpuhost._corrected_tables",
+    "samples": 45,
+    "seconds": 0.45
+   },
+   {
+    "where": "pyrite.transport.inelastic",
+    "samples": 42,
+    "seconds": 0.42
+   },
+   {
+    "where": "gpuhost.electron_cutoffs",
+    "samples": 31,
+    "seconds": 0.31
+   },
+   {
+    "where": "pyrite.lines.reduce",
+    "samples": 25,
+    "seconds": 0.25
+   }
+  ],
+  "by_range_gpu_idle": [
+   {
+    "where": "gpuhost.initial_beam_positions",
+    "samples": 180,
+    "seconds": 1.8
+   },
+   {
+    "where": "gpuhost.block_tail_sums",
+    "samples": 150,
+    "seconds": 1.5
+   },
+   {
+    "where": "gpuhost._resolve_policy_grid",
+    "samples": 74,
+    "seconds": 0.74
+   },
+   {
+    "where": "pyrite.transport.upload",
+    "samples": 50,
+    "seconds": 0.5
+   },
+   {
+    "where": "pyrite.transport.core",
+    "samples": 48,
+    "seconds": 0.48
+   },
+   {
+    "where": "pyrite.transport.alloc",
+    "samples": 47,
+    "seconds": 0.47000000000000003
+   },
+   {
+    "where": "gpuhost.StoppingMonitor.on_block",
+    "samples": 43,
+    "seconds": 0.43
+   },
+   {
+    "where": "pyrite.transport.inelastic",
+    "samples": 42,
+    "seconds": 0.42
+   },
+   {
+    "where": "gpuhost._corrected_tables",
+    "samples": 42,
+    "seconds": 0.42
+   },
+   {
+    "where": "pyrite.transport.continuation.stage",
+    "samples": 36,
+    "seconds": 0.36
+   },
+   {
+    "where": "gpuhost.sinc_feature_samples",
+    "samples": 26,
+    "seconds": 0.26
+   },
+   {
+    "where": "gpuhost.ResidentBlockRecovery.simulate",
+    "samples": 25,
+    "seconds": 0.25
+   },
+   {
+    "where": "pyrite.transport.continuation.launch",
+    "samples": 24,
+    "seconds": 0.24
+   },
+   {
+    "where": "gpuhost.electron_cutoffs",
+    "samples": 20,
+    "seconds": 0.2
+   },
+   {
+    "where": "gpuhost.BlockGridEvidence.add",
+    "samples": 13,
+    "seconds": 0.13
+   },
+   {
+    "where": "gpuhost._simulate_trajectories",
+    "samples": 11,
+    "seconds": 0.11
+   },
+   {
+    "where": "gpuhost.segment_escape_pieces",
+    "samples": 10,
+    "seconds": 0.1
+   },
+   {
+    "where": "gpuhost.BlockSpectrumScorer.result",
+    "samples": 8,
+    "seconds": 0.08
+   },
+   {
+    "where": "gpuhost._transport_case",
+    "samples": 6,
+    "seconds": 0.06
+   },
+   {
+    "where": "pyrite.transport.sample",
+    "samples": 6,
+    "seconds": 0.06
+   },
+   {
+    "where": "pyrite.transport.continuation.assemble",
+    "samples": 3,
+    "seconds": 0.03
+   },
+   {
+    "where": "pyrite.lines.tab",
+    "samples": 2,
+    "seconds": 0.02
+   },
+   {
+    "where": "gpuhost.initial_energies_keV",
+    "samples": 1,
+    "seconds": 0.01
+   }
+  ],
+  "by_pyrite_stack_all": [
+   {
+    "where": "montecarlo/runner/stream_overlap.py:collect:87 < montecarlo/runner/stream_overlap.py:stream_overlapped:117 < montecarlo/runner/block_transport.py:_stream_electron_blocks:289",
+    "samples": 1286,
+    "seconds": 12.86
+   },
+   {
+    "where": "montecarlo/runner/stream_overlap.py:collect:87 < montecarlo/runner/stream_overlap.py:stream_overlapped:127 < montecarlo/runner/block_transport.py:_stream_electron_blocks:289",
+    "samples": 282,
+    "seconds": 2.82
+   },
+   {
+    "where": "montecarlo/transport/continuation.py:_gather_index:396 < montecarlo/transport/continuation.py:_drive_continuation_rounds:569 < montecarlo/transport/batching.py:_run_per_electron_transport:946",
+    "samples": 211,
+    "seconds": 2.11
+   },
+   {
+    "where": "montecarlo/spectrum/_population_tail.py:block_tail_sums:86 < montecarlo/spectrum/cxr_seeds.py:numerator:310 < montecarlo/spectrum/cxr_seeds.py:lost:341",
+    "samples": 150,
+    "seconds": 1.5
+   },
+   {
+    "where": "montecarlo/transport/_jit_launch.py:run_transport_kernel:394 < montecarlo/transport/_jit_launch.py:core:638 < montecarlo/transport/continuation.py:_drive_continuation_rounds:557",
+    "samples": 109,
+    "seconds": 1.09
+   },
+   {
+    "where": "montecarlo/transport/continuation.py:<genexpr>:571 < montecarlo/transport/continuation.py:_drive_continuation_rounds:571 < montecarlo/transport/batching.py:_run_per_electron_transport:946",
+    "samples": 102,
+    "seconds": 1.02
+   },
+   {
+    "where": "montecarlo/spectrum/_ordered_bincount.py:_route:72 < montecarlo/spectrum/_ordered_bincount.py:ordered_bincount:105 < montecarlo/spectrum/cxr/_kernels.py:_accumulate_edge_truncation:177",
+    "samples": 95,
+    "seconds": 0.9500000000000001
+   },
+   {
+    "where": "_backend.py:release_memory:211 < montecarlo/runner/stream_overlap.py:stream_overlapped:120 < montecarlo/runner/block_transport.py:_stream_electron_blocks:289",
+    "samples": 77,
+    "seconds": 0.77
+   },
+   {
+    "where": "montecarlo/transport/host_pass.py:_sample_entry:557 < montecarlo/transport/host_pass.py:_run_validated_pass:258 < montecarlo/transport/host_pass.py:run_transport_pass:242",
+    "samples": 70,
+    "seconds": 0.7000000000000001
+   },
+   {
+    "where": "montecarlo/transport/_continuation_join.py:<genexpr>:112 < montecarlo/transport/_continuation_join.py:upload:112 < montecarlo/transport/_continuation_join.py:_join_cuda:241",
+    "samples": 66,
+    "seconds": 0.66
+   },
+   {
+    "where": "montecarlo/transport/continuation.py:_drive_continuation_rounds:582 < montecarlo/transport/batching.py:_run_per_electron_transport:946 < montecarlo/transport/host_pass.py:_run_per_electron:867",
+    "samples": 64,
+    "seconds": 0.64
+   },
+   {
+    "where": "montecarlo/transport/continuation.py:_pending_order:462 < montecarlo/transport/continuation.py:_drive_continuation_rounds:541 < montecarlo/transport/batching.py:_run_per_electron_transport:946",
+    "samples": 57,
+    "seconds": 0.5700000000000001
+   },
+   {
+    "where": "_backend.py:to_cpu:177 < _backend.py:_to_cpu:445 < montecarlo/spectrum/cxr/_setup.py:_prepare_spectrum:1068",
+    "samples": 48,
+    "seconds": 0.48
+   },
+   {
+    "where": "xsgen/store.py:arrays:456 < xsgen/elsepa/catalog.py:resolve_layer_tables:277 < montecarlo/runner/case_tables.py:_case_elastic_entries:136",
+    "samples": 44,
+    "seconds": 0.44
+   },
+   {
+    "where": "montecarlo/transport/continuation.py:_drive_continuation_rounds:654 < montecarlo/transport/batching.py:_run_per_electron_transport:946 < montecarlo/transport/host_pass.py:_run_per_electron:867",
+    "samples": 43,
+    "seconds": 0.43
+   },
+   {
+    "where": "montecarlo/spectrum/cxr/_formation.py:expand_escape_pieces:169 < montecarlo/spectrum/cxr/_setup.py:_prepare_spectrum:919 < montecarlo/spectrum/cxr/_spectrum.py:_mc_spectrum:366",
+    "samples": 42,
+    "seconds": 0.42
+   },
+   {
+    "where": "xsgen/store.py:arrays:456 < xsgen/elsepa/catalog.py:resolve_layer_tables:271 < montecarlo/runner/case_tables.py:_case_elastic_entries:136",
+    "samples": 40,
+    "seconds": 0.4
+   },
+   {
+    "where": "montecarlo/transport/kinematics.py:_beta_array:159 < montecarlo/transport/beam_entry.py:face_arrival_delay_ang:222 < montecarlo/transport/beam_entry.py:resolve_bunch_times:239",
+    "samples": 39,
+    "seconds": 0.39
+   },
+   {
+    "where": "montecarlo/transport/continuation.py:_drive_continuation_rounds:564 < montecarlo/transport/batching.py:_run_per_electron_transport:946 < montecarlo/transport/host_pass.py:_run_per_electron:867",
+    "samples": 38,
+    "seconds": 0.38
+   },
+   {
+    "where": "montecarlo/transport/continuation.py:_drive_continuation_rounds:576 < montecarlo/transport/batching.py:_run_per_electron_transport:946 < montecarlo/transport/host_pass.py:_run_per_electron:867",
+    "samples": 38,
+    "seconds": 0.38
+   },
+   {
+    "where": "montecarlo/spectrum/segment_escape.py:segment_escape_pieces:321 < montecarlo/spectrum/cxr/_setup.py:_prepare_spectrum:1086 < montecarlo/spectrum/cxr/_spectrum.py:_mc_spectrum:366",
+    "samples": 36,
+    "seconds": 0.36
+   },
+   {
+    "where": "montecarlo/transport/continuation.py:_canonical_runs:415 < montecarlo/transport/_continuation_join.py:__init__:96 < montecarlo/transport/_continuation_join.py:join_rounds:220",
+    "samples": 33,
+    "seconds": 0.33
+   },
+   {
+    "where": "montecarlo/transport/continuation.py:_canonical_runs:417 < montecarlo/transport/_continuation_join.py:__init__:96 < montecarlo/transport/_continuation_join.py:join_rounds:220",
+    "samples": 33,
+    "seconds": 0.33
+   },
+   {
+    "where": "montecarlo/transport/continuation.py:_gather_index:399 < montecarlo/transport/continuation.py:_drive_continuation_rounds:569 < montecarlo/transport/batching.py:_run_per_electron_transport:946",
+    "samples": 31,
+    "seconds": 0.31
+   },
+   {
+    "where": "montecarlo/transport/hard_inelastic.py:hard_keys_from_stream_keys:102 < montecarlo/transport/host_pass.py:_run_validated_pass:272 < montecarlo/transport/host_pass.py:run_transport_pass:242",
+    "samples": 31,
+    "seconds": 0.31
+   }
+  ],
+  "by_pyrite_stack_gpu_idle": [
+   {
+    "where": "montecarlo/spectrum/_population_tail.py:block_tail_sums:86 < montecarlo/spectrum/cxr_seeds.py:numerator:310 < montecarlo/spectrum/cxr_seeds.py:lost:341",
+    "samples": 150,
+    "seconds": 1.5
+   },
+   {
+    "where": "montecarlo/runner/stream_overlap.py:collect:87 < montecarlo/runner/stream_overlap.py:stream_overlapped:127 < montecarlo/runner/block_transport.py:_stream_electron_blocks:289",
+    "samples": 39,
+    "seconds": 0.39
+   },
+   {
+    "where": "montecarlo/transport/host_pass.py:_sample_entry:557 < montecarlo/transport/host_pass.py:_run_validated_pass:258 < montecarlo/transport/host_pass.py:run_transport_pass:242",
+    "samples": 38,
+    "seconds": 0.38
+   },
+   {
+    "where": "montecarlo/spectrum/brem_lattice_share.py:load:234 < montecarlo/runner/lattice_share.py:_kernel:69 < montecarlo/runner/lattice_share.py:_corrected_tables:224",
+    "samples": 29,
+    "seconds": 0.29
+   },
+   {
+    "where": "montecarlo/geometry.py:project_beam_entry:373 < montecarlo/transport/beam_entry.py:initial_beam_positions:89 < montecarlo/transport/beam_prefetch.py:take:133",
+    "samples": 26,
+    "seconds": 0.26
+   },
+   {
+    "where": "montecarlo/transport/continuation.py:_pending_order:462 < montecarlo/transport/continuation.py:_drive_continuation_rounds:541 < montecarlo/transport/batching.py:_run_per_electron_transport:946",
+    "samples": 26,
+    "seconds": 0.26
+   },
+   {
+    "where": "montecarlo/transport/continuation.py:_gather_index:396 < montecarlo/transport/continuation.py:_drive_continuation_rounds:569 < montecarlo/transport/batching.py:_run_per_electron_transport:946",
+    "samples": 24,
+    "seconds": 0.24
+   },
+   {
+    "where": "montecarlo/transport/kinematics.py:counter_normals:308 < montecarlo/transport/beam_entry.py:initial_beam_positions:83 < montecarlo/transport/beam_prefetch.py:take:133",
+    "samples": 22,
+    "seconds": 0.22
+   },
+   {
+    "where": "montecarlo/transport/_jit_launch.py:run_transport_kernel:394 < montecarlo/transport/_jit_launch.py:core:638 < montecarlo/transport/continuation.py:_drive_continuation_rounds:557",
+    "samples": 19,
+    "seconds": 0.19
+   },
+   {
+    "where": "montecarlo/transport/hard_inelastic.py:hard_keys_from_stream_keys:102 < montecarlo/transport/host_pass.py:_run_validated_pass:272 < montecarlo/transport/host_pass.py:run_transport_pass:242",
+    "samples": 19,
+    "seconds": 0.19
+   },
+   {
+    "where": "montecarlo/spectrum/cxr_seeds.py:__init__:293 < montecarlo/spectrum/cxr_seeds.py:resonance_population_stop_eV:276 < montecarlo/spectrum/cxr_seeds.py:case_cxr_stop_eV:1001",
+    "samples": 17,
+    "seconds": 0.17
+   },
+   {
+    "where": "montecarlo/runner/cutoffs.py:electron_cutoffs:116 < montecarlo/runner/case_driver.py:_transport_case:314 < montecarlo/realization.py:call:188",
+    "samples": 16,
+    "seconds": 0.16
+   },
+   {
+    "where": "montecarlo/transport/hard_inelastic.py:hard_keys_from_stream_keys:103 < montecarlo/transport/host_pass.py:_run_validated_pass:272 < montecarlo/transport/host_pass.py:run_transport_pass:242",
+    "samples": 16,
+    "seconds": 0.16
+   },
+   {
+    "where": "xsgen/store.py:arrays:456 < montecarlo/transport/shell_rates.py:adopted_stopping_cs:263 < montecarlo/transport/shell_rates.py:catalog_shell_rate_closure:323",
+    "samples": 15,
+    "seconds": 0.15
+   },
+   {
+    "where": "montecarlo/transport/kinematics.py:_beta_array:159 < montecarlo/transport/beam_entry.py:face_arrival_delay_ang:222 < montecarlo/transport/beam_entry.py:resolve_bunch_times:239",
+    "samples": 14,
+    "seconds": 0.14
+   },
+   {
+    "where": "montecarlo/transport/batching.py:_run_per_electron_transport:885 < montecarlo/transport/host_pass.py:_run_per_electron:867 < montecarlo/transport/host_pass.py:_dispatch_core:734",
+    "samples": 13,
+    "seconds": 0.13
+   },
+   {
+    "where": "montecarlo/transport/continuation.py:_drive_continuation_rounds:582 < montecarlo/transport/batching.py:_run_per_electron_transport:946 < montecarlo/transport/host_pass.py:_run_per_electron:867",
+    "samples": 13,
+    "seconds": 0.13
+   },
+   {
+    "where": "montecarlo/spectrum/cxr_seeds.py:__init__:292 < montecarlo/spectrum/cxr_seeds.py:resonance_population_stop_eV:276 < montecarlo/spectrum/cxr_seeds.py:case_cxr_stop_eV:1001",
+    "samples": 13,
+    "seconds": 0.13
+   },
+   {
+    "where": "montecarlo/geometry.py:project_beam_entry:375 < montecarlo/transport/beam_entry.py:initial_beam_positions:89 < montecarlo/transport/beam_prefetch.py:take:133",
+    "samples": 12,
+    "seconds": 0.12
+   },
+   {
+    "where": "montecarlo/transport/hard_inelastic.py:hard_keys_from_stream_keys:104 < montecarlo/transport/host_pass.py:_run_validated_pass:272 < montecarlo/transport/host_pass.py:run_transport_pass:242",
+    "samples": 11,
+    "seconds": 0.11
+   },
+   {
+    "where": "montecarlo/transport/batching.py:_run_per_electron_transport:884 < montecarlo/transport/host_pass.py:_run_per_electron:867 < montecarlo/transport/host_pass.py:_dispatch_core:734",
+    "samples": 11,
+    "seconds": 0.11
+   },
+   {
+    "where": "xsgen/store.py:arrays:456 < xsgen/elsepa/catalog.py:resolve_layer_tables:271 < montecarlo/runner/case_tables.py:_case_elastic_entries:136",
+    "samples": 9,
+    "seconds": 0.09
+   },
+   {
+    "where": "montecarlo/spectrum/spacing_selection.py:_scan:106 < montecarlo/spectrum/spacing_selection.py:sinc_spacing_by_selection:173 < montecarlo/runner/streamed_line_grid.py:sinc_spacing:231",
+    "samples": 9,
+    "seconds": 0.09
+   },
+   {
+    "where": "montecarlo/transport/batching.py:_run_per_electron_transport:881 < montecarlo/transport/host_pass.py:_run_per_electron:867 < montecarlo/transport/host_pass.py:_dispatch_core:734",
+    "samples": 8,
+    "seconds": 0.08
+   },
+   {
+    "where": "montecarlo/transport/hard_inelastic.py:hard_keys_from_stream_keys:101 < montecarlo/transport/host_pass.py:_run_validated_pass:272 < montecarlo/transport/host_pass.py:run_transport_pass:242",
+    "samples": 8,
+    "seconds": 0.08
+   }
+  ],
+  "by_innermost_gpu_idle": [
+   {
+    "where": "threading.py:wait:369",
+    "samples": 188,
+    "seconds": 1.8800000000000001
+   },
+   {
+    "where": "cupy/_creation/from_data.py:asarray:94",
+    "samples": 65,
+    "seconds": 0.65
+   },
+   {
+    "where": "montecarlo/transport/host_pass.py:_sample_entry:557",
+    "samples": 38,
+    "seconds": 0.38
+   },
+   {
+    "where": "__init__.py:_read1:1181",
+    "samples": 34,
+    "seconds": 0.34
+   },
+   {
+    "where": "montecarlo/geometry.py:project_beam_entry:373",
+    "samples": 26,
+    "seconds": 0.26
+   },
+   {
+    "where": "montecarlo/transport/continuation.py:_gather_index:396",
+    "samples": 24,
+    "seconds": 0.24
+   },
+   {
+    "where": "montecarlo/transport/kinematics.py:counter_normals:308",
+    "samples": 22,
+    "seconds": 0.22
+   },
+   {
+    "where": "montecarlo/transport/hard_inelastic.py:hard_keys_from_stream_keys:102",
+    "samples": 19,
+    "seconds": 0.19
+   },
+   {
+    "where": "montecarlo/runner/cutoffs.py:electron_cutoffs:116",
+    "samples": 16,
+    "seconds": 0.16
+   },
+   {
+    "where": "montecarlo/transport/hard_inelastic.py:hard_keys_from_stream_keys:103",
+    "samples": 16,
+    "seconds": 0.16
+   },
+   {
+    "where": "numpy/_core/_methods.py:_sum:49",
+    "samples": 16,
+    "seconds": 0.16
+   },
+   {
+    "where": "montecarlo/transport/kinematics.py:_beta_array:159",
+    "samples": 15,
+    "seconds": 0.15
+   },
+   {
+    "where": "numpy/_core/fromnumeric.py:sort:1105",
+    "samples": 15,
+    "seconds": 0.15
+   },
+   {
+    "where": "cupyx/jit/_interface.py:__call__:134",
+    "samples": 14,
+    "seconds": 0.14
+   },
+   {
+    "where": "montecarlo/transport/continuation.py:_drive_continuation_rounds:582",
+    "samples": 13,
+    "seconds": 0.13
+   },
+   {
+    "where": "montecarlo/spectrum/cxr_seeds.py:__init__:292",
+    "samples": 13,
+    "seconds": 0.13
+   },
+   {
+    "where": "montecarlo/geometry.py:project_beam_entry:375",
+    "samples": 12,
+    "seconds": 0.12
+   },
+   {
+    "where": "__init__.py:open:771",
+    "samples": 11,
+    "seconds": 0.11
+   },
+   {
+    "where": "numpy/_core/fromnumeric.py:_wrapfunc:54",
+    "samples": 11,
+    "seconds": 0.11
+   },
+   {
+    "where": "montecarlo/transport/hard_inelastic.py:hard_keys_from_stream_keys:104",
+    "samples": 11,
+    "seconds": 0.11
+   },
+   {
+    "where": "montecarlo/spectrum/cxr_seeds.py:__init__:293",
+    "samples": 11,
+    "seconds": 0.11
+   },
+   {
+    "where": "numpy/lib/_format_impl.py:read_array:872",
+    "samples": 10,
+    "seconds": 0.1
+   },
+   {
+    "where": "cupy/cuda/compiler.py:_compile_with_cache_cuda:739",
+    "samples": 9,
+    "seconds": 0.09
+   },
+   {
+    "where": "<frozen posixpath>:realpath:457",
+    "samples": 8,
+    "seconds": 0.08
+   },
+   {
+    "where": "montecarlo/spectrum/brem_lattice_share.py:load:234",
+    "samples": 8,
+    "seconds": 0.08
+   }
+  ],
+  "util_timeline": [
+   [
+    0.0,
+    0.9130434782608695
+   ],
+   [
+    1.0,
+    5.166666666666667
+   ],
+   [
+    2.0,
+    13.081632653061224
+   ],
+   [
+    3.0,
+    31.638297872340427
+   ],
+   [
+    4.0,
+    35.851063829787236
+   ],
+   [
+    5.0,
+    38.630434782608695
+   ],
+   [
+    6.0,
+    37.32608695652174
+   ],
+   [
+    7.0,
+    39.93617021276596
+   ],
+   [
+    8.0,
+    39.97872340425532
+   ],
+   [
+    9.0,
+    39.82608695652174
+   ],
+   [
+    10.0,
+    37.659574468085104
+   ],
+   [
+    11.0,
+    40.91304347826087
+   ],
+   [
+    12.0,
+    40.702127659574465
+   ],
+   [
+    13.0,
+    8.270833333333334
+   ],
+   [
+    14.0,
+    15.708333333333334
+   ],
+   [
+    15.0,
+    22.659574468085108
+   ],
+   [
+    16.0,
+    33.4468085106383
+   ],
+   [
+    17.0,
+    40.020833333333336
+   ],
+   [
+    18.0,
+    16.434782608695652
+   ],
+   [
+    19.0,
+    44.104166666666664
+   ],
+   [
+    20.0,
+    27.106382978723403
+   ],
+   [
+    21.0,
+    28.291666666666668
+   ],
+   [
+    22.0,
+    41.020833333333336
+   ],
+   [
+    23.0,
+    27.979166666666668
+   ],
+   [
+    24.0,
+    0.4375
+   ],
+   [
+    25.0,
+    0.0
+   ],
+   [
+    26.0,
+    0.0
+   ],
+   [
+    27.0,
+    17.78723404255319
+   ],
+   [
+    28.0,
+    13.729166666666666
+   ],
+   [
+    29.0,
+    46.354166666666664
+   ],
+   [
+    30.0,
+    74.54166666666667
+   ],
+   [
+    31.0,
+    77.52083333333333
+   ],
+   [
+    32.0,
+    59.93617021276596
+   ],
+   [
+    33.0,
+    49.583333333333336
+   ],
+   [
+    34.0,
+    77.8125
+   ],
+   [
+    35.0,
+    77.95833333333333
+   ],
+   [
+    36.0,
+    48.5625
+   ],
+   [
+    37.0,
+    64.97916666666667
+   ],
+   [
+    38.0,
+    79.8125
+   ],
+   [
+    39.0,
+    62.833333333333336
+   ],
+   [
+    40.0,
+    50.02040816326531
+   ],
+   [
+    41.0,
+    76.64583333333333
+   ],
+   [
+    42.0,
+    78.27083333333333
+   ],
+   [
+    43.0,
+    45.4375
+   ],
+   [
+    44.0,
+    78.12244897959184
+   ],
+   [
+    45.0,
+    79.54166666666667
+   ],
+   [
+    46.0,
+    67.53061224489795
+   ],
+   [
+    47.0,
+    79.35416666666667
+   ],
+   [
+    48.0,
+    68.0
+   ]
+  ]
+ },
+ "runner_timing": [
+  {
+   "case_index": 0,
+   "timed_case_count": 0,
+   "transport_seconds": null,
+   "spectrum_seconds": null,
+   "driver_wait_seconds": null,
+   "transport_seconds_total": 0.0,
+   "spectrum_seconds_total": 0.0,
+   "driver_wait_seconds_total": 0.0,
+   "gpu_oom_retry_count": 0,
+   "continuation_rows_per_round": 16,
+   "continuation_lanes": 113816,
+   "continuation_rounds": 998,
+   "continuation_passes": 137
+  }
+ ],
+ "host_peak_MiB": 7283.21875,
+ "realized_electrons": 28273478,
+ "stop_reason": "converged",
+ "n_segments": 69314552,
+ "arrays": {
+  "E_grid": "f9640ceb2a3006d5",
+  "spec": "5412481f619cb71c",
+  "spec_characteristic": "7b3e38a4acb393dd",
+  "brem": "11f35d4e22429ebe",
+  "E_grid_brem": "a8f218c0e1fcfced",
+  "brem_wide": "fb0926b6ccbb43ca"
+ }
+}

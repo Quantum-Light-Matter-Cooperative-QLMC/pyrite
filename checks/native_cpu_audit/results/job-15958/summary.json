@@ -1,0 +1,183 @@
+{
+  "crystal300-binmean-t1": {
+    "first_s": 3.100834630895406,
+    "first_compile_s": 1.2057975577190518,
+    "warm_s": {
+      "median": 0.7564784712158144,
+      "min": 0.7506492882966995,
+      "max": 0.7623076541349292,
+      "n": 2
+    },
+    "profile_wall_s": 0.7901788591407239,
+    "peak_rss_MiB": 741.984375,
+    "affinity": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "numba_threads": {
+      "NUMBA_NUM_THREADS": "1",
+      "NUMBA_THREADING_LAYER": null,
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "PYRITE_FFT_THREADS": null
+    },
+    "threading_layer": "omp",
+    "phases_warm": {
+      "_t_spectrum": 0.7457050480879843,
+      "_t_transport": 0.01623983308672905
+    },
+    "repeat_and_profile_hashes_identical": true,
+    "array_sha256": {
+      "E_grid": "3debf775590043f05b6ee0fcab6889dfb69bda14d976b7b7e598959555569085",
+      "spec": "f121d1bb739f5643d068866253db01a379335c3b00398f4a8c5759ad1fc614f4",
+      "spec_characteristic": "d61567d2f9f43e483397f1fbce2e8babf8671551750027e8d715f09d25f2c612",
+      "brem": "876fee2ac8a2025d2564ccf071944c791b769fbcd2cb052b0e243e1d015f2749",
+      "E_grid_brem": "17a64aca7fbbbfcaacc83a4a78c0112cd455beb0e003ec1ac8931239541efa19",
+      "brem_wide": "07345e14e5a8435905a58037fb994bf93b0cad057ad54f7cd31aa4853a9f2875"
+    },
+    "profile_cumulative_s": {
+      "select_reflection_cutoff": 0.748624383,
+      "_corrected_group": 0.16066070000000002,
+      "_transport_case": 0.023068915000000002
+    }
+  },
+  "crystal300-coherent-hr-t1": {
+    "first_s": 2.2896633790805936,
+    "first_compile_s": 0.7283713459037244,
+    "warm_s": {
+      "median": 0.5886323766317219,
+      "min": 0.5754063106141984,
+      "max": 0.6018584426492453,
+      "n": 2
+    },
+    "profile_wall_s": 0.5847471761517227,
+    "peak_rss_MiB": 764.7734375,
+    "affinity": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "numba_threads": {
+      "NUMBA_NUM_THREADS": "1",
+      "NUMBA_THREADING_LAYER": null,
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "PYRITE_FFT_THREADS": null
+    },
+    "threading_layer": "omp",
+    "phases_warm": {
+      "_t_spectrum": 0.5845597730949521,
+      "_t_transport": 0.016609364189207554
+    },
+    "repeat_and_profile_hashes_identical": true,
+    "array_sha256": {
+      "E_grid": "ce4adbc86fef0a5520d3a0d6cf09c3476b30f0c5f526cc014f001b18941d5151",
+      "spec": "8c3f68fac8ea4c3fd4b4254b201c8848798e90c846447e4ed30c5407bd96d5c6",
+      "spec_characteristic": "a2c830078dbcc0c2d73dc34bff1342568fa0e2f331124d7e113b48b8d952b30c",
+      "brem": "2e62297a2e9cac53b0cb104b7dba8f7aab88088aa955f79e32a46d7f8f5b0c4f",
+      "E_grid_brem": "17a64aca7fbbbfcaacc83a4a78c0112cd455beb0e003ec1ac8931239541efa19",
+      "brem_wide": "4daaef679f0592c59a13b8257d1ac46fed1f47fef25a415109baeb0adbc42408",
+      "spec_coherent": "c84842504efe65591be2ad35298e1c839a1b79eb280bb00ba5d06591b49e4117"
+    },
+    "profile_cumulative_s": {
+      "accumulate_sincsq_windowed": 0.037252292,
+      "_transport_case": 0.023481661
+    }
+  },
+  "crystal300-coherent-t1": {
+    "first_s": 0.9966341387480497,
+    "first_compile_s": 0,
+    "warm_s": {
+      "median": 0.03721997165121138,
+      "min": 0.03626440931111574,
+      "max": 0.03817553399130702,
+      "n": 2
+    },
+    "profile_wall_s": 0.04810173576697707,
+    "peak_rss_MiB": 658.08984375,
+    "affinity": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "numba_threads": {
+      "NUMBA_NUM_THREADS": "1",
+      "NUMBA_THREADING_LAYER": null,
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "PYRITE_FFT_THREADS": null
+    },
+    "threading_layer": "omp",
+    "phases_warm": {
+      "_t_spectrum": 0.022022930905222893,
+      "_t_transport": 0.01589845074340701
+    },
+    "repeat_and_profile_hashes_identical": true,
+    "array_sha256": {
+      "E_grid": "3debf775590043f05b6ee0fcab6889dfb69bda14d976b7b7e598959555569085",
+      "spec": "724b3a1bda9a6483751ad4ec5091a14852238b47c9e5c564f243bb0cec89c6e6",
+      "spec_characteristic": "ff0010a600b3bc7bb64feb5c546618c0c5beb397e6bd00f366cb12f3b6c1662f",
+      "brem": "8001f86241a59d047faef21498c75c701030953c39ffa3e19721575dae5eaca3",
+      "E_grid_brem": "17a64aca7fbbbfcaacc83a4a78c0112cd455beb0e003ec1ac8931239541efa19",
+      "brem_wide": "4daaef679f0592c59a13b8257d1ac46fed1f47fef25a415109baeb0adbc42408",
+      "spec_coherent": "fd044247678af291accab4c443dc970361f8c55b2b3f13998e130788cba9604a"
+    },
+    "profile_cumulative_s": {
+      "_transport_case": 0.023696554,
+      "accumulate_sincsq_windowed": 0.001449472,
+      "_batched_block": 0.0007245660000000001
+    }
+  },
+  "crystal300-t1": {
+    "first_s": 18.42391478223726,
+    "first_compile_s": 17.17735418258235,
+    "warm_s": {
+      "median": 0.2111444587353617,
+      "min": 0.2042521871626377,
+      "max": 0.21803673030808568,
+      "n": 2
+    },
+    "profile_wall_s": 0.23990154778584838,
+    "peak_rss_MiB": 930.59765625,
+    "affinity": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "numba_threads": {
+      "NUMBA_NUM_THREADS": "1",
+      "NUMBA_THREADING_LAYER": null,
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "PYRITE_FFT_THREADS": null
+    },
+    "threading_layer": "omp",
+    "phases_warm": {
+      "_t_spectrum": 0.20093007991090417,
+      "_t_transport": 0.01671454729512334
+    },
+    "repeat_and_profile_hashes_identical": true,
+    "array_sha256": {
+      "E_grid": "3debf775590043f05b6ee0fcab6889dfb69bda14d976b7b7e598959555569085",
+      "spec": "e4210ddf4cbd54ac075cbdf18cb5f23f096f1c32ee1c50b9316ffe413359c62c",
+      "spec_characteristic": "d61567d2f9f43e483397f1fbce2e8babf8671551750027e8d715f09d25f2c612",
+      "brem": "876fee2ac8a2025d2564ccf071944c791b769fbcd2cb052b0e243e1d015f2749",
+      "E_grid_brem": "17a64aca7fbbbfcaacc83a4a78c0112cd455beb0e003ec1ac8931239541efa19",
+      "brem_wide": "07345e14e5a8435905a58037fb994bf93b0cad057ad54f7cd31aa4853a9f2875"
+    },
+    "profile_cumulative_s": {
+      "select_reflection_cutoff": 0.197773524,
+      "_corrected_group": 0.161135466,
+      "_transport_case": 0.023655043
+    }
+  }
+}

@@ -1,0 +1,8 @@
+pid 3778026's current affinity list: 0-31
+pid 3778026's new affinity list: 0-3
+Using CPython 3.14.6
+Creating virtual environment at: .venv
+   Building pyrite-mc @ file://<checkout>
+      Built pyrite-mc @ file://<checkout>
+Installed 270 packages in 368ms
+{"layer": "omp", "masks": [4, 4, 4, 4, 4, 4, 4, 4, 4]}

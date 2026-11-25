@@ -1,0 +1,19 @@
+{
+  "job_id": 15941,
+  "state": "COMPLETED",
+  "elapsed_s": 5,
+  "requested_cpus": 4,
+  "requested_memory_MiB": 2048,
+  "producer_revision": "4ae34de80c6bcd07dd98ed552e35debfacbd42c2",
+  "numerical_baseline": "147400d356812d1f1d0ad39834de347ca1d8555f",
+  "sync_code_digest": "9da3bc35f3555224882a8134670170ed5e64ea353085de73bc46ee81f9e6c8d7",
+  "sync_tables_digest": "08bfc386651213994f9dc150d2cbfee28cdf7682909c0fd8a3ae9a934396343d",
+  "command": "sbatch --nodelist=<cpu-node> --job-name=pools1432-4ae34de80 checks/native_cpu_audit/pools.sbatch",
+  "finding": "Selected Numba layer omp; threadpool_limits(limits=1) reports OpenMP 1 but Numba mask stays 4 and kernel CPU/wall ~4 in all rounds; nine output hashes identical. Library-budget diagnostic, not a Dask oversubscription measurement.",
+  "path_sanitization": "isolated checkout path replaced with <checkout>",
+  "files": {
+    "job-log.txt": "d15fafa07c7378dda0be08944fd0f37ac86fa78410a433305bd9ddfebdd7111f",
+    "pool-budget.json": "ee76f341e25c6d63cbc691acaac6e2d07537006fb49d2458e7adac699f71bd61"
+  },
+  "dropped_sha256": {}
+}

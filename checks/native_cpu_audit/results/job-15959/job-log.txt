@@ -1,0 +1,29 @@
+pid 3862044's current affinity list: 0-31
+pid 3862044's new affinity list: 0-3
+Using CPython 3.14.6
+Creating virtual environment at: .venv
+   Building pyrite-mc @ file://<checkout>
+      Built pyrite-mc @ file://<checkout>
+Installed 270 packages in 339ms
+4e8a9ae77401ffa09448da3b339bf36bdf8677bc
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+{"case": "photon-case", "wall_s": [31.03305381676182, 15.191151530016214, 15.125404034741223]}

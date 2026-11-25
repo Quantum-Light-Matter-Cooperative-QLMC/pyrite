@@ -1,0 +1,43 @@
+{
+  "job_id": 15944,
+  "state": "COMPLETED",
+  "elapsed_s": 644,
+  "node": "qlmc-queen (cpu partition)",
+  "requested_cpus": 4,
+  "requested_memory_MiB": 3072,
+  "producer_revision": "6cc9a6ed3cfde62cd094271279c8de8b9bef3cdd",
+  "numerical_baseline": "147400d356812d1f1d0ad39834de347ca1d8555f",
+  "command": "sbatch --job-name=ax1432-6cc9a6ed3 checks/native_cpu_audit/axial.sbatch",
+  "affinity": [
+    8,
+    9,
+    10,
+    11
+  ],
+  "first_s": 87.72040502540767,
+  "warm_s": {
+    "median": 85.92359785642475,
+    "min": 85.34785893559456,
+    "max": 86.49933677725494
+  },
+  "profile_wall_s": 89.97246015444398,
+  "peak_rss_MiB": 450.97265625,
+  "key_cumulative_profile_s": {
+    "get@axial_energy_mcwf.py": 46.08,
+    "_run_cpu@axial_mcwf.py": 43.5,
+    "_solver@axial_energy_mcwf.py": 35.3,
+    "axial_dissipator@axial_dissipator.py": 35.24,
+    "harmonics@vortex.py": 34.83,
+    "_fourier_basis@vortex.py": 18.29,
+    "_level_observer@axial_energy_mcwf.py": 10.75,
+    "_ifft2@axial_mcwf.py": 2.49,
+    "_fft2@axial_mcwf.py": 2.38
+  },
+  "qualification": "Bound 4-CPU queen allocation, one native thread; cumulative cProfile times overlap. uv environment build (~4.4 min) precedes measurement and is not timed. Solver builds = 308 _solver calls for 1000 histories at the default max_cached_solvers=2.",
+  "path_sanitization": "isolated checkout path replaced with <checkout>",
+  "files": {
+    "axial-prod-t1.json": "bd1c0101bec0fec7759415bd4c94111fcdbc504b9df7c9f4108e093cd8c7d68a",
+    "job-log.txt": "55f8599e3d8423c06c64d0dfbb1bb749c5806d04494ccaaaa0b6e39ad55c1f25"
+  },
+  "dropped_sha256": {}
+}

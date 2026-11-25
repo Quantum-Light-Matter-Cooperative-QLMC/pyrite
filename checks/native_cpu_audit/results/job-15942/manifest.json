@@ -1,0 +1,39 @@
+{
+  "job_id": 15942,
+  "state": "COMPLETED",
+  "elapsed_s": 52,
+  "node": "qlmc-queen (cpu partition)",
+  "requested_cpus": 4,
+  "requested_memory_MiB": 2048,
+  "producer_revision": "4ae34de80c6bcd07dd98ed552e35debfacbd42c2",
+  "numerical_baseline": "147400d356812d1f1d0ad39834de347ca1d8555f",
+  "command": "sbatch runs/portability-command.sbatch (copied here; one crystal300 case, 3 warm repeats, 1 Numba thread)",
+  "affinity": [
+    8,
+    9,
+    10,
+    11
+  ],
+  "cpu": "AMD Ryzen 9 9950X3D 16-Core Processor",
+  "first_s": 16.72574288584292,
+  "warm_s": {
+    "median": 0.955617094412446,
+    "min": 0.9376227343454957,
+    "max": 0.9598493194207549
+  },
+  "king_15939_crystal300_t1_warm_s": {
+    "median": 1.1453059369232506,
+    "min": 1.10745509294793,
+    "max": 1.1636840789578855
+  },
+  "arrays_identical_to_king_15939": true,
+  "qualification": "Second node, SAME CPU model (Ryzen 9 9950X3D) and different kernel/host; establishes cross-node reproducibility only. No second CPU architecture available: portability gap remains. Single small case; not a throughput comparison.",
+  "path_sanitization": "isolated checkout path replaced with <checkout>",
+  "files": {
+    "job-log.txt": "ead30070c678cbebdd6a6c9f945c30654aa49584c0455f09614e6440f16a8728",
+    "portability-queen.json": "a2b155de4257f049d2a93c75c487b0bd981d2ebd8fad3ad77a01e1c8a1fc42fc"
+  },
+  "dropped_sha256": {
+    "portability-command.sbatch": "2fd91e3cb2bde25138a4bc2569bac925a62222530a682176e72a1a021adbc40f"
+  }
+}

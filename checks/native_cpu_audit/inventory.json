@@ -1,0 +1,2023 @@
+{
+  "schema": "pyrite.native-cpu-inventory.v1",
+  "baseline": {
+    "current": "51a928b25 (main, includes #1281 / PR #1435)",
+    "historical": "147400d356812d1f1d0ad39834de347ca1d8555f (jobs 15936-15946)"
+  },
+  "routes": [
+    {
+      "family": "cache",
+      "module": "src/pyrite/_jit_cache.py",
+      "function": "NumbaCompileRecorder",
+      "line": 428,
+      "source_sha256": "cd48618c2bdb15e21915e47cad9d5f5d609404115ed3ade087ef0fa0e574daa9",
+      "execution_route": "Python recorder; observes JIT events, not a numerical kernel",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "n=3 cold: median 19.989 s compile, 123\u2013124 events including Numba helpers, 64\u201365 cache misses; n=3 warm disk: zero compile, 13 cache hits; all six first-result hashes/identities match",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Record exclusive/inclusive compilation; reuse existing cache framework",
+      "parallel_applicability": "not a numerical loop",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#910",
+      "evidence_reference": [
+        "results/job-15937/startup-cold.json",
+        "results/job-15937/startup-warm.json",
+        "results/job-15937/manifest.json"
+      ],
+      "confidence": "repeated compilation/cache attribution measured on README startup fixture; unbound co-tenant allocation"
+    },
+    {
+      "family": "warmup",
+      "module": "src/pyrite/_jit_warm.py",
+      "function": "warm",
+      "line": 117,
+      "source_sha256": "6b17cc33300406ccd0f405887e1c77c2230003dd0adc6f46dcd138d48c6c7f87",
+      "execution_route": "Python orchestration of tiny production cases; lazy signature warmup",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Separate warming cost from warm case throughput",
+      "parallel_applicability": "parallel warming risks duplicate compilation and mutable initialization",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#910",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "continuum-fused",
+      "module": "src/pyrite/montecarlo/spectrum/_brem_cpu_fused.py",
+      "function": "score_covered_bremslib",
+      "line": 254,
+      "source_sha256": "55a2be38161b2dcf3023750d63e6aa78758abc80e0af7991f732f2b9567074b3",
+      "execution_route": "FP64 NumPy only; enabled BremsLib, all rows covered, no isotropic shares; stages contiguous arrays then compiled reducers",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Qualify landed #1429; do not duplicate implementation",
+      "parallel_applicability": "already parallel over photon bins / rows; independent writes; fixed inner sum order",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1429",
+      "evidence_reference": [
+        "results/job-15936/summary.json"
+      ],
+      "confidence": "measured bounded unbound pilot only; see allocation/profiler/fixture gaps"
+    },
+    {
+      "family": "continuum-eedl-bh-fallback",
+      "module": "src/pyrite/montecarlo/spectrum/brem.py",
+      "function": "mc_brem_spectrum",
+      "line": 834,
+      "source_sha256": "d7b1adf95c8dd5b6f191499c9b89994425926bf17b8a86272992723bb64328e4",
+      "execution_route": "CPU NumPy tiled cells for EEDL/BH and uncovered/isotropic-share/precision routes; GPU FP32 raw reducers gated separately",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Profile interpolation, attenuation and memory before CPU fusion",
+      "parallel_applicability": "photon bins independent for spectrum; primary-band scatter needs per-row output then deterministic bincount",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1425",
+      "evidence_reference": [
+        "results/job-15936/summary.json"
+      ],
+      "confidence": "measured bounded unbound pilot only; see allocation/profiler/fixture gaps"
+    },
+    {
+      "family": "continuum-table",
+      "module": "src/pyrite/montecarlo/spectrum/brem_bremslib.py",
+      "function": "_evaluate",
+      "line": 214,
+      "source_sha256": "96cbe581662f10267ccfbae75e449fabe5ac5ca6116104681ebfec9e4464c3dd",
+      "execution_route": "NumPy/CuPy vector expressions, table searches and masks on portable route",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Retain support zeros and table boundaries; partial fusion only if measured",
+      "parallel_applicability": "read-only tables can share; no shared scratch or histogram scatter",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1425",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "continuum-gpu",
+      "module": "src/pyrite/montecarlo/spectrum/brem_jit_kernel.py",
+      "function": "run_bremslib_brem_reduction_kernel",
+      "line": 931,
+      "source_sha256": "24934edf94e3d5a463a18305ffdc572021f95664b677196614df5c832a77d44d",
+      "execution_route": "Custom GPU raw kernels; filename is not CPU Numba coverage",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Host launch/staging timing needs accelerator allocation",
+      "parallel_applicability": "CPU prange inapplicable to this GPU kernel",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1395",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "characteristic-interp",
+      "module": "src/pyrite/montecarlo/spectrum/characteristic.py",
+      "function": "_interpolate_shell_cross_sections",
+      "line": 758,
+      "source_sha256": "2c3eac042188d435b3d82a48cb5b080d7242b2e3dfaf385241040e88c4b86009",
+      "execution_route": "CPU shell loop around NumPy interp/mask/stack; CuPy packed fused interpolation",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Compare packed CPU interpolation only after phase attribution",
+      "parallel_applicability": "parallel rows with independent shell cells; amortize packing; preserve thresholds/out-of-support zeros",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1005",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "characteristic-reduce",
+      "module": "src/pyrite/montecarlo/spectrum/characteristic.py",
+      "function": "_accumulate_line_yields",
+      "line": 787,
+      "source_sha256": "2c3eac042188d435b3d82a48cb5b080d7242b2e3dfaf385241040e88c4b86009",
+      "execution_route": "CPU NumPy transmission and sums plus BLAS shell-to-line/path contractions; CUDA fused weighting and reduction",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Compare partial fusion vs existing BLAS; do not assume full fusion wins",
+      "parallel_applicability": "parallel line groups own outputs; preserve shell flux weights; row reduction changes summation order",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1005",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "escape",
+      "module": "src/pyrite/montecarlo/spectrum/segment_escape.py",
+      "function": "mean_transmission",
+      "line": 291,
+      "source_sha256": "3fdf1fd2758e3eb5525c892f84f162099520c352484e9d27e8ebe2afac23ee3f",
+      "execution_route": "NumPy/CuPy elementwise exp/expm1/where; layered geometry prepared separately",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Measure transient memory and cancellation branches",
+      "parallel_applicability": "elementwise independent; prefer fusion with consumer over another parallel launch",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1425",
+      "evidence_reference": [
+        "results/job-15936/summary.json"
+      ],
+      "confidence": "measured bounded unbound pilot only; see allocation/profiler/fixture gaps"
+    },
+    {
+      "family": "photon-queue",
+      "module": "src/pyrite/montecarlo/transport/photon_histories.py",
+      "function": "track_photon_histories",
+      "line": 557,
+      "source_sha256": "bcdaff7e59e9862234ba60d8036c269029abe89591925e65c85e7a1b393f0407",
+      "execution_route": "Host Python queue/dataclasses/ledgers; CPU numerical calls or CUDA channel waves; injected relaxation selects supported host route",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": {
+        "kind": "profiled cumulative / profile wall",
+        "photon_case_job_15957": 0.00929368029739777
+      },
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "not a case bottleneck for documented opt-in usage",
+      "proposed_action": "Defer: photon aperture 0.35 s of 37 s Cu 30 keV case; sample_photoelectric 0.30 s / 643 events. Revisit only for photon-heavy workloads (#341 comment)",
+      "parallel_applicability": "no blanket prange over mutable queue; independent histories require private queues/ledgers then deterministic merge",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#341",
+      "evidence_reference": [
+        "results/job-15957/photon-case-t1.json",
+        "results/job-15936/summary.json"
+      ],
+      "confidence": "one complete-case workload, bound allocation; queue-only fixture earlier"
+    },
+    {
+      "family": "photon-samplers",
+      "module": "src/pyrite/montecarlo/transport/photon_sampling.py",
+      "function": "UniformDraws",
+      "line": 12,
+      "source_sha256": "efc427a44245494d3469ca7b5904e2c23752f4983a31336d83442d47e373e024",
+      "execution_route": "Python iterator around caller-owned draws; scattering/photoelectric/pair samplers call NumPy/native math",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": {
+        "kind": "profiled cumulative / profile wall",
+        "photon_case_job_15957": 0.00929368029739777
+      },
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "not a case bottleneck for documented opt-in usage",
+      "proposed_action": "Defer: photon aperture 0.35 s of 37 s Cu 30 keV case; sample_photoelectric 0.30 s / 643 events. Revisit only for photon-heavy workloads (#341 comment)",
+      "parallel_applicability": "no Numba default RNG or finite draw buffer; history streams must stay counter-addressed",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#341",
+      "evidence_reference": [
+        "results/job-15957/photon-case-t1.json",
+        "results/job-15936/summary.json"
+      ],
+      "confidence": "one complete-case workload, bound allocation; queue-only fixture earlier"
+    },
+    {
+      "family": "relaxation",
+      "module": "src/pyrite/montecarlo/transport/relaxation.py",
+      "function": "sample_relaxation_cascade",
+      "line": 136,
+      "source_sha256": "4ca1afb2a75c9d5a2d3a40490973187e6fff78cfd2b18dee61b6348a3883e17f",
+      "execution_route": "Python vacancy queue, EADL tables and injected uniform iterator",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Measure before flattening packed data; retain injected relaxation interface",
+      "parallel_applicability": "variable daughter count and ordering prohibit naive parallel append",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#341",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "energy-mcwf",
+      "module": "src/pyrite/montecarlo/channeling/axial_energy_mcwf.py",
+      "function": "axial_energy_mcwf",
+      "line": 567,
+      "source_sha256": "880f1e0ad70685d5df87a8d5313d1aeea2f7e52d38ce84cdcbc055a2fe213a61",
+      "execution_route": "CPU one solver.run per globally addressed history; solver cache per exact energy; separate CUDA grouped implementation",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": "production axial-prod (15944): solver rebuild ~51% cumulative (308 builds/1000 histories at default cache 2); propagation FFT ~6%",
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "repeated preparation (solver LRU thrash), not missing compilation",
+      "proposed_action": "size max_cached_solvers by distinct energies with memory guard: 1.94x bit-identical (15945)",
+      "parallel_applicability": "compatible histories may batch but exact energy/tilt/entry, stream ID and ordered reduction must remain; no energy quantization",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#627",
+      "evidence_reference": [
+        "results/job-15936/summary.json",
+        "results/job-15944/",
+        "results/job-15945/",
+        "results/job-15946/"
+      ],
+      "confidence": "measured: bound 4-CPU production-depth case, paired same-job arms"
+    },
+    {
+      "family": "axial-mcwf",
+      "module": "src/pyrite/montecarlo/channeling/axial_mcwf.py",
+      "function": "AxialMCWF",
+      "line": 102,
+      "source_sha256": "7b583c673d32a12448e80e8ae12006e22129b75a38092143d11482497f3d5579",
+      "execution_route": "Python propagation/jump orchestration, NumPy arrays, FFT native transforms",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": "production axial-prod (15944): OAM harmonics ~39% cumulative; split-step fft2/ifft2 ~5 s of ~90 s",
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "observable recomputation (phi-independent Fourier basis) and unoptimized einsum",
+      "proposed_action": "cache basis per n_theta (bit-identical, 3.57x combined with cache); matmul contraction 8.06x at <=1.3e-16 needs tolerance/pin review",
+      "parallel_applicability": "private state and RNG per history; packed arrays possible; do not wrap FFT calls in njit indiscriminately",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1423",
+      "evidence_reference": [
+        "results/job-15936/summary.json",
+        "results/job-15944/",
+        "results/job-15946/"
+      ],
+      "confidence": "measured: bound 4-CPU production-depth case, in-process prototypes"
+    },
+    {
+      "family": "planar-mcwf",
+      "module": "src/pyrite/montecarlo/channeling/mcwf.py",
+      "function": "MCWFSolver",
+      "line": 148,
+      "source_sha256": "0df7d47e16394709eedd098eaf2813c3f0585a1263711709799675a2e8e6583a",
+      "execution_route": "Python histories/jumps; native dense linear algebra and complex amplitudes",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Preserve eigensolvers/contractions; measure packing/observables",
+      "parallel_applicability": "same history stream and jump order; BLAS threads compete with outer workers",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1423",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "electron-core",
+      "module": "src/pyrite/montecarlo/transport/cores.py",
+      "function": "make_cpu_transport_core",
+      "line": 96,
+      "source_sha256": "20acfbdf6f52b5522eab40d711a00b81af05ce11725db9b12e9329cd44e7991f",
+      "execution_route": "Factory compiles body and core; helpers called indirectly compile into native specializations; Python dispatch remains",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Inspect active signatures, cache reuse and LLVM before changing loops",
+      "parallel_applicability": "not currently parallel decorator; counters, segment capacity/replay and buffers need redesign before parallel histories",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1423",
+      "evidence_reference": [
+        "results/job-15936/summary.json"
+      ],
+      "confidence": "measured bounded unbound pilot only; see allocation/profiler/fixture gaps"
+    },
+    {
+      "family": "electron-specializations",
+      "module": "src/pyrite/montecarlo/transport/core_specializations.py",
+      "function": "cone_split_core",
+      "line": 43,
+      "source_sha256": "7b121555ea6ceb6c774ecf20ecc44f0e48f6b8dae2a0340db8a61d55088c6f00",
+      "execution_route": "Lazy cached compiled variants for geometry/LUT/inelastic/radiative/per-electron flags",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Avoid variant explosion; preserve grooved and exact-CUDA refusal boundaries",
+      "parallel_applicability": "compiled does not imply nogil; separate Python-call wrapper from native callees",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#974",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "cxr-points",
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_cpu_reduce.py",
+      "function": "_sincsq_reduce",
+      "line": 26,
+      "source_sha256": "dffd551ca230db677742cbf20cada332c0a9b47a0e622eb6832873a68f1d6741",
+      "execution_route": "CPU Numba parallel photon-bin reduction; grouped formation companion; NumPy backend gating",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Already compiled; compare algorithmic window/sparse alternatives first",
+      "parallel_applicability": "already prange over photon bins; fixed per-bin sums; small grids may not amortize launch",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1390",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "cxr-bins",
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_bin_mean_jit.py",
+      "function": "_near_far_bins",
+      "line": 133,
+      "source_sha256": "e250608a3481ffd03750bc8df98287bb0cab90f66ca590059db39ff406919a21",
+      "execution_route": "CPU Numba parallel bins with compiled scalar sine-integral helpers; near/far certified route",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Retain certified tails and weak-bin/cancellation tests",
+      "parallel_applicability": "already prange independent bins; avoid shared scatter",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1392",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "cxr-windows",
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_node_window.py",
+      "function": "_grouped_window_reduce",
+      "line": 526,
+      "source_sha256": "d777bc5a82c6682b040bcc7924087c7fa2f9495ff3b8372cad78d932ae37136f",
+      "execution_route": "CPU parallel fixed reduction chunks and serial deterministic combine; planning in NumPy/Python",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Profile planning/clustering before further kernel tuning",
+      "parallel_applicability": "already parallel chunks; memory grows with private chunk output; fixed order protects thread invariance",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1291",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "cxr-queues",
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_bin_queue.py",
+      "function": "HostBinLineQueues",
+      "line": 54,
+      "source_sha256": "570deaf4af18bc3de6fe8a8b8130a2937f00e607f13f2ce1908da96e187efb90",
+      "execution_route": "Host concatenation/queueing into existing compiled or Fourier reducers",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Measure concatenation and algorithm choice separately",
+      "parallel_applicability": "mutable queue not safe for naive prange or shared case threads",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1320",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "dask",
+      "module": "src/pyrite/execution/dask.py",
+      "function": "DaskExecutor",
+      "line": 212,
+      "source_sha256": "d55deba611bcc1b5194d0dce6183117fe765f7d19c13d45b9a9a61a00c0fd512",
+      "execution_route": "Process workers; local cluster one task thread per worker; BLAS limit at case-group seam",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Coordinate shard work with #1395; measure outer-worker vs inner-kernel topology",
+      "parallel_applicability": "Numba is a separate pool; threadpoolctl BLAS limit does not prove Numba masking; audit shard worker initialization",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1395",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "pool-init",
+      "module": "src/pyrite/montecarlo/runner/__init__.py",
+      "function": "_worker_init",
+      "line": 312,
+      "source_sha256": "15d25b109faae9c7fa869a96b814d30440b8a7b35be870abbbd02a5cfd3fe6b4",
+      "execution_route": "Process-local CPU worker setup explicitly numba.set_num_threads(1)",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Preserve process budget; do not infer direct call thread behavior from pool behavior",
+      "parallel_applicability": "one Numba thread per process favors aggregate throughput; allocation-aware hybrids need evidence",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1021",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "lattice-share-preparation",
+      "module": "src/pyrite/montecarlo/spectrum/brem_lattice_share.py",
+      "function": "lattice_share_table",
+      "line": 398,
+      "source_sha256": "5ce02f6c00980a8293e33f67241c2bdae095adaf50922f8dc42590aca6afd82a",
+      "execution_route": "NumPy table interpolation/normalization; full table copies and per-T density evaluation",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": {
+        "kind": "overlapping profiled cumulative _corrected_group / profile wall",
+        "post_1281_job_15957": {
+          "thin30": 0.6060606060606061,
+          "thin100": 0.7131367292225201,
+          "crystal300": 0.6736401673640168
+        },
+        "historical_pre_1281_job_15936": {
+          "thin30": 0.917,
+          "thin100": 0.94,
+          "crystal300": 0.929
+        }
+      },
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "fixed per-case preparation; resolved as a throughput blocker by #1281 (PR #1435)",
+      "proposed_action": "Closed for this audit: warm 16-history HOPG cases 5.5-6x faster (0.21-0.33 s); remaining cost is per-case, amortized at production history counts",
+      "parallel_applicability": "Independent T rows possible with private scratch; full H(g,theta,x) temporaries may multiply memory; preserve clamping/support and SDCS integral",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1281 (landed)",
+      "evidence_reference": [
+        "results/job-15957/thin30-t1.json",
+        "results/job-15957/thin100-t1.json",
+        "results/job-15957/crystal300-t1.json",
+        "results/job-15936/summary.json"
+      ],
+      "confidence": "bound 4-CPU allocation, repeated warm samples, exact repeat hashes"
+    },
+    {
+      "family": "cxr-host-fourier",
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_fourier_host.py",
+      "function": "_es_spread",
+      "line": 63,
+      "source_sha256": "d4e5beaa43f5a6edd657982b8cb5c100a593eba6a6ac090be81c8b041d43b008",
+      "execution_route": "Serial Numba nogil spread; existing bounded rectangle ThreadPoolExecutor plus native FFT and parallel interpolation/reduction",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": {
+        "kind": "profiled exclusive _positive_modes / profile wall",
+        "crystal300_binmean_job_15958": 0.6556962025316455
+      },
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "fixed host-Fourier overhead visible only at tiny populations (55 segments)",
+      "proposed_action": "Defer: bin-mean 0.76 s vs node 0.21 s on 16 histories; rank needs production-sized bin-mean case",
+      "parallel_applicability": "Existing rectangle concurrency capped by get_num_threads; no blanket extra parallel layer",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1320",
+      "evidence_reference": [
+        "results/job-15958/crystal300-binmean-t1.json"
+      ],
+      "confidence": "route established; small fixture"
+    },
+    {
+      "family": "tr",
+      "module": "src/pyrite/montecarlo/spectrum/transition_radiation.py",
+      "function": "planar_transition_radiation",
+      "line": 191,
+      "source_sha256": "c05f1f2f3082e7acb6fa1b6b728639947c165b2faf7dfdec57ca09fdc1702348",
+      "execution_route": "NumPy/CuPy amplitude/geometry arrays and native small linear systems",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Defer until measured workload frequency/hotness; retain conditioning and phase cancellation",
+      "parallel_applicability": "Independent nodes possible; avoid replacing native linalg without conditioning/evidence",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1432",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "dtr",
+      "module": "src/pyrite/montecarlo/spectrum/dtr_two_beam.py",
+      "function": "two_beam_straight_field",
+      "line": 240,
+      "source_sha256": "249eb697e4ba0ff92ade1523fccb67b504bfd67a9ad0a1912ad343d7835a86d2",
+      "execution_route": "Python node orchestration with NumPy complex eigensolves and boundary systems",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Defer; preserve native eigensolvers and coherent phases",
+      "parallel_applicability": "Independent photon nodes plausible; kernel fusion around linalg only after measured overhead",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1432",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "dtr-history",
+      "module": "src/pyrite/montecarlo/spectrum/dtr_history.py",
+      "function": "TransportedCurrent",
+      "line": 26,
+      "source_sha256": "9a876d0751aa8fcf910c149cc856112b23c43729e9b22a7d3641d60798519d83",
+      "execution_route": "Host history data and complex field assembly",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Coverage gap: no representative profile in bounded pilot",
+      "parallel_applicability": "Variable history shape; pack only if reuse amortizes copies",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1432",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "cherenkov",
+      "module": "src/pyrite/montecarlo/spectrum/cherenkov.py",
+      "function": "frank_tamm_yield",
+      "line": 204,
+      "source_sha256": "56411be58eeca22db95c5d19611061dad9518fd2b4f0b69d1dc47200002360cd",
+      "execution_route": "Native array evaluation via dielectric response protocol",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Defer unprofiled lower-priority route",
+      "parallel_applicability": "Independent energy nodes; custom callbacks restrict nopython compilation",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1432",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "optical-screen",
+      "module": "src/pyrite/montecarlo/spectrum/optical_finite_screen.py",
+      "function": "circular_pec_transition_field",
+      "line": 180,
+      "source_sha256": "21d2b6ddd592a080bb91bce0951a0ab96a92214b039968df3661a24e746ee396",
+      "execution_route": "NumPy/device arrays and native Bessel functions",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Defer unprofiled lower-priority route",
+      "parallel_applicability": "Independent grid outputs; preserve complex phases and backend special functions",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1432",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "optical-wavefront",
+      "module": "src/pyrite/montecarlo/spectrum/optical_wavefront.py",
+      "function": "propagate_vacuum",
+      "line": 92,
+      "source_sha256": "c13121fce8c65f17675a0ae7569bf8f9335daa8b5ba1035b30b6f0fa5301649e",
+      "execution_route": "NumPy/device FFT and elementwise angular-spectrum phase",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Preserve FFT backend; unprofiled",
+      "parallel_applicability": "Pointwise phase can fuse; FFT threads compete with outer workers",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1432",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "optical-transport",
+      "module": "src/pyrite/montecarlo/spectrum/optical_finite_transport.py",
+      "function": "entrance_pec_screens_from_crossings",
+      "line": 45,
+      "source_sha256": "c714bc105853d164f4e19fd384a2991cd313e2249fbf00191dea7c14e6d0f5bc",
+      "execution_route": "Host boundary/crossing arrays into finite-screen source",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": null,
+      "compilation": "static classification only; runtime signatures/cache/target options in raw measurements",
+      "bottleneck_class": "unmeasured",
+      "proposed_action": "Unprofiled lower-priority route; retain entrance/straightness validity gates",
+      "parallel_applicability": "Variable crossings and coherent sums need private ownership",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1432",
+      "evidence_reference": null,
+      "confidence": "source-inspected route; performance unmeasured"
+    },
+    {
+      "family": "cxr-node-window-incoherent",
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_node_window.py",
+      "function": "accumulate_sincsq_windowed",
+      "line": 496,
+      "source_sha256": "d777bc5a82c6682b040bcc7924087c7fa2f9495ff3b8372cad78d932ae37136f",
+      "execution_route": "Host plan (row_window_plan, chunk bounds) + @njit(parallel=True) _sincsq_window_reduce over fixed 32 chunks; mode-1 rows add full-grid tail loop",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": {
+        "kind": "profiled exclusive / profile wall",
+        "photon_case_t1_job_15957": 0.7886351566648965,
+        "layered_t1_job_15957": 0.7433027386015969,
+        "photon_case_t4_job_15959": 0.52
+      },
+      "compilation": "nopython parallel signature active; omp layer; zero warm compilation",
+      "bottleneck_class": "compiled kernel, per-line cost; dominant on fixed-grid crystal cases (production-mode selection scores every shell on the production axis)",
+      "proposed_action": "#1446: split window vs tail vs rejected-shell cost; prototype per-line reduction. Thread scaling measured: 4 threads cut kernel 29.7->8.1 s (3.7x), case 37.0->15.2 s (2.44x), bitwise identical",
+      "parallel_applicability": "already prange over fixed chunks; output thread-count independent (verified t1 vs t4)",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1446; #1295/#1439 line count; #1395 worker Numba budget",
+      "evidence_reference": [
+        "results/job-15957/photon-case-t1.json",
+        "results/job-15957/layered-t1.json",
+        "results/job-15959/photon-case-t4.json"
+      ],
+      "confidence": "two complete fixed-grid cases, bound allocation; kernel-internal split unmeasured"
+    },
+    {
+      "family": "cxr-coherent",
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_batched_finalize.py",
+      "function": "_batched_coherent_finalize",
+      "line": 23,
+      "source_sha256": "7af34f054e16b052040dfcacb048a750c14278ced45d8b85dc1b773d75c6494a",
+      "execution_route": "Per-hkl electron-grouped coherent rows, formation factor, NumPy reduceat; coherent emission refuses reflection selection",
+      "precision_layout": "route-dependent; active signatures in raw measurements",
+      "runtime_share": {
+        "kind": "profiled cumulative / profile wall",
+        "crystal300_coherent_hr_job_15958": 0.7903225806451613
+      },
+      "compilation": "see raw dispatchers",
+      "bottleneck_class": "small at 16 histories: 0.037 s (400 nodes), 0.59 s (19 001 nodes)",
+      "proposed_action": "Defer: needs production-sized coherent population before ranking",
+      "parallel_applicability": "unassessed",
+      "free_threading": "does not establish shared-state safety; #1423; install support #1421",
+      "coordination_owner": "#1432",
+      "evidence_reference": [
+        "results/job-15958/crystal300-coherent-t1.json",
+        "results/job-15958/crystal300-coherent-hr-t1.json"
+      ],
+      "confidence": "route established; small fixture"
+    }
+  ],
+  "compiler_annotations": [
+    {
+      "module": "src/pyrite/montecarlo/spectrum/_brem_cpu_fused.py",
+      "function": "_lower_node",
+      "line": 50,
+      "decorators": [
+        "njit(cache=True, inline='always')"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/spectrum/_brem_cpu_fused.py",
+      "function": "_scaled_along",
+      "line": 64,
+      "decorators": [
+        "njit(cache=True, inline='always')"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/spectrum/_brem_cpu_fused.py",
+      "function": "_cross_section",
+      "line": 78,
+      "decorators": [
+        "njit(cache=True, inline='always')"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/spectrum/_brem_cpu_fused.py",
+      "function": "_transmission",
+      "line": 102,
+      "decorators": [
+        "njit(cache=True, inline='always')"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/spectrum/_brem_cpu_fused.py",
+      "function": "_reduced",
+      "line": 124,
+      "decorators": [
+        "njit(cache=True, inline='always')"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/spectrum/_brem_cpu_fused.py",
+      "function": "_spectrum_tile",
+      "line": 133,
+      "decorators": [
+        "njit(parallel=True, cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/spectrum/_brem_cpu_fused.py",
+      "function": "_band_rows",
+      "line": 150,
+      "decorators": [
+        "njit(parallel=True, cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_bin_mean_jit.py",
+      "function": "_horner",
+      "line": 36,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_bin_mean_jit.py",
+      "function": "_si_rational_complement",
+      "line": 44,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_bin_mean_jit.py",
+      "function": "_si_minus_half_pi",
+      "line": 76,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_bin_mean_jit.py",
+      "function": "_sincsq_tail",
+      "line": 103,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_bin_mean_jit.py",
+      "function": "_near_far_bins",
+      "line": 133,
+      "decorators": [
+        "njit(parallel=True, cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_cpu_reduce.py",
+      "function": "_sincsq_reduce",
+      "line": 26,
+      "decorators": [
+        "njit(parallel=True, cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_cpu_reduce.py",
+      "function": "_grouped_formation_reduce",
+      "line": 102,
+      "decorators": [
+        "njit(parallel=True, cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_node_window.py",
+      "function": "_cluster_heads",
+      "line": 373,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_node_window.py",
+      "function": "_tail_value",
+      "line": 453,
+      "decorators": [
+        "njit(inline='always', cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_node_window.py",
+      "function": "_tail_correction",
+      "line": 459,
+      "decorators": [
+        "njit(inline='always', cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_node_window.py",
+      "function": "_sincsq_window_reduce",
+      "line": 467,
+      "decorators": [
+        "njit(parallel=True, cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/spectrum/cxr/_node_window.py",
+      "function": "_grouped_window_reduce",
+      "line": 526,
+      "decorators": [
+        "njit(parallel=True, cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/_continuation_join.py",
+      "function": "_copy_runs",
+      "line": 71,
+      "decorators": [
+        "njit(parallel=True, cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/_continuation_join.py",
+      "function": "_copy_bytes",
+      "line": 79,
+      "decorators": [
+        "njit(parallel=True, cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/_jit_cutoff_bound.py",
+      "function": "cutoff_solve_idle",
+      "line": 40,
+      "decorators": [
+        "njit(cache=True, inline='always')"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/_jit_cutoff_bound.py",
+      "function": "sbethe_cutoff_bound",
+      "line": 47,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/_jit_cutoff_bound.py",
+      "function": "lut_cutoff_bound",
+      "line": 71,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/_jit_cutoff_bound.py",
+      "function": "add_soft_moment_bound",
+      "line": 93,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/_jit_cutoff_bound.py",
+      "function": "widen_cutoff_bound",
+      "line": 125,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/_jit_moment_lookup.py",
+      "function": "transport_layer_moments",
+      "line": 10,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/_jit_moment_lookup.py",
+      "function": "table_moments",
+      "line": 51,
+      "decorators": [
+        "njit(cache=True, inline='always')"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/_jit_moment_lookup.py",
+      "function": "exact_moments",
+      "line": 93,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/_jit_radiative.py",
+      "function": "_incident_row",
+      "line": 26,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/_jit_radiative.py",
+      "function": "_scaled_sdcs_at",
+      "line": 46,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/_jit_radiative.py",
+      "function": "_photon_nodes",
+      "line": 66,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/_jit_radiative.py",
+      "function": "_linear_cell",
+      "line": 93,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/_jit_radiative.py",
+      "function": "radiative_moments_scalar",
+      "line": 104,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/_jit_radiative.py",
+      "function": "sample_hard_photon_energy_scalar",
+      "line": 151,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/_jit_radiative.py",
+      "function": "radiative_layer_moments_scalar",
+      "line": 221,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/_jit_radiative.py",
+      "function": "_sample_hard_photon",
+      "line": 259,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/cone_split.py",
+      "function": "_event_key",
+      "line": 136,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/cone_split.py",
+      "function": "_ladder_uniforms",
+      "line": 142,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/cone_split.py",
+      "function": "_row_cdf_at",
+      "line": 188,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/cone_split.py",
+      "function": "_mu_of_xi",
+      "line": 212,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/cone_split.py",
+      "function": "_arc_half_width",
+      "line": 220,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/cone_split.py",
+      "function": "cone_split_event",
+      "line": 233,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/core_adapters.py",
+      "function": "core",
+      "line": 29,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/core_adapters.py",
+      "function": "core",
+      "line": 59,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/core_adapters.py",
+      "function": "core",
+      "line": 94,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/core_adapters.py",
+      "function": "core",
+      "line": 128,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/core_adapters.py",
+      "function": "core",
+      "line": 163,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/core_adapters.py",
+      "function": "core",
+      "line": 195,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/core_adapters.py",
+      "function": "core",
+      "line": 214,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/core_adapters.py",
+      "function": "core",
+      "line": 244,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/core_geometry.py",
+      "function": "_rotate_direction_scalar",
+      "line": 16,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/core_geometry.py",
+      "function": "_rotate_directions",
+      "line": 38,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/core_geometry.py",
+      "function": "_first_prism_exit_scalar",
+      "line": 47,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/core_geometry.py",
+      "function": "_searchsorted_right_scalar",
+      "line": 79,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/core_geometry.py",
+      "function": "_groove_reentry_scalar",
+      "line": 91,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/cores.py",
+      "function": "body",
+      "line": 153,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/dielectric_radiative.py",
+      "function": "dielectric_scale_eV",
+      "line": 19,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/dielectric_radiative.py",
+      "function": "dielectric_cell_moments",
+      "line": 28,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/hard_inelastic.py",
+      "function": "_hard_stream_key_scalar",
+      "line": 89,
+      "decorators": [
+        "njit(uint64(uint64), cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/hard_inelastic.py",
+      "function": "_log_grid_frac",
+      "line": 108,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/hard_inelastic.py",
+      "function": "_triangle_cdf",
+      "line": 129,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/hard_inelastic.py",
+      "function": "_moller_j0",
+      "line": 135,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/hard_inelastic.py",
+      "function": "_bhabha_j0",
+      "line": 143,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/hard_inelastic.py",
+      "function": "_split_branch",
+      "line": 160,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/hard_inelastic.py",
+      "function": "_hard_loss_bounds",
+      "line": 171,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/hard_inelastic.py",
+      "function": "_hard_cdf_density",
+      "line": 196,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/hard_inelastic.py",
+      "function": "_sample_hard_transfer_eV",
+      "line": 228,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/hard_inelastic.py",
+      "function": "_sample_hard_transfer_eV_bisection",
+      "line": 294,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/hard_inelastic.py",
+      "function": "_qmin_ev_scalar",
+      "line": 352,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/hard_inelastic.py",
+      "function": "_hard_primary_cosine",
+      "line": 362,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/hard_inelastic.py",
+      "function": "_hard_secondary_cosine",
+      "line": 412,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/hard_inelastic.py",
+      "function": "_hard_secondary_direction",
+      "line": 459,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/hard_inelastic.py",
+      "function": "_soft_loss_sample_keV",
+      "line": 478,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/hard_inelastic.py",
+      "function": "_sample_hard_collision",
+      "line": 525,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/kinematics.py",
+      "function": "beta_from_keV_scalar",
+      "line": 166,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/kinematics.py",
+      "function": "_splitmix64",
+      "line": 206,
+      "decorators": [
+        "njit(uint64(uint64), cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/kinematics.py",
+      "function": "_stream_key_scalar",
+      "line": 214,
+      "decorators": [
+        "njit(uint64(int64, int64), cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/kinematics.py",
+      "function": "_stream_uniform_scalar",
+      "line": 220,
+      "decorators": [
+        "njit(float64(uint64, uint64), cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/lut.py",
+      "function": "_lut_index_frac_scalar",
+      "line": 94,
+      "decorators": [
+        "njit(cache=True, inline='always')"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/lut.py",
+      "function": "_lut_lerp_1d",
+      "line": 115,
+      "decorators": [
+        "njit(cache=True, inline='always')"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/lut.py",
+      "function": "_lut_lerp_2d",
+      "line": 120,
+      "decorators": [
+        "njit(cache=True, inline='always')"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/lut.py",
+      "function": "_lut_lerp_3d",
+      "line": 125,
+      "decorators": [
+        "njit(cache=True, inline='always')"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/mixed_elastic.py",
+      "function": "_mixed_hard_rate_scalar",
+      "line": 164,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/mixed_elastic.py",
+      "function": "_hard_rate_bound_scalar",
+      "line": 175,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/mixed_elastic.py",
+      "function": "_layer_hard_rate_bound",
+      "line": 197,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/mixed_elastic.py",
+      "function": "_grid_rate_bound",
+      "line": 214,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/mixed_elastic.py",
+      "function": "_mixed_hard_element",
+      "line": 232,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/mixed_elastic.py",
+      "function": "_plan_mixed_step",
+      "line": 253,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/mixed_elastic.py",
+      "function": "_mixed_hard_quantile_scalar",
+      "line": 275,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/mixed_elastic.py",
+      "function": "_mixed_soft_rates_scalar",
+      "line": 285,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/mixed_elastic.py",
+      "function": "_hinge_moments",
+      "line": 305,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/mixed_elastic.py",
+      "function": "_sample_hinge_mu",
+      "line": 316,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/mixed_elastic.py",
+      "function": "_layer_soft_rates",
+      "line": 337,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/mixed_elastic.py",
+      "function": "_hinge_direction",
+      "line": 355,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/radiative_moments.py",
+      "function": "interpolate_moments",
+      "line": 46,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/radiative_moments.py",
+      "function": "_exact_layer",
+      "line": 94,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/scattering.py",
+      "function": "_sigma_browning_cm2",
+      "line": 75,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/scattering.py",
+      "function": "_sigma_browning_cm2_scalar",
+      "line": 97,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/scattering.py",
+      "function": "_alpha_sr_joy_scalar",
+      "line": 114,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/scattering.py",
+      "function": "_alpha_sr_joy_numba",
+      "line": 120,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/scattering.py",
+      "function": "_scatter_rates_mott_scalar",
+      "line": 202,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/scattering.py",
+      "function": "_scatter_rates_sr_scalar",
+      "line": 208,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/scattering.py",
+      "function": "_sample_cos_theta_sr_numba",
+      "line": 220,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/scattering.py",
+      "function": "_sample_cos_theta_from_alpha",
+      "line": 234,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/scattering.py",
+      "function": "_interp_mott_log_alpha_scalar",
+      "line": 239,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/scattering.py",
+      "function": "_sample_cos_theta_joy_scalar",
+      "line": 268,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/scattering.py",
+      "function": "_sample_cos_theta_mott_scalar",
+      "line": 274,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/scattering.py",
+      "function": "_elsepa_bracket",
+      "line": 517,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/scattering.py",
+      "function": "_elsepa_rate_scalar",
+      "line": 540,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/scattering.py",
+      "function": "_elsepa_panel",
+      "line": 550,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/scattering.py",
+      "function": "_elsepa_invert_row",
+      "line": 581,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/scattering.py",
+      "function": "_sample_cos_theta_elsepa",
+      "line": 612,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/stopping.py",
+      "function": "_dEds_sbethe_scalar",
+      "line": 75,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/stopping.py",
+      "function": "_dEds_sbethe_packed_scalar",
+      "line": 108,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/stopping.py",
+      "function": "_dEds_compound_scalar",
+      "line": 140,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/stopping.py",
+      "function": "_dEds_compound",
+      "line": 154,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/stopping.py",
+      "function": "_dEds_bs_compound_scalar",
+      "line": 223,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/stopping.py",
+      "function": "_dEds_bs_packed_scalar",
+      "line": 241,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/stopping.py",
+      "function": "_dEds_bs_compound",
+      "line": 264,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/stopping.py",
+      "function": "_dEds_spliced_compound_scalar",
+      "line": 347,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/stopping.py",
+      "function": "_dEds_spliced_compound",
+      "line": 374,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/stopping.py",
+      "function": "_dEds_spliced_packed_scalar",
+      "line": 384,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/straggling.py",
+      "function": "_urban_stream_key_scalar",
+      "line": 37,
+      "decorators": [
+        "njit(uint64(uint64), cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/straggling.py",
+      "function": "_urban_flight_key_scalar",
+      "line": 43,
+      "decorators": [
+        "njit(uint64(uint64, int64, int64), cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/straggling.py",
+      "function": "_urban_levels_scalar",
+      "line": 133,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/straggling.py",
+      "function": "_urban_channels_scalar",
+      "line": 161,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/straggling.py",
+      "function": "_urban_moments_element_scalar",
+      "line": 207,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/straggling.py",
+      "function": "_urban_poisson_scalar",
+      "line": 229,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/straggling.py",
+      "function": "_urban_ionisation_keV",
+      "line": 266,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/straggling.py",
+      "function": "_urban_sample_element_keV",
+      "line": 278,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/straggling.py",
+      "function": "_dEds_spliced_element_scalar",
+      "line": 307,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    },
+    {
+      "module": "src/pyrite/montecarlo/transport/straggling.py",
+      "function": "_urban_sample_compound_keV",
+      "line": 332,
+      "decorators": [
+        "njit(cache=True)"
+      ],
+      "runtime_active": "unmeasured unless present in results",
+      "indirect_callees": "not exhaustively enumerated; absence is not uncompiled evidence"
+    }
+  ]
+}

@@ -1,0 +1,281 @@
+pid 3769769's current affinity list: 0-31
+pid 3769769's new affinity list: 0-3
+Using CPython 3.14.6
+Creating virtual environment at: .venv
+   Building pyrite-mc @ file://<checkout>
+      Built pyrite-mc @ file://<checkout>
+Installed 270 packages in 358ms
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+{"case": "crystal300", "wall_s": [19.51858121296391, 1.10745509294793, 1.1636840789578855, 1.1453059369232506]}
+{"case": "char-multi", "wall_s": [0.016083668917417526, 0.004351276904344559, 0.0042888568714261055, 0.004304487025365233]}
+{"case": "char-layered", "wall_s": [0.01591856707818806, 0.003070947015658021, 0.002800262998789549, 0.002892754040658474]}
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+{"case": "crystal300", "wall_s": [2.5416091200895607, 1.3754098750650883, 1.0830951570533216, 1.1201901570893824]}
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+{"processes": 1, "threads": 1, "round_wall_s": [5.75347140384838, 5.686810135142878, 5.812778986059129]}
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+{"processes": 4, "threads": 1, "round_wall_s": [4.331137430854142, 4.7380532620009035, 4.799384651938453]}
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+{"processes": 1, "threads": 4, "round_wall_s": [6.290204308927059, 6.128304530167952, 6.314790145959705]}
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+<checkout>/src/pyrite/xsgen/store.py:483: RuntimeWarning: reading legacy workspace tables at <checkout>/xsgen/tables; run pyrite tables migrate
+  for root in search_dirs():
+{"processes": 2, "threads": 2, "round_wall_s": [5.518673535902053, 4.952996124979109, 3.940127484034747]}

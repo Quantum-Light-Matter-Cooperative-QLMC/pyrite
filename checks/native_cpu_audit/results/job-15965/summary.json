@@ -1,0 +1,62 @@
+{
+ "case": "cleo_test hopg 300 keV 500 nm, azim 180, adaptive RSE 1e-3 (max 1e8), policy grid sinc-oversampled/bin-mean; bandwidth defaulted (resonance-population with kinematic fallback; profile key dropped 2026-11-24)",
+ "device": "RTX 5080 (king), CUDA, 8 OS-bound CPUs, nsys 2025.6.3",
+ "per_tilt": [
+  {
+   "tilt_deg": 85,
+   "sampler_wall_s": 34.63305975263938,
+   "nsys_wall_s": 42.59105812,
+   "device_busy_fraction": 0.30664055488368314,
+   "device_idle_s": 29.530912425,
+   "realized_electrons": 3473280,
+   "n_segments": 26031487,
+   "error": null,
+   "idle_by_gap_size_s": {
+    "<0.01ms": 1.654644952,
+    "<0.1ms": 11.910515306,
+    "<100ms": 3.183868022,
+    "<10ms": 2.524540606,
+    "<1ms": 1.57133426,
+    ">=100ms": 8.686009279
+   },
+   "top_idle_innermost_s": {
+    "gpuhost.BlockSpectrumScorer.add": 12.198257105,
+    "gpuhost.StoppingMonitor.on_block": 2.431780982,
+    "gpuhost.sinc_spacing_from_samples": 1.883563305,
+    "gpuhost.electron_cutoffs": 1.557720516,
+    "gpuhost.sinc_feature_samples": 1.316880862,
+    "gpuhost.cuda_fourier_bin_mean_reduce": 1.108096039,
+    "gpuhost.initial_beam_positions": 0.87187815,
+    "gpuhost.BlockGridEvidence.add": 0.849674797
+   }
+  },
+  {
+   "tilt_deg": 45,
+   "sampler_wall_s": 8.019972204230726,
+   "nsys_wall_s": 8.460187408,
+   "device_busy_fraction": 0.11373520107723838,
+   "device_idle_s": 7.497966291999999,
+   "realized_electrons": 387885,
+   "n_segments": 1111490,
+   "error": null,
+   "idle_by_gap_size_s": {
+    "<0.01ms": 0.137100645,
+    "<0.1ms": 1.116906188,
+    "<100ms": 2.427240106,
+    "<10ms": 0.33787786,
+    "<1ms": 0.473106278,
+    ">=100ms": 3.005735215
+   },
+   "top_idle_innermost_s": {
+    "gpuhost.electron_cutoffs": 1.51224991,
+    "gpuhost._corrected_tables": 1.301969344,
+    "gpuhost.StoppingMonitor.on_block": 0.681854932,
+    "gpuhost.build_shell_inelastic_tables": 0.53690931,
+    "gpuhost.PrefixSelectingScorer.add": 0.52616525,
+    "gpuhost.BlockSpectrumScorer.add": 0.382821267,
+    "gpuhost.cuda_fourier_bin_mean_reduce": 0.349367428,
+    "gpuhost.ResidentBlockRecovery.simulate": 0.288995508
+   }
+  }
+ ]
+}

@@ -1,0 +1,39 @@
+{
+  "job_id": 15964,
+  "state": "COMPLETED",
+  "elapsed_s": 364,
+  "node": "king (gpu partition, RTX 5080)",
+  "requested_cpus": 8,
+  "requested_memory_MiB": 30720,
+  "producer_revision": "bf54315e9",
+  "sync_code_digest_py": "bfabbb79ef95f420e9c033ebe83c5c776dd20ab2af80bed5ec2f0362c674f62b (sha256sum of src+checks *.py, LC_ALL=C sorted)",
+  "scheduler_step_max_rss_KiB": {
+    "batch": 8531608
+  },
+  "command": "sbatch -t 01:00:00 -J gpuhostnsys1432-bf54315e9 checks/native_cpu_audit/gpu_host_nsys.sbatch runs-fine hopg 300 \"5 85\" 1800",
+  "path_sanitization": "isolated checkout path replaced with <checkout>, home with <home>, node hostname with king; nsys progress bars elided",
+  "not_retained": "2 .nsys-rep traces remain in the isolated checkout runs-fine/ on the box",
+  "files": {
+    "hopg-300-5-gaps.json": "d01f3195400338b721505d817a5183cba0861b1ac2320904c76088735f549b19",
+    "hopg-300-85-gaps.json": "80b39007a6ecf6aaad2c2373dd55b9823248749a222df1e8639f24a88e5e2b7c",
+    "job-log.txt": "e6b1ec51ffd7bbc011bf6c7140d9a78d0d6411a0ea044c9d75f7834f385d9593",
+    "summary.json": "3f6ab2dfb77802ac39fc423a667ba7e424e983d726f3f08e742e514ee9900478"
+  },
+  "dropped_sha256": {
+    "gpu-info.txt": "3cf17948797e413ad9c2cbc9100bfaedea2319e58d50962ff1a85eafbe3684ff",
+    "hopg-300-5-export.log": "d98f44df217f7a617f99a936b27805d29a5cb6367f45ea7ee1aeb8874795c596",
+    "hopg-300-5-gaps.log": "eb7cb3f9280d45ae621a68619243e3012167d12801d8a5ae71b96b20fc085ea1",
+    "hopg-300-5-nsys.json": "55db467fdb33c60857f8e07f4fb670aa7b8ae769965eff26cb9bf1b09c66c328",
+    "hopg-300-5-nsys.log": "892fdcb99fed3f97b0ddcc52bab3ecfc5d230dd2f8c7b3b5143403c27ad7bae5",
+    "hopg-300-5-sampler.json": "d322a6d91ee4738ef14158ae211c359d32e039eba7450af594eebb0c2539e18f",
+    "hopg-300-5-sampler.log": "e024b9ab4478f921dcc144d41eb67eba3ed6c4058878153236ab0fb86044b6bf",
+    "hopg-300-5-warm.json": "50b6f0836824928bbe9aec813ff136c03cc4bbf90c66ef9020b4640232887fe3",
+    "hopg-300-5-warm.log": "bb02c2de3e4aed5d634e6431d5c405650aad7d6eb6323cf091707211f848038a",
+    "hopg-300-85-export.log": "e5249d1f0a386da10f61ce01bfc3fa3d2102fab95e82bd42e446c37f08bff87c",
+    "hopg-300-85-gaps.log": "0ba7f0145a990a84f1a335babb18378a072744424b495afa26ff4684c70b4744",
+    "hopg-300-85-nsys.json": "8dede062cad6e507cb43572c353b010abfc09a22ad016dbda4d618fe3f7a8894",
+    "hopg-300-85-nsys.log": "83160d1ad98153415e692362470a305ffe6bfc993dd780a14e9d4d5fb1379daf",
+    "hopg-300-85-sampler.json": "ece4f05a020a541e656365a93e2e355308b1b24b65654c967f7578a6041d0bd6",
+    "hopg-300-85-sampler.log": "2dce155fd7d2a13573e95c543b85cf42b0302f6dc28e4abde7118f15d809c5ee"
+  }
+}

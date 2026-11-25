@@ -1,0 +1,62 @@
+{
+ "case": "cleo_test hopg 300 keV 500 nm, azim 180, adaptive RSE 1e-3 (max 1e8), policy grid sinc-oversampled/bin-mean; bandwidth explicit resonance-population",
+ "device": "RTX 5080 (king), CUDA, 8 OS-bound CPUs, nsys 2025.6.3",
+ "per_tilt": [
+  {
+   "tilt_deg": 5,
+   "sampler_wall_s": 59.75297932000831,
+   "nsys_wall_s": 64.836842645,
+   "device_busy_fraction": 0.30151886079708096,
+   "device_idle_s": 45.28731171300001,
+   "realized_electrons": 31100826,
+   "n_segments": 72158433,
+   "error": null,
+   "idle_by_gap_size_s": {
+    "<0.01ms": 0.678681087,
+    "<0.1ms": 4.671721043,
+    "<100ms": 7.508021888,
+    "<10ms": 4.035303959,
+    "<1ms": 3.110620436,
+    ">=100ms": 25.2829633
+   },
+   "top_idle_innermost_s": {
+    "gpuhost._resolve_policy_grid": 10.674282675,
+    "gpuhost.initial_beam_positions": 7.818866939,
+    "gpuhost._transport_case": 4.762520608,
+    "gpuhost.StoppingMonitor.on_block": 2.628465549,
+    "gpuhost.block_tail_sums": 2.480526418,
+    "pyrite.transport.continuation.assemble": 2.229101054,
+    "pyrite.transport.sample": 1.889813795,
+    "pyrite.transport.core": 1.808123823
+   }
+  },
+  {
+   "tilt_deg": 85,
+   "sampler_wall_s": 35.065953901037574,
+   "nsys_wall_s": 40.854180278,
+   "device_busy_fraction": 0.3074575716004285,
+   "device_idle_s": 28.29325322,
+   "realized_electrons": 3473280,
+   "n_segments": 26031487,
+   "error": null,
+   "idle_by_gap_size_s": {
+    "<0.01ms": 1.145424785,
+    "<0.1ms": 11.85653515,
+    "<100ms": 3.396620182,
+    "<10ms": 2.276254271,
+    "<1ms": 1.286254361,
+    ">=100ms": 8.332164471
+   },
+   "top_idle_innermost_s": {
+    "gpuhost._transport_case": 12.908046487,
+    "gpuhost.StoppingMonitor.on_block": 2.423040483,
+    "gpuhost.sinc_spacing_from_samples": 1.819321125,
+    "gpuhost.electron_cutoffs": 1.571008467,
+    "gpuhost.sinc_feature_samples": 1.339152524,
+    "gpuhost.cuda_fourier_bin_mean_reduce": 1.256201342,
+    "gpuhost.initial_beam_positions": 0.86243952,
+    "gpuhost.block_tail_sums": 0.813807288
+   }
+  }
+ ]
+}

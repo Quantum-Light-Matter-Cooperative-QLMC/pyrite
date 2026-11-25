@@ -1,0 +1,27 @@
+{
+  "job_id": 15939,
+  "state": "COMPLETED",
+  "elapsed_s": 137,
+  "requested_cpus": 4,
+  "requested_memory_MiB": 8192,
+  "producer_revision": "bfeb3187559d9f1df685dbdf2665cec7f409fa24",
+  "numerical_baseline": "147400d356812d1f1d0ad39834de347ca1d8555f",
+  "sync_code_digest": "591d6c553c02e5c1128f2059df88886a86a9670bf90f30659b8ec028d4358b93",
+  "sync_tables_digest": "08bfc386651213994f9dc150d2cbfee28cdf7682909c0fd8a3ae9a934396343d",
+  "scheduler_step_max_rss_KiB": {
+    "batch": 1329172
+  },
+  "command": "sbatch --nodelist=<cpu-node> --job-name=top1432-bfeb31875 checks/native_cpu_audit/topology.sbatch",
+  "superseded_failure": "15938 (producer a13e86eb3): char-multi fixture lacked homogeneous layer column; no result accepted.",
+  "files": {
+    "char-layered-t1.json": "76cbf7747aa529be465455677c86d701917cdfb454f589f0b9becef92c0b51b8",
+    "char-multi-t1.json": "4cda4a0f5c24ec8d2627a246c227ba736b1646d480b6bdc8a3b484865771af74",
+    "job-log.txt": "9c41d222da995971346ae03f3a96a9674eb0173cecb38273d66d5a229e92329f",
+    "summary.json": "470f8fb04c2709c90841063ec4038a00b4126d8afaba5ba18a4d3dd84dfe2ed5",
+    "topology.json": "17e705a9e81ba669bd80f696f950f8922cdcc3748c63f7933548132223357b16"
+  },
+  "dropped_sha256": {
+    "crystal300-t1.json": "0e6b5840e567138981cf40bab541cccb718c1d95db7e09fc5b52e9730aff397f",
+    "crystal300-t4.json": "b5d7619bb7a7287ee0439f7185f96674ba3889d42c6a3a5a29792390ae36ab26"
+  }
+}

@@ -1,0 +1,1759 @@
+{
+  "schema": "pyrite.native-cpu-audit.v1",
+  "case": "axial-prod-cache8",
+  "environment": {
+    "revision": "c51030eeb7adc26a1137b939e6435228f585f677",
+    "python": "3.14.6",
+    "versions": {
+      "numpy": "2.5.4",
+      "numba": "0.68.1",
+      "scipy": "1.18.1",
+      "llvmlite": "0.50.0",
+      "dask": "2026.8.0",
+      "distributed": "2026.8.0",
+      "pyfftw": "0.15.1"
+    },
+    "machine": "x86_64",
+    "cpu": "AMD Ryzen 9 9950X3D 16-Core Processor",
+    "affinity": [
+      8,
+      9,
+      10,
+      11
+    ],
+    "gil_enabled": true,
+    "numba_threads": 1,
+    "numba_threading_layer": null,
+    "backend": "<pyrite._backend.NumPyBackend object at 0x71d9079201a0>",
+    "precision": "float64",
+    "native_pools": [
+      {
+        "user_api": "blas",
+        "internal_api": "openblas",
+        "num_threads": 1,
+        "prefix": "libscipy_openblas",
+        "filepath": "<checkout>/.venv/lib/python3.14/site-packages/numpy.libs/libscipy_openblas64_-f48b354e.so",
+        "version": "0.3.34.106.0",
+        "threading_layer": "pthreads",
+        "architecture": "SkylakeX"
+      },
+      {
+        "user_api": "blas",
+        "internal_api": "openblas",
+        "num_threads": 1,
+        "prefix": "libscipy_openblas",
+        "filepath": "<checkout>/.venv/lib/python3.14/site-packages/scipy.libs/libscipy_openblas-5f890258.so",
+        "version": "0.3.31.dev",
+        "threading_layer": "pthreads",
+        "architecture": "SkylakeX"
+      },
+      {
+        "user_api": "openmp",
+        "internal_api": "openmp",
+        "num_threads": 1,
+        "prefix": "libgomp",
+        "filepath": "/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0",
+        "version": null
+      }
+    ],
+    "threads": {
+      "NUMBA_NUM_THREADS": "1",
+      "NUMBA_THREADING_LAYER": null,
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "PYRITE_FFT_THREADS": null
+    },
+    "cache": {
+      "NUMBA_CACHE_DIR": "<checkout>/runs/cache-axial",
+      "CUPY_CACHE_DIR": "<home>/.cache/pyrite/cupy"
+    },
+    "numpy_config": {
+      "Compilers": {
+        "c": {
+          "name": "gcc",
+          "linker": "ld.bfd",
+          "version": "14.2.1",
+          "commands": "cc"
+        },
+        "cython": {
+          "name": "cython",
+          "linker": "cython",
+          "version": "3.3.0",
+          "commands": "cython"
+        },
+        "c++": {
+          "name": "gcc",
+          "linker": "ld.bfd",
+          "version": "14.2.1",
+          "commands": "c++"
+        }
+      },
+      "Machine Information": {
+        "host": {
+          "cpu": "x86_64",
+          "family": "x86_64",
+          "endian": "little",
+          "system": "linux"
+        },
+        "build": {
+          "cpu": "x86_64",
+          "family": "x86_64",
+          "endian": "little",
+          "system": "linux"
+        }
+      },
+      "Build Dependencies": {
+        "blas": {
+          "name": "scipy-openblas",
+          "found": true,
+          "version": "0.3.34.106.0",
+          "detection method": "pkgconfig",
+          "include directory": "/opt/_internal/cpython-3.14.6/lib/python3.14/site-packages/scipy_openblas64/include",
+          "lib directory": "/opt/_internal/cpython-3.14.6/lib/python3.14/site-packages/scipy_openblas64/lib",
+          "openblas configuration": "OpenBLAS 0.3.34.106.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64",
+          "pc file directory": "/project/.openblas"
+        },
+        "lapack": {
+          "name": "scipy-openblas",
+          "found": true,
+          "version": "0.3.34.106.0",
+          "detection method": "pkgconfig",
+          "include directory": "/opt/_internal/cpython-3.14.6/lib/python3.14/site-packages/scipy_openblas64/include",
+          "lib directory": "/opt/_internal/cpython-3.14.6/lib/python3.14/site-packages/scipy_openblas64/lib",
+          "openblas configuration": "OpenBLAS 0.3.34.106.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64",
+          "pc file directory": "/project/.openblas"
+        }
+      },
+      "Python Information": {
+        "path": "/tmp/build-env-c90f47zn/bin/python",
+        "version": "3.14"
+      },
+      "SIMD Extensions": {
+        "baseline": [
+          "X86_V2"
+        ],
+        "found": [
+          "X86_V3",
+          "X86_V4",
+          "AVX512_ICL"
+        ],
+        "not found": [
+          "AVX512_SPR"
+        ]
+      }
+    },
+    "allocation": {
+      "SLURM_JOB_ID": "15945",
+      "SLURM_CPUS_PER_TASK": "4",
+      "SLURM_MEM_PER_NODE": "3072"
+    }
+  },
+  "parameters": {
+    "kind": "production-depth-energy-resolved-mcwf",
+    "fixture": "docs/physics/radiation-physics/channeling-energy-resolved-mcwf.md example; depth 1000 A, step 5 A",
+    "config": {
+      "crystal": "silicon",
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "kinetic_energy_eV": 5000000.0,
+      "temperature_K": 293.15,
+      "cells": [
+        1,
+        1
+      ],
+      "shape": [
+        32,
+        32
+      ],
+      "depths_ang": [
+        0.0,
+        250.0,
+        500.0,
+        1000.0
+      ],
+      "step_ang": 5.0,
+      "tilt_rad": [
+        0.0,
+        0.0
+      ],
+      "mode": "mcwf",
+      "histories": 16,
+      "seed": 0,
+      "mechanisms": [
+        "tds",
+        "electronic"
+      ],
+      "oam_string": 0,
+      "oam_radius_ang": 0.5,
+      "backend": "cpu",
+      "spectral_states": 0,
+      "spectral_representation": "energy_bins",
+      "spectral_energy_bins": 8,
+      "spectral_cutoff_eV": null,
+      "record_coherence": false,
+      "coherence_reference_index": null,
+      "record_current": false,
+      "record_current_divergence": false,
+      "current_contour": null,
+      "oam_symmetry": "required"
+    },
+    "options": {
+      "histories": 1000,
+      "seed": 627,
+      "sampling": "binned",
+      "chunk_size": 25,
+      "max_bins": 32,
+      "max_cached_solvers": 8,
+      "max_distinct_energies": 2048,
+      "checkpoint_every": 0,
+      "work_limit": 1000000000,
+      "storage_limit_bytes": 134217728,
+      "backend": "cpu",
+      "memory_budget_bytes": null
+    },
+    "beam": {
+      "energy_eV": 5000000.0,
+      "energy_spread_frac": 0.002,
+      "order": 9
+    },
+    "coherence_pairs": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "photon_energy_edges_eV": {
+      "shape": [
+        301
+      ],
+      "dtype": "<f8",
+      "sha256": "50e1f397c8901b6122a8b6f44ace4433868be9ca7e2ed74a32ff838ea188e798"
+    },
+    "split_steps": 200
+  },
+  "setup_s": 28.955074760131538,
+  "samples": [
+    {
+      "wall_s": 44.40034709125757,
+      "process_cpu_s": 44.208566936,
+      "first": true,
+      "compile_s": 0,
+      "compile_by_kernel": [],
+      "arrays": {
+        "energies_eV": {
+          "shape": [
+            1000
+          ],
+          "dtype": "<f8",
+          "sha256": "dcd793c656a699f2aa5910f25e644c407adf624a32db6ea11db94ebd24ef8222"
+        },
+        "energy_bin_edges_eV": {
+          "shape": [
+            10
+          ],
+          "dtype": "<f8",
+          "sha256": "f73949e500fddc4a263cf9ee14a3b075727ffdc3595366f66e8ee8ffd66018fb"
+        },
+        "energy_bin_centers_eV": {
+          "shape": [
+            9
+          ],
+          "dtype": "<f8",
+          "sha256": "19cf4d12a9218c54ee0bb54a125adcf41e1ca744b66a326417d7cd9ff600cf7d"
+        },
+        "bin_counts": {
+          "shape": [
+            9
+          ],
+          "dtype": "<i8",
+          "sha256": "a52686ec621d2969339ba603cb5a0b4a6e47e7d7023d2e9858211f291a4bab99"
+        },
+        "depths_ang": {
+          "shape": [
+            4
+          ],
+          "dtype": "<f8",
+          "sha256": "7345ed1a15cba67d763c27c62a498437e5da78dba9117e1f37bce262afd495e4"
+        },
+        "density_per_ang2": {
+          "shape": [
+            4,
+            32,
+            32
+          ],
+          "dtype": "<f8",
+          "sha256": "32203645fc89682eea3594a3e69a4d380cbe4010d2d30807729a846449f56563"
+        },
+        "density_by_bin_per_ang2": {
+          "shape": [
+            9,
+            4,
+            32,
+            32
+          ],
+          "dtype": "<f8",
+          "sha256": "ba4fdc657c92bd51f07fbab4e6e03b49eadce3b5c128f4722f25db29e264cc2e"
+        },
+        "surviving": {
+          "shape": [
+            4
+          ],
+          "dtype": "<f8",
+          "sha256": "0432e35f7180ad2d0d308e6a889a54cfde9ef4128dba198ad6b33b610808dd5f"
+        },
+        "surviving_by_bin": {
+          "shape": [
+            9,
+            4
+          ],
+          "dtype": "<f8",
+          "sha256": "3fe94e43ff4456f542981edbc613b9ab1f186f3ed60a8ba60034a07044cc7bd6"
+        },
+        "oam_ells": {
+          "shape": [
+            17
+          ],
+          "dtype": "<i8",
+          "sha256": "54780e16ca39c6cfd33efb825abf3a8ede399d10b73b0645a50f2ff108b77b5c"
+        },
+        "oam_populations": {
+          "shape": [
+            4,
+            17
+          ],
+          "dtype": "<f8",
+          "sha256": "5dd1bf5a678dc3bb02e246a8e3618b63370e7adc92b36a4b276e9eabe865814f"
+        },
+        "oam_populations_by_bin": {
+          "shape": [
+            9,
+            4,
+            17
+          ],
+          "dtype": "<f8",
+          "sha256": "3cefdfcbe2b3257687c7c3d5931e1f1dc15f397ad36691966deb14a48e70fe0a"
+        },
+        "coherence_per_ang2": {
+          "shape": [
+            4,
+            2
+          ],
+          "dtype": "<c16",
+          "sha256": "d87a3311309bc3e408ed1c5273ce6dd110f70ce3762d386cf6a5cfcccb626b88"
+        },
+        "coherence_by_bin_per_ang2": {
+          "shape": [
+            9,
+            4,
+            2
+          ],
+          "dtype": "<c16",
+          "sha256": "67a35a6ef089aa1b6feebd045bc6cd99d80766adba5aa62e9da4a82373370f03"
+        },
+        "photon_energy_edges_eV": {
+          "shape": [
+            301
+          ],
+          "dtype": "<f8",
+          "sha256": "50e1f397c8901b6122a8b6f44ace4433868be9ca7e2ed74a32ff838ea188e798"
+        },
+        "photon_density_per_eV": {
+          "shape": [
+            300
+          ],
+          "dtype": "<f8",
+          "sha256": "d03d95862d38266f11abcd98204c0405d2901bd9aaa4146e17d5c7fa87d369a8"
+        },
+        "photon_density_by_bin_per_eV": {
+          "shape": [
+            9,
+            300
+          ],
+          "dtype": "<f8",
+          "sha256": "0911a9917c93669085700abaf43f8681b1ba60ff30d6d19445ae56adce8359a0"
+        },
+        "helicity_plus_per_eV": {
+          "shape": [
+            300
+          ],
+          "dtype": "<f8",
+          "sha256": "a3fe49c124a30a50f85e3b5bf7c1170be96827779209b9976e318b492d9a55c7"
+        },
+        "helicity_minus_per_eV": {
+          "shape": [
+            300
+          ],
+          "dtype": "<f8",
+          "sha256": "17ca8a1a1746f072e303a1dfee4509f8d3807ab8ea46086e78d0ce9f35218bb8"
+        }
+      }
+    },
+    {
+      "wall_s": 43.1658836370334,
+      "process_cpu_s": 43.158664994,
+      "first": false,
+      "compile_s": 0,
+      "compile_by_kernel": [],
+      "arrays": {
+        "energies_eV": {
+          "shape": [
+            1000
+          ],
+          "dtype": "<f8",
+          "sha256": "dcd793c656a699f2aa5910f25e644c407adf624a32db6ea11db94ebd24ef8222"
+        },
+        "energy_bin_edges_eV": {
+          "shape": [
+            10
+          ],
+          "dtype": "<f8",
+          "sha256": "f73949e500fddc4a263cf9ee14a3b075727ffdc3595366f66e8ee8ffd66018fb"
+        },
+        "energy_bin_centers_eV": {
+          "shape": [
+            9
+          ],
+          "dtype": "<f8",
+          "sha256": "19cf4d12a9218c54ee0bb54a125adcf41e1ca744b66a326417d7cd9ff600cf7d"
+        },
+        "bin_counts": {
+          "shape": [
+            9
+          ],
+          "dtype": "<i8",
+          "sha256": "a52686ec621d2969339ba603cb5a0b4a6e47e7d7023d2e9858211f291a4bab99"
+        },
+        "depths_ang": {
+          "shape": [
+            4
+          ],
+          "dtype": "<f8",
+          "sha256": "7345ed1a15cba67d763c27c62a498437e5da78dba9117e1f37bce262afd495e4"
+        },
+        "density_per_ang2": {
+          "shape": [
+            4,
+            32,
+            32
+          ],
+          "dtype": "<f8",
+          "sha256": "32203645fc89682eea3594a3e69a4d380cbe4010d2d30807729a846449f56563"
+        },
+        "density_by_bin_per_ang2": {
+          "shape": [
+            9,
+            4,
+            32,
+            32
+          ],
+          "dtype": "<f8",
+          "sha256": "ba4fdc657c92bd51f07fbab4e6e03b49eadce3b5c128f4722f25db29e264cc2e"
+        },
+        "surviving": {
+          "shape": [
+            4
+          ],
+          "dtype": "<f8",
+          "sha256": "0432e35f7180ad2d0d308e6a889a54cfde9ef4128dba198ad6b33b610808dd5f"
+        },
+        "surviving_by_bin": {
+          "shape": [
+            9,
+            4
+          ],
+          "dtype": "<f8",
+          "sha256": "3fe94e43ff4456f542981edbc613b9ab1f186f3ed60a8ba60034a07044cc7bd6"
+        },
+        "oam_ells": {
+          "shape": [
+            17
+          ],
+          "dtype": "<i8",
+          "sha256": "54780e16ca39c6cfd33efb825abf3a8ede399d10b73b0645a50f2ff108b77b5c"
+        },
+        "oam_populations": {
+          "shape": [
+            4,
+            17
+          ],
+          "dtype": "<f8",
+          "sha256": "5dd1bf5a678dc3bb02e246a8e3618b63370e7adc92b36a4b276e9eabe865814f"
+        },
+        "oam_populations_by_bin": {
+          "shape": [
+            9,
+            4,
+            17
+          ],
+          "dtype": "<f8",
+          "sha256": "3cefdfcbe2b3257687c7c3d5931e1f1dc15f397ad36691966deb14a48e70fe0a"
+        },
+        "coherence_per_ang2": {
+          "shape": [
+            4,
+            2
+          ],
+          "dtype": "<c16",
+          "sha256": "d87a3311309bc3e408ed1c5273ce6dd110f70ce3762d386cf6a5cfcccb626b88"
+        },
+        "coherence_by_bin_per_ang2": {
+          "shape": [
+            9,
+            4,
+            2
+          ],
+          "dtype": "<c16",
+          "sha256": "67a35a6ef089aa1b6feebd045bc6cd99d80766adba5aa62e9da4a82373370f03"
+        },
+        "photon_energy_edges_eV": {
+          "shape": [
+            301
+          ],
+          "dtype": "<f8",
+          "sha256": "50e1f397c8901b6122a8b6f44ace4433868be9ca7e2ed74a32ff838ea188e798"
+        },
+        "photon_density_per_eV": {
+          "shape": [
+            300
+          ],
+          "dtype": "<f8",
+          "sha256": "d03d95862d38266f11abcd98204c0405d2901bd9aaa4146e17d5c7fa87d369a8"
+        },
+        "photon_density_by_bin_per_eV": {
+          "shape": [
+            9,
+            300
+          ],
+          "dtype": "<f8",
+          "sha256": "0911a9917c93669085700abaf43f8681b1ba60ff30d6d19445ae56adce8359a0"
+        },
+        "helicity_plus_per_eV": {
+          "shape": [
+            300
+          ],
+          "dtype": "<f8",
+          "sha256": "a3fe49c124a30a50f85e3b5bf7c1170be96827779209b9976e318b492d9a55c7"
+        },
+        "helicity_minus_per_eV": {
+          "shape": [
+            300
+          ],
+          "dtype": "<f8",
+          "sha256": "17ca8a1a1746f072e303a1dfee4509f8d3807ab8ea46086e78d0ce9f35218bb8"
+        }
+      }
+    },
+    {
+      "wall_s": 43.40090192947537,
+      "process_cpu_s": 43.39285816399999,
+      "first": false,
+      "compile_s": 0,
+      "compile_by_kernel": [],
+      "arrays": {
+        "energies_eV": {
+          "shape": [
+            1000
+          ],
+          "dtype": "<f8",
+          "sha256": "dcd793c656a699f2aa5910f25e644c407adf624a32db6ea11db94ebd24ef8222"
+        },
+        "energy_bin_edges_eV": {
+          "shape": [
+            10
+          ],
+          "dtype": "<f8",
+          "sha256": "f73949e500fddc4a263cf9ee14a3b075727ffdc3595366f66e8ee8ffd66018fb"
+        },
+        "energy_bin_centers_eV": {
+          "shape": [
+            9
+          ],
+          "dtype": "<f8",
+          "sha256": "19cf4d12a9218c54ee0bb54a125adcf41e1ca744b66a326417d7cd9ff600cf7d"
+        },
+        "bin_counts": {
+          "shape": [
+            9
+          ],
+          "dtype": "<i8",
+          "sha256": "a52686ec621d2969339ba603cb5a0b4a6e47e7d7023d2e9858211f291a4bab99"
+        },
+        "depths_ang": {
+          "shape": [
+            4
+          ],
+          "dtype": "<f8",
+          "sha256": "7345ed1a15cba67d763c27c62a498437e5da78dba9117e1f37bce262afd495e4"
+        },
+        "density_per_ang2": {
+          "shape": [
+            4,
+            32,
+            32
+          ],
+          "dtype": "<f8",
+          "sha256": "32203645fc89682eea3594a3e69a4d380cbe4010d2d30807729a846449f56563"
+        },
+        "density_by_bin_per_ang2": {
+          "shape": [
+            9,
+            4,
+            32,
+            32
+          ],
+          "dtype": "<f8",
+          "sha256": "ba4fdc657c92bd51f07fbab4e6e03b49eadce3b5c128f4722f25db29e264cc2e"
+        },
+        "surviving": {
+          "shape": [
+            4
+          ],
+          "dtype": "<f8",
+          "sha256": "0432e35f7180ad2d0d308e6a889a54cfde9ef4128dba198ad6b33b610808dd5f"
+        },
+        "surviving_by_bin": {
+          "shape": [
+            9,
+            4
+          ],
+          "dtype": "<f8",
+          "sha256": "3fe94e43ff4456f542981edbc613b9ab1f186f3ed60a8ba60034a07044cc7bd6"
+        },
+        "oam_ells": {
+          "shape": [
+            17
+          ],
+          "dtype": "<i8",
+          "sha256": "54780e16ca39c6cfd33efb825abf3a8ede399d10b73b0645a50f2ff108b77b5c"
+        },
+        "oam_populations": {
+          "shape": [
+            4,
+            17
+          ],
+          "dtype": "<f8",
+          "sha256": "5dd1bf5a678dc3bb02e246a8e3618b63370e7adc92b36a4b276e9eabe865814f"
+        },
+        "oam_populations_by_bin": {
+          "shape": [
+            9,
+            4,
+            17
+          ],
+          "dtype": "<f8",
+          "sha256": "3cefdfcbe2b3257687c7c3d5931e1f1dc15f397ad36691966deb14a48e70fe0a"
+        },
+        "coherence_per_ang2": {
+          "shape": [
+            4,
+            2
+          ],
+          "dtype": "<c16",
+          "sha256": "d87a3311309bc3e408ed1c5273ce6dd110f70ce3762d386cf6a5cfcccb626b88"
+        },
+        "coherence_by_bin_per_ang2": {
+          "shape": [
+            9,
+            4,
+            2
+          ],
+          "dtype": "<c16",
+          "sha256": "67a35a6ef089aa1b6feebd045bc6cd99d80766adba5aa62e9da4a82373370f03"
+        },
+        "photon_energy_edges_eV": {
+          "shape": [
+            301
+          ],
+          "dtype": "<f8",
+          "sha256": "50e1f397c8901b6122a8b6f44ace4433868be9ca7e2ed74a32ff838ea188e798"
+        },
+        "photon_density_per_eV": {
+          "shape": [
+            300
+          ],
+          "dtype": "<f8",
+          "sha256": "d03d95862d38266f11abcd98204c0405d2901bd9aaa4146e17d5c7fa87d369a8"
+        },
+        "photon_density_by_bin_per_eV": {
+          "shape": [
+            9,
+            300
+          ],
+          "dtype": "<f8",
+          "sha256": "0911a9917c93669085700abaf43f8681b1ba60ff30d6d19445ae56adce8359a0"
+        },
+        "helicity_plus_per_eV": {
+          "shape": [
+            300
+          ],
+          "dtype": "<f8",
+          "sha256": "a3fe49c124a30a50f85e3b5bf7c1170be96827779209b9976e318b492d9a55c7"
+        },
+        "helicity_minus_per_eV": {
+          "shape": [
+            300
+          ],
+          "dtype": "<f8",
+          "sha256": "17ca8a1a1746f072e303a1dfee4509f8d3807ab8ea46086e78d0ce9f35218bb8"
+        }
+      }
+    }
+  ],
+  "profile_wall_s": 47.088382923044264,
+  "profile": [
+    {
+      "file": "native_cpu_audit.py",
+      "line": 318,
+      "function": "run",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 7.791300000000001e-05,
+      "cumulative_s": 47.088337678
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_energy_mcwf.py",
+      "line": 567,
+      "function": "axial_energy_mcwf",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 0.007440187000000001,
+      "cumulative_s": 47.088059167000004
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_mcwf.py",
+      "line": 216,
+      "function": "run",
+      "calls": 1000,
+      "primitive_calls": 1000,
+      "exclusive_s": 0.004728187,
+      "cumulative_s": 43.847462376
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_mcwf.py",
+      "line": 287,
+      "function": "_run_cpu",
+      "calls": 1000,
+      "primitive_calls": 1000,
+      "exclusive_s": 1.1596374150000002,
+      "cumulative_s": 43.830835029
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_mcwf.py",
+      "line": 413,
+      "function": "_observe",
+      "calls": 4000,
+      "primitive_calls": 4000,
+      "exclusive_s": 0.054699891,
+      "cumulative_s": 35.630299247
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_energy_mcwf.py",
+      "line": 878,
+      "function": "observe",
+      "calls": 3941,
+      "primitive_calls": 3941,
+      "exclusive_s": 0.032722977,
+      "cumulative_s": 35.501855452
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/vortex.py",
+      "line": 219,
+      "function": "__call__",
+      "calls": 3941,
+      "primitive_calls": 3941,
+      "exclusive_s": 0.00194544,
+      "cumulative_s": 35.229373611
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/vortex.py",
+      "line": 213,
+      "function": "project",
+      "calls": 3941,
+      "primitive_calls": 3941,
+      "exclusive_s": 0.055303248000000006,
+      "cumulative_s": 35.227428171
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/vortex.py",
+      "line": 186,
+      "function": "harmonics",
+      "calls": 3941,
+      "primitive_calls": 3941,
+      "exclusive_s": 0.266689602,
+      "cumulative_s": 35.168314549
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/vortex.py",
+      "line": 223,
+      "function": "_fourier_basis",
+      "calls": 7882,
+      "primitive_calls": 7882,
+      "exclusive_s": 18.532524333,
+      "cumulative_s": 18.532524333
+    },
+    {
+      "file": "einsumfunc.py",
+      "line": 1242,
+      "function": "einsum",
+      "calls": 20376,
+      "primitive_calls": 20376,
+      "exclusive_s": 0.006447811,
+      "cumulative_s": 16.32000181
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method numpy._core._multiarray_umath.c_einsum>",
+      "calls": 20376,
+      "primitive_calls": 20376,
+      "exclusive_s": 16.313553999,
+      "cumulative_s": 16.313553999
+    },
+    {
+      "file": "_backend.py",
+      "line": 19,
+      "function": "__ua_function__",
+      "calls": 400370,
+      "primitive_calls": 400370,
+      "exclusive_s": 0.16528403600000002,
+      "cumulative_s": 4.713806357
+    },
+    {
+      "file": "_basic_backend.py",
+      "line": 52,
+      "function": "_execute_nD",
+      "calls": 400370,
+      "primitive_calls": 400370,
+      "exclusive_s": 0.261761471,
+      "cumulative_s": 4.338971581
+    },
+    {
+      "file": "basic.py",
+      "line": 126,
+      "function": "c2cn",
+      "calls": 400370,
+      "primitive_calls": 400370,
+      "exclusive_s": 0.49291459800000004,
+      "cumulative_s": 4.016181815
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_energy_mcwf.py",
+      "line": 505,
+      "function": "get",
+      "calls": 1000,
+      "primitive_calls": 1000,
+      "exclusive_s": 0.001039458,
+      "cumulative_s": 2.9045914400000004
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_mcwf.py",
+      "line": 448,
+      "function": "_ifft2",
+      "calls": 201698,
+      "primitive_calls": 201698,
+      "exclusive_s": 0.08580193300000001,
+      "cumulative_s": 2.496485611
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_mcwf.py",
+      "line": 444,
+      "function": "_fft2",
+      "calls": 198672,
+      "primitive_calls": 198672,
+      "exclusive_s": 0.083051859,
+      "cumulative_s": 2.386174538
+    },
+    {
+      "file": "_basic_backend.py",
+      "line": 131,
+      "function": "ifft2",
+      "calls": 201698,
+      "primitive_calls": 201698,
+      "exclusive_s": 0.041357580000000005,
+      "cumulative_s": 2.307269947
+    },
+    {
+      "file": "_basic_backend.py",
+      "line": 120,
+      "function": "ifftn",
+      "calls": 201698,
+      "primitive_calls": 201698,
+      "exclusive_s": 0.047106221000000004,
+      "cumulative_s": 2.2659123670000003
+    },
+    {
+      "file": "_basic_backend.py",
+      "line": 126,
+      "function": "fft2",
+      "calls": 198672,
+      "primitive_calls": 198672,
+      "exclusive_s": 0.039636435000000005,
+      "cumulative_s": 2.2051475540000003
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_energy_mcwf.py",
+      "line": 543,
+      "function": "_level_observer",
+      "calls": 6,
+      "primitive_calls": 6,
+      "exclusive_s": 6.606300000000001e-05,
+      "cumulative_s": 2.2046561970000003
+    },
+    {
+      "file": "src/pyrite/apps/axial_channeling.py",
+      "line": 147,
+      "function": "_level_observable",
+      "calls": 6,
+      "primitive_calls": 6,
+      "exclusive_s": 7.670700000000001e-05,
+      "cumulative_s": 2.204229931
+    },
+    {
+      "file": "src/pyrite/apps/axial_channeling.py",
+      "line": 109,
+      "function": "_catalog",
+      "calls": 6,
+      "primitive_calls": 6,
+      "exclusive_s": 8.0831e-05,
+      "cumulative_s": 2.185376238
+    },
+    {
+      "file": "_basic_backend.py",
+      "line": 113,
+      "function": "fftn",
+      "calls": 198672,
+      "primitive_calls": 198672,
+      "exclusive_s": 0.045345684000000004,
+      "cumulative_s": 2.165511119
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_emission.py",
+      "line": 222,
+      "function": "axial_line_catalog",
+      "calls": 6,
+      "primitive_calls": 6,
+      "exclusive_s": 0.000739067,
+      "cumulative_s": 1.563280159
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_bloch.py",
+      "line": 62,
+      "function": "axial_states",
+      "calls": 18,
+      "primitive_calls": 18,
+      "exclusive_s": 0.044830326000000004,
+      "cumulative_s": 1.5514365300000001
+    },
+    {
+      "file": "_linalg.py",
+      "line": 1513,
+      "function": "eigh",
+      "calls": 18,
+      "primitive_calls": 18,
+      "exclusive_s": 1.4966877760000001,
+      "cumulative_s": 1.497123707
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method scipy.fft._duccfft.pyduccfft.c2c>",
+      "calls": 400370,
+      "primitive_calls": 400370,
+      "exclusive_s": 1.458379424,
+      "cumulative_s": 1.458379424
+    },
+    {
+      "file": "helper.py",
+      "line": 47,
+      "function": "_init_nd_shape_and_axes",
+      "calls": 400370,
+      "primitive_calls": 400370,
+      "exclusive_s": 0.614101572,
+      "cumulative_s": 1.216000636
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_mcwf.py",
+      "line": 158,
+      "function": "_jump",
+      "calls": 1056,
+      "primitive_calls": 1056,
+      "exclusive_s": 0.010250217,
+      "cumulative_s": 0.967249691
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_mcwf.py",
+      "line": 174,
+      "function": "_tds_jump",
+      "calls": 519,
+      "primitive_calls": 519,
+      "exclusive_s": 0.018378503,
+      "cumulative_s": 0.797799573
+    },
+    {
+      "file": "src/pyrite/materials/channeling/axial.py",
+      "line": 241,
+      "function": "axial_profile",
+      "calls": 7,
+      "primitive_calls": 7,
+      "exclusive_s": 0.103737278,
+      "cumulative_s": 0.725465541
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_energy_mcwf.py",
+      "line": 521,
+      "function": "_solver",
+      "calls": 6,
+      "primitive_calls": 6,
+      "exclusive_s": 0.0005822570000000001,
+      "cumulative_s": 0.698001969
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_dissipator.py",
+      "line": 313,
+      "function": "axial_dissipator",
+      "calls": 6,
+      "primitive_calls": 6,
+      "exclusive_s": 0.043441634,
+      "cumulative_s": 0.6969347130000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_dissipator.py",
+      "line": 406,
+      "function": "_tds_terms",
+      "calls": 6,
+      "primitive_calls": 6,
+      "exclusive_s": 0.011297372,
+      "cumulative_s": 0.6401886760000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/operators.py",
+      "line": 614,
+      "function": "_tds_transform",
+      "calls": 6,
+      "primitive_calls": 6,
+      "exclusive_s": 0.11699466500000001,
+      "cumulative_s": 0.6191298580000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/operators.py",
+      "line": 137,
+      "function": "_potential",
+      "calls": 6390,
+      "primitive_calls": 6390,
+      "exclusive_s": 0.043212025,
+      "cumulative_s": 0.502259521
+    },
+    {
+      "file": "_function_base_impl.py",
+      "line": 1550,
+      "function": "interp",
+      "calls": 6390,
+      "primitive_calls": 6390,
+      "exclusive_s": 0.0034824010000000004,
+      "cumulative_s": 0.45811300400000005
+    },
+    {
+      "file": "numeric.py",
+      "line": 675,
+      "function": "flatnonzero",
+      "calls": 201161,
+      "primitive_calls": 201161,
+      "exclusive_s": 0.142151882,
+      "cumulative_s": 0.457806733
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method numpy._core._multiarray_umath.interp>",
+      "calls": 6390,
+      "primitive_calls": 6390,
+      "exclusive_s": 0.45266899800000004,
+      "cumulative_s": 0.45266899800000004
+    },
+    {
+      "file": "fromnumeric.py",
+      "line": 2342,
+      "function": "sum",
+      "calls": 206903,
+      "primitive_calls": 206903,
+      "exclusive_s": 0.10280594900000001,
+      "cumulative_s": 0.41331132000000004
+    },
+    {
+      "file": "src/pyrite/materials/crystal.py",
+      "line": 253,
+      "function": "bonding_charge_correction",
+      "calls": 93380,
+      "primitive_calls": 93380,
+      "exclusive_s": 0.13110386300000001,
+      "cumulative_s": 0.392964494
+    },
+    {
+      "file": "helper.py",
+      "line": 114,
+      "function": "_asfarray",
+      "calls": 400370,
+      "primitive_calls": 400370,
+      "exclusive_s": 0.24372157400000002,
+      "cumulative_s": 0.388348658
+    },
+    {
+      "file": "helper.py",
+      "line": 22,
+      "function": "_iterable_of_int",
+      "calls": 400370,
+      "primitive_calls": 400370,
+      "exclusive_s": 0.156895436,
+      "cumulative_s": 0.37991041400000003
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_dissipator.py",
+      "line": 240,
+      "function": "tds_weight_envelope",
+      "calls": 519,
+      "primitive_calls": 519,
+      "exclusive_s": 0.290929747,
+      "cumulative_s": 0.31349190800000004
+    },
+    {
+      "file": "fromnumeric.py",
+      "line": 66,
+      "function": "_wrapreduction",
+      "calls": 206934,
+      "primitive_calls": 206934,
+      "exclusive_s": 0.113414518,
+      "cumulative_s": 0.294263673
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'reduce' of 'numpy.ufunc' objects>",
+      "calls": 535635,
+      "primitive_calls": 535635,
+      "exclusive_s": 0.282491897,
+      "cumulative_s": 0.282491897
+    },
+    {
+      "file": "_pocketfft.py",
+      "line": 741,
+      "function": "_raw_fftnd",
+      "calls": 10165,
+      "primitive_calls": 10165,
+      "exclusive_s": 0.022835346000000003,
+      "cumulative_s": 0.263328297
+    },
+    {
+      "file": "helper.py",
+      "line": 146,
+      "function": "_fix_shape",
+      "calls": 400370,
+      "primitive_calls": 400370,
+      "exclusive_s": 0.26185815900000003,
+      "cumulative_s": 0.26185815900000003
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.isinstance>",
+      "calls": 1270136,
+      "primitive_calls": 1270136,
+      "exclusive_s": 0.135237675,
+      "cumulative_s": 0.23644794100000002
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_dissipator.py",
+      "line": 232,
+      "function": "tds_weight",
+      "calls": 519,
+      "primitive_calls": 519,
+      "exclusive_s": 0.055567411000000004,
+      "cumulative_s": 0.22657315800000002
+    },
+    {
+      "file": "_pocketfft.py",
+      "line": 58,
+      "function": "_raw_fft",
+      "calls": 24271,
+      "primitive_calls": 24271,
+      "exclusive_s": 0.21197304800000003,
+      "cumulative_s": 0.220627229
+    },
+    {
+      "file": "src/pyrite/apps/axial_channeling.py",
+      "line": 134,
+      "function": "__call__",
+      "calls": 3947,
+      "primitive_calls": 3947,
+      "exclusive_s": 0.011005138000000001,
+      "cumulative_s": 0.20917975300000002
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_energy_mcwf.py",
+      "line": 789,
+      "function": "accumulate",
+      "calls": 1000,
+      "primitive_calls": 1000,
+      "exclusive_s": 0.018474462,
+      "cumulative_s": 0.16660691400000002
+    },
+    {
+      "file": "fromnumeric.py",
+      "line": 48,
+      "function": "_wrapfunc",
+      "calls": 220599,
+      "primitive_calls": 220599,
+      "exclusive_s": 0.06725344700000001,
+      "cumulative_s": 0.165743793
+    },
+    {
+      "file": "_pocketfft.py",
+      "line": 120,
+      "function": "fft",
+      "calls": 17021,
+      "primitive_calls": 17021,
+      "exclusive_s": 0.0086365,
+      "cumulative_s": 0.16237647600000002
+    },
+    {
+      "file": "_pocketfft.py",
+      "line": 1019,
+      "function": "fft2",
+      "calls": 6540,
+      "primitive_calls": 6540,
+      "exclusive_s": 0.002945238,
+      "cumulative_s": 0.160780415
+    },
+    {
+      "file": "numeric.py",
+      "line": 2471,
+      "function": "array_equal",
+      "calls": 93381,
+      "primitive_calls": 93381,
+      "exclusive_s": 0.080408716,
+      "cumulative_s": 0.16069493
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_dissipator.py",
+      "line": 191,
+      "function": "tds_weight_spectrum",
+      "calls": 519,
+      "primitive_calls": 519,
+      "exclusive_s": 0.056933063000000006,
+      "cumulative_s": 0.15493043
+    },
+    {
+      "file": "fromnumeric.py",
+      "line": 2031,
+      "function": "nonzero",
+      "calls": 201161,
+      "primitive_calls": 201161,
+      "exclusive_s": 0.042627322,
+      "cumulative_s": 0.14856755500000002
+    },
+    {
+      "file": "shape_base.py",
+      "line": 378,
+      "function": "stack",
+      "calls": 6653,
+      "primitive_calls": 6653,
+      "exclusive_s": 0.14328574100000002,
+      "cumulative_s": 0.146118789
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_emission.py",
+      "line": 485,
+      "function": "__call__",
+      "calls": 3947,
+      "primitive_calls": 3947,
+      "exclusive_s": 0.077726976,
+      "cumulative_s": 0.145772698
+    },
+    {
+      "file": "fromnumeric.py",
+      "line": 1917,
+      "function": "ravel",
+      "calls": 201161,
+      "primitive_calls": 201161,
+      "exclusive_s": 0.081835603,
+      "cumulative_s": 0.141817944
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'any' of 'numpy.ndarray' objects>",
+      "calls": 196707,
+      "primitive_calls": 196707,
+      "exclusive_s": 0.045563262,
+      "cumulative_s": 0.141293359
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_energy_mcwf.py",
+      "line": 306,
+      "function": "_radiation_bins",
+      "calls": 1000,
+      "primitive_calls": 1000,
+      "exclusive_s": 0.037073327,
+      "cumulative_s": 0.13432887300000002
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_mcwf.py",
+      "line": 205,
+      "function": "_electronic_jump",
+      "calls": 511,
+      "primitive_calls": 511,
+      "exclusive_s": 0.00462945,
+      "cumulative_s": 0.13273321400000002
+    },
+    {
+      "file": "_pocketfft.py",
+      "line": 1144,
+      "function": "ifft2",
+      "calls": 3625,
+      "primitive_calls": 3625,
+      "exclusive_s": 0.001523817,
+      "cumulative_s": 0.107016937
+    },
+    {
+      "file": "<frozen abc>",
+      "line": 117,
+      "function": "__instancecheck__",
+      "calls": 403370,
+      "primitive_calls": 403370,
+      "exclusive_s": 0.058913769000000005,
+      "cumulative_s": 0.10262649300000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_mcwf.py",
+      "line": 393,
+      "function": "_sample_components",
+      "calls": 1000,
+      "primitive_calls": 1000,
+      "exclusive_s": 0.001169698,
+      "cumulative_s": 0.10150951000000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/realspace.py",
+      "line": 104,
+      "function": "sample",
+      "calls": 1000,
+      "primitive_calls": 1000,
+      "exclusive_s": 0.005611371,
+      "cumulative_s": 0.100237693
+    },
+    {
+      "file": "helper.py",
+      "line": 134,
+      "function": "_datacopied",
+      "calls": 400370,
+      "primitive_calls": 400370,
+      "exclusive_s": 0.074815956,
+      "cumulative_s": 0.098845387
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_dissipator.py",
+      "line": 273,
+      "function": "electronic_expectations",
+      "calls": 511,
+      "primitive_calls": 511,
+      "exclusive_s": 0.084050469,
+      "cumulative_s": 0.097506592
+    },
+    {
+      "file": "_methods.py",
+      "line": 55,
+      "function": "_any",
+      "calls": 196999,
+      "primitive_calls": 196999,
+      "exclusive_s": 0.034475207,
+      "cumulative_s": 0.095870667
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method numpy.asarray>",
+      "calls": 826475,
+      "primitive_calls": 826475,
+      "exclusive_s": 0.09553594600000001,
+      "cumulative_s": 0.09553594600000001
+    },
+    {
+      "file": "helper.py",
+      "line": 84,
+      "function": "<genexpr>",
+      "calls": 1201110,
+      "primitive_calls": 1201110,
+      "exclusive_s": 0.093056128,
+      "cumulative_s": 0.093056128
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.len>",
+      "calls": 1261446,
+      "primitive_calls": 1261446,
+      "exclusive_s": 0.08492975200000001,
+      "cumulative_s": 0.08492975200000001
+    },
+    {
+      "file": "_helper.py",
+      "line": 125,
+      "function": "fftfreq",
+      "calls": 30172,
+      "primitive_calls": 30172,
+      "exclusive_s": 0.057652899,
+      "cumulative_s": 0.084478235
+    },
+    {
+      "file": "numeric.py",
+      "line": 1226,
+      "function": "roll",
+      "calls": 6949,
+      "primitive_calls": 6949,
+      "exclusive_s": 0.058314577000000006,
+      "cumulative_s": 0.075736589
+    },
+    {
+      "file": "helper.py",
+      "line": 107,
+      "function": "<genexpr>",
+      "calls": 1201110,
+      "primitive_calls": 1201110,
+      "exclusive_s": 0.074422207,
+      "cumulative_s": 0.074422207
+    },
+    {
+      "file": "_pocketfft.py",
+      "line": 219,
+      "function": "ifft",
+      "calls": 7250,
+      "primitive_calls": 7250,
+      "exclusive_s": 0.003206548,
+      "cumulative_s": 0.071939549
+    },
+    {
+      "file": "_pocketfft.py",
+      "line": 704,
+      "function": "_cook_nd_args",
+      "calls": 10165,
+      "primitive_calls": 10165,
+      "exclusive_s": 0.026653098,
+      "cumulative_s": 0.06865913800000001
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method numpy.array>",
+      "calls": 409697,
+      "primitive_calls": 409697,
+      "exclusive_s": 0.067349238,
+      "cumulative_s": 0.067349238
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/realspace.py",
+      "line": 90,
+      "function": "kx",
+      "calls": 14555,
+      "primitive_calls": 14555,
+      "exclusive_s": 0.01518798,
+      "cumulative_s": 0.06263141
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/vortex.py",
+      "line": 179,
+      "function": "_theta_nodes",
+      "calls": 3941,
+      "primitive_calls": 3941,
+      "exclusive_s": 0.020312859000000003,
+      "cumulative_s": 0.059063915
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.getattr>",
+      "calls": 636662,
+      "primitive_calls": 636662,
+      "exclusive_s": 0.056812523000000004,
+      "cumulative_s": 0.056812523000000004
+    },
+    {
+      "file": "src/pyrite/materials/crystal.py",
+      "line": 269,
+      "function": "<genexpr>",
+      "calls": 373520,
+      "primitive_calls": 373520,
+      "exclusive_s": 0.056331116,
+      "cumulative_s": 0.056331116
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'newbyteorder' of 'numpy.dtype' objects>",
+      "calls": 400370,
+      "primitive_calls": 400370,
+      "exclusive_s": 0.05144722,
+      "cumulative_s": 0.05144722
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'all' of 'numpy.ndarray' objects>",
+      "calls": 93381,
+      "primitive_calls": 93381,
+      "exclusive_s": 0.014849635000000002,
+      "cumulative_s": 0.051124707000000005
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method _operator.index>",
+      "calls": 801831,
+      "primitive_calls": 801831,
+      "exclusive_s": 0.047495339000000004,
+      "cumulative_s": 0.047495339000000004
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/realspace.py",
+      "line": 95,
+      "function": "ky",
+      "calls": 14555,
+      "primitive_calls": 14555,
+      "exclusive_s": 0.011697512,
+      "cumulative_s": 0.046444128
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method _abc._abc_instancecheck>",
+      "calls": 403370,
+      "primitive_calls": 403370,
+      "exclusive_s": 0.043712724,
+      "cumulative_s": 0.043712724
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_emission.py",
+      "line": 145,
+      "function": "polarization",
+      "calls": 4000,
+      "primitive_calls": 4000,
+      "exclusive_s": 0.006627306,
+      "cumulative_s": 0.043504008000000004
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_energy_mcwf.py",
+      "line": 38,
+      "function": "_rng",
+      "calls": 2000,
+      "primitive_calls": 2000,
+      "exclusive_s": 0.023668393000000003,
+      "cumulative_s": 0.041550828000000005
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_dissipator.py",
+      "line": 169,
+      "function": "tds_phase",
+      "calls": 519,
+      "primitive_calls": 519,
+      "exclusive_s": 0.021794687,
+      "cumulative_s": 0.04007442
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_mcwf.py",
+      "line": 150,
+      "function": "_half_kinetic",
+      "calls": 1511,
+      "primitive_calls": 1511,
+      "exclusive_s": 0.029607001,
+      "cumulative_s": 0.040071911
+    },
+    {
+      "file": "fromnumeric.py",
+      "line": 106,
+      "function": "take",
+      "calls": 10165,
+      "primitive_calls": 10165,
+      "exclusive_s": 0.004080248,
+      "cumulative_s": 0.039345137
+    },
+    {
+      "file": "src/pyrite/montecarlo/channeling/axial_energy_mcwf.py",
+      "line": 768,
+      "function": "entry_for",
+      "calls": 1000,
+      "primitive_calls": 1000,
+      "exclusive_s": 0.002930677,
+      "cumulative_s": 0.03901392
+    },
+    {
+      "file": "helper.py",
+      "line": 195,
+      "function": "_workers",
+      "calls": 400370,
+      "primitive_calls": 400370,
+      "exclusive_s": 0.038277782,
+      "cumulative_s": 0.038277782
+    },
+    {
+      "file": "_methods.py",
+      "line": 64,
+      "function": "_all",
+      "calls": 93743,
+      "primitive_calls": 93743,
+      "exclusive_s": 0.011416679,
+      "cumulative_s": 0.036478452
+    }
+  ],
+  "dispatchers": {
+    "cache_stats": [
+      {
+        "kernel": "pyrite.montecarlo.transport.hard_inelastic._hard_stream_key_scalar",
+        "cached": true,
+        "signatures": 1,
+        "hits": 0,
+        "misses": 1
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.kinematics._splitmix64",
+        "cached": true,
+        "signatures": 1,
+        "hits": 0,
+        "misses": 1
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.kinematics._stream_key_scalar",
+        "cached": true,
+        "signatures": 1,
+        "hits": 0,
+        "misses": 1
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.kinematics._stream_uniform_scalar",
+        "cached": true,
+        "signatures": 1,
+        "hits": 0,
+        "misses": 1
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.straggling._urban_flight_key_scalar",
+        "cached": true,
+        "signatures": 1,
+        "hits": 0,
+        "misses": 1
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.straggling._urban_stream_key_scalar",
+        "cached": true,
+        "signatures": 1,
+        "hits": 0,
+        "misses": 1
+      }
+    ],
+    "active": [
+      {
+        "kernel": "pyrite.montecarlo.transport.hard_inelastic._hard_stream_key_scalar",
+        "signatures": [
+          "(uint64,)"
+        ],
+        "nopython_signatures": [
+          "(uint64,) -> uint64"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          true
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.kinematics._splitmix64",
+        "signatures": [
+          "(uint64,)"
+        ],
+        "nopython_signatures": [
+          "(uint64,) -> uint64"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          true
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.kinematics._stream_key_scalar",
+        "signatures": [
+          "(int64, int64)"
+        ],
+        "nopython_signatures": [
+          "(int64, int64) -> uint64"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          true
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.kinematics._stream_uniform_scalar",
+        "signatures": [
+          "(uint64, uint64)"
+        ],
+        "nopython_signatures": [
+          "(uint64, uint64) -> float64"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          true
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.straggling._urban_flight_key_scalar",
+        "signatures": [
+          "(uint64, int64, int64)"
+        ],
+        "nopython_signatures": [
+          "(uint64, int64, int64) -> uint64"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          true
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.straggling._urban_stream_key_scalar",
+        "signatures": [
+          "(uint64,)"
+        ],
+        "nopython_signatures": [
+          "(uint64,) -> uint64"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          true
+        ]
+      }
+    ]
+  },
+  "threading_layer": null,
+  "peak_rss_bytes": 485507072
+}

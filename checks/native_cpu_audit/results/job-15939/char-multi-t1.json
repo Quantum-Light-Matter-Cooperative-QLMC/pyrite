@@ -1,0 +1,1466 @@
+{
+  "schema": "pyrite.native-cpu-audit.v1",
+  "case": "char-multi",
+  "environment": {
+    "revision": "bfeb3187559d9f1df685dbdf2665cec7f409fa24",
+    "python": "3.14.6",
+    "versions": {
+      "numpy": "2.5.4",
+      "numba": "0.68.1",
+      "scipy": "1.18.1",
+      "llvmlite": "0.50.0",
+      "dask": "2026.8.0",
+      "distributed": "2026.8.0",
+      "pyfftw": "0.15.1"
+    },
+    "machine": "x86_64",
+    "cpu": "AMD Ryzen 9 9950X3D 16-Core Processor",
+    "affinity": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "gil_enabled": true,
+    "numba_threads": 1,
+    "numba_threading_layer": null,
+    "backend": "<pyrite._backend.NumPyBackend object at 0x75a97ea87e00>",
+    "precision": "float64",
+    "native_pools": [
+      {
+        "user_api": "blas",
+        "internal_api": "openblas",
+        "num_threads": 1,
+        "prefix": "libscipy_openblas",
+        "filepath": "/home/aamador/pyrite-1432-topology-v2/.venv/lib/python3.14/site-packages/scipy.libs/libscipy_openblas-5f890258.so",
+        "version": "0.3.31.dev",
+        "threading_layer": "pthreads",
+        "architecture": "SkylakeX"
+      },
+      {
+        "user_api": "openmp",
+        "internal_api": "openmp",
+        "num_threads": 1,
+        "prefix": "libgomp",
+        "filepath": "/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0",
+        "version": null
+      },
+      {
+        "user_api": "blas",
+        "internal_api": "openblas",
+        "num_threads": 1,
+        "prefix": "libscipy_openblas",
+        "filepath": "/home/aamador/pyrite-1432-topology-v2/.venv/lib/python3.14/site-packages/numpy.libs/libscipy_openblas64_-f48b354e.so",
+        "version": "0.3.34.106.0",
+        "threading_layer": "pthreads",
+        "architecture": "SkylakeX"
+      }
+    ],
+    "threads": {
+      "NUMBA_NUM_THREADS": "1",
+      "NUMBA_THREADING_LAYER": null,
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "PYRITE_FFT_THREADS": null
+    },
+    "cache": {
+      "NUMBA_CACHE_DIR": "/home/aamador/pyrite-1432-topology-v2/runs/cache-1",
+      "CUPY_CACHE_DIR": "/home/aamador/.cache/pyrite/cupy"
+    },
+    "numpy_config": {
+      "Compilers": {
+        "c": {
+          "name": "gcc",
+          "linker": "ld.bfd",
+          "version": "14.2.1",
+          "commands": "cc"
+        },
+        "cython": {
+          "name": "cython",
+          "linker": "cython",
+          "version": "3.3.0",
+          "commands": "cython"
+        },
+        "c++": {
+          "name": "gcc",
+          "linker": "ld.bfd",
+          "version": "14.2.1",
+          "commands": "c++"
+        }
+      },
+      "Machine Information": {
+        "host": {
+          "cpu": "x86_64",
+          "family": "x86_64",
+          "endian": "little",
+          "system": "linux"
+        },
+        "build": {
+          "cpu": "x86_64",
+          "family": "x86_64",
+          "endian": "little",
+          "system": "linux"
+        }
+      },
+      "Build Dependencies": {
+        "blas": {
+          "name": "scipy-openblas",
+          "found": true,
+          "version": "0.3.34.106.0",
+          "detection method": "pkgconfig",
+          "include directory": "/opt/_internal/cpython-3.14.6/lib/python3.14/site-packages/scipy_openblas64/include",
+          "lib directory": "/opt/_internal/cpython-3.14.6/lib/python3.14/site-packages/scipy_openblas64/lib",
+          "openblas configuration": "OpenBLAS 0.3.34.106.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64",
+          "pc file directory": "/project/.openblas"
+        },
+        "lapack": {
+          "name": "scipy-openblas",
+          "found": true,
+          "version": "0.3.34.106.0",
+          "detection method": "pkgconfig",
+          "include directory": "/opt/_internal/cpython-3.14.6/lib/python3.14/site-packages/scipy_openblas64/include",
+          "lib directory": "/opt/_internal/cpython-3.14.6/lib/python3.14/site-packages/scipy_openblas64/lib",
+          "openblas configuration": "OpenBLAS 0.3.34.106.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64",
+          "pc file directory": "/project/.openblas"
+        }
+      },
+      "Python Information": {
+        "path": "/tmp/build-env-c90f47zn/bin/python",
+        "version": "3.14"
+      },
+      "SIMD Extensions": {
+        "baseline": [
+          "X86_V2"
+        ],
+        "found": [
+          "X86_V3",
+          "X86_V4",
+          "AVX512_ICL"
+        ],
+        "not found": [
+          "AVX512_SPR"
+        ]
+      }
+    },
+    "allocation": {
+      "SLURM_JOB_ID": "15939",
+      "SLURM_CPUS_PER_TASK": "4",
+      "SLURM_MEM_PER_NODE": "8192"
+    }
+  },
+  "parameters": {
+    "kind": "synthetic-characteristic-scorer-only",
+    "rows": 4096,
+    "fixture": "existing photon-blocking segment recipe; per-layer caller ownership follows test_characteristic.py",
+    "seed": 819,
+    "compositions": [
+      [
+        [
+          "Mo",
+          0.0188
+        ],
+        [
+          "S",
+          0.0376
+        ]
+      ]
+    ],
+    "layers": null,
+    "inputs": {
+      "r_mid": {
+        "shape": [
+          4096,
+          3
+        ],
+        "dtype": "<f8",
+        "sha256": "5bec5b733777f40572757001d0ab9db8c5c746a19ddc5e024c20b87e66c780a0"
+      },
+      "v_hat": {
+        "shape": [
+          4096,
+          3
+        ],
+        "dtype": "<f8",
+        "sha256": "00c954a942a9419e760e4003842515f4d585e47e6f9c052d5f01de9995b5b550"
+      },
+      "L_ang": {
+        "shape": [
+          4096
+        ],
+        "dtype": "<f8",
+        "sha256": "3798a43f225ce9e6def975522f851682790ad3153a614f79a8fd954fc4d2ef89"
+      },
+      "E_keV": {
+        "shape": [
+          4096
+        ],
+        "dtype": "<f8",
+        "sha256": "205a2e5cb1b87c938cd6ae2d848aead1e7eba8403310f584e396207faf4dc73e"
+      },
+      "elec_id": {
+        "shape": [
+          4096
+        ],
+        "dtype": "<i8",
+        "sha256": "3382c3b176caa9b407790b06615af9d4c1ca984f42b36245b28e22ecbd8ec0ff"
+      },
+      "layer": {
+        "shape": [
+          4096
+        ],
+        "dtype": "<i8",
+        "sha256": "c35020473aed1b4642cd726cad727b63fff2824ad68cedd7ffb73c7cbd890479"
+      }
+    },
+    "table_array_pins": {
+      "Mo": {
+        "shell_binding_energy_eV": {
+          "shape": [
+            10
+          ],
+          "dtype": "<f8",
+          "sha256": "48af60afaf57d4587795b09031ecb8ca597d88c1100214b6c6e96227658b718c"
+        },
+        "shell_fluorescence_yield": {
+          "shape": [
+            10
+          ],
+          "dtype": "<f8",
+          "sha256": "a423c6b3db959bf438a1753ae2e53a1ff731f7a1d99ee40f9f10806add93c234"
+        },
+        "ionization_relaxation_index": {
+          "shape": [
+            10
+          ],
+          "dtype": "<i8",
+          "sha256": "23c379d6c0f22ef64cdef873fd530df1f1419b4a3935e9323d5f1d82ca697b6a"
+        },
+        "radiative_yield_per_decay": {
+          "shape": [
+            15,
+            48
+          ],
+          "dtype": "<f8",
+          "sha256": "38ae4d99980d48049dd480c833dcc4b00d17c9de4a1bf5db8d903148f834ebea"
+        },
+        "line_energy_eV": {
+          "shape": [
+            48
+          ],
+          "dtype": "<f8",
+          "sha256": "65b3cf4dc3c69e951528f2e806c85d1f265532f85915938fd25b8334f003bcc7"
+        },
+        "cxr_fwhm_eV": {
+          "shape": [
+            48
+          ],
+          "dtype": "<f8",
+          "sha256": "9f71acbc2584847b63c0242cf768b4f03d0af864065c1caf1d9bf66751714735"
+        },
+        "vacancy_transfer": {
+          "shape": [
+            10,
+            15
+          ],
+          "dtype": "<f8",
+          "sha256": "093e041e1762c35b4c1c67a7b1e39f4d6155ce11a835c271259ec52e3f8f8070"
+        },
+        "line_yield_per_vacancy": {
+          "shape": [
+            10,
+            48
+          ],
+          "dtype": "<f8",
+          "sha256": "189c2d23879caa0cd10e064bda8254bad80d351176e500f3c6ecfcb318f7f99b"
+        }
+      },
+      "S": {
+        "shell_binding_energy_eV": {
+          "shape": [
+            4
+          ],
+          "dtype": "<f8",
+          "sha256": "d22b4b3f05b876f7b39a592eca975ad03cfd3adfb9511e2d93ae47073b99d90a"
+        },
+        "shell_fluorescence_yield": {
+          "shape": [
+            4
+          ],
+          "dtype": "<f8",
+          "sha256": "4501df358a69381628ab8080e9a1a831aa86630ca76e6e9bbd0e9c7c512e6da3"
+        },
+        "ionization_relaxation_index": {
+          "shape": [
+            4
+          ],
+          "dtype": "<i8",
+          "sha256": "a1e03200f1f82ad2c1cec8795c271aaecf98f5aa2d151d2229ec5fa0c177cf77"
+        },
+        "radiative_yield_per_decay": {
+          "shape": [
+            7,
+            13
+          ],
+          "dtype": "<f8",
+          "sha256": "726e7d9e412eac2fe8e0d6866f2c73c5a475cc86160ccb1c21bd7a545579fdf6"
+        },
+        "line_energy_eV": {
+          "shape": [
+            13
+          ],
+          "dtype": "<f8",
+          "sha256": "c02601ac0725d5429dd23b929e6486c99fa97dfaeed78c294438dc7441644d9e"
+        },
+        "cxr_fwhm_eV": {
+          "shape": [
+            13
+          ],
+          "dtype": "<f8",
+          "sha256": "ed8e9c44ce179910d4430473b394aeb1eafada0d49d35d2b2a658e667394d0b5"
+        },
+        "vacancy_transfer": {
+          "shape": [
+            4,
+            7
+          ],
+          "dtype": "<f8",
+          "sha256": "59eb5f0e3567334bf5e70e7a9e1effb2da2e6ae140e0a950240aa38addd7343c"
+        },
+        "line_yield_per_vacancy": {
+          "shape": [
+            4,
+            13
+          ],
+          "dtype": "<f8",
+          "sha256": "a11270925f13683435a6e99461108340ae035608657ce505286cad63edcdd787"
+        }
+      }
+    },
+    "grid": {
+      "shape": [
+        512
+      ],
+      "dtype": "<f8",
+      "sha256": "ce6acbaa68461ee27c80e4ff7a84c44c5dc359c6db442860ca32026cb01f54cc"
+    },
+    "chunk": 512,
+    "prepared_cache": "one cache per layer, reused across calls"
+  },
+  "setup_s": 0.7836704710498452,
+  "samples": [
+    {
+      "wall_s": 0.016083668917417526,
+      "process_cpu_s": 0.01608277899999999,
+      "first": true,
+      "compile_s": 0,
+      "compile_by_kernel": [],
+      "arrays": {
+        "spectrum": {
+          "shape": [
+            512
+          ],
+          "dtype": "<f8",
+          "sha256": "6ad23a6e8a8d3d1c330e282ede0209f42460183b3bef2c1309b5ece70501c571"
+        }
+      }
+    },
+    {
+      "wall_s": 0.004351276904344559,
+      "process_cpu_s": 0.004352509999999921,
+      "first": false,
+      "compile_s": 0,
+      "compile_by_kernel": [],
+      "arrays": {
+        "spectrum": {
+          "shape": [
+            512
+          ],
+          "dtype": "<f8",
+          "sha256": "6ad23a6e8a8d3d1c330e282ede0209f42460183b3bef2c1309b5ece70501c571"
+        }
+      }
+    },
+    {
+      "wall_s": 0.0042888568714261055,
+      "process_cpu_s": 0.004290036999999969,
+      "first": false,
+      "compile_s": 0,
+      "compile_by_kernel": [],
+      "arrays": {
+        "spectrum": {
+          "shape": [
+            512
+          ],
+          "dtype": "<f8",
+          "sha256": "6ad23a6e8a8d3d1c330e282ede0209f42460183b3bef2c1309b5ece70501c571"
+        }
+      }
+    },
+    {
+      "wall_s": 0.004304487025365233,
+      "process_cpu_s": 0.004305638000000056,
+      "first": false,
+      "compile_s": 0,
+      "compile_by_kernel": [],
+      "arrays": {
+        "spectrum": {
+          "shape": [
+            512
+          ],
+          "dtype": "<f8",
+          "sha256": "6ad23a6e8a8d3d1c330e282ede0209f42460183b3bef2c1309b5ece70501c571"
+        }
+      }
+    }
+  ],
+  "profile_wall_s": 0.005069883074611425,
+  "profile": [
+    {
+      "file": "native_cpu_audit.py",
+      "line": 364,
+      "function": "run",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.1890000000000002e-05,
+      "cumulative_s": 0.0050307730000000005
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/characteristic.py",
+      "line": 969,
+      "function": "mc_characteristic_spectrum",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 0.000141561,
+      "cumulative_s": 0.0049830230000000005
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/characteristic.py",
+      "line": 787,
+      "function": "_accumulate_line_yields",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 0.001151001,
+      "cumulative_s": 0.0041298360000000004
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/characteristic.py",
+      "line": 758,
+      "function": "_interpolate_shell_cross_sections",
+      "calls": 16,
+      "primitive_calls": 16,
+      "exclusive_s": 0.0005229750000000001,
+      "cumulative_s": 0.001456304
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/segment_escape.py",
+      "line": 291,
+      "function": "mean_transmission",
+      "calls": 16,
+      "primitive_calls": 16,
+      "exclusive_s": 0.001262588,
+      "cumulative_s": 0.001265988
+    },
+    {
+      "file": "_function_base_impl.py",
+      "line": 1550,
+      "function": "interp",
+      "calls": 112,
+      "primitive_calls": 112,
+      "exclusive_s": 8.892100000000001e-05,
+      "cumulative_s": 0.000752209
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method numpy._core._multiarray_umath.interp>",
+      "calls": 112,
+      "primitive_calls": 112,
+      "exclusive_s": 0.0006062060000000001,
+      "cumulative_s": 0.0006062060000000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_kernels.py",
+      "line": 853,
+      "function": "_clip_segments_to_cutoff",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 0.000183262,
+      "cumulative_s": 0.00035588300000000003
+    },
+    {
+      "file": "fromnumeric.py",
+      "line": 2342,
+      "function": "sum",
+      "calls": 17,
+      "primitive_calls": 17,
+      "exclusive_s": 1.879e-05,
+      "cumulative_s": 0.000203092
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/segment_escape.py",
+      "line": 280,
+      "function": "segment_escape_paths",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 4.6e-06,
+      "cumulative_s": 0.000184062
+    },
+    {
+      "file": "fromnumeric.py",
+      "line": 66,
+      "function": "_wrapreduction",
+      "calls": 17,
+      "primitive_calls": 17,
+      "exclusive_s": 2.3630000000000002e-05,
+      "cumulative_s": 0.00018105200000000001
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/segment_escape.py",
+      "line": 191,
+      "function": "_segment_escape_paths",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 0.00014478100000000002,
+      "cumulative_s": 0.00017925200000000002
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'reduce' of 'numpy.ufunc' objects>",
+      "calls": 21,
+      "primitive_calls": 21,
+      "exclusive_s": 0.000158782,
+      "cumulative_s": 0.000158782
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_kernels.py",
+      "line": 915,
+      "function": "_stopping_at",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.87e-06,
+      "cumulative_s": 0.00014112100000000002
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_kernels.py",
+      "line": 780,
+      "function": "_spliced_stopping_magnitude_xp",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 0.000125091,
+      "cumulative_s": 0.00013825100000000002
+    },
+    {
+      "file": "shape_base.py",
+      "line": 378,
+      "function": "stack",
+      "calls": 16,
+      "primitive_calls": 16,
+      "exclusive_s": 0.00011169000000000001,
+      "cumulative_s": 0.00012644000000000002
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/characteristic.py",
+      "line": 929,
+      "function": "_prepared_lines_cached",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 2.7230000000000002e-05,
+      "cumulative_s": 5.3411e-05
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/characteristic.py",
+      "line": 619,
+      "function": "_energy_bin_edges_and_widths",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.807e-05,
+      "cumulative_s": 4.596e-05
+    },
+    {
+      "file": "_type_check_impl.py",
+      "line": 265,
+      "function": "iscomplexobj",
+      "calls": 112,
+      "primitive_calls": 112,
+      "exclusive_s": 2.8092e-05,
+      "cumulative_s": 3.8362e-05
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/characteristic.py",
+      "line": 954,
+      "function": "_shell_flux_weight",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 2.461e-05,
+      "cumulative_s": 3.5090000000000005e-05
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/_characteristic_fused.py",
+      "line": 158,
+      "function": "weighted_transmission",
+      "calls": 16,
+      "primitive_calls": 16,
+      "exclusive_s": 2.2910000000000003e-05,
+      "cumulative_s": 3.2311e-05
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/segment_escape.py",
+      "line": 33,
+      "function": "_escape_paths_at",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 9.941e-06,
+      "cumulative_s": 2.6091e-05
+    },
+    {
+      "file": "fromnumeric.py",
+      "line": 48,
+      "function": "_wrapfunc",
+      "calls": 4,
+      "primitive_calls": 4,
+      "exclusive_s": 4.61e-06,
+      "cumulative_s": 2.103e-05
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method numpy.asarray>",
+      "calls": 150,
+      "primitive_calls": 150,
+      "exclusive_s": 1.929e-05,
+      "cumulative_s": 1.929e-05
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_position_twins.py",
+      "line": 45,
+      "function": "stage_row",
+      "calls": 6,
+      "primitive_calls": 6,
+      "exclusive_s": 3.98e-06,
+      "cumulative_s": 1.868e-05
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/_characteristic_fused.py",
+      "line": 49,
+      "function": "_cupy_arrays",
+      "calls": 32,
+      "primitive_calls": 32,
+      "exclusive_s": 1.1071000000000001e-05,
+      "cumulative_s": 1.7491000000000002e-05
+    },
+    {
+      "file": "_dtype.py",
+      "line": 342,
+      "function": "_name_get",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 6.621000000000001e-06,
+      "cumulative_s": 1.7371e-05
+    },
+    {
+      "file": "shape_base.py",
+      "line": 368,
+      "function": "_stack_dispatcher",
+      "calls": 16,
+      "primitive_calls": 16,
+      "exclusive_s": 5.84e-06,
+      "cumulative_s": 1.4940000000000001e-05
+    },
+    {
+      "file": "fromnumeric.py",
+      "line": 2245,
+      "function": "clip",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 2.35e-06,
+      "cumulative_s": 1.4700000000000002e-05
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_kernels.py",
+      "line": 1080,
+      "function": "__call__",
+      "calls": 6,
+      "primitive_calls": 6,
+      "exclusive_s": 3.8100000000000004e-06,
+      "cumulative_s": 1.4700000000000002e-05
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/_characteristic_fused.py",
+      "line": 180,
+      "function": "segment_sum",
+      "calls": 16,
+      "primitive_calls": 16,
+      "exclusive_s": 6.33e-06,
+      "cumulative_s": 1.4420000000000001e-05
+    },
+    {
+      "file": "cProfile.py",
+      "line": 120,
+      "function": "__exit__",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.7700000000000002e-06,
+      "cumulative_s": 1.4400000000000001e-05
+    },
+    {
+      "file": "_function_base_impl.py",
+      "line": 1414,
+      "function": "diff",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 1.2420000000000001e-05,
+      "cumulative_s": 1.411e-05
+    },
+    {
+      "file": "multiarray.py",
+      "line": 406,
+      "function": "where",
+      "calls": 149,
+      "primitive_calls": 149,
+      "exclusive_s": 1.4020000000000001e-05,
+      "cumulative_s": 1.4020000000000001e-05
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'append' of 'list' objects>",
+      "calls": 114,
+      "primitive_calls": 114,
+      "exclusive_s": 1.3860000000000001e-05,
+      "cumulative_s": 1.3860000000000001e-05
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.hasattr>",
+      "calls": 22,
+      "primitive_calls": 22,
+      "exclusive_s": 7.520000000000001e-06,
+      "cumulative_s": 1.301e-05
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.issubclass>",
+      "calls": 120,
+      "primitive_calls": 120,
+      "exclusive_s": 1.27e-05,
+      "cumulative_s": 1.27e-05
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'disable' of '_lsprof.Profiler' objects>",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.2630000000000001e-05,
+      "cumulative_s": 1.2630000000000001e-05
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/characteristic.py",
+      "line": 546,
+      "function": "load_characteristic_cross_sections",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 2.7600000000000003e-06,
+      "cumulative_s": 1.177e-05
+    },
+    {
+      "file": "fromnumeric.py",
+      "line": 86,
+      "function": "_wrapreduction_any_all",
+      "calls": 3,
+      "primitive_calls": 3,
+      "exclusive_s": 6.79e-06,
+      "cumulative_s": 1.132e-05
+    },
+    {
+      "file": "native_cpu_audit.py",
+      "line": 44,
+      "function": "digest",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 6.27e-06,
+      "cumulative_s": 1.109e-05
+    },
+    {
+      "file": "numeric.py",
+      "line": 97,
+      "function": "zeros_like",
+      "calls": 3,
+      "primitive_calls": 3,
+      "exclusive_s": 8.87e-06,
+      "cumulative_s": 1.0500000000000001e-05
+    },
+    {
+      "file": "fromnumeric.py",
+      "line": 2031,
+      "function": "nonzero",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 1.56e-06,
+      "cumulative_s": 1.024e-05
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'clip' of 'numpy.ndarray' objects>",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 2.46e-06,
+      "cumulative_s": 1.0130000000000001e-05
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.getattr>",
+      "calls": 43,
+      "primitive_calls": 43,
+      "exclusive_s": 9.620000000000001e-06,
+      "cumulative_s": 9.620000000000001e-06
+    },
+    {
+      "file": "_dtype.py",
+      "line": 326,
+      "function": "_name_includes_bit_suffix",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 2.11e-06,
+      "cumulative_s": 9.590000000000001e-06
+    },
+    {
+      "file": "fromnumeric.py",
+      "line": 2586,
+      "function": "all",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.99e-06,
+      "cumulative_s": 9.420000000000001e-06
+    },
+    {
+      "file": "_type_check_impl.py",
+      "line": 172,
+      "function": "_is_type_dispatcher",
+      "calls": 112,
+      "primitive_calls": 112,
+      "exclusive_s": 9.29e-06,
+      "cumulative_s": 9.29e-06
+    },
+    {
+      "file": "shape_base.py",
+      "line": 206,
+      "function": "_arrays_for_stack_dispatcher",
+      "calls": 16,
+      "primitive_calls": 16,
+      "exclusive_s": 6.1400000000000005e-06,
+      "cumulative_s": 9.100000000000001e-06
+    },
+    {
+      "file": "_function_base_impl.py",
+      "line": 1546,
+      "function": "_interp_dispatcher",
+      "calls": 112,
+      "primitive_calls": 112,
+      "exclusive_s": 8.95e-06,
+      "cumulative_s": 8.95e-06
+    },
+    {
+      "file": "__init__.py",
+      "line": 169,
+      "function": "fullmatch",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 5.71e-06,
+      "cumulative_s": 8.76e-06
+    },
+    {
+      "file": "numeric.py",
+      "line": 675,
+      "function": "flatnonzero",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.19e-06,
+      "cumulative_s": 8.52e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method numpy.asanyarray>",
+      "calls": 115,
+      "primitive_calls": 115,
+      "exclusive_s": 8.27e-06,
+      "cumulative_s": 8.27e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.max>",
+      "calls": 36,
+      "primitive_calls": 36,
+      "exclusive_s": 7.0300000000000005e-06,
+      "cumulative_s": 7.690000000000001e-06
+    },
+    {
+      "file": "_methods.py",
+      "line": 96,
+      "function": "_clip",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 7.670000000000001e-06,
+      "cumulative_s": 7.670000000000001e-06
+    },
+    {
+      "file": "numerictypes.py",
+      "line": 418,
+      "function": "issubdtype",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 3.3700000000000003e-06,
+      "cumulative_s": 7.48e-06
+    },
+    {
+      "file": "<frozen importlib._bootstrap>",
+      "line": 544,
+      "function": "_module_repr",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 2.6200000000000003e-06,
+      "cumulative_s": 6.130000000000001e-06
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/characteristic.py",
+      "line": 964,
+      "function": "<genexpr>",
+      "calls": 16,
+      "primitive_calls": 16,
+      "exclusive_s": 5.75e-06,
+      "cumulative_s": 5.75e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.isinstance>",
+      "calls": 30,
+      "primitive_calls": 30,
+      "exclusive_s": 5.56e-06,
+      "cumulative_s": 5.56e-06
+    },
+    {
+      "file": "__init__.py",
+      "line": 700,
+      "function": "__getattr__",
+      "calls": 6,
+      "primitive_calls": 6,
+      "exclusive_s": 5.49e-06,
+      "cumulative_s": 5.49e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'nonzero' of 'numpy.ndarray' objects>",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 5.410000000000001e-06,
+      "cumulative_s": 5.410000000000001e-06
+    },
+    {
+      "file": "fromnumeric.py",
+      "line": 2474,
+      "function": "any",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 1.37e-06,
+      "cumulative_s": 5.2600000000000005e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.min>",
+      "calls": 32,
+      "primitive_calls": 32,
+      "exclusive_s": 5.1e-06,
+      "cumulative_s": 5.1e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method numpy.zeros>",
+      "calls": 6,
+      "primitive_calls": 6,
+      "exclusive_s": 4.6400000000000005e-06,
+      "cumulative_s": 4.6400000000000005e-06
+    },
+    {
+      "file": "numeric.py",
+      "line": 170,
+      "function": "ones",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 3.4500000000000004e-06,
+      "cumulative_s": 4.23e-06
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/characteristic.py",
+      "line": 725,
+      "function": "_characteristic_transport_cutoff_keV",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.25e-06,
+      "cumulative_s": 4.090000000000001e-06
+    },
+    {
+      "file": "numerictypes.py",
+      "line": 230,
+      "function": "issubclass_",
+      "calls": 4,
+      "primitive_calls": 4,
+      "exclusive_s": 1.9600000000000003e-06,
+      "cumulative_s": 3.88e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'all' of 'numpy.ndarray' objects>",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.5100000000000002e-06,
+      "cumulative_s": 3.7e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'items' of 'dict' objects>",
+      "calls": 20,
+      "primitive_calls": 20,
+      "exclusive_s": 3.6400000000000003e-06,
+      "cumulative_s": 3.6400000000000003e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method numpy.lib.array_utils.normalize_axis_index>",
+      "calls": 18,
+      "primitive_calls": 18,
+      "exclusive_s": 3.5900000000000004e-06,
+      "cumulative_s": 3.5900000000000004e-06
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_kernels.py",
+      "line": 1146,
+      "function": "_observation_direction",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.11e-06,
+      "cumulative_s": 3.4600000000000003e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method numpy.arange>",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 3.44e-06,
+      "cumulative_s": 3.44e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'extend' of 'list' objects>",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 2.5800000000000003e-06,
+      "cumulative_s": 2.9e-06
+    },
+    {
+      "file": "<frozen importlib._bootstrap>",
+      "line": 826,
+      "function": "_module_repr_from_spec",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 2.68e-06,
+      "cumulative_s": 2.8800000000000004e-06
+    },
+    {
+      "file": "src/pyrite/montecarlo/eedl_ionization.py",
+      "line": 82,
+      "function": "_require_finite",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.8400000000000003e-06,
+      "cumulative_s": 2.8400000000000003e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method _hashlib.openssl_sha256>",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 2.81e-06,
+      "cumulative_s": 2.81e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'get' of 'dict' objects>",
+      "calls": 15,
+      "primitive_calls": 15,
+      "exclusive_s": 2.6e-06,
+      "cumulative_s": 2.6e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.len>",
+      "calls": 18,
+      "primitive_calls": 18,
+      "exclusive_s": 2.6e-06,
+      "cumulative_s": 2.6e-06
+    },
+    {
+      "file": "<frozen importlib._bootstrap>",
+      "line": 648,
+      "function": "parent",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 1.6400000000000002e-06,
+      "cumulative_s": 2.5e-06
+    },
+    {
+      "file": "fromnumeric.py",
+      "line": 2337,
+      "function": "_sum_dispatcher",
+      "calls": 17,
+      "primitive_calls": 17,
+      "exclusive_s": 2.33e-06,
+      "cumulative_s": 2.33e-06
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/channeling_flux.py",
+      "line": 19,
+      "function": "flux_columns",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 1.54e-06,
+      "cumulative_s": 2.2300000000000002e-06
+    },
+    {
+      "file": "src/pyrite/_backend.py",
+      "line": 442,
+      "function": "_to_cpu",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 1.41e-06,
+      "cumulative_s": 2.2200000000000003e-06
+    },
+    {
+      "file": "fromnumeric.py",
+      "line": 1917,
+      "function": "ravel",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.3300000000000002e-06,
+      "cumulative_s": 2.2200000000000003e-06
+    },
+    {
+      "file": "_methods.py",
+      "line": 64,
+      "function": "_all",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 3.8e-07,
+      "cumulative_s": 2.19e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'tobytes' of 'numpy.ndarray' objects>",
+      "calls": 3,
+      "primitive_calls": 3,
+      "exclusive_s": 2.11e-06,
+      "cumulative_s": 2.11e-06
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/_characteristic_fused.py",
+      "line": 120,
+      "function": "shell_sigma",
+      "calls": 16,
+      "primitive_calls": 16,
+      "exclusive_s": 2.02e-06,
+      "cumulative_s": 2.02e-06
+    },
+    {
+      "file": "__init__.py",
+      "line": 330,
+      "function": "_compile",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 1.15e-06,
+      "cumulative_s": 1.68e-06
+    },
+    {
+      "file": "src/pyrite/montecarlo/transport/stopping.py",
+      "line": 421,
+      "function": "_element_crossover_keV",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 1.06e-06,
+      "cumulative_s": 1.54e-06
+    },
+    {
+      "file": "multiarray.py",
+      "line": 197,
+      "function": "concatenate",
+      "calls": 16,
+      "primitive_calls": 16,
+      "exclusive_s": 1.54e-06,
+      "cumulative_s": 1.54e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'fullmatch' of 're.Pattern' objects>",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 1.37e-06,
+      "cumulative_s": 1.37e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method numpy.array>",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.35e-06,
+      "cumulative_s": 1.35e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method numpy.empty>",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 1.3100000000000002e-06,
+      "cumulative_s": 1.3100000000000002e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'hexdigest' of '_blake2.blake2b' objects>",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 1.02e-06,
+      "cumulative_s": 1.02e-06
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'hexdigest' of '_hashlib.HASH' objects>",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 1.02e-06,
+      "cumulative_s": 1.02e-06
+    },
+    {
+      "file": "_dtype.py",
+      "line": 23,
+      "function": "_kind_name",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 8.8e-07,
+      "cumulative_s": 8.8e-07
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_position_twins.py",
+      "line": 29,
+      "function": "with_position_twins",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 8.7e-07,
+      "cumulative_s": 8.7e-07
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'rpartition' of 'str' objects>",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 8.6e-07,
+      "cumulative_s": 8.6e-07
+    },
+    {
+      "file": "src/pyrite/_backend.py",
+      "line": 69,
+      "function": "to_cpu",
+      "calls": 2,
+      "primitive_calls": 2,
+      "exclusive_s": 5.800000000000001e-07,
+      "cumulative_s": 8.100000000000001e-07
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/cxr/_kernels.py",
+      "line": 1065,
+      "function": "__init__",
+      "calls": 1,
+      "primitive_calls": 1,
+      "exclusive_s": 7.4e-07,
+      "cumulative_s": 7.4e-07
+    },
+    {
+      "file": "src/pyrite/montecarlo/spectrum/characteristic.py",
+      "line": 1065,
+      "function": "<genexpr>",
+      "calls": 3,
+      "primitive_calls": 3,
+      "exclusive_s": 6.6e-07,
+      "cumulative_s": 6.6e-07
+    }
+  ],
+  "dispatchers": {
+    "cache_stats": [
+      {
+        "kernel": "pyrite.montecarlo.transport.hard_inelastic._hard_stream_key_scalar",
+        "cached": true,
+        "signatures": 1,
+        "hits": 1,
+        "misses": 0
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.kinematics._splitmix64",
+        "cached": true,
+        "signatures": 1,
+        "hits": 1,
+        "misses": 0
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.kinematics._stream_key_scalar",
+        "cached": true,
+        "signatures": 1,
+        "hits": 1,
+        "misses": 0
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.kinematics._stream_uniform_scalar",
+        "cached": true,
+        "signatures": 1,
+        "hits": 1,
+        "misses": 0
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.straggling._urban_flight_key_scalar",
+        "cached": true,
+        "signatures": 1,
+        "hits": 1,
+        "misses": 0
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.straggling._urban_stream_key_scalar",
+        "cached": true,
+        "signatures": 1,
+        "hits": 1,
+        "misses": 0
+      }
+    ],
+    "active": [
+      {
+        "kernel": "pyrite.montecarlo.transport.hard_inelastic._hard_stream_key_scalar",
+        "signatures": [
+          "(uint64,)"
+        ],
+        "nopython_signatures": [
+          "(uint64,) -> uint64"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          false
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.kinematics._splitmix64",
+        "signatures": [
+          "(uint64,)"
+        ],
+        "nopython_signatures": [
+          "(uint64,) -> uint64"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          false
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.kinematics._stream_key_scalar",
+        "signatures": [
+          "(int64, int64)"
+        ],
+        "nopython_signatures": [
+          "(int64, int64) -> uint64"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          false
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.kinematics._stream_uniform_scalar",
+        "signatures": [
+          "(uint64, uint64)"
+        ],
+        "nopython_signatures": [
+          "(uint64, uint64) -> float64"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          false
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.straggling._urban_flight_key_scalar",
+        "signatures": [
+          "(uint64, int64, int64)"
+        ],
+        "nopython_signatures": [
+          "(uint64, int64, int64) -> uint64"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          false
+        ]
+      },
+      {
+        "kernel": "pyrite.montecarlo.transport.straggling._urban_stream_key_scalar",
+        "signatures": [
+          "(uint64,)"
+        ],
+        "nopython_signatures": [
+          "(uint64,) -> uint64"
+        ],
+        "targetoptions": {
+          "nopython": true,
+          "boundscheck": null
+        },
+        "parallel_metadata_present": [
+          false
+        ]
+      }
+    ]
+  },
+  "threading_layer": null,
+  "peak_rss_bytes": 285884416
+}

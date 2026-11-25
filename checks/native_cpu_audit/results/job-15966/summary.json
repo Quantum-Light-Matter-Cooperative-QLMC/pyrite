@@ -1,0 +1,140 @@
+{
+  "per_tilt": {
+    "5": {
+      "wall_s": 62.979431294836104,
+      "host_peak_MiB": 7517.890625,
+      "error": null,
+      "realized_electrons": 31100826,
+      "n_segments": 72158433,
+      "stop_reason": "converged",
+      "code_sha": "0ae722442d34c49c0603a702a1c0dbf488e0bef2",
+      "array_sha256": {
+        "E_grid": "ed91262616cf30fd",
+        "spec": "a0d147da42e8a1ee",
+        "spec_characteristic": "f5cf013572138e6c",
+        "brem": "826923126e9379db",
+        "E_grid_brem": "a8f218c0e1fcfced",
+        "brem_wide": "7d7a57915c2f7196"
+      }
+    },
+    "15": {
+      "wall_s": 106.21725139673799,
+      "host_peak_MiB": 8780.7421875,
+      "error": null,
+      "realized_electrons": 50088192,
+      "n_segments": 118289989,
+      "stop_reason": "converged",
+      "code_sha": "0ae722442d34c49c0603a702a1c0dbf488e0bef2",
+      "array_sha256": {
+        "E_grid": "44eb51006bdbf011",
+        "spec": "c6f3fb0d5b376129",
+        "spec_characteristic": "ccb5a08a3f330718",
+        "brem": "da12397b98e55372",
+        "E_grid_brem": "a8f218c0e1fcfced",
+        "brem_wide": "76b398c1a616ab2c"
+      }
+    },
+    "25": {
+      "wall_s": 62.931090065743774,
+      "host_peak_MiB": 7278.48828125,
+      "error": null,
+      "realized_electrons": 28273478,
+      "n_segments": 69314552,
+      "stop_reason": "converged",
+      "code_sha": "0ae722442d34c49c0603a702a1c0dbf488e0bef2",
+      "array_sha256": {
+        "E_grid": "f9640ceb2a3006d5",
+        "spec": "5f12efa2369a9090",
+        "spec_characteristic": "7b3e38a4acb393dd",
+        "brem": "11f35d4e22429ebe",
+        "E_grid_brem": "a8f218c0e1fcfced",
+        "brem_wide": "fb0926b6ccbb43ca"
+      }
+    },
+    "35": {
+      "wall_s": 70.3711159019731,
+      "host_peak_MiB": 7479.47265625,
+      "error": null,
+      "realized_electrons": 31100826,
+      "n_segments": 81067776,
+      "stop_reason": "converged",
+      "code_sha": "0ae722442d34c49c0603a702a1c0dbf488e0bef2",
+      "array_sha256": {
+        "E_grid": "846b4ff43dac57cf",
+        "spec": "ac28050c3d7f996b",
+        "spec_characteristic": "d408153becccb05e",
+        "brem": "c34f5078547540d5",
+        "E_grid_brem": "a8f218c0e1fcfced",
+        "brem_wide": "6f7210350850cc8a"
+      }
+    },
+    "55": {
+      "wall_s": 12.521940161008388,
+      "host_peak_MiB": 5105.421875,
+      "error": null,
+      "realized_electrons": 2870479,
+      "n_segments": 9467662,
+      "stop_reason": "converged",
+      "code_sha": "0ae722442d34c49c0603a702a1c0dbf488e0bef2",
+      "array_sha256": {
+        "E_grid": "a2c42cf79136f0c2",
+        "spec": "a93f7753b133942e",
+        "spec_characteristic": "811438fe5ec6750c",
+        "brem": "e6dd3b8599eb8313",
+        "E_grid_brem": "a8f218c0e1fcfced",
+        "brem_wide": "ea01ca32b3234a0c"
+      }
+    },
+    "65": {
+      "wall_s": 7.430367941968143,
+      "host_peak_MiB": 4507.26953125,
+      "error": null,
+      "realized_electrons": 831472,
+      "n_segments": 3400906,
+      "stop_reason": "converged",
+      "code_sha": "0ae722442d34c49c0603a702a1c0dbf488e0bef2",
+      "array_sha256": {
+        "E_grid": "275c6374de866b86",
+        "spec": "b43d27fecfe95cb0",
+        "spec_characteristic": "342f12c9d6c08b44",
+        "brem": "056318769267e5b7",
+        "E_grid_brem": "a8f218c0e1fcfced",
+        "brem_wide": "501d6da98200a0d2"
+      }
+    },
+    "75": {
+      "wall_s": 9.648563264869153,
+      "host_peak_MiB": 4547.0390625,
+      "error": null,
+      "realized_electrons": 831472,
+      "n_segments": 4557486,
+      "stop_reason": "converged",
+      "code_sha": "0ae722442d34c49c0603a702a1c0dbf488e0bef2",
+      "array_sha256": {
+        "E_grid": "800df571bcd1e2d6",
+        "spec": "190801a74b33d484",
+        "spec_characteristic": "ed9b0ec4d90042bb",
+        "brem": "22d767e998fae3be",
+        "E_grid_brem": "a8f218c0e1fcfced",
+        "brem_wide": "994799c348c09b69"
+      }
+    },
+    "85": {
+      "wall_s": 34.985331176780164,
+      "host_peak_MiB": 5874.8359375,
+      "error": null,
+      "realized_electrons": 3473280,
+      "n_segments": 26031487,
+      "stop_reason": "converged",
+      "code_sha": "0ae722442d34c49c0603a702a1c0dbf488e0bef2",
+      "array_sha256": {
+        "E_grid": "716e831dc17e6c12",
+        "spec": "bde7a89ec71c484b",
+        "spec_characteristic": "73ede95a30736956",
+        "brem": "a369a14b9ddbbe1e",
+        "E_grid_brem": "a8f218c0e1fcfced",
+        "brem_wide": "b4fc38c394e624e2"
+      }
+    }
+  }
+}
