@@ -261,8 +261,10 @@ def _(
         component_values=set(spectrum_components_ui.value),
     )
     # Fresh zoom state per slice: a new selection starts at the default domain.
-    narrow_zoom_get, narrow_zoom_set = mo.state(None)
-    broad_zoom_get, broad_zoom_set = mo.state(None)
+    # The render cell both reads the getter and owns the plotly element whose
+    # on_change calls the setter, so it must be allowed to re-run itself.
+    narrow_zoom_get, narrow_zoom_set = mo.state(None, allow_self_loops=True)
+    broad_zoom_get, broad_zoom_set = mo.state(None, allow_self_loops=True)
     return (
         broad_zoom_get,
         broad_zoom_set,

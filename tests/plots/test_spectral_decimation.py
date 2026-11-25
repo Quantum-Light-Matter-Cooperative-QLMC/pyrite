@@ -238,3 +238,39 @@ def test_frame_default_stays_native():
     rec = _record(15.0)
     frame = spectrum_frame([rec], _settings(), include_brem=False)
     assert len(frame) == rec["E_grid"].size
+
+
+def test_window_between_two_samples_keeps_the_bracketing_pair():
+    x = np.arange(0.0, 2000.0, 5.0)
+    y = _lines(x)
+    idx = trace_indices(x, y, np.ones(x.size, bool), 50, x_window=(1001.0, 1003.0))
+
+    assert {200, 201} <= set(idx.tolist())  # 1000 and 1005 eV
+    assert idx.size <= 50
+
+
+def test_log_axis_after_linear_zoom_below_zero_does_not_raise():
+    from pyrite.plots.plotly.spectra import prepare_compare_spectra, render_prepared_spectra
+
+    prepared = prepare_compare_spectra(
+        {"HOPG bulk": {15.0: _record(15.0)}}, _settings(), hue="tilt_deg", band="broad"
+    )
+    fig = render_prepared_spectra(prepared, viewport=(-40.0, 600.0), x_type="log")
+
+    low, high = fig.layout.xaxis.range
+    assert low == pytest.approx(np.log10(50.0)) and high == pytest.approx(np.log10(600.0))
+
+
+def test_decimated_traces_disable_plotly_simplify_and_note_is_per_trace():
+    recs = [_record(15.0), _record(15.0)]
+    recs[1]["case"] = {**recs[1]["case"], "tilt_azim_deg": 90.0}
+    fig = spectrum_chart(
+        {"HOPG bulk": {300.0: recs[0], 301.0: recs[1]}},
+        _settings(),
+        include_brem=False,
+        collapse_azimuth=False,
+        resolution="fast",
+        band="broad",
+    )
+    assert all(trace.line.simplify is False for trace in fig.data)
+    assert "of 20,000 native points per trace" in fig.layout.title.subtitle.text

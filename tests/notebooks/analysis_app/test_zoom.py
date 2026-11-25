@@ -105,3 +105,10 @@ def test_zoom_stores_viewport_and_resamples_natively():
 
     element._update({"xaxis": {"autorange": True}})
     assert state["viewport"] is None
+
+
+def test_zoom_state_allows_the_render_cell_to_rerun_itself():
+    # The render cell owns the plotly element whose on_change calls the setter
+    # and also reads the getter; marimo skips the setter cell otherwise.
+    source = (Path(__file__).parents[3] / "src/pyrite/apps/analysis_app.py").read_text()
+    assert source.count("mo.state(None, allow_self_loops=True)") == 2

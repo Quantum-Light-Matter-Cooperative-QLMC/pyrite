@@ -230,9 +230,17 @@ def _window_mask(energy, x_window):
     if high is not None:
         inside &= energy <= high
     hits = np.flatnonzero(inside)
-    if not hits.size or hits.size == energy.size:
+    if hits.size == energy.size:
         return None
-    inside[max(hits[0] - 1, 0) : hits[-1] + 2] = True
+    if hits.size:
+        inside[max(hits[0] - 1, 0) : hits[-1] + 2] = True
+    else:
+        # A window between two stored samples: keep that bracketing pair.
+        anchor = high if low is None else low
+        right = int(np.searchsorted(energy, anchor))
+        if right == 0 or right == energy.size:
+            return None
+        inside[right - 1 : right + 1] = True
     return inside
 
 

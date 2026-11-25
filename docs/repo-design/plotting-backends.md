@@ -54,8 +54,9 @@ Each trace keeps the largest and smallest sample of every display bucket
 energy on a log axis), so nonuniform grids are handled and empty buckets are
 skipped. With an x window (the narrowband line domain, or a zoom range) the
 budget goes to the visible range, every visible native node is kept when it
-fits, and a tenth of the budget keeps coarse context outside. `full` also turns
-off Plotly's SVG `line.simplify`. Each figure states native versus displayed
+fits, and a tenth of the budget keeps coarse context outside; a window between
+two stored samples keeps that bracketing pair. SVG traces turn off Plotly's
+`line.simplify`, so every selected node is drawn. Each figure states native versus displayed
 counts in its subtitle, `layout.meta["display_points"]` and per-trace
 hover/`meta`, so a downloaded or `write_image` export discloses any
 decimation. Matplotlib figures are never decimated.

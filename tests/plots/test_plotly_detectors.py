@@ -186,6 +186,10 @@ def test_dense_eagle_chart_bounds_points():
     assert max(len(t.x) for t in _curves(fig)) <= 5000
     fast = eaglexo_detected_chart(store, _settings(), show_qe=False, resolution="fast")
     assert max(len(t.x) for t in _curves(fast)) <= 2000
+    many = {"HOPG bulk": {e: _record(e, -20.0, 0.0, n=8651) for e in (30.0, 40.0, 50.0, 60.0)}}
+    shared = eaglexo_detected_chart(many, _settings(), show_qe=False, resolution="high")
+    # Incident + detected curves both count against the 400k shared budget.
+    assert sum(len(t.x) for t in _curves(shared)) <= 400_000
     assert "of 8,651 native points" in fast.layout.title.subtitle.text
     full = eaglexo_detected_chart(store, _settings(), show_qe=False, resolution="full")
     assert max(len(t.x) for t in _curves(full)) == 8651

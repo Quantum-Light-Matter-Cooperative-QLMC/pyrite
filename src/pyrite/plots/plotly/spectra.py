@@ -90,6 +90,22 @@ def _display_sampling(resolution, max_points, domain, x_type):
     }
 
 
+def _positive_viewport(frame, viewport):
+    """A zoom range usable on a log axis, or ``None`` (default domain).
+
+    A range stored on a linear axis may reach zero or below; switching to log
+    clamps its lower bound to the smallest positive stored energy.
+    """
+    low, high = viewport
+    energy = frame["energy_eV"].to_numpy(dtype=float)
+    positive = energy[energy > 0]
+    if high is None or high <= 0 or not positive.size:
+        return None
+    if low is None or low <= 0:
+        low = float(positive.min())
+    return (low, high) if low < high else None
+
+
 def _native_points(df, hue):
     """``{hue value: (native, displayed)}`` from the frame's decimation record."""
     record = df.attrs.get("display_points") or {}
@@ -110,7 +126,9 @@ def _sampling_note(df, hue):
     record = df.attrs.get("display_points")
     if not record:
         return None, False
-    counts = list(_native_points(df, hue).values())
+    # Per decimated trace, never summed: one hue value may span several
+    # traces (azimuths, detector line/brem bands).
+    counts = [(entry["native"], entry["displayed"]) for entry in record.get("traces", ())]
     if not counts:
         return None, False
     native = [n for n, _ in counts]
@@ -141,7 +159,7 @@ def _trace_series(df, *, hue, components, width, height, title, x_type, y_type, 
         y_type = "linear"
         title += " · signed values: linear y"
     fig = go.Figure()
-    note, decimated = _sampling_note(df, hue)
+    note, _decimated = _sampling_note(df, hue)
     counts = _native_points(df, hue)
     labels = list(dict.fromkeys(df[hue].tolist()))
     # Numeric cases get stable, human-meaningful sorting, not lexical sorting.
@@ -163,9 +181,9 @@ def _trace_series(df, *, hue, components, width, height, title, x_type, y_type, 
             trace_type = go.Scattergl if xs.size > _WEBGL_MIN_POINTS else go.Scatter
             native = counts.get(label, (xs.size, xs.size))[0]
             line = dict(color=color, width=thickness, dash=dash)
-            if trace_type is go.Scatter and not decimated:
+            if trace_type is go.Scatter:
                 # Plotly's SVG path simplification drops near-collinear nodes;
-                # a full-resolution figure must draw every coordinate.
+                # every selected coordinate must be drawn, as the note states.
                 line["simplify"] = False
             fig.add_trace(
                 trace_type(
@@ -354,6 +372,8 @@ def render_prepared_spectra(
     """
     if prepared is None:
         return None
+    if viewport is not None and _axis_type(x_type) == "log":
+        viewport = _positive_viewport(prepared.frame, viewport)
     domain = viewport if viewport is not None else prepared.domain
     frame = _decimate_frame(
         prepared.frame, **_display_sampling(resolution, max_points, domain, x_type)

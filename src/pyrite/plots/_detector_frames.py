@@ -56,7 +56,8 @@ def _chart_frame(
     else:
         chosen = resolve_plot_resolution(resolution)
         name = chosen.name
-        points_per_group = trace_budget(chosen, len(groups))
+        # Incident and detected curves both serialize the group's indices.
+        points_per_group = trace_budget(chosen, len(groups) * kinds_per_group)
     sampled, counts = [], []
     for key, group in groups:
         if "kind" in group:
