@@ -467,30 +467,46 @@ def _tail_correction(e, node, step, mode, m2, m3, m4, n_E):  # pragma: no cover 
 def _sincsq_window_reduce(  # pragma: no cover - numba
     E_r, a_width, weights, E_grid, node, lo, hi, mode, mu, step, bounds, out
 ):
+    # Zero-based loops over window slices: a loop starting at ``lo[j]`` keeps
+    # Numba's negative-index wraparound check, which blocks LLVM vectorization
+    # (#1459). Same operations in the same order, so output is bit-identical.
     n_l = E_r.shape[0]
     n_E = E_grid.shape[0]
     for c in prange(bounds.shape[0] - 1):
-        acc = out[c]
+        buf = np.empty(n_E)
         for j in range(bounds[c], bounds[c + 1]):
             if j >= n_l or mode[j] == 2:
                 continue
-            for e in range(lo[j], hi[j] + 1):
-                x = a_width[j] * (E_grid[e] - E_r[j]) / np.pi
-                if x == 0.0:
-                    x = 1.0e-20
-                y = np.pi * x
-                s = np.sin(y) / y
-                v = s * s + _tail_correction(
-                    e, node[j], step, mode[j], mu[0, j], mu[1, j], mu[2, j], n_E
-                )
+            lo_j, hi_j, nd = lo[j], hi[j], node[j]
+            m2, m3, m4 = mu[0, j], mu[1, j], mu[2, j]
+            if hi_j >= lo_j:
+                aj, ej = a_width[j], E_r[j]
+                Es = E_grid[lo_j : hi_j + 1]
+                b = buf[: hi_j - lo_j + 1]
+                for i in range(Es.shape[0]):
+                    x = aj * (Es[i] - ej) / np.pi
+                    if x == 0.0:
+                        x = 1.0e-20
+                    y = np.pi * x
+                    s = np.sin(y) / y
+                    b[i] = s * s
+                if mode[j] == 0:
+                    for i in range(Es.shape[0]):
+                        b[i] += _tail_correction(lo_j + i, nd, step, 0, m2, m3, m4, n_E)
                 for t in range(weights.shape[0]):
-                    acc[t, e] += weights[t, j] * v
+                    wt = weights[t, j]
+                    o = out[c, t, lo_j : hi_j + 1]
+                    for i in range(Es.shape[0]):
+                        o[i] += wt * b[i]
             if mode[j] == 1:
-                for e in range(n_E):
-                    if e < lo[j] or e > hi[j]:
-                        v = _tail_value(mu[0, j], mu[1, j], mu[2, j], (e - node[j]) * step)
-                        for t in range(weights.shape[0]):
-                            acc[t, e] += weights[t, j] * v
+                for e in range(0, min(lo_j, n_E)):
+                    v = _tail_value(m2, m3, m4, (e - nd) * step)
+                    for t in range(weights.shape[0]):
+                        out[c, t, e] += weights[t, j] * v
+                for e in range(max(hi_j + 1, 0), n_E):
+                    v = _tail_value(m2, m3, m4, (e - nd) * step)
+                    for t in range(weights.shape[0]):
+                        out[c, t, e] += weights[t, j] * v
 
 
 def accumulate_sincsq_windowed(E_r, a_width, weights, E_grid, targets, tail, target_ids):
