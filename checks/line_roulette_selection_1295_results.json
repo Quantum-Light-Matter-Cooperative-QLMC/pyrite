@@ -1131,7 +1131,7 @@
    "optimal_keep_probability_bound_free_screen": 1.0
   }
  ],
- "verdict": "negative at every energy: no arm gains (best 0.60/0.68 at 30 keV, <=0.39 at 300 keV-30 MeV); optimal per-history keep probabilities p_i ∝ m_i/sqrt(rows_i) with free exact masses gain <=1.02x. Per-history line mass is not concentrated (CV ~0.7 at 30 keV, lower at higher energy; top 10% of histories hold 11-27% of the mass) and rows track mass (corr ~0.85).",
+ "verdict": "negative at every energy: no arm gains (best 0.60/0.68 at 30 keV, <=0.39 at 300 keV-30 MeV); optimal per-history keep probabilities p_i \u221d m_i/sqrt(rows_i) with free exact masses gain <=1.02x. Per-history line mass is not concentrated (CV ~0.7 at 30 keV, lower at higher energy; top 10% of histories hold 11-27% of the mass) and rows track mass (corr ~0.85).",
  "thick_target_mass_only": {
   "job": 14521,
   "code_sha": "4674e995f1c41af7cc7d2d239e116b48128f5e7b",
@@ -1345,7 +1345,8 @@
     }
    }
   ],
-  "finding": "Production time scales with histories on the post-#1390/#1392 code (180 s at N=16, 6413 s at N=256: 35.7x for 16x histories). The timed arm scored 67.8% of rows in 36% of the analog time (per-row cost is not uniform: kept rows ran at ~0.65 ms/row, the analog mean was 1.24 ms/row), so the measured FOM gain is 2.3-2.5x, above the 1.5x threshold. Analog and rouletted VOV gates fail at N=256; a pooled larger-N mass check (15931-15934, seeds 0-3 x N=1024, 1 and 5 MeV, mass-only) decides whether the concentration estimate holds."
+  "finding": "Production time grows faster than the rows scored on the post-#1390/#1392 code: 180 s for 285,197 rows at N=16 (0.63 ms/row) and 6413 s for 5,155,107 rows at N=256 (1.24 ms/row), i.e. 35.7x the time for 18.1x the rows (16x histories). Rows scored are therefore the lever (reopen condition met). The timed arm scored 67.8% of rows in 36% of the analog time; its kept rows ran at ~0.65 ms/row, the N=16 rate, which points to per-row cost rising with the total rows scored (cause not isolated). The measured FOM gain of 2.3-2.5x thus combines the roulette's variance/rows trade with that superlinear saving, and the linear-in-rows model (time ratio 0.69, gain ~1.2x with the predicted variance ratio 1.20) underestimates it at N=256. Because per-row cost depends on N, neither this gain nor the free-screen bounds (time proportional to rows) transfers to other N without a timed run there. Analog and rouletted VOV gates fail at N=256; the pooled larger-N mass check is thick_target_pooled_vov (jobs 15931, 15932, 15947, 15948).",
+  "patch_applied": "920509ce2 (#1430, now on main): fixed-N brem-prefix hunk of checks/reflection_selection_subsample_1281.py, copied by hand onto 2f74b0e65; reproduce with any main at or after 920509ce2 plus the #1392/#1390 code of 2f74b0e65"
  },
  "thick_target_pooled_vov": {
   "jobs": [
@@ -1495,9 +1496,10 @@
      "fom_gain_free_screen": 1.96,
      "fom_gain_realized": 1.96,
      "rouletted_vov": 0.002,
-     "rouletted_vov_gate_passes": true
+     "rouletted_vov_gate_passes": true,
+     "note": "Pooled gain applies to N=4096 runs: arm_prediction always keeps the first 128 (pilot) histories, 12.5% of N=1024 but 3.1% of 4096, and the pooled draws reuse seed 0's pilot and uniforms. Per-seed N=1024 best-arm gains: [1.78, 1.77, 1.76, 1.76]."
     },
-    "verdict": "pays"
+    "verdict": "pays (free-screen bound; analog and rouletted VOV gates pass)"
    },
    "5000": {
     "histories": 4096,
@@ -1524,11 +1526,13 @@
      "fom_gain_free_screen": 4.83,
      "fom_gain_realized": 4.71,
      "rouletted_vov": 0.0109,
-     "rouletted_vov_gate_passes": false
+     "rouletted_vov_gate_passes": false,
+     "note": "Pooled gain applies to N=4096 runs (pilot share 3.1% vs 12.5% at N=1024; seed 0's pilot and uniforms reused). Per-seed N=1024 best-arm gains: [3.57, 3.13, 3.3, 3.4]."
     },
-    "verdict": "pays"
+    "verdict": "pays on the free-screen bound only; analog and rouletted VOV gates fail, screen (~1370 s at N=1024) and analog pass untimed"
    }
   },
-  "finding": "Both energies meet the pays rule. 1 MeV: the four seeds agree (CV 1.58-1.64, bound 2.81-2.98x); pooled, the analog VOV gate passes (0.0022 + 1/n), the bound is 2.89x and the best arm keep 0.25 / floor 0.1 gives 1.96x with a passing rouletted gate. 5 MeV: heavy-tailed (top 10% of histories hold 92% of the mass, CV 3.94); the pooled analog gate still fails narrowly (0.0118 + 1/n against 0.01), but the bound is 12.2x and the best arm keep 0.05 / floor 0.05 gives 4.8x. The 5 MeV screen costs ~1370 s at N=1024 and its analog pass is untimed, so the 5 MeV arm gains exclude screen cost."
+  "finding": "Both energies pass the 1.5x free-screen bound rule; only 1 MeV also passes the VOV gates. 1 MeV: the four seeds agree (CV 1.58-1.64, bound 2.81-2.98x, best arm keep 0.25 / floor 0.1 at 1.76-1.78x per N=1024 seed); pooled to 4096 the analog VOV gate passes (0.0022 + 1/n), the bound is 2.89x and the same arm predicts 1.96x at N=4096 with a passing rouletted gate. 5 MeV: heavy-tailed (top 10% of histories hold 92% of the mass, CV 3.94, ESS 248 of 4096); the pooled analog gate still fails (0.0118 + 1/n against 0.01) and so does the rouletted one (0.0109); the bound is 12.2x and the best arm 3.1-3.6x per N=1024 seed (4.8x pooled at N=4096). The 5 MeV screen costs ~1370 s at N=1024 and its analog pass is untimed, so its gains exclude screen cost and its variance estimate is not yet trustworthy under the VOV gate. All gains assume time proportional to rows, which thick_target_scaling shows does not hold here (per-row cost rises with N); they are indicative, not production speedups.",
+  "patch_applied": "920509ce2 (#1430, now on main): fixed-N brem-prefix hunk of checks/reflection_selection_subsample_1281.py, copied by hand onto 2f74b0e65; reproduce with any main at or after 920509ce2 plus the #1392/#1390 code of 2f74b0e65"
  }
 }
