@@ -66,7 +66,10 @@ from ._temporal import segment_arrival_times
 # 1 eV mesh (line-absorption-tabulation).
 # fp64-spectrum-sum-v1 (#1313): device line spectra accumulate in FP64 (dense
 # node kernel sums, flush and block adds); cells stay FP32.
-CXR_ESCAPE_MODEL = "segment-mean-v9-edge-geometric-tables/fp64-spectrum-sum-v1"
+# fp64-spectrum-sum-v2 (#1459): CPU windowed sinc^2 reduction uses the
+# vectorizable fdlibm-kernel vector_sin (<= 0.79 ulp) instead of libm sin,
+# ~4e-16 relative on the reduced spectrum.
+CXR_ESCAPE_MODEL = "segment-mean-v9-edge-geometric-tables/fp64-spectrum-sum-v2"
 
 
 #: Size of the most recent line setups' tabulation, for performance telemetry.

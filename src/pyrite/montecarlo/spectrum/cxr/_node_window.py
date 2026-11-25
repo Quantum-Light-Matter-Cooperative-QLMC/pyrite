@@ -35,6 +35,7 @@ import numpy as np
 from numba import njit, prange
 
 from ....materials.crystal import HBARC_EV_ANG
+from ._vector_sin import VECTOR_SIN_LIMIT, vector_sin
 
 #: Default window parameter: exact within ``|v| <= x_c`` of each flight.
 DEFAULT_NODE_SUPPORT_CUTOFF = 100.0
@@ -469,7 +470,8 @@ def _sincsq_window_reduce(  # pragma: no cover - numba
 ):
     # Zero-based loops over window slices: a loop starting at ``lo[j]`` keeps
     # Numba's negative-index wraparound check, which blocks LLVM vectorization
-    # (#1459). Same operations in the same order, so output is bit-identical.
+    # (#1459). ``vector_sin`` replaces the scalar libm call so the sinc^2 loop
+    # vectorizes; windows reaching ``VECTOR_SIN_LIMIT`` keep ``np.sin``.
     n_l = E_r.shape[0]
     n_E = E_grid.shape[0]
     for c in prange(bounds.shape[0] - 1):
@@ -483,13 +485,22 @@ def _sincsq_window_reduce(  # pragma: no cover - numba
                 aj, ej = a_width[j], E_r[j]
                 Es = E_grid[lo_j : hi_j + 1]
                 b = buf[: hi_j - lo_j + 1]
-                for i in range(Es.shape[0]):
-                    x = aj * (Es[i] - ej) / np.pi
-                    if x == 0.0:
-                        x = 1.0e-20
-                    y = np.pi * x
-                    s = np.sin(y) / y
-                    b[i] = s * s
+                if abs(aj) * max(abs(Es[0] - ej), abs(Es[-1] - ej)) < VECTOR_SIN_LIMIT:
+                    for i in range(Es.shape[0]):
+                        x = aj * (Es[i] - ej) / np.pi
+                        if x == 0.0:
+                            x = 1.0e-20
+                        y = np.pi * x
+                        s = vector_sin(y) / y
+                        b[i] = s * s
+                else:
+                    for i in range(Es.shape[0]):
+                        x = aj * (Es[i] - ej) / np.pi
+                        if x == 0.0:
+                            x = 1.0e-20
+                        y = np.pi * x
+                        s = np.sin(y) / y
+                        b[i] = s * s
                 if mode[j] == 0:
                     for i in range(Es.shape[0]):
                         b[i] += _tail_correction(lo_j + i, nd, step, 0, m2, m3, m4, n_E)
