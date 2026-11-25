@@ -12,6 +12,17 @@ import pytest
 
 from pyrite import _jit_cache
 
+#: Numba >= 0.62 stamps cached kernels by a SHA-256 of their source; 0.61 (the
+#: pixi ``svml`` environment's SVML build, #1462) stamps ``(mtime, size)``.
+CONTENT_STAMPS = hasattr(pytest.importorskip("numba.core.caching"), "_hash_source_file")
+
+
+def _expected_stamp(source: Path):
+    if CONTENT_STAMPS:
+        return hashlib.sha256(source.read_bytes()).digest()
+    stat = source.stat()
+    return (stat.st_mtime, stat.st_size)
+
 
 @pytest.fixture
 def managed(monkeypatch, tmp_path):
@@ -102,8 +113,8 @@ def _probe(module_dir: Path, cache: Path) -> dict:
 def test_native_numba_cache_hits_and_invalidates_across_processes(tmp_path):
     """Same source + cache dir hits; source edit or another directory misses.
 
-    Numba stamps sources by content, so an mtime-only change (a remote sync)
-    still hits.
+    Numba >= 0.62 stamps sources by content, so an mtime-only change (a remote
+    sync) still hits; Numba 0.61 stamps ``(mtime, size)`` and misses.
 
     Closure kernels are keyed by their cell contents, so a closure created
     with the same values hits in a fresh process.
@@ -135,18 +146,18 @@ def test_native_numba_cache_hits_and_invalidates_across_processes(tmp_path):
 
     index = next(cache.rglob("kernels.scale-*.nbi"))
     stamp, overloads = _jit_cache.numba_index_entries(index)
-    assert stamp == hashlib.sha256(source.read_bytes()).digest() and overloads == 1
+    assert stamp == _expected_stamp(source) and overloads == 1
     stat = source.stat()
 
     assert _probe(module_dir, tmp_path / "other-cache") == miss
     source.write_text(body.format(factor=3.0))
     os.utime(source, (stat.st_atime, stat.st_mtime + 10))
     assert _probe(module_dir, cache) == miss
-    assert _jit_cache.numba_index_entries(index)[0] == hashlib.sha256(source.read_bytes()).digest()
+    assert _jit_cache.numba_index_entries(index)[0] == _expected_stamp(source)
 
-    # Touching the source without changing its bytes keeps the content stamp.
+    # Touching the source without changing its bytes keeps a content stamp.
     os.utime(source, (stat.st_atime, stat.st_mtime + 20))
-    assert _probe(module_dir, cache) == hit
+    assert _probe(module_dir, cache) == (hit if CONTENT_STAMPS else miss)
 
 
 def test_cli_entry_respects_overrides_after_import_defaults(tmp_path):

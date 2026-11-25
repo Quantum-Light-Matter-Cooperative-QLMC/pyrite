@@ -3,13 +3,14 @@
 This keeps agents and humans out of shell one-liner hell on Windows.
 Exposed as the ``pyrite-dev`` console script (see ``[project.scripts]``); run via:
 
-    uv run pyrite-dev <command>
+    pixi run pyrite-dev <command>
 
 Use ``pyrite-dev --help`` for the maintained command inventory.
 """
 
 import argparse
 import fnmatch
+import importlib.util
 import os
 import re
 import shutil
@@ -157,12 +158,6 @@ def run(*args: str, cwd: Path = ROOT, extra_env: dict[str, str] | None = None) -
     subprocess.run([sys.executable, *args], cwd=cwd, check=True, env=env)
 
 
-def run_uv(*args: str, cwd: Path = ROOT, extra_env: dict[str, str] | None = None) -> None:
-    """Run a locked project tool, provisioning its explicit dependency group."""
-    env = {**os.environ, **extra_env} if extra_env else None
-    subprocess.run(["uv", "run", *args], cwd=cwd, check=True, env=env)
-
-
 def cmd_acp_up(_: argparse.Namespace) -> None:
     processes = start_acp_servers()
     print("ACP bridges running:")
@@ -245,30 +240,30 @@ def cmd_repo_map(args: argparse.Namespace) -> None:
     print()
     print("Canonical commands:")
     for line in [
-        "uv run pyrite-dev acp-up",
-        "uv run pyrite-dev acp-down",
-        "uv run pyrite-dev lint",
-        "uv run pyrite-dev format",
-        "uv run pyrite-dev typecheck",
-        "uv run pyrite-dev check-lines",
-        "uv run pyrite-dev complexity --check",
-        "uv run pyrite-dev precommit",
-        "uv run pyrite-dev test path/to/test.py -k test_name",
-        "uv run pyrite-dev test-suite transport",
-        "uv run pyrite-dev test-suite spectrum",
-        "uv run pyrite-dev package-smoke",
-        "uv run pyrite-dev smoke --material hopg --output-dir /tmp/pyrite-smoke",
-        "uv run pyrite-dev docs",
-        "uv run pyrite-dev cli-reference --check",
-        "uv run pyrite-dev cli-deprecations --check",
-        "uv run pyrite-dev validation-ledger --check",
-        "uv run pyrite-dev validation-records -- checks/dans_diffraction_oracle.py",
-        "uv run pyrite-dev repo-map --check",
-        "uv run pyrite-dev sync-skills",
-        "uv run pyrite-dev check-skills",
-        "uv run pyrite-dev verify",
-        "uv run pyrite-dev nbqa",
-        "uv run pyrite-dev nbstrip",
+        "pixi run pyrite-dev acp-up",
+        "pixi run pyrite-dev acp-down",
+        "pixi run pyrite-dev lint",
+        "pixi run pyrite-dev format",
+        "pixi run pyrite-dev typecheck",
+        "pixi run pyrite-dev check-lines",
+        "pixi run pyrite-dev complexity --check",
+        "pixi run pyrite-dev precommit",
+        "pixi run pyrite-dev test path/to/test.py -k test_name",
+        "pixi run pyrite-dev test-suite transport",
+        "pixi run pyrite-dev test-suite spectrum",
+        "pixi run pyrite-dev package-smoke",
+        "pixi run pyrite-dev smoke --material hopg --output-dir /tmp/pyrite-smoke",
+        "pixi run pyrite-dev docs",
+        "pixi run pyrite-dev cli-reference --check",
+        "pixi run pyrite-dev cli-deprecations --check",
+        "pixi run pyrite-dev validation-ledger --check",
+        "pixi run pyrite-dev validation-records -- checks/dans_diffraction_oracle.py",
+        "pixi run pyrite-dev repo-map --check",
+        "pixi run pyrite-dev sync-skills",
+        "pixi run pyrite-dev check-skills",
+        "pixi run pyrite-dev verify",
+        "pixi run pyrite-dev nbqa",
+        "pixi run pyrite-dev nbstrip",
     ]:
         print(f"  {line}")
 
@@ -636,10 +631,13 @@ def cmd_docs(args: argparse.Namespace) -> None:
     _remove_path(docs_dir / "_autosummary")
     _remove_path(docs_dir / "_build")
     builder = "linkcheck" if getattr(args, "linkcheck", False) else "html"
-    run_uv(
-        "--group",
-        "docs",
-        "sphinx-build",
+    if importlib.util.find_spec("sphinx") is None:
+        raise SystemExit(
+            "docs: Sphinx is not installed here; run `pixi run -e docs pyrite-dev docs`"
+        )
+    run(
+        "-m",
+        "sphinx",
         "-E",
         "-a",
         "-W",
@@ -744,8 +742,8 @@ def cmd_release(args: argparse.Namespace) -> None:
         notes = release.render_notes(args.version, base, release.collect_changes(ROOT, base))
         if not args.check:
             release.bump_versions(ROOT, args.version)
-            # uv.lock records the project version; CI syncs with --locked.
-            subprocess.run(["uv", "lock"], cwd=ROOT, check=True)
+            # Keep pixi.lock satisfiable for the new metadata; CI installs --locked.
+            subprocess.run(["pixi", "lock"], cwd=ROOT, check=True)
             # Generated docs embed __version__, so regenerate in fresh processes.
             for command in ("cli-reference", "cli-deprecations"):
                 run("-m", "pyrite._dev", command, "--write")

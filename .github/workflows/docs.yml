@@ -23,23 +23,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set up uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - name: Set up pixi
+        uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
         with:
-          python-version: "3.14"
-          enable-cache: true
+          pixi-version: v0.85.0
+          environments: docs
+          locked: true
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
 
       - name: Check generated references
         run: |
-          uv run --locked --no-default-groups --group docs pyrite-dev cli-reference --check
-          uv run --locked --no-default-groups --group docs pyrite-dev validation-ledger --check
+          pixi run --locked -e docs pyrite-dev cli-reference --check
+          pixi run --locked -e docs pyrite-dev validation-ledger --check
 
       - name: Build Sphinx documentation
         run: >
-          uv run
+          pixi run
           --locked
-          --no-default-groups
-          --group docs
+          -e docs
           sphinx-build
           -W
           --keep-going

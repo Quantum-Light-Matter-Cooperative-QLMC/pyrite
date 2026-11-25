@@ -83,7 +83,7 @@ def test_docs_cleans_generated_trees_and_runs_strict_build(
     monkeypatch.setattr(
         dev_module, "cmd_cli_reference", lambda args: calls.append(("cli-reference", args.check))
     )
-    monkeypatch.setattr(dev_module, "run_uv", lambda *args, **kwargs: calls.append((args, kwargs)))
+    monkeypatch.setattr(dev_module, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
 
     dev_module.cmd_docs(Namespace(linkcheck=linkcheck))
 
@@ -94,9 +94,8 @@ def test_docs_cleans_generated_trees_and_runs_strict_build(
         ("cli-reference", True),
         (
             (
-                "--group",
-                "docs",
-                "sphinx-build",
+                "-m",
+                "sphinx",
                 "-E",
                 "-a",
                 "-W",
@@ -124,7 +123,7 @@ def test_docs_rejects_stale_cli_before_cleaning_or_building(dev_module, monkeypa
     removed = []
     built = []
     monkeypatch.setattr(dev_module, "_remove_path", removed.append)
-    monkeypatch.setattr(dev_module, "run_uv", lambda *args, **kwargs: built.append(args))
+    monkeypatch.setattr(dev_module, "run", lambda *args, **kwargs: built.append(args))
     with pytest.raises(SystemExit, match="2"):
         dev_module.cmd_docs(Namespace(linkcheck=False))
     assert removed == []
@@ -331,9 +330,10 @@ def test_ci_runs_every_primary_suite_once(dev_module) -> None:
 
     assert set(matrix["suite"]) == set(dev_module.PRIMARY_TEST_SUITE_NAMES) - {"quantum"}
     assert len(matrix["suite"]) == len(set(matrix["suite"]))
-    assert matrix["python"] == ["3.13", "3.14"]
+    # Python 3.13 and 3.14 are the `default` and `py314` pixi environments.
+    assert matrix["environment"] == ["default", "py314"]
     quantum = workflow["jobs"]["quantum"]["strategy"]["matrix"]
-    assert quantum["python"] == matrix["python"]
+    assert quantum["environment"] == matrix["environment"]
 
 
 def test_numba_online_shards_run_every_primary_suite_once(dev_module) -> None:
@@ -382,7 +382,7 @@ def test_formatter_regenerates_and_commits_cli_reference(dev_module) -> None:
         if step.get("name") == "Commit formatting and generated-reference fixes"
     )
 
-    assert reference["run"] == "uv run --locked pyrite-dev cli-reference --write"
+    assert reference["run"] == "pixi run --locked pyrite-dev cli-reference --write"
     assert "'docs/repo-design/cli/cli-reference*.md'" in commit["run"]
     assert "style: apply Ruff formatting and regenerate CLI reference" in commit["run"]
 
