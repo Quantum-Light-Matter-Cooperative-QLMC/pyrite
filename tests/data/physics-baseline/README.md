@@ -614,3 +614,14 @@ portable expressions; only the summation order changes (a few ulps). Re-pinned
 with `pyrite-dev test-suite identity-pins --update-pins`: the BremsLib
 `case_content_key` and `parameter_sha256` hashes in `resolved.json`. Every
 recorded output keeps its expectation and tolerance.
+
+## BremsLib Born-zero repair (#1449)
+
+A non-positive Born SDCS value is now interpolated in `ln T1` within its
+`k/T1` column, as Interpolate_DCS does, instead of falling back to the plain
+SDCS spline for that row. In v2.0.8 this changes only Z = 5 at 3 MeV.
+`BREMSSTRAHLUNG_BREMSLIB_MODEL` changed from `…/idcs-x18-born-v1-geo4-…` to
+`…/idcs-x18-born-v2-geo4-…`. Only identity hashes in `resolved.json`,
+`channeling.json` and `identity-pins.json` were re-pinned
+(`pyrite-dev test-suite identity-pins --update-pins`); no fixture uses boron,
+so `outputs.json` is unchanged.

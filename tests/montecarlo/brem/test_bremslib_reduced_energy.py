@@ -119,8 +119,29 @@ def test_sub_node_shapes_mix_their_neighbours_linearly():
     np.testing.assert_allclose(refined[0, 1:6], np.c_[1 - w, w], rtol=1e-15)
 
 
-def test_a_non_positive_born_value_falls_back_to_the_sdcs_spline_with_a_warning():
-    """BremsLib v2.0.8 has a zero Born SDCS at Z = 5, T1 = 3 MeV, k/T1 = 0.0046."""
+def test_a_non_positive_born_value_is_interpolated_in_ln_t1():
+    """BremsLib v2.0.8 has a zero Born SDCS at Z = 5, T1 = 3 MeV, k/T1 = 0.0046.
+
+    Interpolate_DCS drops it from that column's not-a-knot ``ln B``-``ln T1``
+    spline. A power law in ``T1`` is a straight line there, so the repair
+    reproduces the removed value and the sub-nodes match the intact table.
+    """
+    t1 = np.array([1.0, 1.5, 2.0, 3.0, 4.0, 5.0])
+    power = (t1 / 1.0)[:, None] ** np.linspace(-0.3, 0.2, BORN_K.size)
+    intact = np.asarray(LI_BORN_1MEV) * power
+    broken = intact.copy()
+    broken[3, 6] = 0.0
+    table = {"born_t1_MeV": t1, "born_k_over_t1": BORN_K}
+    rows = np.tile(LI_SDCS[1.0], (t1.size, 1))
+    expected, _ = _refine(t1, rows, {**table, "born_sdcs_mb": intact})
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        repaired, _ = _refine(t1, rows, {**table, "born_sdcs_mb": broken})
+    np.testing.assert_allclose(repaired, expected, rtol=1e-13)
+
+
+def test_an_unrepairable_born_value_falls_back_to_the_sdcs_spline_with_a_warning():
+    """With no other ``T1`` row in its column the zero cannot be interpolated."""
     broken = np.array(LI_BORN_1MEV)
     broken[6] = 0.0
     with pytest.warns(PhysicsFallbackWarning, match="T1 = 1 MeV"):
