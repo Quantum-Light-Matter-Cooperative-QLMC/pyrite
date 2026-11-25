@@ -44,7 +44,13 @@ _PHASE_DIMENSIONS = {
         "scratch_mib",
         "kernel_threads",
     ),
-    "spectrum": ("cxr_chunk", "brem_chunk", "cxr_threads", "cxr_energies_per_block"),
+    "spectrum": (
+        "cxr_chunk",
+        "brem_chunk",
+        "characteristic_chunk",
+        "cxr_threads",
+        "cxr_energies_per_block",
+    ),
 }
 _DIMENSIONS = _PHASE_DIMENSIONS["transport"] + _PHASE_DIMENSIONS["spectrum"]
 Phase = Literal["transport", "spectrum", "total"]
@@ -57,8 +63,9 @@ class KernelSearchSpace:
     ``electron_batch``, ``schedule``, ``continuation_rows``, ``scratch_mib``
     and ``kernel_threads`` set :class:`~pyrite.config.TransportKernelTuning`
     (the transport phase);
-    ``cxr_chunk``, ``brem_chunk``, ``cxr_threads`` and ``cxr_energies_per_block``
-    set the spectrum segment chunks and CXR reduction launch (the
+    ``cxr_chunk``, ``brem_chunk``, ``characteristic_chunk``, ``cxr_threads``
+    and ``cxr_energies_per_block`` set the spectrum segment chunks and CXR
+    reduction launch (the
     spectrum phase). ``None`` in a tuple selects the process default.
     Combinations the config rejects (a row quantum with full-history) are
     never run.
@@ -73,6 +80,7 @@ class KernelSearchSpace:
     kernel_threads: tuple[int | None, ...] = ()
     cxr_threads: tuple[int | None, ...] = ()
     cxr_energies_per_block: tuple[int | None, ...] = ()
+    characteristic_chunk: tuple[int | None, ...] = ()
 
     def __post_init__(self) -> None:
         for name in _DIMENSIONS:
@@ -553,7 +561,12 @@ def _join(best: Any, chosen: Any, phase: Phase) -> Any:
     if phase == "transport":
         return replace(best, transport=chosen.transport)
     if phase == "spectrum":
-        return replace(best, cxr_chunk=chosen.cxr_chunk, brem_chunk=chosen.brem_chunk)
+        return replace(
+            best,
+            cxr_chunk=chosen.cxr_chunk,
+            brem_chunk=chosen.brem_chunk,
+            characteristic_chunk=chosen.characteristic_chunk,
+        )
     return chosen
 
 

@@ -278,3 +278,27 @@ def test_streamed_scorer_applies_selection_without_mutating_the_case():
     assert streamed["hkl_list"] == case["hkl_list"]
     assert streaming_refusal(case) is None and automatic_selection(case)
     assert case["reflection_selection"]["automatic"]
+
+
+def test_characteristic_chunk_lowers_as_an_execution_only_case_key():
+    """The #1455 characteristic chunk reaches the case but never its identity."""
+    default = _case(pr.Numerics())
+    tuned = _case(pr.Numerics(execution=pr.ExecutionConfig(characteristic_chunk=4096)))
+    assert "characteristic_chunk" not in default.to_dict()
+    assert tuned["characteristic_chunk"] == 4096
+    assert tuned.brem_chunk is None
+    assert case_content_key(tuned) == case_content_key(default)
+    assert pickle.loads(pickle.dumps(tuned)) == tuned
+    assert pickle.loads(pickle.dumps(default)) == default
+    with pytest.raises(ValueError, match="characteristic_chunk"):
+        pr.ExecutionConfig(characteristic_chunk=0)
+
+
+def test_kernel_tuning_pickle_without_characteristic_chunk_defaults_to_automatic():
+    tuning = pr.ExecutionConfig(brem_chunk=8)
+    state = dict(tuning.__dict__)
+    del state["characteristic_chunk"]
+    restored = object.__new__(pr.ExecutionConfig)
+    restored.__setstate__(state)
+    assert restored.characteristic_chunk is None
+    assert restored == tuning

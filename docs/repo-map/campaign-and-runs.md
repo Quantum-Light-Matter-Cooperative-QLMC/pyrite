@@ -310,7 +310,7 @@ Tests: `tests/optimization/`. Guide: `docs/guides/optimization-studies.md`.
 
 `kernel_tuning.py::tune_kernels` (#776) tunes CUDA execution controls, not
 physics: transport (`electron_batch`, `schedule`, `continuation_rows`) and
-spectrum (`cxr_chunk`, `brem_chunk`) dimensions are independent Optuna studies
+spectrum (`cxr_chunk`, `brem_chunk`, `characteristic_chunk`) dimensions are independent Optuna studies
 (exhaustive for small lattices), measured by one persistent
 `_kernel_worker.py` process per tuning (JSON lines over stdin/stdout).
 Transport candidates time `campaign.trajectories.scene_trajectories` and

@@ -138,6 +138,11 @@ class ExecutionConfig:
     **not** changed or presumed invariant in this compatibility slice.
     ``transport`` holds the experimental CUDA transport schedule
     (:class:`TransportKernelTuning`), which never enters case identity.
+    ``characteristic_chunk`` (segments per characteristic-line reduction;
+    ``None``: automatic, #1455) is independent of ``brem_chunk``. The automatic
+    device size follows characteristic's own per-segment intermediates, not
+    the line-energy grid; the CPU keeps its grid-sized default. It changes
+    only FP64 summation order (#1313) and never enters case identity.
     ``cxr_threads`` (32-1024, ``None``: 512) and ``cxr_energies_per_block``
     (1-4, ``None``: 3) set the CUDA CXR line-reduction launch on the
     node-quadrature route: threads per block and how many energy nodes one
@@ -180,11 +185,18 @@ class ExecutionConfig:
     stream_memory_mib: int | None = None
     stream_spill_dir: str | None = None
     stream_spill_mib: int | None = None
+    characteristic_chunk: int | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.transport_core, str) or not self.transport_core:
             raise ValueError("transport_core must be a nonempty string")
-        for name in ("cxr_chunk", "brem_chunk", "stream_block_electrons", "stream_memory_mib"):
+        for name in (
+            "cxr_chunk",
+            "brem_chunk",
+            "characteristic_chunk",
+            "stream_block_electrons",
+            "stream_memory_mib",
+        ):
             value = getattr(self, name)
             if value is not None and (type(value) is not int or value <= 0):
                 raise ValueError(f"{name} must be a positive integer or None")
@@ -223,7 +235,7 @@ class ExecutionConfig:
     def __setstate__(self, state: dict[str, object]) -> None:
         # Pickles from before #776 carry no ``transport`` entry, before #825 no
         # CXR launch controls, before #865/#868 no streaming controls, before
-        # #1283 no spill controls.
+        # #1283 no spill controls, before #1455 no characteristic chunk.
         state.setdefault("transport", TransportKernelTuning())
         state.setdefault("cxr_threads", None)
         state.setdefault("cxr_energies_per_block", None)
@@ -231,6 +243,7 @@ class ExecutionConfig:
         state.setdefault("stream_memory_mib", None)
         state.setdefault("stream_spill_dir", None)
         state.setdefault("stream_spill_mib", None)
+        state.setdefault("characteristic_chunk", None)
         self.__dict__.update(state)
 
 

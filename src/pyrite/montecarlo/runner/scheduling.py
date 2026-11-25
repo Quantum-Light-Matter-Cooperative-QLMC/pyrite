@@ -479,6 +479,8 @@ _UNTIMED_OUTPUT_KEYS = (
     "_effective_spec_chunk",
     "_attempted_brem_chunk",
     "_effective_brem_chunk",
+    "_attempted_characteristic_chunk",
+    "_effective_characteristic_chunk",
     "_learned_spec_chunk",
     "_backend_fallback_reason",
 )

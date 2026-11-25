@@ -781,7 +781,55 @@ def _interpolate_shell_cross_sections(
 
 
 #: Elements of the (segments, lines) transmission matrix per batched line group.
+#: Internal memory bound, not a tuning control: it caps each group's
+#: ``(rows, lines)`` working set and the automatic segment chunk (#1455).
 _LINE_BATCH_ELEMENTS = 1 << 22
+#: Widest automatic device chunk: 26M segments score in 25 chunks, so the
+#: per-chunk launch sets no longer matter, while device scratch stays a
+#: fraction of the spectrum budget (#1455).
+_AUTO_CHUNK_ROWS = 1 << 20
+#: Upper bound on one element's ionized subshells: EEDL MF=23 MT=534-572.
+_MAX_IONIZATION_SHELLS = 39
+#: Live ``(rows, lines)`` arrays per line group: both escape depths, the
+#: effective line cross section, the weighted product, and the unfused
+#: :func:`mean_transmission` temporaries.
+_LINE_GROUP_INTERMEDIATES = 8
+#: Live per-row vectors outside the shell columns: query energy, path length
+#: and its temporaries, and the unfused interpolation's per-shell scratch.
+_ROW_INTERMEDIATES = 8
+
+
+def _chunk_row_elements(n_shell: int) -> int:
+    """Scoring-device elements one segment row of a chunk holds (#1455).
+
+    Two ``(rows, n_shell)`` arrays (shell cross sections and their flux
+    weighting or the unfused interpolation stack), the per-row vectors, and,
+    for a chunk wider than :data:`_LINE_BATCH_ELEMENTS`, one-line groups.
+    Independent of the line-energy grid: no chunk intermediate spans it.
+    """
+    return 2 * int(n_shell) + _ROW_INTERMEDIATES + _LINE_GROUP_INTERMEDIATES
+
+
+def _chunk_fixed_elements() -> int:
+    """Line-group elements a chunk of at most :data:`_LINE_BATCH_ELEMENTS` rows adds.
+
+    A group holds ``rows * lines <= max(rows, _LINE_BATCH_ELEMENTS)`` elements
+    per intermediate, so this bound is independent of the line count.
+    """
+    return _LINE_GROUP_INTERMEDIATES * _LINE_BATCH_ELEMENTS
+
+
+def _max_ionization_shells(elements, ionization_model: IonizationModel = "eedl") -> int:
+    """Most ionized subshells any of ``elements`` scores; the EEDL bound when empty."""
+    counts = [
+        len(
+            load_characteristic_cross_sections(
+                el, ionization_model=ionization_model
+            ).ionization_shell_labels
+        )
+        for el in sorted(set(elements))
+    ]
+    return max(counts, default=_MAX_IONIZATION_SHELLS)
 
 
 def _accumulate_line_yields(

@@ -284,16 +284,25 @@ from .emission import _brem_wide_from_segments as _brem_wide_from_segments
 from .emission import _characteristic_from_segments as _characteristic_from_segments
 from .emission import optional_line_components as optional_line_components
 from .stage_chunks import (
+    _characteristic_chunk as _characteristic_chunk,
+)
+from .stage_chunks import (
     _effective_brem_chunk as _effective_brem_chunk,
 )
 from .stage_chunks import (
     _effective_brem_photon_block as _effective_brem_photon_block,
 )
 from .stage_chunks import (
+    _effective_characteristic_chunk as _effective_characteristic_chunk,
+)
+from .stage_chunks import (
     _effective_spec_chunk as _effective_spec_chunk,
 )
 from .stage_chunks import (
     _halve_case_brem_chunk as _halve_case_brem_chunk,
+)
+from .stage_chunks import (
+    _halve_case_characteristic_chunk as _halve_case_characteristic_chunk,
 )
 from .stage_chunks import (
     _halve_case_chunks as _halve_case_chunks,

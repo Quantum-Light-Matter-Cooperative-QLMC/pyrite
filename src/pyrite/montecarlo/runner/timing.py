@@ -55,6 +55,8 @@ class _TimingAgg:
                 "_effective_spec_chunk",
                 "_attempted_brem_chunk",
                 "_effective_brem_chunk",
+                "_attempted_characteristic_chunk",
+                "_effective_characteristic_chunk",
                 "_learned_spec_chunk",
                 "_line_axis_nodes",
                 "_brem_axis_nodes",

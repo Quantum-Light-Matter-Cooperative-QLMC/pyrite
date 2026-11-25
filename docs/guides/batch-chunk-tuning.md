@@ -10,7 +10,7 @@ optimization variable. The tuner uses Optuna directly, separately from
 `pyrite.optimization.tune_kernels` tunes any subset of the transport
 `electron_batch`, continuation `schedule` and `continuation_rows`, device
 scratch budget `scratch_mib` and launch `kernel_threads`, and the
-spectral `cxr_chunk`/`brem_chunk` and CXR line-reduction launch
+spectral `cxr_chunk`/`brem_chunk`/`characteristic_chunk` and CXR line-reduction launch
 (`cxr_threads`, `cxr_energies_per_block`), and returns a `KernelTuning` to
 apply through ordinary `Numerics`. `KernelSearchSpace` holds the candidate
 values per control (named `KernelLattice` through 0.24.1; the old name
@@ -31,6 +31,7 @@ result = tune_kernels(
         kernel_threads=(None, 32, 64),
         cxr_chunk=(None, 8192, 32768),
         brem_chunk=(None, 1024),
+        characteristic_chunk=(None, 262144),
         cxr_energies_per_block=(None, 4),
     ),
     storage="sqlite:///kernel-tuning.sqlite3",

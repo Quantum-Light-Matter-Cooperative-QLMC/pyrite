@@ -112,6 +112,13 @@ def test_candidate_changes_only_search_space_dimensions():
     assert cxr.dimensions("spectrum") == ("cxr_threads", "cxr_energies_per_block")
     got = cxr.candidate(base, {"cxr_threads": 256, "cxr_energies_per_block": 4})
     assert (got.cxr_threads, got.cxr_energies_per_block, got.brem_chunk) == (256, 4, 8)
+    characteristic = KernelSearchSpace(characteristic_chunk=(None, 1 << 20))
+    assert characteristic.dimensions("spectrum") == ("characteristic_chunk",)
+    got = characteristic.candidate(base, {"characteristic_chunk": 1 << 20})
+    assert (got.characteristic_chunk, got.brem_chunk) == (1 << 20, 8)
+    joined = kt._join(base, got, "spectrum")
+    assert (joined.characteristic_chunk, joined.brem_chunk) == (1 << 20, 8)
+    assert kw.tuning_from_dict(kt.asdict(got)) == got
 
 
 def test_spectrum_worker_applies_all_proposed_launch_controls(monkeypatch, tmp_path):
@@ -123,6 +130,7 @@ def test_spectrum_worker_applies_all_proposed_launch_controls(monkeypatch, tmp_p
         brem_chunk=1024,
         cxr_threads=128,
         cxr_energies_per_block=4,
+        characteristic_chunk=65_536,
     )
     session = object.__new__(kw._Session)
     session.base = base

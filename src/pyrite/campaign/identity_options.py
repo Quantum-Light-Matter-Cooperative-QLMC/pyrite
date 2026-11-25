@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 #   - ``beam_current_na``: legacy reporting fallback, never a kernel input.
 #   - ``mosaic_fwhm_rad``: analytic post-processing broadening in
 #     ``store_result``. The MC route remains keyed by ``mosaic_mc_fwhm_rad``.
-#   - ``spec_chunk`` / ``brem_chunk``: GPU batch sizes. Chunk-invariant per the
+#   - ``spec_chunk`` / ``brem_chunk`` / ``characteristic_chunk``: GPU batch sizes. Chunk-invariant per the
 #     goldens, and only ever set on ``-p/--perf`` runs -- which bypass the cache
 #     entirely (perf implies ``--no-cache``) -- so the cache never mixes chunks.
 # ``catalog_profile`` / ``variant`` / ``fidelity`` (the frozen identity tier,
@@ -56,6 +56,7 @@ _CONTENT_KEY_DENYLIST = frozenset(
         "mosaic_fwhm_rad",
         "spec_chunk",
         "brem_chunk",
+        "characteristic_chunk",
         "catalog_profile",
         "variant",
         "fidelity",

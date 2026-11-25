@@ -139,6 +139,7 @@ chunking or a backend can alter floating-point reduction order.
 | variable | format and unset behavior | owner |
 |---|---|---|
 | `PYRITE_MC_CXR_CHUNK`, `PYRITE_MC_BREM_CHUNK` | Positive segments-per-spectrum/brems chunk; unset `0` selects adaptive sizing. Explicit CLI chunk options win. | `runner.chunking` |
+| `PYRITE_MC_CHARACTERISTIC_CHUNK` | Positive segments per characteristic-line reduction; unset `0` selects automatic sizing (device: from characteristic's own per-segment intermediates, independent of the line grid and of `PYRITE_MC_BREM_CHUNK`; CPU: the line-grid adaptive size). A per-case `KernelTuning.characteristic_chunk` wins. | `runner.chunking`, `runner.stage_chunks` |
 | `PYRITE_MC_MIN_CHUNK` | Positive smallest segment chunk the device budget must admit before a case falls back to CPU; unset `1` (chunks follow the budget; only a single segment that cannot fit falls back). Malformed or non-positive values raise. Raise it to force CPU fallback for grids whose chunks would be too small to be efficient. | `montecarlo._resources` |
 | `PYRITE_MC_CXR_BUDGET_MB` | Positive MiB spectrum working-set budget; unset is `min(1920, resolved device budget)`. | `runner.chunking` |
 | `PYRITE_MC_FREE_EVERY` | Positive case cadence for releasing GPU-pool blocks; unset comes from the resource policy. | `runner.chunking` |
@@ -164,7 +165,7 @@ owner states it.
 | `PYRITE_MC_NSYS` | `runs.scan` and remote queue scripts set `1` for an Nsight child. | `runner.chunking` enables NVTX ranges; unset disables them. |
 | `PYRITE_LOCAL_DASHBOARD` | `runs.scan` sets `1` while its local dashboard runs, then clears it. | `runner.scheduling` enables dashboard progress only for `1`. |
 | `PYRITE_MC_CXR_CHUNK`, `PYRITE_MC_BREM_CHUNK`, `PYRITE_MC_GPU_SHARE` | CLI and remote scripts may write these runtime overrides. | See the diagnostic table above. |
-| `PYRITE_MC_TRANSPORT_CORE`, `PYRITE_MC_RESOURCE_POLICY`, `PYRITE_MC_MIN_CHUNK` | Remote queue scripts copy the submitter's values into the job, validated before submission. | See the tables above. |
+| `PYRITE_MC_TRANSPORT_CORE`, `PYRITE_MC_RESOURCE_POLICY`, `PYRITE_MC_MIN_CHUNK`, `PYRITE_MC_CHARACTERISTIC_CHUNK` | Remote queue scripts copy the submitter's values into the job, validated before submission. | See the tables above. |
 
 ### Validation, documentation, and test controls
 
@@ -240,7 +241,7 @@ Every `Physics`/`Numerics` field has exactly one owner in the import-light
 | Physical model (`Physics`) | `emission`, `brem_source`, `cxr_source`, `straggling`, `inelastic_model`, `inelastic_cutoff_eV`, `secondary_threshold_eV`, `elastic_model`, `transport_mode`, `mixed_c1`, `mixed_c2`, `mixed_max_step_um`, `bremsstrahlung_model`, `radiative_model`, `radiative_cutoff_eV`, `pair_production_model`, `positron_transport`, `atomic_electron_deflection`, `transition_radiation`, `transition_lattice_origin_ang`, `shell_ionization_model`, `photon_transport` |
 | Sampling and convergence (`Numerics`) | `sampling`, `cxr_reflections`, `seed` |
 | Numerical approximation (`Numerics`) | `energy_model`, `max_dE_frac`, `energy_bins`, `transport`, `radiation` |
-| Kernel tuning (`Numerics`) | `transport_core`, `cxr_chunk`, `brem_chunk`, `execution` |
+| Kernel tuning (`Numerics`) | `transport_core`, `cxr_chunk`, `brem_chunk`, `execution` (incl. `characteristic_chunk`) |
 | Channeling (`pyrite.quantum.Channeling`) | No `Physics` or `Numerics` fields (#1017). `model`, `plane`, `axial`, `admission` and `ChannelingNumerics` (`basis_size`, `bloch_cells`, `step_ang`, `zone_max_ang`); profiles use a `[channeling]` table. |
 | Scheduling and resources (`pyrite.execution`) | No `Physics` or `Numerics` fields. `ExecutionProfile`, `Executor`, `ResourceRequest`, Dask and SLURM backends. |
 
@@ -284,8 +285,8 @@ boundary and has no `Numerics` dataclass counterpart.
 
 ### Scientific identity is not bitwise reproducibility
 
-The existing `case_content_key` denylist excludes `spec_chunk` and
-`brem_chunk`. That cache decision does **not** establish chunk-invariant
+The existing `case_content_key` denylist excludes `spec_chunk`,
+`brem_chunk` and `characteristic_chunk`. That cache decision does **not** establish chunk-invariant
 floating-point reductions or exact replay on different hardware. Chunking
 may affect summation order; transport cores, backends and FP modes may
 change numerical paths or RNG consumption. Preserve kernel choice, chunk

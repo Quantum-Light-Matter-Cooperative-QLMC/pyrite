@@ -136,6 +136,7 @@ _CASE_KEY_ORDER = (
     "seed",
     "spec_chunk",
     "brem_chunk",
+    "characteristic_chunk",
     "dtheta_obs_rad",
     "domega_sr",
     # Accepted legacy/manual-only runner controls. ``build_cases`` never emits
@@ -207,6 +208,9 @@ class Case(Mapping[str, Any]):
         Line/background macro-electron counts and random seed.
     spec_chunk, brem_chunk
         Optional spectrum-kernel chunk sizes.
+    characteristic_chunk
+        Optional characteristic-line segment chunk (#1455); absent selects the
+        automatic size. Execution-only, like the other chunks.
     bunch_charge_pc, rep_rate_hz
         Optional source-normalization values.
     energy_spread_frac, long_shape, bunch_length_fs, long_offsets_fs
@@ -428,12 +432,15 @@ class Case(Mapping[str, Any]):
     transport_realization: TransportRealization | Mapping[str, str] | _Absent = _ABSENT
     # Opt-in detector-cone splitting (#379), appended for pickle offsets.
     cone_split: dict[str, object] | _Absent = _ABSENT
+    # Characteristic segment chunk (#1455), appended for pickle offsets.
+    characteristic_chunk: int | _Absent = _ABSENT
 
     def __getstate__(self) -> list[Any]:
         """Keep the historical frozen-slot pickle: drop trailing absent appended fields."""
         state = [getattr(self, field.name) for field in fields(self)]
-        # Only cone_split and transport_realization postdate the legacy layout.
-        for _ in range(2):
+        # Only characteristic_chunk, cone_split and transport_realization
+        # postdate the legacy layout.
+        for _ in range(3):
             if state[-1] is not _ABSENT:
                 break
             state.pop()
@@ -488,9 +495,9 @@ class Case(Mapping[str, Any]):
                 raise ValueError("adaptive case Ne and Ne_brem must equal precision.max_histories")
         if isinstance(self.seed, bool) or not isinstance(self.seed, int):
             raise ValueError("seed must be an integer")
-        for name in ("spec_chunk", "brem_chunk"):
+        for name in ("spec_chunk", "brem_chunk", "characteristic_chunk"):
             value = getattr(self, name)
-            if value is not None:
+            if value not in (None, _ABSENT):
                 _positive_int(name, value)
         for name in (
             "coherent_emission",

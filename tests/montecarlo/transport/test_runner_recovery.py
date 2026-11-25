@@ -34,11 +34,11 @@ def execution(monkeypatch):
 @pytest.mark.parametrize("phase", ["line", "characteristic", "brem"])
 def test_public_runner_retries_phase_without_retransport(execution, monkeypatch, serial, phase):
     tp, calls = execution
-    case = {"spec_chunk": 8, "brem_chunk": 8, "seed": 42}
+    case = {"spec_chunk": 8, "brem_chunk": 8, "characteristic_chunk": 8, "seed": 42}
 
     def spectrum(work, transport, record_timing=False):
         assert transport is tp
-        calls.append((work["spec_chunk"], work["brem_chunk"]))
+        calls.append((work["spec_chunk"], work["brem_chunk"], work["characteristic_chunk"]))
         if len(calls) == 1:
             raise runner._SpectrumPhaseOOM(phase, AllocationError("allocation failed"))
         return {"spec": np.array([1.0, 2.0])}
@@ -51,8 +51,10 @@ def test_public_runner_retries_phase_without_retransport(execution, monkeypatch,
     else:
         out = runner.run_case(case)
     np.testing.assert_array_equal(out["spec"], [1.0, 2.0])
-    assert calls == [(8, 8), (4, 8) if phase == "line" else (8, 4)]
-    assert case == {"spec_chunk": 8, "brem_chunk": 8, "seed": 42}
+    # Each phase halves only its own chunk; characteristic never moves brem (#1455).
+    halved = {"line": (4, 8, 8), "characteristic": (8, 8, 4), "brem": (8, 4, 8)}[phase]
+    assert calls == [(8, 8, 8), halved]
+    assert case == {"spec_chunk": 8, "brem_chunk": 8, "characteristic_chunk": 8, "seed": 42}
 
 
 @pytest.mark.parametrize("error", [AllocationError("oom"), BackendResourceError("budget")])

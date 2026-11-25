@@ -51,6 +51,9 @@ class _RunnerResourcePolicy:
     available_mem_mb: Callable[[], int]
     spec_chunk: int
     brem_chunk: int
+    #: Pinned characteristic segment chunk (``PYRITE_MC_CHARACTERISTIC_CHUNK``);
+    #: 0 selects :func:`_characteristic_auto_chunk` (#1455).
+    characteristic_chunk: int
     spec_budget_mb: int
     free_every: int
     worker_mem_mb: int
@@ -106,6 +109,7 @@ def _resolve_runner_resource_policy() -> _RunnerResourcePolicy:
         available_mem_mb=_available_mem_mb,
         spec_chunk=_env_chunk("PYRITE_MC_CXR_CHUNK", 0),
         brem_chunk=_env_chunk("PYRITE_MC_BREM_CHUNK", 0),
+        characteristic_chunk=_env_chunk("PYRITE_MC_CHARACTERISTIC_CHUNK", 0),
         spec_budget_mb=_env_chunk("PYRITE_MC_CXR_BUDGET_MB", min(1920, policy_device_mb)),
         free_every=_env_chunk("PYRITE_MC_FREE_EVERY", resolved.release_every),
         worker_mem_mb=_env_chunk("PYRITE_MC_WORKER_MEM_MB", 6144),
@@ -198,6 +202,46 @@ def _admit_chunk(chunk, bins, *, intermediates=3):
         itemsize=itemsize,
         budget_bytes=(_RESOURCE_POLICY.device_budget_bytes if _RESOURCE_POLICY.gpu else None),
         intermediates=int(intermediates),
+    )
+
+
+#: Bytes per characteristic chunk element: the line-group arrays are binary64.
+_CHARACTERISTIC_ITEMSIZE = 8
+
+
+def _characteristic_auto_chunk(n_shell):
+    """Device characteristic chunk from its own intermediates (#1455).
+
+    Holds :func:`~pyrite.montecarlo.spectrum.characteristic._chunk_row_elements`
+    per row plus the fixed line-group working set within the policy spectrum
+    budget, capped at ``_AUTO_CHUNK_ROWS``: wider chunks would save under one
+    launch set per million rows while holding more device scratch. Unlike
+    :func:`_adaptive_chunk`, no characteristic intermediate spans the
+    line-energy grid, so its size does not enter. Chunking only regroups the
+    FP64 segment sum (#1313).
+    """
+    from ..spectrum import characteristic
+
+    per_row = characteristic._chunk_row_elements(n_shell) * _CHARACTERISTIC_ITEMSIZE
+    fixed = characteristic._chunk_fixed_elements() * _CHARACTERISTIC_ITEMSIZE
+    budget = 1_000_000 * _RESOURCE_POLICY.spec_budget_mb - fixed
+    return max(1, min(characteristic._AUTO_CHUNK_ROWS, budget // per_row))
+
+
+def _admit_characteristic_chunk(chunk, n_shell):
+    """Cap a device characteristic chunk to the device budget before allocation."""
+    from ..spectrum import characteristic
+
+    budget = _RESOURCE_POLICY.device_budget_bytes if _RESOURCE_POLICY.gpu else None
+    if budget is None:
+        return int(chunk)
+    fixed = characteristic._chunk_fixed_elements() * _CHARACTERISTIC_ITEMSIZE
+    return admitted_chunk(
+        requested_chunk=int(chunk),
+        bins=characteristic._chunk_row_elements(n_shell),
+        itemsize=_CHARACTERISTIC_ITEMSIZE,
+        budget_bytes=max(0, budget - fixed),
+        intermediates=1,
     )
 
 

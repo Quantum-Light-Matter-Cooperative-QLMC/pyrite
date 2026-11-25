@@ -398,6 +398,8 @@ TransportNumerics = { target = "pyrite._numerics_groups:TransportNumerics", stat
 load_numerics = { target = "pyrite._config_presets:load_numerics", status = "advanced-stable" }
 load_physics = { target = "pyrite._config_presets:load_physics", status = "advanced-stable" }
 AngularSampling = { target = "pyrite.config:AngularSampling", status = "advanced-stable" }
+# #1455: KernelTuning.characteristic_chunk (None: automatic) is execution-only; it never
+# enters case identity. No new export.
 KernelTuning = { target = "pyrite._numerics_groups:KernelTuning", status = "advanced-stable" }
 TransportKernelTuning = { target = "pyrite._numerics_groups:TransportKernelTuning", status = "experimental" }
 Timepix3ResponseNumerics = { target = "pyrite.config:Timepix3ResponseNumerics", status = "advanced-stable" }
@@ -574,6 +576,7 @@ ParameterSpace = { target = "pyrite.optimization.space:ParameterSpace", status =
 Objective = { target = "pyrite.optimization.study:Objective", status = "experimental" }
 Constraint = { target = "pyrite.optimization.study:Constraint", status = "experimental" }
 OptunaOptimizer = { target = "pyrite.optimization.optuna_adapter:OptunaOptimizer", status = "experimental" }
+# #1455: KernelSearchSpace.characteristic_chunk is a spectrum-phase dimension.
 KernelSearchSpace = { target = "pyrite.optimization.kernel_tuning:KernelSearchSpace", status = "experimental" }
 KernelTrial = { target = "pyrite.optimization.kernel_tuning:KernelTrial", status = "experimental" }
 KernelTuningResult = { target = "pyrite.optimization.kernel_tuning:KernelTuningResult", status = "experimental" }

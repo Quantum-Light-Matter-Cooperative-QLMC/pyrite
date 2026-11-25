@@ -202,8 +202,10 @@ def _retry_metrics(counts, events, initial, work, tp):
         **{f"_{phase}_gpu_oom_retries": count for phase, count in counts.items()},
         "_attempted_spec_chunk": initial[0],
         "_attempted_brem_chunk": initial[1],
+        "_attempted_characteristic_chunk": initial[2],
         "_effective_spec_chunk": runner._effective_spec_chunk(work, tp),
         "_effective_brem_chunk": runner._effective_brem_chunk(work, tp),
+        "_effective_characteristic_chunk": runner._effective_characteristic_chunk(work, tp),
         "_brem_photon_block": runner._effective_brem_photon_block(work, tp),
         "_recovery_events": [*tp.get("_recovery_events", []), *events],
         "_recovery_path": (
@@ -219,7 +221,8 @@ def _spectrum_case_retry(
 ):
     """Retry allocator OOMs with smaller execution chunks on the same transport.
 
-    Characteristic scoring shares brem tuning but has its own failure counter.
+    Each phase halves only its own chunk: characteristic has its own
+    ``characteristic_chunk`` and failure counter, independent of brem (#1455).
     Resource admission and unrelated runtime failures propagate immediately.
     The first allocator OOM on device-resident rows first moves the rows to
     admitted host memory (``host_segments``, #905; see :func:`_rows_to_host`)
@@ -235,7 +238,11 @@ def _spectrum_case_retry(
     initial_spec = runner._effective_spec_chunk(work, tp)
     if spec_chunk_cap is not None and initial_spec > spec_chunk_cap:
         work["spec_chunk"] = initial_spec = spec_chunk_cap
-    initial = initial_spec, runner._effective_brem_chunk(work, tp)
+    initial = (
+        initial_spec,
+        runner._effective_brem_chunk(work, tp),
+        runner._effective_characteristic_chunk(work, tp),
+    )
     counts = dict.fromkeys(("line", "characteristic", "brem", "generic"), 0)
     events = []
     attempt = 0
@@ -284,9 +291,7 @@ def _halve_phase_chunks(phase, work, tp):
     if phase == "line":
         runner._halve_case_spec_chunk(work, tp)
     elif phase == "characteristic":
-        from .stage_chunks import _halve_case_characteristic_chunk
-
-        _halve_case_characteristic_chunk(work, tp)
+        runner._halve_case_characteristic_chunk(work, tp)
     elif phase == "brem":
         runner._halve_case_brem_chunk(work, tp)
     else:

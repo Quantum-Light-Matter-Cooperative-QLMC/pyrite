@@ -345,12 +345,7 @@ def _characteristic_from_segments(
     """
     from .. import runner
 
-    characteristic_chunk = runner._admit_chunk(
-        case.get("brem_chunk")
-        or runner._RESOURCE_POLICY.brem_chunk
-        or runner._adaptive_chunk(E_grid.size),
-        E_grid.size,
-    )
+    characteristic_chunk = runner._characteristic_chunk(case, E_grid.size)
     ionization_model = case.get("shell_ionization_model", "eedl")
     n_lay = int(segs.get("n_layers", 1))
 

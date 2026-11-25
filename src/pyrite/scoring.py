@@ -49,6 +49,7 @@ SCORING_ONLY_FIELDS = frozenset(
         "coherent_flat_omission_limit",
         "spec_chunk",
         "brem_chunk",
+        "characteristic_chunk",
         "hkl_list",
         "coherent_emission",
         "temporal_profile",

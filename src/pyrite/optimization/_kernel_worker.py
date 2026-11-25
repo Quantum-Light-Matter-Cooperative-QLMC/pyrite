@@ -48,6 +48,7 @@ def tuning_from_dict(data: dict[str, Any]) -> Any:
         transport=TransportKernelTuning(**data["transport"]),
         cxr_threads=data.get("cxr_threads"),
         cxr_energies_per_block=data.get("cxr_energies_per_block"),
+        characteristic_chunk=data.get("characteristic_chunk"),
     )
 
 
@@ -198,6 +199,7 @@ class _Session:
                 transport=spectral.transport,
                 cxr_chunk=tuning.cxr_chunk,
                 brem_chunk=tuning.brem_chunk,
+                characteristic_chunk=tuning.characteristic_chunk,
                 cxr_threads=tuning.cxr_threads,
                 cxr_energies_per_block=tuning.cxr_energies_per_block,
             )

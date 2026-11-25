@@ -35,11 +35,12 @@ _FORWARDED_ENV = (
     "PYRITE_MC_TRANSPORT_PRECISION",
     "PYRITE_MC_RESOURCE_POLICY",
     "PYRITE_MC_MIN_CHUNK",
+    "PYRITE_MC_CHARACTERISTIC_CHUNK",
 )
 
 
 def _forwarded_env_choices(name):
-    if name == "PYRITE_MC_MIN_CHUNK":
+    if name in ("PYRITE_MC_MIN_CHUNK", "PYRITE_MC_CHARACTERISTIC_CHUNK"):
         return None
     if name == "PYRITE_MC_TRANSPORT_CORE":
         from ..montecarlo.transport.batching import TRANSPORT_CORES

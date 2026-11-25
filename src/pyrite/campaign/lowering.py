@@ -140,7 +140,7 @@ def _with_line_resolution(
 
 
 def _with_run_options(cases: list[Case], numerics: Numerics) -> list[Case]:
-    """Apply the explicit seed stream and opt-in line roulette/cone splitting to cases.
+    """Apply the seed stream, opt-in line roulette/cone splitting and characteristic chunk.
 
     Replacing re-runs case validation, which refuses non-additive line routes.
     """
@@ -152,6 +152,10 @@ def _with_run_options(cases: list[Case], numerics: Numerics) -> list[Case]:
     if numerics.cone_split is not None:
         record = numerics.cone_split.to_dict()
         cases = [replace(case, cone_split=record) for case in cases]
+    # Execution-only (#1455): a case key, never in content or dataset identity.
+    chunk = numerics.resolved_execution.characteristic_chunk
+    if chunk is not None:
+        cases = [replace(case, characteristic_chunk=chunk) for case in cases]
     return cases
 
 

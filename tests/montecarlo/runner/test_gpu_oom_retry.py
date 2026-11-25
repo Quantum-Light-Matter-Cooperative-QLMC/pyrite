@@ -697,3 +697,46 @@ def test_allocation_retry_keeps_finished_spectrum_phases(monkeypatch, failing, r
     assert all(calls[name] == 1 for name in reused)
     assert "_spectrum_phase_cache" not in case
     np.testing.assert_array_equal(out["spec"], np.ones(2))
+
+
+def test_characteristic_oom_halves_only_characteristic_chunk(monkeypatch):
+    """A characteristic OOM never shrinks the brem chunk (#1455)."""
+    calls = []
+
+    def fake_spectrum(case, tp, record_timing=False):
+        calls.append((case.get("brem_chunk"), case.get("characteristic_chunk")))
+        if len(calls) <= 2:
+            raise runner._SpectrumPhaseOOM("characteristic", DummyOOM())
+        return {"ok": True}
+
+    monkeypatch.setattr(runner, "_spectrum_case", fake_spectrum)
+    case = {"spec_chunk": 30_000, "brem_chunk": 100_000, "characteristic_chunk": 40_000}
+
+    out = runner._spectrum_case_retry(case, _tp(), max_retries=3)
+
+    assert calls == [(100_000, 40_000), (100_000, 20_000), (100_000, 10_000)]
+    assert case == {"spec_chunk": 30_000, "brem_chunk": 100_000, "characteristic_chunk": 40_000}
+    assert out["_attempted_brem_chunk"] == out["_effective_brem_chunk"] == 100_000
+    assert out["_attempted_characteristic_chunk"] == 40_000
+    assert out["_effective_characteristic_chunk"] == 10_000
+    assert out["_characteristic_gpu_oom_retries"] == 2
+    assert out["_brem_gpu_oom_retries"] == 0
+
+
+def test_brem_oom_keeps_the_characteristic_chunk(monkeypatch):
+    calls = []
+
+    def fake_spectrum(case, tp, record_timing=False):
+        calls.append((case.get("brem_chunk"), case.get("characteristic_chunk")))
+        if len(calls) == 1:
+            raise runner._SpectrumPhaseOOM("brem", DummyOOM())
+        return {"ok": True}
+
+    monkeypatch.setattr(runner, "_spectrum_case", fake_spectrum)
+    out = runner._spectrum_case_retry({"brem_chunk": 100_000}, _tp(), max_retries=3)
+
+    assert calls == [(100_000, None), (50_000, None)]
+    # The CPU automatic characteristic chunk follows the line grid, not brem.
+    automatic = runner._admit_chunk(runner._adaptive_chunk(2000), 2000)
+    assert out["_attempted_characteristic_chunk"] == automatic
+    assert out["_effective_characteristic_chunk"] == automatic

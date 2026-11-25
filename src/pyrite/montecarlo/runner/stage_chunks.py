@@ -13,8 +13,10 @@ from .chunking import (
     _EEDL_BREM_DENSE_INTERMEDIATES,
     _RESOURCE_POLICY,
     _adaptive_chunk,
+    _admit_characteristic_chunk,
     _admit_chunk,
     _brem_photon_block,
+    _characteristic_auto_chunk,
 )
 
 
@@ -71,6 +73,40 @@ def _effective_brem_chunk(case, tp):
     )
 
 
+def _characteristic_elements(case):
+    """Every element a characteristic layer of ``case`` emits from."""
+    layers = case.get("abs_layers")
+    compositions = [layer[2] for layer in layers] if layers else []
+    compositions.append(case.get("composition") or ())
+    return {element for composition in compositions for element, _density in composition}
+
+
+def _characteristic_chunk(case, line_bins):
+    """Resolve one case's characteristic segment chunk without changing the case.
+
+    An explicit per-case ``characteristic_chunk`` wins, then a pinned
+    ``PYRITE_MC_CHARACTERISTIC_CHUNK``, then the automatic size. On a device
+    that size comes from characteristic's own per-row intermediates
+    (:func:`.chunking._characteristic_auto_chunk`), independent of the
+    line-energy grid and of the brem chunk (#1455). The CPU keeps its
+    historical grid-sized default.
+    """
+    from ..spectrum.characteristic import _max_ionization_shells
+
+    requested = case.get("characteristic_chunk") or _RESOURCE_POLICY.characteristic_chunk
+    if not _RESOURCE_POLICY.gpu:
+        return _admit_chunk(requested or _adaptive_chunk(line_bins), line_bins)
+    n_shell = _max_ionization_shells(
+        _characteristic_elements(case), case.get("shell_ionization_model", "eedl")
+    )
+    return _admit_characteristic_chunk(requested or _characteristic_auto_chunk(n_shell), n_shell)
+
+
+def _effective_characteristic_chunk(case, tp):
+    """:func:`_characteristic_chunk` on the case's line grid."""
+    return _characteristic_chunk(case, tp["E_grid"].size)
+
+
 def _effective_brem_photon_block(case, tp):
     """Narrowest photon block any emitting layer scores this case's brem grid in.
 
@@ -99,12 +135,8 @@ def _halve_case_brem_chunk(case, tp):
 
 
 def _halve_case_characteristic_chunk(case, tp):
-    """Characteristic uses the line grid and the shared brem chunk selector."""
-    current = _admit_chunk(
-        case.get("brem_chunk") or _RESOURCE_POLICY.brem_chunk or _adaptive_chunk(tp["E_grid"].size),
-        tp["E_grid"].size,
-    )
-    case["brem_chunk"] = max(1, current // 2)
+    """Halve the admitted characteristic chunk; preserve brem and line tuning (#1455)."""
+    case["characteristic_chunk"] = max(1, _effective_characteristic_chunk(case, tp) // 2)
 
 
 def _halve_case_chunks(case, tp):

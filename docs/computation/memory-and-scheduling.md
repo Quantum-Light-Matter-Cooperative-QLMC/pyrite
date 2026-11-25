@@ -83,6 +83,20 @@ As the number of bins grows, the chunk shrinks to stay within the same byte budg
 
 Precedence runs: an explicit per-case `spec_chunk` / `brem_chunk` wins, then a pinned `PYRITE_MC_CXR_CHUNK` / `PYRITE_MC_BREM_CHUNK`, then the adaptive size. Whichever wins is capped by device admission.
 
+### Chunking characteristic lines
+
+Characteristic scoring has its own chunk, `KernelTuning.characteristic_chunk`, pinned by `PYRITE_MC_CHARACTERISTIC_CHUNK`, with the same precedence. It is independent of the brem chunk: tuning one never moves the other, and an allocation failure in the characteristic phase halves only the characteristic chunk (#1455).
+
+None of its intermediates spans the line-energy grid. Each segment row of a chunk holds its interpolated shell cross sections and their flux weighting, two $(\text{chunk}, n_{\text{shell}})$ arrays, plus a few per-row vectors. Lines are scored in groups of at most $2^{22}$ (segment, line) elements, with about eight live arrays per group. On a device the automatic chunk therefore holds
+
+```{math}
+w\,\bigl[\mathrm{chunk}\,(2 n_{\text{shell}} + 16) + 8 \cdot 2^{22}\bigr] \le B
+```
+
+with $w = 8$ bytes, since the line arrays are binary64. $n_{\text{shell}}$ is the largest subshell count of any emitting element. The chunk is capped at $2^{20}$ segments and then admitted against the device budget. With the grid-sized formula above, a fine sinc-oversampled line grid made the characteristic chunk a few hundred segments, and launch overhead dominated GPU idle time on high-tilt cases. The CPU keeps that grid-sized default.
+
+The line grouping (`_LINE_BATCH_ELEMENTS`) is an internal memory bound and not a tuning control. All of these chunk choices change only the FP64 summation order of the line yields (#1313). Spectra agree to rounding but are not bitwise identical across chunk sizes.
+
 ### Blocking the bremsstrahlung photon grid
 
 Segment chunking leaves one cost proportional to the full grid: each pass stages state that does not depend on the segments. For EEDL that is one unit-base panel row per photon node, about 327 binary64 panels per element, plus a REAL device copy on an accelerator. The BremsLib route stages the same rows as its fallback. A 1 keV–3 MeV grid at 10 eV spacing has 299,901 nodes, which is 0.8 GB per element.
