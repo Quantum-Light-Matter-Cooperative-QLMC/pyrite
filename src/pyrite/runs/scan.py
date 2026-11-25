@@ -902,6 +902,7 @@ def _run_material(args, material, max_seconds=None):
     ckpt = os.path.join(args.checkpoint_dir, stem)
     results = {}
     progress = MaterialProgress(args, material, len(cases))
+    progress.set_checkpoint_stem(stem, args.checkpoint_dir)
     progress.write_started()
     performance_logger = start_performance_logger(
         args,

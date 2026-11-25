@@ -78,6 +78,7 @@ class MaterialProgress:
         self.progress_phase = getattr(args, "progress_phase", None)
         self.has_dashboard = hasattr(args, "_job_records")
         self.latest_progress = _resumed_progress(self.progress_file, material, total_cases)
+        self.checkpoint_stems = None
         self.latest_case: dict[str, Any] = {}
         self.last_completed_case: dict[str, Any] = {}
         self.latest_cost: dict[str, Any] = {}
@@ -108,6 +109,24 @@ class MaterialProgress:
         return self.timer.snapshot(
             completed_new_cases=completed_new_cases, computed_cost=self._computed_cost(cost)
         )
+
+    def set_checkpoint_stem(self, stem, checkpoint_dir):
+        """Report exact scan identities, accumulating detector stems in a job's file."""
+        if self.progress_file is None:
+            return
+        self.checkpoint_stems = []
+        # Profiling uses private checkpoint roots that normal remote pull must not read.
+        if Path(checkpoint_dir).resolve() != output_dir("checkpoints").resolve():
+            return
+        try:
+            previous = json.loads(Path(self.progress_file).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            previous = {}
+        if isinstance(previous, dict) and previous.get("material") == self.material:
+            stems = previous.get("checkpoint_stems")
+            if isinstance(stems, list):
+                self.checkpoint_stems.extend(item for item in stems if isinstance(item, str))
+        self.checkpoint_stems = sorted(set([*self.checkpoint_stems, stem]))
 
     def sweep_callbacks(self, *, logged, case_cost_fn):
         """``run_sweep`` callback keywords; reporters off when nothing observes them."""
@@ -167,6 +186,7 @@ class MaterialProgress:
                 self.progress_file,
                 material=self.material,
                 phase=self.progress_phase,
+                checkpoint_stems=self.checkpoint_stems,
                 state="running",
                 current=case_snapshot,
                 activity=self.activity_info.get("phase"),
@@ -267,6 +287,7 @@ class MaterialProgress:
             self.progress_file,
             material=self.material,
             phase=self.progress_phase,
+            checkpoint_stems=self.checkpoint_stems,
             state="running",
             **self.latest_progress,
             **self.timer.snapshot(),
@@ -279,6 +300,7 @@ class MaterialProgress:
             self.progress_file,
             material=self.material,
             phase=self.progress_phase,
+            checkpoint_stems=self.checkpoint_stems,
             state="failed",
             **self.latest_progress,
             **self.latest_cost,
@@ -295,6 +317,7 @@ class MaterialProgress:
             self.progress_file,
             material=self.material,
             phase=self.progress_phase,
+            checkpoint_stems=self.checkpoint_stems,
             state=state,
             activity="handoff",
             last_completed=dict(self.last_completed_case) or None,

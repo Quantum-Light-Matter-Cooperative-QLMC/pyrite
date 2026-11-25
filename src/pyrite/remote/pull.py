@@ -224,6 +224,21 @@ def resolve_profile_stems(material, catalog_profile):
     ]
 
 
+def resolve_reported_stems(stems):
+    """Check the exact stems reported by the running scan, without catalog guessing."""
+    if not stems:
+        return [], []
+    written, unwritten = set(), set()
+    allowed = set(stems)
+    for line in transport._ssh_capture(
+        scripts._written_stems_command(sorted(allowed))
+    ).splitlines():
+        kind, _, stem = line.strip().partition(" ")
+        if stem in allowed and kind in {"written", "unwritten"}:
+            (written if kind == "written" else unwritten).add(stem)
+    return sorted(written), sorted(unwritten)
+
+
 def resolve_job_stems(jobid, materials):
     """Resolve the written checkpoint stems a live job reserved for ``materials``.
 

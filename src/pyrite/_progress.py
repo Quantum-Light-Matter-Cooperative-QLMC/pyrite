@@ -94,11 +94,16 @@ class _ProgressTimer:
 
 
 def _electron_progress_fields(activity):
-    """Copy a complete electron-progress pair, omitting partial updates."""
+    """Copy complete electron progress and optional adaptive decision telemetry."""
     keys = ("transport_electrons_done", "transport_electrons_total")
-    if all(activity.get(key) is not None for key in keys):
-        return {key: activity[key] for key in keys}
-    return {}
+    fields = (
+        {key: activity[key] for key in keys}
+        if all(activity.get(key) is not None for key in keys)
+        else {}
+    )
+    if activity.get("adaptive_progress"):
+        fields["adaptive_progress"] = activity["adaptive_progress"]
+    return fields
 
 
 def _write_progress_record(
@@ -123,6 +128,8 @@ def _write_progress_record(
     sample_new_cost=None,
     transport_electrons_done=None,
     transport_electrons_total=None,
+    adaptive_progress=None,
+    checkpoint_stems=None,
 ):
     """Atomically replace one scan's compact JSON progress record.
 
@@ -175,6 +182,10 @@ def _write_progress_record(
     if transport_electrons_done is not None and transport_electrons_total is not None:
         record["transport_electrons_done"] = transport_electrons_done
         record["transport_electrons_total"] = transport_electrons_total
+    if adaptive_progress:
+        record["adaptive_progress"] = adaptive_progress
+    if checkpoint_stems is not None:
+        record["checkpoint_stems"] = checkpoint_stems
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps(record, separators=(",", ":")) + "\n", encoding="utf-8")
     os.replace(tmp, path)

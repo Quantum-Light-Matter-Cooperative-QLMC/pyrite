@@ -416,14 +416,17 @@ def _pull_attached_progress(jobid, sections):
     if fields.get("cpu_only") == "True":
         raise SystemExit("CPU-only profiling has no primary checkpoints to pull")
     records = presentation.parse_progress_records(sections.get("PROGRESS", ""))
-    materials = list(
-        dict.fromkeys(
-            record["material"] for record in records.values() if record.get("phase") != "cpu"
-        )
-    )
+    primary = [record for record in records.values() if record.get("phase") != "cpu"]
+    materials = list(dict.fromkeys(record["material"] for record in primary))
     if not materials:
         raise SystemExit("no partial checkpoints have reported progress yet")
-    stems, unwritten = lifecycle.resolve_job_stems(jobid, materials)
+    reported = sorted({stem for record in primary for stem in record.get("checkpoint_stems", [])})
+    legacy = [record["material"] for record in primary if "checkpoint_stems" not in record]
+    stems, unwritten = lifecycle.resolve_reported_stems(reported) if reported else ([], [])
+    if legacy:
+        old_stems, old_unwritten = lifecycle.resolve_job_stems(jobid, legacy)
+        stems = sorted(set(stems + old_stems))
+        unwritten = sorted(set(unwritten + old_unwritten) - set(stems))
     if not stems:
         pending = f" (reserved but not yet written: {', '.join(unwritten)})" if unwritten else ""
         raise SystemExit(
@@ -432,7 +435,7 @@ def _pull_attached_progress(jobid, sections):
         )
     if unwritten:
         print(f"\nnot yet written, skipped: {', '.join(unwritten)}")
-    lifecycle.pull(stems, no_sync=True)
+    lifecycle.pull(stems, no_sync=True, _expand_surveys=False)
     print(f"\nPARTIAL PULL COMPLETE · job {jobid} · {len(stems)} checkpoint(s)")
 
 

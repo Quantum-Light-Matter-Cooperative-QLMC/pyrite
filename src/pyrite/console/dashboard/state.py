@@ -201,9 +201,41 @@ def parse_progress_records(payload):
         _sanitize_cost_fields(record)
         _sanitize_timing_fields(record)
         _sanitize_electron_fields(record)
+        _sanitize_adaptive_fields(record)
+        _sanitize_checkpoint_stems(record)
         key = material if phase in (None, "primary") else f"{material}:cpu"
         records[key] = record
     return records
+
+
+def _sanitize_adaptive_fields(record):
+    from ..._adaptive_progress import clean_adaptive_progress
+
+    data = clean_adaptive_progress(record.get("adaptive_progress"))
+    if data:
+        record["adaptive_progress"] = data
+    else:
+        record.pop("adaptive_progress", None)
+
+
+def _sanitize_checkpoint_stems(record):
+    stems = record.get("checkpoint_stems")
+    if not isinstance(stems, list):
+        record.pop("checkpoint_stems", None)
+        return
+    material = record["material"]
+    record["checkpoint_stems"] = sorted(
+        {
+            stem
+            for stem in stems
+            if isinstance(stem, str)
+            and SHELL_TOKEN_RE.fullmatch(stem)
+            and (
+                stem == material
+                or stem.startswith((material + "@", material + "--", material + "_quick"))
+            )
+        }
+    )
 
 
 def _sanitize_cost_fields(record):

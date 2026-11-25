@@ -428,8 +428,10 @@ def transport_monitored_blocks(
 
     Validation: adaptive-sample-size-stopping
     """
+    from . import _TRANSPORT_PROGRESS
     from .host_admission import AdaptiveHostAdmission
 
+    report = getattr(_TRANSPORT_PROGRESS.get(), "adaptive", None)
     admission = AdaptiveHostAdmission(limit, stream=stream_route and consume is None)
     blocks: list[dict[str, Any]] = []
 
@@ -446,7 +448,8 @@ def transport_monitored_blocks(
     counts: dict[str, Any] = dict.fromkeys(_ADDITIVE_COUNTS, 0)
     start = 0
     while start < limit:
-        stop = plan.next_stop(start, monitor.next_point(), limit)
+        point = monitor.next_point()
+        stop = plan.next_stop(start, point, limit)
         if consume is None:
             admission.check(blocks, start)
         block = simulate(start, stop)
@@ -470,6 +473,8 @@ def transport_monitored_blocks(
             admission.check([*blocks, block], stop)
             blocks.append(block)
         del block
+        if report is not None and (start == 0 or stopped or point != monitor.next_point()):
+            report(monitor, plan, start, stop, limit, force=stopped or start == 0)
         start = stop
         if stopped:
             break

@@ -542,6 +542,90 @@ def _format_case_progress(records, materials=()):
     return "\n".join(lines)
 
 
+def _format_adaptive_progress(records, detail):
+    """Latest folded estimates; never label unmeasured histories as samples."""
+    lines = []
+    for record in records.values():
+        data = record.get("adaptive_progress")
+        if (
+            not data
+            or record["state"] != "running"
+            or record.get("activity") not in {"computing", "spectrum"}
+        ):
+            continue
+        label = _material_label(record["material"])
+        if record.get("phase") == "cpu":
+            label += " [CPU]"
+        lines.append(f"  {label} · latest stopping check")
+        for name, row in data["populations"].items():
+
+            def value(key, fmt=".3g", *, row=row):
+                number = row.get(key)
+                return "—" if number is None else format(number, fmt)
+
+            passes = row.get("passes", {})
+            failed = ", ".join(key for key, passed in passes.items() if not passed)
+            status = row.get("stop_reason") or ("waiting: " + failed if failed else "checking")
+            lines.append(
+                f"    {name.upper():<4} n {value('n_electrons', ',.0f')} · "
+                f"RSE {value('relative_se', '.3%')} / {value('target_rse', '.3%')} · "
+                f"VOV {value('variance_of_variance', '.3%')} · "
+                f"ESS {value('effective_sample_size', ',.0f')} · "
+                f"max share {value('max_electron_share', '.3%')} · "
+                f"stability {value('stability', '.3g')} / {value('stability_limit', '.3g')}"
+            )
+            lines.append(f"         {status}")
+            if detail >= 2:
+                lines.append(
+                    f"         min/max {value('min_electrons', ',.0f')}/{value('max_electrons', ',.0f')} · "
+                    f"next {value('next_point', ',.0f')} · pilot projection {value('projected_electrons', ',.0f')} · "
+                    f"checks {value('checks', ',.0f')}"
+                )
+                lines.append(
+                    f"         VOV guard {value('max_variance_of_variance', '.3%')} · "
+                    f"ESS min {value('min_effective_histories', ',.0f')} · "
+                    f"share cap {value('max_history_share', '.3%')} · "
+                    f"CV {value('coefficient_of_variation', '.3g')} · "
+                    f"VOV slope {value('vov_trend_slope')} · tail slope {value('tail_slope')} · "
+                    f"shift/SE {value('shift_over_se')} · FOM {value('figure_of_merit')}"
+                )
+        if detail >= 2:
+            fields = (
+                ("block_histories", "last block"),
+                ("chunk_floor", "chunk floor"),
+                ("chunk_budget_mib", "chunk budget MiB"),
+                ("rows_per_electron", "max rows/history"),
+                ("decision_growth", "decision growth"),
+                ("stability_checks", "stability checks"),
+                ("stability_fraction", "stability fraction"),
+            )
+            plan = " · ".join(f"{label} {data[key]:.5g}" for key, label in fields if key in data)
+            if plan:
+                lines.append(f"    {plan}")
+    return "\n".join(lines)
+
+
+def _format_case_numerics(records):
+    lines = []
+    for record in records.values():
+        current = record.get("current")
+        if record["state"] != "running" or not isinstance(current, dict):
+            continue
+        fields = []
+        for key, label in (
+            ("spec_chunk", "CXR chunk"),
+            ("brem_chunk", "brem chunk"),
+            ("line_grid_bins", "line bins"),
+            ("brem_grid_bins", "brem bins"),
+        ):
+            value = current.get(key)
+            if type(value) is int and 0 <= value < 10**18:
+                fields.append(f"{label} {value:,}")
+        if fields:
+            lines.append(f"  {_material_label(record['material'])} · " + " · ".join(fields))
+    return "\n".join(lines)
+
+
 def _format_compute_usage(payload):
     """Render optional host/GPU utilization sampled by the remote status probe."""
     fields = scheduler_fields(payload)
@@ -894,6 +978,10 @@ def _status_detail_sections(sections, context, detail):
         if not records and detail >= 2:
             progress = _legacy_progress(sections.get("LOG", ""), context["state_text"]) or progress
         output.extend(["", "CASE PROGRESS", progress])
+        if detail >= 1 and (adaptive := _format_adaptive_progress(records, detail)):
+            output.extend(["", "ADAPTIVE STOPPING", adaptive])
+        if detail >= 2 and (numerics := _format_case_numerics(records)):
+            output.extend(["", "CASE NUMERICS (runtime plan)", numerics])
         performance = _format_performance_profiles(sections.get("PERFORMANCE", ""))
         if performance is not None:
             output.extend(["", "PERFORMANCE PROFILE", performance])

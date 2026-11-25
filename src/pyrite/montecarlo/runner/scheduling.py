@@ -201,6 +201,8 @@ class _TransportProgress:
         self._show_bar = show_bar
         self._report = report
         self._interval = interval
+        self.adaptive_progress = {}
+        self._last_adaptive_report = None
         self._bar = None
         self._done = 0
         self._total = None
@@ -238,6 +240,23 @@ class _TransportProgress:
     def boundary(self, done, total):
         """Report a completed block even when its last batch was throttled."""
         self(done, total, force=True)
+
+    def adaptive(self, monitor, plan, start, stop, total, *, force=False):
+        """Publish folded stopping estimates, rate limited independently of transport."""
+        if self._report is None:
+            return
+        now = perf_counter()
+        if (
+            not force
+            and self._last_adaptive_report is not None
+            and now - self._last_adaptive_report < self._interval
+        ):
+            return
+        from ..._adaptive_progress import adaptive_snapshot
+
+        self.adaptive_progress = adaptive_snapshot(monitor, plan, stop - start)
+        self._last_adaptive_report = now
+        self.boundary(stop, total)
 
     def finish_transport(self, done, total):
         """Publish the realized population before population-wide spectrum work."""
@@ -674,6 +693,9 @@ class _CaseRun:
             yield
             return
 
+        def _adaptive_fields():
+            return {"adaptive_progress": sink.adaptive_progress} if sink.adaptive_progress else {}
+
         def _report(done, total):
             self.activity(
                 "serial_case",
@@ -681,6 +703,7 @@ class _CaseRun:
                 in_flight_case_count=1,
                 transport_electrons_done=done,
                 transport_electrons_total=total,
+                **_adaptive_fields(),
             )
 
         sink = _TransportProgress(
@@ -688,7 +711,7 @@ class _CaseRun:
             _report if self.on_activity is not None else None,
             on_complete=None
             if self.transport_only
-            else lambda: self.activity("spectrum", i, in_flight_case_count=1),
+            else lambda: self.activity("spectrum", i, in_flight_case_count=1, **_adaptive_fields()),
         )
         token = _TRANSPORT_PROGRESS.set(sink)
         try:

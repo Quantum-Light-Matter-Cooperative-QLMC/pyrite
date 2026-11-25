@@ -67,11 +67,23 @@ def _release_job_reservations_command(jobid: str) -> str:
     )
 
 
+def _written_stems_command(stems: list[str]) -> str:
+    """Probe published checkpoint indexes, not empty/shared CAS directories."""
+    transport._check_shell_tokens(stems)
+    words = " ".join(config.shell_word(stem) for stem in stems)
+    return (
+        f"C={config.shell_word(config.remote_output_path('checkpoints'))}; "
+        f"for s in {words}; do "
+        'if [ -f "$C/$s/line.h5" ] || [ -f "$C/$s.pkl" ]; '
+        'then echo "written $s"; else echo "unwritten $s"; fi; done'
+    )
+
+
 def _job_reserved_stems_command(jobid: str) -> str:
     """Return a remote command listing the checkpoint stems a job reserved.
 
     One ``written <stem>`` / ``unwritten <stem>`` line per reservation owned by
-    ``jobid``; ``written`` means ``checkpoints/<stem>`` exists on the box. The
+    ``jobid``; ``written`` means a checkpoint index exists on the box. The
     reservation set is the run's own submit-time identity list, so it is
     independent of the catalog the caller has selected locally.
     """
@@ -82,7 +94,8 @@ def _job_reserved_stems_command(jobid: str) -> str:
         'for d in "$R"/*; do [ -d "$d" ] || continue; '
         '[ "$(cat "$d/jobid" 2>/dev/null)" = "$J" ] || continue; '
         's=$(basename "$d"); '
-        'if [ -e "$C/$s" ]; then echo "written $s"; else echo "unwritten $s"; fi; done'
+        'if [ -f "$C/$s/line.h5" ] || [ -f "$C/$s.pkl" ]; '
+        'then echo "written $s"; else echo "unwritten $s"; fi; done'
     )
 
 
