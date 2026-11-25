@@ -91,7 +91,7 @@ def _store_multi_azim(wide_brem=False):
 
 
 def _labels(fig):
-    return {trace.customdata[0][0] for trace in fig.data}
+    return {trace.meta["label"] for trace in fig.data}
 
 
 def _components(fig):
@@ -145,7 +145,7 @@ def test_compare_frame_carries_every_hue_field():
 def test_compare_chart_broadband_uses_wide_brem_tail(store, hue, values):
     fig = compare_spectrum_chart(store(wide_brem=True), _settings(), hue=hue, band="broad")
     totals = [t for t in fig.data if t.name.endswith("· total")]
-    assert {t.customdata[0][0] for t in totals if max(t.x) > 5000.0} == values
+    assert {t.meta["label"] for t in totals if max(t.x) > 5000.0} == values
     assert max(max(t.x) for t in fig.data) == 30000.0
 
 
@@ -348,7 +348,7 @@ def test_multi_case_chart_broadband_wide_brem_tail():
     ]
     fig = multi_case_spectrum_chart(cases, _settings(), band="broad")
     totals = [t for t in fig.data if t.name.endswith("· total") and max(t.x) > 5000.0]
-    assert {t.customdata[0][0] for t in totals} == {"HOPG - 30 keV broad", "HOPG - 40 deg broad"}
+    assert {t.meta["label"] for t in totals} == {"HOPG - 30 keV broad", "HOPG - 40 deg broad"}
     assert max(max(t.x) for t in fig.data) == 30000.0
 
 

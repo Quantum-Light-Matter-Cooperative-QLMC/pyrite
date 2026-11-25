@@ -5,7 +5,7 @@ from pathlib import Path
 
 import plotly.graph_objects as go
 
-from pyrite.apps.analysis_ui.axes import resolve_axis_spec
+from pyrite.apps.analysis_ui.axes import resolve_axis_pair, resolve_axis_spec
 from pyrite.apps.analysis_ui.controls import (
     axes_panel,
     make_case_axes,
@@ -353,6 +353,10 @@ def test_axis_controls_have_four_scale_toggles_and_no_domains() -> None:
         def dictionary(elements):
             return elements
 
+        @staticmethod
+        def dropdown(options, *, value, label):
+            return options[value]
+
     class FakeMo:
         ui = FakeUI()
 
@@ -360,8 +364,11 @@ def test_axis_controls_have_four_scale_toggles_and_no_domains() -> None:
         FakeMo(),
         broad_xlog=True,
     )
-    assert set(axes) == {"narrow", "broad"}
-    assert all(set(band) == {"xlog", "ylog"} for band in axes.values())
+    assert set(axes) == {"narrow", "broad", "resolution"}
+    assert all(set(axes[band]) == {"xlog", "ylog"} for band in ("narrow", "broad"))
+    # Display-only plotting resolution (#1440) defaults to the standard preset.
+    assert axes["resolution"] == "standard"
+    assert resolve_axis_pair(axes).resolution == "standard"
     assert resolve_axis_spec(axes["broad"]).x_type == "log"
     assert resolve_axis_spec(axes["narrow"]).y_type == "linear"
 

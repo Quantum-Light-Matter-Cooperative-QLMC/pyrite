@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from ..results import records
-from ._spectrum_frames import _peak_preserving_indices
+from ._decimation import _peak_preserving_indices
 
 _COMPONENTS = (
     ("temporal_intensity", "incoherent"),

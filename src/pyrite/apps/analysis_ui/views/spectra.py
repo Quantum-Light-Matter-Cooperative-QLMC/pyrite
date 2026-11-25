@@ -1,12 +1,16 @@
 """Spectra view: one dimension varies across curves, the sidebar slice pins the rest."""
 
-from pyrite.plots.plotly.spectra import compare_spectrum_chart
+from dataclasses import dataclass, field
+from typing import Any
+
+from pyrite.plots.plotly.spectra import prepare_compare_spectra, render_prepared_spectra
 from pyrite.plots.plotly.temporal import temporal_chart
 from pyrite.results import records, select_results, sweep_values
 
 from ..controls import axes_panel
 from ..data import slice_results
 from ..models import DimensionComparisonSpec
+from ..zoom import zoomable_chart
 from .common import themed_chart
 
 SPECTRA_SPECS = {
@@ -75,51 +79,37 @@ def _fallback_note(mo, selected):
     )
 
 
-def render_spectra(
-    mo,
-    *,
-    context,
-    slice_values,
-    spec,
-    vary_ui,
-    varying_ui,
-    components,
-    axes_controls,
-    axes,
-    theme,
-):
-    """The Spectra view: vary radio, curve picker, components, two bands."""
+_BANDS = (("narrow", "Narrowband"), ("broad", "Broadband"))
+
+
+@dataclass(frozen=True)
+class SpectraPreparation:
+    """Native spectra for the current slice, rebuilt only when it changes.
+
+    Zooming re-renders from ``prepared`` without touching records (#1442).
+    ``blocked`` holds the message shown instead of charts, if any.
+    """
+
+    notes: tuple[str, ...] = ()
+    blocked: str | None = None
+    selected: Any = None
+    prepared: dict = field(default_factory=dict)
+
+
+def prepare_spectra(*, context, slice_values, spec, varying_values, component_values):
+    """Select the slice and build each band's native frame once."""
     results = context.results
-    component_values = set(components.value)
-    from ..radiation import radiation_panel
-
-    parts = [
-        mo.hstack([vary_ui, varying_ui], align="end", widths=[1, 1]),
-        mo.md(spec.description),
-        components,
-        radiation_panel(mo, list(records(results))),
-        axes_panel(mo, axes_controls),
-    ]
-
     available = sweep_values(results).get(spec.varying_key, []) if records(results) else []
-    if len(available) <= 1:
-        parts.append(mo.md(f"*Only one {spec.varying_label} in this checkpoint.*"))
+    notes = (f"*Only one {spec.varying_label} in this checkpoint.*",) if len(available) <= 1 else ()
     if not component_values:
-        parts.append(mo.md("*Select at least one component above to plot.*"))
-        return mo.vstack(parts)
-    varying_values = list(varying_ui.value or [])
+        return SpectraPreparation(notes, "*Select at least one component above to plot.*")
     if not varying_values:
-        parts.append(mo.md(f"*Select at least one {spec.varying_label} above to plot.*"))
-        return mo.vstack(parts)
-
-    selected = spectra_selection(results, slice_values, spec, varying_values)
-    note = _fallback_note(mo, selected)
-    if note is not None:
-        parts.append(note)
-
-    for band, heading in (("narrow", "Narrowband"), ("broad", "Broadband")):
-        band_axes = getattr(axes, band)
-        chart = compare_spectrum_chart(
+        return SpectraPreparation(
+            notes, f"*Select at least one {spec.varying_label} above to plot.*"
+        )
+    selected = spectra_selection(results, slice_values, spec, list(varying_values))
+    prepared = {
+        band: prepare_compare_spectra(
             selected,
             context.settings,
             hue=spec.varying_key,
@@ -130,12 +120,71 @@ def render_spectra(
             include_transition="TR/CTR" in component_values,
             include_coherent=context.show_both_emissions,
             sum_components=True,
-            max_points=2500 if context.show_both_emissions else 5000,
-            x_type=band_axes.x_type,
-            y_type=band_axes.y_type,
             band=band,
         )
+        for band, _heading in _BANDS
+    }
+    return SpectraPreparation(notes, None, selected, prepared)
+
+
+def _band_chart(mo, figure, *, band, x_type, zoom):
+    if figure is None or zoom is None or band not in zoom:
+        return figure
+    get_viewport, set_viewport = zoom[band]
+    return zoomable_chart(
+        mo, figure, x_type=x_type, get_viewport=get_viewport, set_viewport=set_viewport
+    )
+
+
+def render_spectra(
+    mo,
+    *,
+    context,
+    prep,
+    spec,
+    vary_ui,
+    varying_ui,
+    components,
+    axes_controls,
+    axes,
+    theme,
+    zoom=None,
+):
+    """The Spectra view: vary radio, curve picker, components, two bands.
+
+    ``zoom`` maps each band to its ``(get_viewport, set_viewport)`` marimo
+    state; a zoom re-samples that band from ``prep`` at the chosen resolution.
+    """
+    from ..radiation import radiation_panel
+
+    parts = [
+        mo.hstack([vary_ui, varying_ui], align="end", widths=[1, 1]),
+        mo.md(spec.description),
+        components,
+        radiation_panel(mo, list(records(context.results))),
+        axes_panel(mo, axes_controls),
+        *(mo.md(note) for note in prep.notes),
+    ]
+    if prep.blocked is not None:
+        parts.append(mo.md(prep.blocked))
+        return mo.vstack(parts)
+
+    note = _fallback_note(mo, prep.selected)
+    if note is not None:
+        parts.append(note)
+
+    for band, heading in _BANDS:
+        band_axes = getattr(axes, band)
+        viewport = zoom[band][0]() if zoom and band in zoom else None
+        chart = render_prepared_spectra(
+            prep.prepared.get(band),
+            resolution=axes.resolution,
+            viewport=viewport,
+            x_type=band_axes.x_type,
+            y_type=band_axes.y_type,
+        )
         chart = context.title_for_face(themed_chart(chart, theme))
+        chart = _band_chart(mo, chart, band=band, x_type=band_axes.x_type, zoom=zoom)
         parts.extend(
             [
                 mo.md(f"**{heading}**"),
@@ -145,7 +194,7 @@ def render_spectra(
             ]
         )
     # Opt-in line I(t) (#292): shown only when the checkpoint stored it.
-    temporal = temporal_chart(selected, hue=spec.varying_key)
+    temporal = temporal_chart(prep.selected, hue=spec.varying_key)
     if temporal is not None:
         parts.extend(
             [

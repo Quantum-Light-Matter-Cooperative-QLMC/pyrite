@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 
 from pyrite._util.formatting import fmt_thickness
+from pyrite.plots._decimation import DEFAULT_PLOT_RESOLUTION, PLOT_RESOLUTIONS
 from pyrite.plots._frames import _HEATMAP_QUANTITIES
 from pyrite.results import records, sweep_values, thicknesses_by_energy
 
@@ -66,7 +67,17 @@ def make_spectrum_axes(
                 xlog=broad_xlog,
                 ylog=broad_ylog,
             ),
+            "resolution": make_resolution_control(mo),
         }
+    )
+
+
+def make_resolution_control(mo):
+    """Display-only plotting resolution (#1440): no rerun, arrays untouched."""
+    return mo.ui.dropdown(
+        {name.capitalize(): name for name in PLOT_RESOLUTIONS},
+        value=DEFAULT_PLOT_RESOLUTION.capitalize(),
+        label="Plot resolution",
     )
 
 
@@ -75,15 +86,10 @@ def axis_row(mo, axis_controls):
 
 
 def axes_panel(mo, axes):
-    return mo.hstack(
-        [
-            axis_row(mo, axes["narrow"]),
-            axis_row(mo, axes["broad"]),
-        ],
-        gap=2,
-        align="center",
-        widths=[1, 1],
-    )
+    rows = [axis_row(mo, axes["narrow"]), axis_row(mo, axes["broad"])]
+    if "resolution" in axes:
+        rows.append(axes["resolution"])
+    return mo.hstack(rows, gap=2, align="center", widths=[1] * len(rows))
 
 
 SLICE_KEYS = {

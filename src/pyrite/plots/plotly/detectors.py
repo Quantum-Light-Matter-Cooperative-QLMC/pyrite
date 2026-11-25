@@ -14,6 +14,7 @@ from plotly.colors import qualitative
 
 from ...detectors import eaglexo_response as eag
 from .._common import SI_K_EDGE_EV, _thr_keV
+from .._decimation import DEFAULT_PLOT_RESOLUTION
 from .._detector_frames import (
     _INTENSITY_TITLE,
     _chart_frame,
@@ -23,6 +24,7 @@ from .._detector_frames import (
     timepix_detected_frame,
 )
 from .._spectrum_frames import _tilt_records, _windowed_frame
+from .spectra import _sampling_note
 
 _MAX_ROWS = 5000
 _COLORS = qualitative.Plotly
@@ -71,9 +73,16 @@ def _ranges(frame, field, *, x_type, y_type, x_domain, y_domain):
     return xr, yr
 
 
-def _prepare(frame, field, *, x_type, y_type, x_domain, y_domain):
-    # Limit serialized rows, not model evaluation; weak-response peaks preserved.
-    frame = _chart_frame(frame, value_column=field, max_rows=_MAX_ROWS)
+def _prepare(frame, field, *, x_type, y_type, x_domain, y_domain, resolution):
+    # Limit serialized rows, not model evaluation; weak-response lineshapes preserved.
+    frame = _chart_frame(
+        frame,
+        value_column=field,
+        max_rows=_MAX_ROWS,
+        resolution=resolution,
+        x_window=x_domain,
+        log_x=x_type == "log",
+    )
     xr, yr = _ranges(
         frame,
         field,
@@ -98,6 +107,7 @@ def _draw_curves(
     width,
     height,
     detected=False,
+    resolution=DEFAULT_PLOT_RESOLUTION,
 ):
     df, xr, yr = _prepare(
         frame,
@@ -106,6 +116,7 @@ def _draw_curves(
         y_type=y_type,
         x_domain=x_domain,
         y_domain=y_domain,
+        resolution=resolution,
     )
     fig = go.Figure()
     # The legend is keyed by beam energy; all line/brem and
@@ -145,8 +156,10 @@ def _draw_curves(
                 )
             )
             shown = True
+    note, _decimated = _sampling_note(df, "E0_keV")
     fig.update_layout(
-        title=title,
+        title=dict(text=title, subtitle=dict(text=note) if note else None),
+        meta={"display_points": df.attrs.get("display_points")},
         width=width,
         height=height,
         xaxis=dict(title="Photon energy (eV)", type=x_type, range=xr),
@@ -184,6 +197,7 @@ def timepix_detected_chart(
     x_type="linear",
     y_type="log",
     band="broad",
+    resolution=DEFAULT_PLOT_RESOLUTION,
     width=720,
     height=360,
 ):
@@ -212,6 +226,7 @@ def timepix_detected_chart(
         y_type=y_type,
         x_domain=x_domain,
         y_domain=y_domain,
+        resolution=resolution,
         width=width,
         height=height,
         detected=True,
@@ -234,6 +249,7 @@ def eaglexo_detected_chart(
     x_type="log",
     y_type="log",
     band="broad",
+    resolution=DEFAULT_PLOT_RESOLUTION,
     width=720,
     height=360,
 ):
@@ -261,6 +277,7 @@ def eaglexo_detected_chart(
         y_type=y_type,
         x_domain=x_domain,
         y_domain=y_domain,
+        resolution=resolution,
         width=width,
         height=height,
         detected=True,
@@ -307,6 +324,7 @@ def eaglexo_charge_chart(
     x_type="log",
     y_type="log",
     band="broad",
+    resolution=DEFAULT_PLOT_RESOLUTION,
     width=720,
     height=360,
 ):
@@ -332,6 +350,7 @@ def eaglexo_charge_chart(
         y_type=y_type,
         x_domain=x_domain,
         y_domain=y_domain,
+        resolution=resolution,
         width=width,
         height=height,
     )

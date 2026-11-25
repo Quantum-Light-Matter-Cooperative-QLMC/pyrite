@@ -9,7 +9,7 @@ does not pull them into the analysis app.
 from .detectors import render_detectors
 from .map import render_map, render_map_trends, render_rankings
 from .sidebar import render_sidebar
-from .spectra import SPECTRA_SPECS, render_spectra
+from .spectra import SPECTRA_SPECS, prepare_spectra, render_spectra
 
 __all__ = [
     "SPECTRA_SPECS",
@@ -18,5 +18,6 @@ __all__ = [
     "render_map_trends",
     "render_rankings",
     "render_sidebar",
+    "prepare_spectra",
     "render_spectra",
 ]

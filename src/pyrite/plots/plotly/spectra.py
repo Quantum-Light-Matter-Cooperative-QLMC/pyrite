@@ -8,7 +8,10 @@ wide bremsstrahlung tails and peak-aware sampling remain shared.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 from plotly.colors import qualitative
 
@@ -16,9 +19,11 @@ _COLORS = qualitative.Plotly
 
 from ...results import records
 from .._common import _COMPARISON_SELECTION_TITLES, _case_title, _comparison_drop_message
+from .._decimation import DEFAULT_PLOT_RESOLUTION, resolve_plot_resolution
 from .._spectrum_frames import (
     _COMPARE_HUE_FIELDS,
     _compare_frame,
+    _decimate_frame,
     _multi_case_frame,
     _narrow_line_domain,
     _tilt_records,
@@ -76,6 +81,73 @@ def _y_range(frame, *, y_type, x_domain=None, automatic_x_domain=True):
     return None
 
 
+def _display_sampling(resolution, max_points, domain, x_type):
+    """Frame-builder kwargs: budget, visible window and display-space buckets."""
+    return {
+        "resolution": resolve_plot_resolution(resolution, max_points=max_points),
+        "x_window": domain,
+        "log_x": _axis_type(x_type) == "log",
+    }
+
+
+def _positive_viewport(frame, viewport):
+    """A zoom range usable on a log axis, or ``None`` (default domain).
+
+    A range stored on a linear axis may reach zero or below; switching to log
+    clamps its lower bound to the smallest positive stored energy.
+    """
+    low, high = viewport
+    energy = frame["energy_eV"].to_numpy(dtype=float)
+    positive = energy[energy > 0]
+    if high is None or high <= 0 or not positive.size:
+        return None
+    if low is None or low <= 0:
+        low = float(positive.min())
+    return (low, high) if low < high else None
+
+
+def _native_points(df, hue):
+    """``{hue value: (native, displayed)}`` from the frame's decimation record."""
+    record = df.attrs.get("display_points") or {}
+    totals: dict = {}
+    for entry in record.get("traces", ()):
+        label = entry.get(hue)
+        native, displayed = totals.get(label, (0, 0))
+        totals[label] = (native + entry["native"], displayed + entry["displayed"])
+    return totals
+
+
+def _sampling_note(df, hue):
+    """Figure subtitle stating native vs displayed coordinates (#1440).
+
+    Exports of the figure (PNG/SVG download, ``write_image``) carry this note,
+    so a decimated export always says so.
+    """
+    record = df.attrs.get("display_points")
+    if not record:
+        return None, False
+    # Per decimated trace, never summed: one hue value may span several
+    # traces (azimuths, detector line/brem bands).
+    counts = [(entry["native"], entry["displayed"]) for entry in record.get("traces", ())]
+    if not counts:
+        return None, False
+    native = [n for n, _ in counts]
+    shown = [d for _, d in counts]
+    decimated = any(d < n for n, d in counts)
+
+    def _span(values):
+        low, high = min(values), max(values)
+        return f"{low:,}" if low == high else f"{low:,}–{high:,}"
+
+    if not decimated:
+        return f"Display: every native point ({_span(native)} per trace)", False
+    return (
+        f"Display ({record['resolution']}): {_span(shown)} of {_span(native)} native points "
+        "per trace · min/max decimated, not interpolated",
+        True,
+    )
+
+
 def _trace_series(df, *, hue, components, width, height, title, x_type, y_type, x_domain):
     """Build bounded Plotly traces without converting long frames to JSON records."""
     if df.empty:
@@ -87,6 +159,8 @@ def _trace_series(df, *, hue, components, width, height, title, x_type, y_type, 
         y_type = "linear"
         title += " · signed values: linear y"
     fig = go.Figure()
+    note, _decimated = _sampling_note(df, hue)
+    counts = _native_points(df, hue)
     labels = list(dict.fromkeys(df[hue].tolist()))
     # Numeric cases get stable, human-meaningful sorting, not lexical sorting.
     if all(isinstance(x, (int, float, np.integer, np.floating)) for x in labels):
@@ -105,6 +179,12 @@ def _trace_series(df, *, hue, components, width, height, title, x_type, y_type, 
             plot_y = np.where(np.isfinite(ys) & (ys > 0), ys, np.nan) if y_type == "log" else ys
             dash, thickness = _STYLES[component]
             trace_type = go.Scattergl if xs.size > _WEBGL_MIN_POINTS else go.Scatter
+            native = counts.get(label, (xs.size, xs.size))[0]
+            line = dict(color=color, width=thickness, dash=dash)
+            if trace_type is go.Scatter:
+                # Plotly's SVG path simplification drops near-collinear nodes;
+                # every selected coordinate must be drawn, as the note states.
+                line["simplify"] = False
             fig.add_trace(
                 trace_type(
                     x=xs,
@@ -112,11 +192,18 @@ def _trace_series(df, *, hue, components, width, height, title, x_type, y_type, 
                     mode="lines",
                     name=f"{label} · {component}" if len(components) > 1 else str(label),
                     legendgroup=str(idx),
-                    line=dict(color=color, width=thickness, dash=dash),
-                    customdata=np.full((xs.size, 1), str(label), dtype=object),
+                    line=line,
+                    # Trace-level label (not per-point customdata): an object
+                    # array per coordinate dominated build time and payload.
+                    meta={
+                        "label": str(label),
+                        "native_points": int(native),
+                        "displayed_points": int(xs.size),
+                    },
                     hovertemplate=(
-                        f"{hue}: %{{customdata[0]}}<br>component: {component}"
+                        f"{hue}: %{{meta.label}}<br>component: {component}"
                         "<br>Energy: %{x:.6g} eV<br>Intensity: %{y:.6g} Phs/s/eV/uA"
+                        f"<br>display: {xs.size:,} of {int(native):,} native points"
                         "<extra></extra>"
                     ),
                 )
@@ -124,7 +211,8 @@ def _trace_series(df, *, hue, components, width, height, title, x_type, y_type, 
     if not fig.data:
         return None
     fig.update_layout(
-        title=title,
+        title=dict(text=title, subtitle=dict(text=note) if note else None),
+        meta={"display_points": df.attrs.get("display_points")},
         width=width,
         height=height,
         hovermode="closest",
@@ -161,7 +249,8 @@ def spectrum_chart(
     x_type="linear",
     y_type="linear",
     band="narrow",
-    max_points=5000,
+    max_points=None,
+    resolution=DEFAULT_PLOT_RESOLUTION,
     width=720,
     height=360,
 ):
@@ -170,6 +259,7 @@ def spectrum_chart(
     recs = _tilt_records(results, tilt_deg)
     if not recs:
         return None
+    domain = _narrow_line_domain(recs, band, x_domain)
     frame = spectrum_frame(
         recs,
         settings,
@@ -181,7 +271,7 @@ def spectrum_chart(
         include_coherent=include_coherent,
         collapse_azimuth=collapse_azimuth,
         band=band,
-        max_points=max_points,
+        **_display_sampling(resolution, max_points, domain, x_type),
     )
     return _trace_series(
         frame,
@@ -195,7 +285,109 @@ def spectrum_chart(
         title=_case_title(recs[0]["case"], "response-free source", latex=False),
         x_type=x_type,
         y_type=y_type,
-        x_domain=_narrow_line_domain(recs, band, x_domain),
+        x_domain=domain,
+    )
+
+
+@dataclass(frozen=True)
+class PreparedSpectra:
+    """Native comparison spectra, prepared once and re-rendered per zoom (#1442).
+
+    ``frame`` is undecimated (it keeps the sampling helper columns); rendering
+    selects display nodes from it for a resolution and visible window, so a
+    zoom never rebuilds record DataFrames.
+    """
+
+    frame: pd.DataFrame
+    hue: str
+    components: tuple[str, ...]
+    title: str
+    domain: tuple | None
+
+
+def prepare_compare_spectra(
+    results,
+    settings,
+    *,
+    hue,
+    include_brem=True,
+    include_cxr=False,
+    include_characteristic=True,
+    include_channeling=True,
+    include_transition=True,
+    include_coherent=False,
+    sum_components=False,
+    x_domain=None,
+    band="narrow",
+):
+    """Native frame and chart metadata for :func:`render_prepared_spectra`."""
+    _validate_band(band)
+    if hue not in _COMPARE_HUE_FIELDS:
+        raise ValueError(f"hue must be one of {sorted(_COMPARE_HUE_FIELDS)}, got {hue!r}")
+    recs = records(results)
+    if not recs:
+        return None
+    frame = _compare_frame(
+        recs,
+        settings,
+        hue=hue,
+        include_brem=include_brem,
+        include_cxr=include_cxr,
+        include_characteristic=include_characteristic,
+        include_channeling=include_channeling,
+        include_transition=include_transition,
+        include_coherent=include_coherent,
+        sum_components=sum_components,
+        band=band,
+        decimate=False,
+    )
+    return PreparedSpectra(
+        frame=frame,
+        hue=hue,
+        components=("total",)
+        + (("brem",) if include_brem and not sum_components else ())
+        + (("line",) if include_cxr and not sum_components else ())
+        + (("coherent",) if include_coherent else ()),
+        title=_case_title(recs[0]["case"], "comparison", latex=False),
+        domain=_narrow_line_domain(recs, band, x_domain),
+    )
+
+
+def render_prepared_spectra(
+    prepared,
+    *,
+    resolution=DEFAULT_PLOT_RESOLUTION,
+    max_points=None,
+    viewport=None,
+    x_type="linear",
+    y_type="linear",
+    width=720,
+    height=360,
+):
+    """Plotly figure of ``prepared`` sampled for ``resolution`` and ``viewport``.
+
+    ``viewport`` (an ``(E_min, E_max)`` zoom range in eV) replaces the band's
+    default domain for both the axis range and the decimation window, so
+    zooming in restores native sampling.
+    """
+    if prepared is None:
+        return None
+    if viewport is not None and _axis_type(x_type) == "log":
+        viewport = _positive_viewport(prepared.frame, viewport)
+    domain = viewport if viewport is not None else prepared.domain
+    frame = _decimate_frame(
+        prepared.frame, **_display_sampling(resolution, max_points, domain, x_type)
+    )
+    return _trace_series(
+        frame,
+        hue=prepared.hue,
+        components=prepared.components,
+        width=width,
+        height=height,
+        title=prepared.title,
+        x_type=x_type,
+        y_type=y_type,
+        x_domain=domain,
     )
 
 
@@ -215,19 +407,14 @@ def compare_spectrum_chart(
     x_type="linear",
     y_type="linear",
     band="narrow",
-    max_points=5000,
+    max_points=None,
+    resolution=DEFAULT_PLOT_RESOLUTION,
     width=720,
     height=360,
 ):
     """Plot one spectrum per selected case-field value (supports sum_components)."""
-    _validate_band(band)
-    if hue not in _COMPARE_HUE_FIELDS:
-        raise ValueError(f"hue must be one of {sorted(_COMPARE_HUE_FIELDS)}, got {hue!r}")
-    recs = records(results)
-    if not recs:
-        return None
-    frame = _compare_frame(
-        recs,
+    prepared = prepare_compare_spectra(
+        results,
         settings,
         hue=hue,
         include_brem=include_brem,
@@ -237,22 +424,17 @@ def compare_spectrum_chart(
         include_transition=include_transition,
         include_coherent=include_coherent,
         sum_components=sum_components,
+        x_domain=x_domain,
         band=band,
-        max_points=max_points,
     )
-    return _trace_series(
-        frame,
-        hue=hue,
-        components=("total",)
-        + (("brem",) if include_brem and not sum_components else ())
-        + (("line",) if include_cxr and not sum_components else ())
-        + (("coherent",) if include_coherent else ()),
-        width=width,
-        height=height,
-        title=_case_title(recs[0]["case"], "comparison", latex=False),
+    return render_prepared_spectra(
+        prepared,
+        resolution=resolution,
+        max_points=max_points,
         x_type=x_type,
         y_type=y_type,
-        x_domain=_narrow_line_domain(recs, band, x_domain),
+        width=width,
+        height=height,
     )
 
 
@@ -271,7 +453,8 @@ def multi_case_spectrum_chart(
     x_type="linear",
     y_type="linear",
     band="narrow",
-    max_points=5000,
+    max_points=None,
+    resolution=DEFAULT_PLOT_RESOLUTION,
     width=720,
     height=360,
 ):
@@ -287,6 +470,7 @@ def multi_case_spectrum_chart(
         label = str(label)
         count[label] = count.get(label, 0) + 1
         distinct.append((record, label if count[label] == 1 else f"{label} (#{count[label]})"))
+    domain = _narrow_line_domain((r for r, _ in cases), band, x_domain)
     frame = _multi_case_frame(
         distinct,
         settings,
@@ -298,7 +482,7 @@ def multi_case_spectrum_chart(
         include_coherent=include_coherent,
         sum_components=sum_components,
         band=band,
-        max_points=max_points,
+        **_display_sampling(resolution, max_points, domain, x_type),
     )
     return _trace_series(
         frame,
@@ -312,7 +496,7 @@ def multi_case_spectrum_chart(
         title="Case comparison",
         x_type=x_type,
         y_type=y_type,
-        x_domain=_narrow_line_domain((r for r, _ in cases), band, x_domain),
+        x_domain=domain,
     )
 
 

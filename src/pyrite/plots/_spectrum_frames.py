@@ -12,9 +12,13 @@ from .._spectral_components import cxr_spectrum
 from ..results import records
 from ..results.store import _detected_background_wide
 from ._common import _best_azimuth, _cxr_brem
+from ._decimation import (
+    resolve_plot_resolution,
+    trace_budget,
+    trace_indices,
+)
 
 _FRAME_COLUMNS = ["energy_eV", "intensity", "E0_keV", "azimuth_deg", "component"]
-_TAIL_BUDGET_DIVISOR = 10
 _NA_PER_UA = 1000.0
 _COMPARE_HUE_FIELDS = {
     "E0_keV": "beam energy (keV)",
@@ -259,50 +263,29 @@ def _record_frame(
     return frames
 
 
-def _peak_preserving_indices(y, max_points):
-    y = np.asarray(y, dtype=float)
-    n = y.size
-    if max_points is None or n <= max_points:
-        return np.arange(n)
-    max_points = int(max_points)
-    if max_points <= 0:
-        return np.arange(n)
-    if max_points == 1:
-        return np.array([int(np.nanargmax(np.nan_to_num(y, nan=-np.inf)))])
-    if max_points == 2:
-        return np.array([0, n - 1])
+def _decimate_frame(df, max_points=None, *, resolution="full", x_window=None, log_x=False):
+    """Decimate logical traces for display without charging paired components twice.
 
-    keep = {0, n - 1}
-    for bucket in np.array_split(np.arange(1, n - 1), max_points - 2):
-        if bucket.size == 0:
-            continue
-        vals = np.nan_to_num(y[bucket], nan=-np.inf)
-        keep.add(int(bucket[int(np.argmax(vals))]))
-    return np.fromiter(sorted(keep), dtype=int)
-
-
-def _decimate_frame(df, max_points):
-    """Decimate logical traces without charging paired components twice.
-
-    The coherent-line grid owns the budget. When a wide background tail is
-    present, retain the complete line grid if it fits and spend the remainder
-    on the tail. Otherwise reserve ten percent for the tail and use the rest
-    for peak-preserving line sampling. Total/background components then reuse
-    identical selected coordinates.
+    ``resolution`` (preset name or :class:`PlotResolution`) and the legacy
+    ``max_points`` total budget set each trace's budget (:func:`trace_budget`).
+    The coherent-line grid owns that budget; a wide background tail keeps a
+    tenth, and an ``x_window`` focuses it on the visible energy range. Total
+    and background components reuse identical selected coordinates. The
+    result's ``attrs["display_points"]`` records native and displayed
+    coordinate counts per trace. Only indices are selected: no interpolation.
     """
-    if max_points is None or df.empty or len(df) <= max_points:
+    chosen = resolve_plot_resolution(resolution, max_points=max_points)
+    if df.empty:
         return df.drop(columns=["_line_intensity", "_line_grid"], errors="ignore")
     trace_cols = [
         c
         for c in df.columns
         if c not in {"energy_eV", "intensity", "_line_intensity", "_line_grid", "component"}
     ]
-    traces = list(df.groupby(trace_cols, sort=False, dropna=False))
-    if not traces:
-        return df.drop(columns=["_line_intensity", "_line_grid"], errors="ignore")
-    per_trace = max(3, int(max_points) // len(traces))
-    frames = []
-    for _, trace in traces:
+    traces = list(df.groupby(trace_cols, sort=False, dropna=False)) if trace_cols else [((), df)]
+    budget = trace_budget(chosen, len(traces))
+    frames, counts = [], []
+    for key, trace in traces:
         components = {
             component: grp.sort_values("energy_eV")
             for component, grp in trace.groupby("component", sort=False, dropna=False)
@@ -310,35 +293,28 @@ def _decimate_frame(df, max_points):
         basis = components["total"] if "total" in components else next(iter(components.values()))
         basis_energy = basis["energy_eV"].to_numpy()
         for component in components.values():
-            component_energy = component["energy_eV"].to_numpy()
-            if not np.array_equal(component_energy, basis_energy):
+            if not np.array_equal(component["energy_eV"].to_numpy(), basis_energy):
                 raise ValueError("spectrum components must share one energy grid")
-
-        basis_intensity = basis["_line_intensity"].to_numpy()
-        line_positions = np.flatnonzero(basis["_line_grid"].to_numpy())
-        tail_positions = np.flatnonzero(~basis["_line_grid"].to_numpy())
-        if line_positions.size and tail_positions.size:
-            minimum_tail = min(tail_positions.size, max(1, per_trace // _TAIL_BUDGET_DIVISOR))
-            cxr_budget = min(line_positions.size, per_trace - minimum_tail)
-            tail_budget = min(tail_positions.size, per_trace - cxr_budget)
-        elif line_positions.size:
-            cxr_budget, tail_budget = min(line_positions.size, per_trace), 0
-        else:
-            cxr_budget, tail_budget = 0, min(tail_positions.size, per_trace)
-        line_idx = (
-            line_positions[_peak_preserving_indices(basis_intensity[line_positions], cxr_budget)]
-            if cxr_budget
-            else np.array([], dtype=int)
+        idx = trace_indices(
+            basis_energy,
+            basis["_line_intensity"].to_numpy(),
+            basis["_line_grid"].to_numpy(dtype=bool),
+            budget,
+            x_window=x_window,
+            log_x=log_x,
         )
-        tail_idx = (
-            tail_positions[_peak_preserving_indices(basis_intensity[tail_positions], tail_budget)]
-            if tail_budget
-            else np.array([], dtype=int)
+        frames.extend(component.iloc[idx] for component in components.values())
+        key = key if isinstance(key, tuple) else (key,)
+        counts.append(
+            {
+                **dict(zip(trace_cols, key, strict=True)),
+                "native": basis_energy.size,
+                "displayed": idx.size,
+            }
         )
-        idx = np.sort(np.concatenate([line_idx, tail_idx]))
-        for component in components.values():
-            frames.append(component.iloc[idx])
-    return pd.concat(frames, ignore_index=True).drop(columns=["_line_intensity", "_line_grid"])
+    out = pd.concat(frames, ignore_index=True).drop(columns=["_line_intensity", "_line_grid"])
+    out.attrs["display_points"] = {"resolution": chosen.name, "traces": counts}
+    return out
 
 
 def spectrum_frame(
@@ -354,6 +330,9 @@ def spectrum_frame(
     collapse_azimuth=True,
     band="narrow",
     max_points=None,
+    resolution="full",
+    x_window=None,
+    log_x=False,
 ):
     """Tidy long-form spectrum table for ``recs`` (already restricted to one polar
     tilt): one row per (beam energy, energy-grid point, component). Mirrors the
@@ -396,7 +375,13 @@ def spectrum_frame(
             )
     if not frames:
         return pd.DataFrame(columns=_FRAME_COLUMNS)
-    return _decimate_frame(pd.concat(frames, ignore_index=True), max_points)
+    return _decimate_frame(
+        pd.concat(frames, ignore_index=True),
+        max_points,
+        resolution=resolution,
+        x_window=x_window,
+        log_x=log_x,
+    )
 
 
 def _compare_frame(
@@ -413,6 +398,10 @@ def _compare_frame(
     sum_components=False,
     band="narrow",
     max_points=None,
+    resolution="full",
+    x_window=None,
+    log_x=False,
+    decimate=True,
 ):
     """Tidy long-form spectrum table for ``recs``, ONE row per (hue value, energy
     -grid point, component) -- the generalization of :func:`spectrum_frame` to an
@@ -421,6 +410,8 @@ def _compare_frame(
     strongest-peak record, exactly like :func:`_best_azimuth`'s per-energy
     selection (the largest displayed line peak wins). ``band`` and
     ``max_points`` have the same meaning as in :func:`spectrum_frame`.
+    ``decimate=False`` returns the native frame with its sampling helper
+    columns, for callers that re-decimate per zoom window (#1442).
     """
     _validate_band(band)
     groups: dict[float, list] = {}
@@ -462,7 +453,16 @@ def _compare_frame(
     _columns = ["energy_eV", "intensity", "E0_keV", "tilt_deg", "tilt_azim_deg", "component"]
     if not frames:
         return pd.DataFrame(columns=_columns)
-    return _decimate_frame(pd.concat(frames, ignore_index=True), max_points)
+    native = pd.concat(frames, ignore_index=True)
+    if not decimate:
+        return native
+    return _decimate_frame(
+        native,
+        max_points,
+        resolution=resolution,
+        x_window=x_window,
+        log_x=log_x,
+    )
 
 
 def _multi_case_frame(
@@ -478,6 +478,9 @@ def _multi_case_frame(
     sum_components=False,
     band="narrow",
     max_points=None,
+    resolution="full",
+    x_window=None,
+    log_x=False,
 ):
     """Tidy long-form spectrum table, ONE row per (case-basket entry, energy-grid
     point, component) -- the case-basket counterpart of :func:`_compare_frame`
@@ -505,4 +508,10 @@ def _multi_case_frame(
     columns = ["energy_eV", "intensity", "label", "component"]
     if not frames:
         return pd.DataFrame(columns=columns)
-    return _decimate_frame(pd.concat(frames, ignore_index=True), max_points)
+    return _decimate_frame(
+        pd.concat(frames, ignore_index=True),
+        max_points,
+        resolution=resolution,
+        x_window=x_window,
+        log_x=log_x,
+    )

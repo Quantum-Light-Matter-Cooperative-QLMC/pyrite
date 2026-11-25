@@ -19,7 +19,8 @@ from ._common import (
     _eag_wide_charge,
     _tpx_detected,
 )
-from ._spectrum_frames import _peak_preserving_indices, _validate_band
+from ._decimation import resolve_plot_resolution, trace_budget, trace_indices
+from ._spectrum_frames import _validate_band
 
 # incident-vs-detected long form (Timepix + Eagle photon density)
 _DET_COLUMNS = ["energy_eV", "intensity", "E0_keV", "azimuth_deg", "kind", "band"]
@@ -32,21 +33,33 @@ _CHARGE_COLUMNS = ["energy_eV", "charge_density", "E0_keV", "azimuth_deg", "band
 _CHART_MAX_ROWS = 5000
 
 
-def _chart_frame(df, *, value_column, max_rows=_CHART_MAX_ROWS):
-    """Bound serialized detector data while retaining peaks on each curve.
+def _chart_frame(
+    df, *, value_column, max_rows=_CHART_MAX_ROWS, resolution=None, x_window=None, log_x=False
+):
+    """Bound serialized detector data while retaining lineshapes on each curve.
 
     Incident and detected rows share sampled energies, so their overlays stay
-    aligned. Normalize each kind before selecting peaks: the weaker detected
-    response must not lose its narrow features to the incident curve.
+    aligned. Normalize each kind before selecting nodes: the weaker detected
+    response must not lose its narrow features to the incident curve. With a
+    ``resolution`` (#1440) each curve group gets :func:`trace_budget` points
+    focused on ``x_window``; without one the legacy ``max_rows`` total applies.
+    ``attrs["display_points"]`` records native and displayed counts.
     """
-    if len(df) <= max_rows:
-        return df
     group_columns = ["E0_keV", "azimuth_deg", "band"]
     groups = list(df.groupby(group_columns, sort=False, dropna=False))
     kinds_per_group = 2 if "kind" in df else 1
-    points_per_group = max(2, max_rows // (len(groups) * kinds_per_group))
-    sampled = []
-    for _, group in groups:
+    if resolution is None:
+        if len(df) <= max_rows:
+            return df
+        name = f"<= {max_rows:,} rows"
+        points_per_group = max(2, max_rows // (len(groups) * kinds_per_group))
+    else:
+        chosen = resolve_plot_resolution(resolution)
+        name = chosen.name
+        # Incident and detected curves both serialize the group's indices.
+        points_per_group = trace_budget(chosen, len(groups) * kinds_per_group)
+    sampled, counts = [], []
+    for key, group in groups:
         if "kind" in group:
             curves = [
                 part.sort_values("energy_eV") for _, part in group.groupby("kind", sort=False)
@@ -64,10 +77,27 @@ def _chart_frame(df, *, value_column, max_rows=_CHART_MAX_ROWS):
             basis = np.maximum.reduce(normalized)
         else:
             curves = [group.sort_values("energy_eV")]
+            energy = curves[0]["energy_eV"].to_numpy()
             basis = np.abs(curves[0][value_column].to_numpy())
-        indices = _peak_preserving_indices(basis, points_per_group)
+        indices = trace_indices(
+            energy,
+            basis,
+            np.ones(energy.size, dtype=bool),
+            points_per_group,
+            x_window=x_window,
+            log_x=log_x,
+        )
         sampled.extend(curve.iloc[indices] for curve in curves)
-    return pd.concat(sampled, ignore_index=True)
+        counts.append(
+            {
+                **dict(zip(group_columns, key, strict=True)),
+                "native": energy.size,
+                "displayed": indices.size,
+            }
+        )
+    out = pd.concat(sampled, ignore_index=True)
+    out.attrs["display_points"] = {"resolution": name, "traces": counts}
+    return out
 
 
 def _collapsed(recs, *, collapse_azimuth):

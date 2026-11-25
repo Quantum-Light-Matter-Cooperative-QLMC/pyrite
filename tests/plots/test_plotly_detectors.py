@@ -104,7 +104,7 @@ def test_detector_chart_sampling_bounds_payload_and_keeps_both_peaks():
         ignore_index=True,
     )
     sampled = _chart_frame(frame, value_column="intensity")
-    assert len(sampled) == 5000
+    assert 4_500 <= len(sampled) <= 5000
     curves = {kind: part for kind, part in sampled.groupby("kind")}
     assert set(curves["incident"]["energy_eV"]) == set(curves["detected"]["energy_eV"])
     assert 4321.0 in set(curves["incident"]["energy_eV"])
@@ -182,7 +182,17 @@ def test_eaglexo_charge_chart_none_on_empty():
 def test_dense_eagle_chart_bounds_points():
     store = {"HOPG bulk": {30.0: _record(30.0, -20.0, 0.0, n=8651)}}
     fig = eaglexo_detected_chart(store, _settings(), show_qe=False)
-    assert sum(len(t.x) for t in _curves(fig)) <= 5000
+    # Per-curve display budget (#1440): standard caps each curve at 5000.
+    assert max(len(t.x) for t in _curves(fig)) <= 5000
+    fast = eaglexo_detected_chart(store, _settings(), show_qe=False, resolution="fast")
+    assert max(len(t.x) for t in _curves(fast)) <= 2000
+    many = {"HOPG bulk": {e: _record(e, -20.0, 0.0, n=8651) for e in (30.0, 40.0, 50.0, 60.0)}}
+    shared = eaglexo_detected_chart(many, _settings(), show_qe=False, resolution="high")
+    # Incident + detected curves both count against the 400k shared budget.
+    assert sum(len(t.x) for t in _curves(shared)) <= 400_000
+    assert "of 8,651 native points" in fast.layout.title.subtitle.text
+    full = eaglexo_detected_chart(store, _settings(), show_qe=False, resolution="full")
+    assert max(len(t.x) for t in _curves(full)) == 8651
 
 
 def test_timepix_chart_incident_detected_and_threshold():

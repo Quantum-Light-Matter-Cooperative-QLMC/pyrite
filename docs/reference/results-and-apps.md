@@ -77,6 +77,13 @@ standard flat run when available; otherwise choose a checkpoint explicitly.
 | **Map** | Azimuth × tilt heatmap at fixed energy/thickness; select a cell for its spectrum, trends and top-20 ranking. A 1-D sweep shows scan plots. |
 | **Detectors** | Eagle XO or Timepix3 response at fixed tilt/azimuth/thickness, varying beam energy. |
 
+**Plot resolution** (Fast, Standard, High, Publication, Full) on the Spectra
+and Detectors axis panels changes only how many stored points each curve
+draws; nothing reruns and no array changes. Zooming a spectrum re-samples the
+visible range, down to every native point. Each chart's subtitle states native
+versus displayed point counts. See [spectral display
+resolution](../repo-design/plotting-backends.md#spectral-display-resolution).
+
 When a pinned thickness was not reached at a lower energy, the view identifies
 its fallback to that energy's thickest computed slab. For static scientific
 figures, `pyrite.plots` provides spectral, sweep and detector-response helpers.
