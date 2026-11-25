@@ -125,7 +125,7 @@ def test_compare_chart_one_line_per_hue_value_tilt():
     # The title pins only what is common: no single tilt for a tilt comparison.
     title = fig.layout.title.text
     assert title.startswith("$") and title.endswith("$")
-    assert r"\theta" not in title and r"\phi_{\mathrm{azim}} = 0^\circ" in title
+    assert r"\theta" not in title and r"\phi_{\mathrm{tilt}} = 0^\circ" in title
     assert fig.layout.title.subtitle.text is None
 
 
