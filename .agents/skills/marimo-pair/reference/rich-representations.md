@@ -60,7 +60,6 @@ When unsure, check in the scratchpad:
 
 ```python
 import anywidget
-
 obj = scatter.widget  # or whatever accessor the library provides
 print(isinstance(obj, anywidget.AnyWidget))  # True = marimo can render it
 ```
@@ -148,7 +147,6 @@ export default () => {
 };
 """
 
-
 class Timer(anywidget.AnyWidget):
     seconds = traitlets.Int(0).tag(sync=True)
     running = traitlets.Bool(True).tag(sync=True)
@@ -207,11 +205,10 @@ justifies it.
 
 ```python
 # Polars (native, no pyarrow needed)
-_ipc = df.write_ipc(None).getvalue()
+_ipc=df.write_ipc(None).getvalue()
 
 # Any __arrow_c_stream__ source (pandas, narwhals, pyarrow, etc.)
 import io, pyarrow as pa, pyarrow.feather as feather
-
 
 def to_arrow_ipc(data) -> bytes:
     table = pa.RecordBatchReader.from_stream(data).read_all()
@@ -266,8 +263,8 @@ Two strategies for reactive anywidgets. Choose one per widget — don't mix them
 Read widget state or set UI controls from the scratchpad — no clicking:
 
 ```python
-print(timer.seconds)  # read
-timer.seconds = 0  # set — frontend updates automatically
+print(timer.seconds)    # read
+timer.seconds = 0       # set — frontend updates automatically
 ```
 
 `mo.ui.*` elements need `ctx.set_ui_value(...)` from code mode; anywidgets use
@@ -284,7 +281,6 @@ Precedence: `_display_()` > built-in formatters > `_mime_()` > IPython
 ```python
 from dataclasses import dataclass
 import marimo as mo
-
 
 @dataclass
 class ColorSwatch:

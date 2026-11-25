@@ -23,6 +23,21 @@ Review names after the cells work and their dependencies are visible.
 Many private names can mean that a useful stage is hidden or that a cell is
 doing too much. Treat this as a prompt to inspect, not a rule.
 
+## Before deleting a cell
+
+Deleting a cell removes the variables it defines. To see which cells depend
+on it, look up its ID in the notebook’s graph. This example uses `Hbol`.
+
+```sh
+marimo pair execute --notebook nb-analysis --file - <<'PYTHON'
+import marimo._code_mode as cm
+
+async with cm.get_context() as ctx:
+    for cell_id in ctx.graph.descendants("Hbol"):
+        print(cell_id, ctx.cells[cell_id].code)
+PYTHON
+```
+
 ## Setup cell
 
 A setup cell is named `"setup"` and is guaranteed to run before all other
@@ -49,13 +64,10 @@ one and hoist scattered imports into it. `name="setup"` auto-positions the cell
 first — no `before`/`after` needed:
 
 ```python
-cid = ctx.create_cell(
-    """import polars as pl
+cid = ctx.create_cell('''import polars as pl
 import marimo as mo
 import anywidget
-import traitlets""",
-    name="setup",
-)
+import traitlets''', name="setup")
 ctx.run_cell(cid)
 ```
 
@@ -82,10 +94,8 @@ cell-internal helpers that aren't meant to be reused.
 objects = pl.read_csv("https://example.com/objects.csv")
 artists = pl.read_csv("https://example.com/artists.csv")
 
-
 def top_counts(df, col, n=5):
     return df.group_by(col).len().sort("len", descending=True).head(n)
-
 
 result = top_counts(objects.join(artists, on="id"), "category")
 ```
@@ -114,7 +124,6 @@ def load_data():
     objects = pl.read_csv("https://example.com/objects.csv")
     artists = pl.read_csv("https://example.com/artists.csv")
     return objects.join(artists, on="id", how="left")
-
 
 df = load_data()
 ```
