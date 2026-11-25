@@ -35,16 +35,21 @@ class HostMemoryResourceError(BackendResourceError):
         )
 
 
-def _cgroup_headroom_bytes() -> int | None:
-    """Free space under the tightest visible cgroup v2 ancestor (if any)."""
-    root = Path("/sys/fs/cgroup")
+#: cgroup v2 mount and this process's membership file; test seams.
+_CGROUP_ROOT = "/sys/fs/cgroup"
+_PROC_SELF_CGROUP = "/proc/self/cgroup"
+
+
+def _cgroup_limits() -> list[tuple[int, Path]]:
+    """``(memory.max, folder)`` for each limited visible cgroup v2 ancestor."""
+    root = Path(_CGROUP_ROOT)
     if not root.exists():
-        return None
+        return []
     # Most containerized/HPC processes see their current cgroup mounted at
     # /sys/fs/cgroup; on other hosts the /proc/self/cgroup suffix is visible.
     bases = [root]
     try:
-        for line in Path("/proc/self/cgroup").read_text().splitlines():
+        for line in Path(_PROC_SELF_CGROUP).read_text().splitlines():
             if line.startswith("0::"):
                 child = root / line.split("::", 1)[1].lstrip("/")
                 if child.is_dir():
@@ -59,13 +64,28 @@ def _cgroup_headroom_bytes() -> int | None:
             if current == root:
                 break
             current = current.parent
-    remaining = []
+    limits = []
     for folder in candidate_dirs:
         try:
             raw = (folder / "memory.max").read_text().strip()
-            if raw == "max":
-                continue
-            maximum = int(raw)
+            if raw != "max":
+                limits.append((int(raw), folder))
+        except (OSError, ValueError):
+            continue
+    return limits
+
+
+def _cgroup_limit_bytes() -> int | None:
+    """Tightest visible cgroup v2 ``memory.max`` (``None`` when unlimited)."""
+    limits = _cgroup_limits()
+    return min(maximum for maximum, _ in limits) if limits else None
+
+
+def _cgroup_headroom_bytes() -> int | None:
+    """Free space under the tightest visible cgroup v2 ancestor (if any)."""
+    remaining = []
+    for maximum, folder in _cgroup_limits():
+        try:
             used = int((folder / "memory.current").read_text().strip())
         except (OSError, ValueError):
             continue

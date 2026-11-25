@@ -728,6 +728,48 @@ def test_gpu_pipeline_workers_uses_the_transport_only_budget(monkeypatch):
     assert runner._gpu_pipeline_workers(None, 980) == 4  # (10 - 2) // 2
 
 
+# ---- cgroup v2 bound on the RAM cap (#1460) ----------------------------------
+# A batch job's enforced limit is its cgroup memory.max, not the node's RAM.
+
+_GIB = 1 << 30
+
+
+def _fake_cgroup(monkeypatch, tmp_path, job_max):
+    """500 GiB host; this process sits in ``/job`` with ``job_max`` and 10 GiB used."""
+    from types import SimpleNamespace
+
+    from pyrite.montecarlo.runner import chunking
+    from pyrite.montecarlo.transport import host_memory
+
+    root = tmp_path / "cgroup"
+    (root / "job").mkdir(parents=True)
+    (root / "memory.max").write_text("max\n")
+    (root / "job" / "memory.max").write_text(f"{job_max}\n")
+    (root / "job" / "memory.current").write_text(f"{10 * _GIB}\n")
+    proc = tmp_path / "proc_self_cgroup"
+    proc.write_text("0::/job\n")
+    monkeypatch.setattr(host_memory, "_CGROUP_ROOT", str(root))
+    monkeypatch.setattr(host_memory, "_PROC_SELF_CGROUP", str(proc))
+    host = SimpleNamespace(total=500 * _GIB, available=480 * _GIB)
+    monkeypatch.setattr(chunking.psutil, "virtual_memory", lambda: host)
+    runner = _patch_host(monkeypatch, total_mb=chunking._total_mem_mb())
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "available_mem_mb", chunking._available_mem_mb)
+    return runner
+
+
+def test_mem_worker_cap_is_bounded_by_cgroup_memory_max(monkeypatch, tmp_path):
+    runner = _fake_cgroup(monkeypatch, tmp_path, 120 * _GIB)
+    # min(110 GiB headroom, 0.9 * 120 GiB) in MB // 6144, not ~75 host-scale.
+    expected = min(110 * _GIB // 1_000_000, int(120 * _GIB // 1_000_000 * 0.9)) // 6_144
+    assert runner._mem_worker_cap() == expected == 18
+
+
+def test_mem_worker_cap_unlimited_cgroup_keeps_host_figures(monkeypatch, tmp_path):
+    runner = _fake_cgroup(monkeypatch, tmp_path, "max")
+    expected = min(480 * _GIB // 1_000_000, int(500 * _GIB // 1_000_000 * 0.9)) // 6_144
+    assert runner._mem_worker_cap() == expected
+
+
 def test_gpu_pipeline_workers_pin_is_clamped_by_memory_and_warns(monkeypatch):
     """An explicit --max-workers pin cannot re-create the OOM either -- but the
     clamp is announced, not silent."""
