@@ -44,6 +44,7 @@ CASES = (
     "crystal300-coherent",
     "crystal300-coherent-hr",
     "crystal300-binmean",
+    "transport-si300",
 )
 
 
@@ -301,6 +302,45 @@ def photon_case_workload():
         "case": case.to_dict(),
         "table_markers": case_table_markers(case),
         "photon_samples": samples,
+    }
+
+
+def transport_workload():
+    import pyrite as pr
+    from pyrite.config import FixedSampling
+    from pyrite.transport import simulate_trajectories
+
+    # Transport-heavy (#1469): default physics (shell-soft-hard, ELSEPA single
+    # scattering), 2048 primaries through 200 um Si at 300 keV. The explicit
+    # 5 keV cutoff calls the engine directly (no case-level transport reuse),
+    # so repeats re-transport; the result is not scorable.
+    histories = 2048
+    beam = pr.Beam(
+        energy_keV=300.0, transverse=pr.beams.PointSpot(), longitudinal=pr.beams.PointBunch()
+    )
+    slab = pr.geometry.Slab("silicon", thickness_ang=2e6, tilt_deg=5.0, width=None, height=None)
+    numerics = pr.Numerics(
+        sampling=FixedSampling(cxr_histories=histories, brem_histories=histories), seed=1469
+    )
+
+    def run():
+        out = simulate_trajectories(beam, slab, numerics=numerics, E_cut_keV=5.0)
+        segs = out.segments
+        return {
+            "arrays": {k: digest(v) for k, v in segs.items() if isinstance(v, np.ndarray)},
+            "phases": {},
+            "n_segments": out.segment_count,
+            "fallbacks": {},
+        }
+
+    return run, {
+        "kind": "transport-only-engine",
+        "histories": histories,
+        "material": "silicon",
+        "energy_keV": 300.0,
+        "thickness_ang": 2e6,
+        "E_cut_keV": 5.0,
+        "seed": 1469,
     }
 
 
@@ -585,6 +625,8 @@ def measure(args):
         run, parameters = photon_workload(args.case)
     elif args.case == "photon-case":
         run, parameters = photon_case_workload()
+    elif args.case == "transport-si300":
+        run, parameters = transport_workload()
     elif args.case == "axial":
         run, parameters = axial_workload()
     elif args.case == "axial-prod":
