@@ -32,7 +32,9 @@ class FiberCXRModel:
     ``numerics`` is the user-facing :class:`pyrite.config.FiberAverage`
     (reciprocal cutoff [1/Angstrom], uniform roll count, reflection batch
     size); ``temperature_K`` must be covered by the measured carbon tensor.
-    Neither cutoff nor quadrature convergence is inferred from these inputs.
+    Neither cutoff nor quadrature convergence is inferred from these inputs;
+    ``score_fiber_case(..., line_yield_tolerance=...)`` measures the cutoff
+    with ``cutoff_invang`` as the search cap (#1484).
     The c axis is the positive sample normal before mosaic tilt and miscut.
     """
 
