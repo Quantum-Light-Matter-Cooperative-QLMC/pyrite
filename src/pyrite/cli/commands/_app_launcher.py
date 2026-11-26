@@ -42,7 +42,7 @@ class MarimoApp:
     title: str
     material_picker: bool = True
     initial_env: str = "PYRITE_ANALYZE_INITIAL"
-    base_env: Mapping[str, str] = field(default_factory=dict)
+    base_env: Mapping[str, str] = field(default_factory=dict, hash=False, compare=False)
 
     @property
     def notebook(self) -> str:

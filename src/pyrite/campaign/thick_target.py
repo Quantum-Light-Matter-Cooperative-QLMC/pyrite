@@ -15,7 +15,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from ..materials.radiation_length import radiation_length_ang
-from ..montecarlo.runner.transition_emission import case_layers
+from ..montecarlo.case import case_layers
 
 #: Warn above this traversed thickness in radiation lengths. At 0.05 X0 a
 #: high-energy photon converts with probability 1 - exp(-7/9 * 0.05) ~ 4%, the

@@ -1120,3 +1120,15 @@ def _energy_grid(name: str, value: object) -> None:
         raise ValueError(f"{name} must be a non-empty finite one-dimensional energy grid")
     if isinstance(value, tuple) and len(value) != 3:
         raise ValueError(f"{name} uniform encoding must be a three-item tuple")
+
+
+def case_layers(case):
+    """Transport layers ``[(z_top, z_bottom, composition)]`` of a case mapping.
+
+    Explicit ``abs_layers`` win; otherwise one slab ``[0, thickness_ang]`` of the
+    case composition.
+    """
+    layers = case.get("abs_layers")
+    if layers is not None:
+        return list(layers)
+    return [(0.0, float(case["thickness_ang"]), case["composition"])]

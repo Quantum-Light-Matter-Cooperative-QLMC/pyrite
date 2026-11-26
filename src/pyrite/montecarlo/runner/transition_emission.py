@@ -27,6 +27,7 @@ import numpy as np
 
 from ..._backend import cp
 from ...materials.optical import OpticalResponse
+from ..case import case_layers
 from ..spectrum.transition_radiation import composition_dielectric
 from ..spectrum.transition_radiation_crossings import (
     TRANSITION_MODEL,
@@ -43,14 +44,6 @@ __all__ = [
     "case_optical_transition",
     "case_transition_spectrum",
 ]
-
-
-def case_layers(case):
-    """Transport layers ``[(z_top, z_bottom, composition)]`` of a case."""
-    layers = case.get("abs_layers")
-    if layers is not None:
-        return list(layers)
-    return [(0.0, float(case["thickness_ang"]), case["composition"])]
 
 
 def case_layer_eps(

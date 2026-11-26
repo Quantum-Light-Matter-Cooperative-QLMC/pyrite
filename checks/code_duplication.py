@@ -10,8 +10,8 @@ Usage (from the repository root):
         [--include-marimo] [--include-tests]
 
 Defaults: ROOTS=src, min-nodes=40, marimo cells and lazy ``__getattr__``
-shims skipped. Report-only engineering diagnostic (#1467): always exits 0,
-no physics claim. For copied blocks inside functions, pair it with
+shims skipped. Report-only engineering diagnostic (#1467): exits 0 with any
+findings, 2 (explicit skip) outside a git checkout; no physics claim. For copied blocks inside functions, pair it with
 ``pixi exec --spec pylint symilar -d 12 -i --ignore-imports --ignore-signatures``
 over ``git ls-files -z 'src/*.py'``.
 """
@@ -20,6 +20,7 @@ import argparse
 import ast
 import copy
 import subprocess
+import sys
 import warnings
 from collections import defaultdict
 from pathlib import Path
@@ -28,11 +29,15 @@ SKIP_NAMES = {"__getattr__", "__dir__"}
 
 
 def tracked_files(roots):
-    out = subprocess.run(
-        ["git", "ls-files", "-z", "--", *roots],
-        check=True,
-        capture_output=True,
-    ).stdout.decode()
+    try:
+        out = subprocess.run(
+            ["git", "ls-files", "-z", "--", *roots],
+            check=True,
+            capture_output=True,
+        ).stdout.decode()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        print(f"code_duplication: needs a git checkout ({exc})", file=sys.stderr)
+        raise SystemExit(2) from None
     return [Path(p) for p in out.split("\0") if p.endswith(".py")]
 
 
@@ -75,14 +80,39 @@ class LocalRenamer(ast.NodeTransformer):
         node.annotation = None
         return node
 
+    def _rename_def(self, node):
+        if node.name in self.mapping:
+            node.name = self.mapping[node.name]
+        self.generic_visit(node)
+        return node
+
+    visit_FunctionDef = visit_AsyncFunctionDef = visit_ClassDef = _rename_def
+
+    def visit_ExceptHandler(self, node):
+        if node.name in self.mapping:
+            node.name = self.mapping[node.name]
+        self.generic_visit(node)
+        return node
+
+    def visit_alias(self, node):
+        bound = node.asname or node.name.split(".")[0]
+        if bound in self.mapping:
+            node.asname = self.mapping[bound]
+        return node
+
 
 def local_names(func):
     names = [a.arg for a in ast.walk(func.args) if isinstance(a, ast.arg)]
     for node in ast.walk(func):
         if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
             names.append(node.id)
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node is not func:
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            if node is not func:
+                names.append(node.name)
+        elif isinstance(node, ast.ExceptHandler) and node.name:
             names.append(node.name)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            names.extend(a.asname or a.name.split(".")[0] for a in node.names)
     seen = {}
     for n in names:
         seen.setdefault(n, None)
