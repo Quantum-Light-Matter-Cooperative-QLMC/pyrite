@@ -605,6 +605,7 @@ line-length = 100
 
 # keep this tight; avoid duplicate exclusion logic
 exclude = [
+    ".pixi",
     ".venv",
     "__pycache__",
     ".ruff_cache",

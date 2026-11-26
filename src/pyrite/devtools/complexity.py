@@ -29,6 +29,7 @@ SCOPES = {"src": Path("src/pyrite"), "tests": Path("tests")}
 EXCLUDED_PARTS = frozenset(
     {
         ".git",
+        ".pixi",
         ".venv",
         ".worktrees",
         "__pycache__",
