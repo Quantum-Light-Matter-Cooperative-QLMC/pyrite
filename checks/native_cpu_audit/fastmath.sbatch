@@ -7,7 +7,8 @@
 #SBATCH --output=runs/fastmath1469-%j.log
 # #1469 fastmath / reduced-accuracy arms on four OS-bound CPUs (bind.sh).
 # Numba threads from AUDIT1432_NUMBA_THREADS (default 1); BLAS/OpenMP stay 1.
-# PIXI_ENV selects the pixi environment (default `default`; `svml` for SVML Numba).
+# PIXI_ENV selects the pixi environment (default `default`; `svml` for SVML Numba);
+# PYRITE_MATH=fast runs the adopted `fast` kernels (output tags gain `-math_fast`).
 #   sbatch [--nodelist=N] checks/native_cpu_audit/fastmath.sbatch MODE [ARGS]
 # MODE:
 #   cases ARM...   every case in CASES (default "photon-case layered transport-si300")
@@ -34,7 +35,7 @@ py=(pixi run --as-is -e "$env_name" python)
 run() { "${py[@]}" "$@"; }
 run -c 'from pyrite.validation.check_records import current_revision; print(current_revision())'
 run -c 'import numba; print("numba", numba.__version__, "svml", numba.config.USING_SVML)'
-tag=$env_name-t$threads
+tag=$env_name-t$threads${PYRITE_MATH:+-math_$PYRITE_MATH}
 case $mode in
 cases)
     read -r -a cases <<< "${CASES:-photon-case layered transport-si300}"
