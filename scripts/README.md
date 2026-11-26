@@ -36,6 +36,6 @@ In particular, use `pyrite-dev cli-reference --write|--check`,
 standalone generator files are compatibility wrappers, not documentation
 workflow owners.
 - `concurrent_case_probe.py` times independent transport or `run_case` jobs
-  serially, on 1/2/4 threads or on a spawn process pool, with digest parity and
-  PSS (#1423 audit, see `docs/repo-design/compute/concurrent-case-audit.md`);
+  serially, on 1/2/4 threads or on a spawn process pool, with digest parity,
+  PSS/USS and an optional stop/drain trial (#1423 audit, see `docs/repo-design/compute/concurrent-case-audit.md`);
   measurement only.

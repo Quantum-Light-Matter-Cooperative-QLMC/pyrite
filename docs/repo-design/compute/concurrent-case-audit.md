@@ -19,8 +19,8 @@ executor, default, tolerance, seed semantics or checkpoint format changed.
 
 `scripts/concurrent_case_probe.py` runs 8 independent jobs serially and on N
 threads or a warmed `spawn` process pool, with Numba, OpenMP and OpenBLAS pinned
-to one thread, and reports best-of-3 wall time, peak summed PSS of the process
-tree, and whether every result digest equals the serial run. Jobs are the
+to one thread, and reports best-of-3 wall time, peak summed PSS (and, since
+2026-11-26, USS) of the process tree, and whether every result digest equals the serial run. Jobs are the
 maintained #611 HOPG case (`checks/streamed_scoring_memory.py`, 30 keV, 1 um,
 seeds 0-7): ELSEPA elastic, BremsLib continuum with `bremslib-soft-hard`, fixed
 400-node line grid, per-electron core. `pyrite tables verify` passes
@@ -63,6 +63,47 @@ noisy (the 2-thread GIL arm ranged 6.05-16.59 s), so read ratios, not
 decimals. Transport PSS here (6.2 GiB serial, 9.8-12.3 GiB parallel) is
 dominated by the 8 retained result sets, not the working set.
 
+**Repeat with bound CPUs and USS (2026-11-26).** Unbound repeats of the full
+case on this hybrid-core host varied 6.9-13.5 s serial between identical runs,
+so the arms were rerun under `taskset -c 0,2,4,6` (one SMT thread on each of
+four P-cores), Python 3.14.10, branch source after the math-mode merge (#1468;
+default `reproducible`). Seeds were submitted in shuffled order and digests
+compared by seed.
+
+| Arm, 1024 histories | 1 worker | 2 workers | 4 workers | Speedup at 4 | Peak PSS / USS at 4 |
+|---|---|---|---|---|---|
+| threads, current source | 7.03 s | 4.03 s | 2.74 s | 2.6x | 1330 / 1325 MiB (1.8x serial) |
+| process pool (`spawn`, warmed) | 7.13 s | 3.74 s | 2.45 s | 2.9x | 2914 / 2781 MiB (4.2x / 4.0x serial) |
+
+The memory ratio holds under USS: threads share almost no pages a process pool
+would count once, and spawned workers duplicate the tables and JIT state
+(serial USS about 0.7 GiB). At 128 histories (2.77 s serial) threads reached
+1.55x at two workers and no further gain at four, so a thread executor pays
+only for cases of roughly a second or more. Digests equalled serial in every
+arm and order.
+
+**Stop, drain and exceptions.** `PROBE_STOP=1` makes job 2 of 8 raise; the
+coordinator takes results from `as_completed`, cancels pending futures on the
+first exception, then calls `shutdown(wait=True)`. Bound as above, 1024
+histories:
+
+| Arm | Workers | Started | Cancelled | Completed after error | Drain |
+|---|---|---|---|---|---|
+| threads | 2 | 4 | 4 | 2 | 0.9 s |
+| threads | 4 | 5 | 3 | 4 | 1.4 s |
+| process pool | 2 | 7 | 1 | 5 | 2.3 s |
+| process pool | 4 | 8 | 0 | 7 | 2.7 s |
+
+The exception reached the coordinator unchanged in both arms and every
+completion was observed on the coordinator thread. Threads cancel every job not
+yet running. `ProcessPoolExecutor` moves up to `max_workers + 1` jobs into its
+call queue ahead of execution, and `cancel()` fails on those, so after a stop
+it ran work that had not started: at four workers nothing could be cancelled.
+The #928 contract (drain started tasks, start no more) is therefore easier to
+meet with threads; the current process path should be checked against it
+separately. Running jobs cannot be interrupted in either arm; drain time is the
+remainder of the running cases.
+
 **Not measured, so not claimed.**
 
 - Only one case family on one hybrid-core workstation. The #1432 audit measured
@@ -73,8 +114,9 @@ dominated by the 8 retained result sets, not the working set.
 - Adaptive precision, cone split, channeling, photon, axial MCWF and GPU paths.
 - More than one Numba thread per job with concurrent launches (see row 10).
 - A free-threaded interpreter: none could be installed (#1421).
-- Memory sampling is PSS of the process tree at 50 ms; USS and an allocator
-  breakdown were not collected.
+- Memory sampling is PSS and USS of the process tree at 50 ms; no allocator
+  breakdown. Shutdown was measured only for a raised exception, not for
+  `KeyboardInterrupt` or a killed worker.
 - A first-pass probe that called `_simulate_trajectories` directly ran the
   BremsLib-less fallback and an unrelated attempt that hand-built a case dict
   selected Mott; both were discarded, not used above.
@@ -106,40 +148,15 @@ same parallelism without touching kernel loops, because every case already owns
 its buffers. A thread executor plus `nogil` entry points is therefore the
 smaller lever for transport; a new `prange` is not.
 
-**SVML / `icc_rt`.** Not available on any Numba this project can run. Numba
-documents SVML as unsupported since 0.62 (the SVML patch does not apply to
-LLVM 20) and still unsupported in 0.65 and 0.66. On the project stack (Numba
-0.68.1, llvmlite 0.50.0) `numba -s` reports `Using SVML Patched LLVM: False`
-with the runtime library installed from PyPI (`icc-rt`, `intel-cmplr-lib-rt`)
-and from conda (`pkgs/main`, `intel-cmplr-lib-rt` 2025.0.4, where the library
-loads but llvmlite is still unpatched). SVML works only on Numba 0.61 or older
-(here 0.61.2, llvmlite 0.44, NumPy 2.2.5), which cannot import this project
-(`numpy>=2.4.6`, `numba>=0.66`). Upstream says it "will be addressed in a
-future release".
-
-To bound the upside I ran the verbatim `_sincsq_reduce` kernel (CXR line
-reduction, `sin` in the inner loop) on one thread, 8000 lines by 4000
-energies:
-
-| Arm | Time | vs strict | Max rel. diff vs strict |
-|---|---|---|---|
-| strict (current), Numba 0.61 SVML on or off, and Numba 0.68 | 0.65 s | 1.0x | 0 (bit-identical) |
-| `fastmath=True`, no SVML (Numba 0.68) | 0.48 s | 1.4x | 1.0e-14 |
-| `fastmath=True`, no SVML (Numba 0.61) | 0.47 s | 1.4x | 1.0e-14 |
-| `fastmath=True`, SVML (Numba 0.61) | 0.037 s | 17.8x | 1.0e-14 |
-
-SVML alone does nothing: a strict floating-point reduction does not vectorize,
-so there is no vector loop to substitute into (identical time and bits with SVML
-on or off). It pays only together with `fastmath` reassociation, which #1432
-rejected as a default. Against a `longdouble` reference every arm is within
-about 1e-15 relative, so the changed sums are no less accurate than the strict
-ones. Caveats: one kernel, one host; the share of a real case spent in this
-kernel is not measured; SVML selects its implementation by CPU instruction set,
-so bits may differ between hosts (for example AVX2 versus AVX-512 nodes) and
-would have to be pinned per catalog or per model marker. The 1.4x from
-`fastmath` alone is available today without SVML and, like any change to
-default numerical output, would need a `*_MODEL` marker bump. Tracked in [#1459](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1459). Evidence:
-`~/dev/pyrite-benches/issue-1423/svml/`.
+**SVML and `fastmath`.** Superseded by
+[CPU sine vectorization](cpu-sine-vectorization.md) (#1459), which adopted the
+portable `vector_sin` and keeps SVML as an opt-in `svml` environment, and by
+[math mode](math-mode.md) (#1468), which owns any `fastmath` variant. Neither
+changes the threading question: kernels compiled under either mode still hold
+the GIL unless declared `nogil` (row 1), and the `fast` guarantee is
+run-to-run determinism at a fixed thread count, which concurrent cases with one
+Numba thread each preserve. This audit's earlier single-kernel microbenchmark
+is kept with its evidence in `~/dev/pyrite-benches/issue-1423/svml/`.
 
 ## Shared-state register
 
@@ -160,12 +177,12 @@ not evaluated; **n/a** = not reachable by the CPU case path.
 | 9 | `functools.cache`/`lru_cache` tables | `photon_cross_sections._table()` and ~35 others | CPython serializes the dict; two threads may both compute the first value | read-only after build | ok |
 | 10 | ContextVar state | tuning, spectrum launch, precision, progress, recovery engine, fallback audit, line-data coverage (`runner/transport_options.py:15-22`, `runner/__init__.py:79-82`, `runner/recovery.py:13`, `_physics_fallback.py:18`, `spectrum/cxr/_coverage.py:45`, `_bin_quadrature.py:801`, `transport/beam_prefetch.py:32`) | a new `ThreadPoolExecutor` thread starts with an empty context. The probe set none of them in the caller, so it does not exercise propagation; `stream_overlap.py` and `beam_prefetch.py` call `copy_context()` explicitly | an executor must copy the caller context per submitted case and own a per-case fallback-audit and progress sink; no test covers it | **blocker** |
 | 11 | Numba `parallel=True` | 12 kernels | `numba.set_num_threads(1)` only in pool workers. Numba documents that `workqueue` is not thread-safe and aborts on nested parallelism; `default` promises nothing and `threadsafe` needs `omp` or `tbb` | pin `NUMBA_THREADING_LAYER=threadsafe` and test two concurrent launches; the probe ran with one Numba thread | **blocker** |
-| 12 | RNG and seed ownership | per-case `seed` consumed as `default_rng(p.seed)` or `SeedSequence(seed).spawn(...)`; no `np.random.seed` or global generator in `src/` | the 8 seeds produced digests equal to serial in every thread and process arm above | adaptive, cone-split and channeling paths | ok for the measured path |
+| 12 | RNG and seed ownership | per-case `seed` consumed as `default_rng(p.seed)` or `SeedSequence(seed).spawn(...)`; no `np.random.seed` or global generator in `src/` | the 8 seeds produced digests equal to serial in every thread and process arm above, also with shuffled submission order | adaptive, cone-split and channeling paths | ok for the measured path |
 | 13 | `_RESOURCE_POLICY` | `runner/oom.py` mutates `pool_peak_bytes`, `cases_since_free`, `pool_limit_*`; `chunking.py` rebinds `gpu` | single-driver design | CPU path reads only; GPU OOM counters are not thread-safe | **blocker** for any GPU use |
 | 14 | Host-memory admission | `runner/host_admission.py`, `transport/host_memory.py` read `MemAvailable`/cgroup headroom per call; the docstring says a projection is not a reservation | check-then-act | N threads admit against the same headroom and can over-commit together; needs a shared reservation ledger | **blocker** |
 | 15 | Worker-count and memory budget | `host_admission._cpu_pool_workers` (`worker_mem_mb`, about 5.5 GiB per full-case process measured earlier) | sized for processes | a thread budget needs its own measured per-case footprint (this probe: about 0.19 GiB marginal PSS per extra thread at 1024 histories, against about 0.7 GiB per extra process) | open |
 | 16 | Device contexts, streams, pools | `runner/stream_overlap.py` one scoring thread on a non-blocking stream | one owner by design; #1411 owns multi-GPU | none for a CPU slice | n/a |
-| 17 | Callbacks, stop and drain | `execution/protocol.py` requires `callback` in the coordinating process and draining of started tasks on `should_stop` | #928 contract; `LocalExecutor` delegates to `run_cases` | a thread executor can satisfy it; callback threading and exception propagation need tests | open |
+| 17 | Callbacks, stop and drain | `execution/protocol.py` requires `callback` in the coordinating process and draining of started tasks on `should_stop` | #928 contract; `LocalExecutor` delegates to `run_cases` | probe: exceptions reach the coordinator, completions are observed there, and threads cancel every unstarted job, while a process pool runs up to `max_workers + 1` queued jobs after a stop (above); a production executor still needs these as tests | ok for threads (probe only) |
 | 18 | Checkpoint and result isolation | callback owns persistence; results returned by value | a process boundary copies today | threads return arrays by reference (the process arm's times already include pickling the 8 results); ownership rules must be stated | open |
 | 19 | Concurrent tests | `test_montecarlo.py` and `test_gpu_oom_retry.py` replace `ProcessPoolExecutor` with a synchronous fake | none ran two cases at once; this branch adds the two tests named in rows 2 and 5 | digest-parity test for two threads, ContextVar propagation | **blocker** |
 
@@ -188,9 +205,7 @@ must not be disabled around extensions that have not.
   resolve rows 3, 4, 10, 11 and 14; decide whether `nogil` on the per-electron
   entry points is worth its parity evidence (row 1), which matters for
   transport-only workloads and not for full cases.
-- Not pursued: a new `prange` over electrons. SVML is blocked upstream until
-  Numba restores it; a `fastmath` reassociation variant of the hot CXR
-  reductions (1.4x on one kernel with no SVML) is a candidate for a separate,
-  model-marked issue.
+- Not pursued: a new `prange` over electrons. SVML and `fastmath` now belong
+  to #1459 and #1468.
 - Raw logs and the SHA-256 manifest are kept locally in
   `~/dev/pyrite-benches/issue-1423/` (not committed).
