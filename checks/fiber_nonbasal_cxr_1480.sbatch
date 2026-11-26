@@ -11,11 +11,13 @@
 # Usage:
 #   sbatch checks/fiber_nonbasal_cxr_1480.sbatch OUT_DIR frozen CRYSTAL E0 THICK TILT [opts]
 #   sbatch checks/fiber_nonbasal_cxr_1480.sbatch OUT_DIR paired [fiber_paired_1480.py opts]
-# `frozen` writes OUT_DIR/result.{json,npz}; `paired` gets --output OUT_DIR/paired.
+#   sbatch checks/fiber_nonbasal_cxr_1480.sbatch OUT_DIR campaign E0 THICK TILT [opts]
+# `frozen` and `campaign` (#1483) write OUT_DIR/result.{json,npz}; `paired`
+# gets --output OUT_DIR/paired.
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 if (( $# < 2 )); then
-    echo "usage: $0 OUT_DIR {frozen|paired} [options]" >&2
+    echo "usage: $0 OUT_DIR {frozen|paired|campaign} [options]" >&2
     exit 2
 fi
 OUT=$(mkdir -p "$1" && cd "$1" && pwd)
@@ -40,9 +42,9 @@ printf '\n' >> "$OUT/arguments.txt"
 echo "code $SHA host $(hostname) job $SLURM_JOB_ID mode $MODE backend $PYRITE_MC_BACKEND fp64=${PYRITE_FP64:-0}"
 pixi install --locked -e "$ENV"
 case "$MODE" in
-    frozen)
+    frozen|campaign)
         /usr/bin/time -v pixi run --as-is -e "$ENV" python -u \
-            checks/fiber_nonbasal_cxr_1480.py frozen "$@" --json "$OUT/result.json" \
+            checks/fiber_nonbasal_cxr_1480.py "$MODE" "$@" --json "$OUT/result.json" \
             > "$OUT/run.log" 2>&1
         files=(CODE_SHA arguments.txt run.log result.json result.npz)
         ;;

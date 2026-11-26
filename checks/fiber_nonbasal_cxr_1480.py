@@ -14,6 +14,8 @@ Subcommands::
                               azimuth averaged, against (002)
   frozen CRYSTAL E0_KEV THICK_NM TILT_DEG [--electrons N] [--json OUT]
                               arms A-E on one frozen local transport
+  campaign E0_KEV THICK_NM TILT_DEG --energy-max EV [--json OUT]
+                              #1483 campaign fiber route vs the Q arm
 
 Conventions (production): sample +z is the reciprocal ``surface_hkl = (001)``
 axis (``_orientation_R``); a crystallite at azimuth ``phi`` is rolled by
@@ -776,6 +778,122 @@ def cmd_frozen(args):
     print(json.dumps({k: v.get("rel_to_reference") for k, v in record["arms"].items()}))
 
 
+# ---- campaign route parity (#1483) --------------------------------------------
+def cmd_campaign(args):
+    """Campaign fiber route versus the Q arm on one campaign transport (#1483).
+
+    Lowers a HOPG Scene with ``CxrReflections(fiber=...)`` on this script's
+    explicit photon axis, transports it once, then scores (a) the campaign
+    line seam, (b) the full campaign spectrum phase and (c) the Q arm's
+    per-family loop on the same segments. With ``--basal-b tensor`` the Q
+    arm uses the model's projected basal B instead of catalog B33, so (a) and
+    (c) differ only by summation order.
+    """
+    from pyrite import Scene
+    from pyrite.beams import Beam, PointBunch, Spot
+    from pyrite.campaign.lowering import lower_simulation
+    from pyrite.campaign.resolution import resolve_simulation
+    from pyrite.config import CxrReflections, FiberAverage, FixedSampling, Numerics, Physics
+    from pyrite.detectors import Detector, EnergyBins
+    from pyrite.geometry import Footprint, Slab
+    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.runner.fiber_emission import fiber_domain
+
+    E = np.arange(args.step, args.energy_max, args.step)
+    average = FiberAverage(
+        cutoff_invang=args.g_max, azimuth_count=args.reference, reflection_batch_size=args.batch
+    )
+    scene = Scene(
+        Beam(args.E0, transverse=Spot(), longitudinal=PointBunch()),
+        Slab("hopg", args.thick_nm * 10.0, tilt_deg=args.tilt, footprint=Footprint(5.0, 5.0)),
+        Detector(observation_angle_deg=args.theta),
+    )
+    numerics = Numerics(
+        sampling=FixedSampling(cxr_histories=args.electrons, brem_histories=args.electrons),
+        cxr_reflections=CxrReflections(fiber=average),
+        energy_bins=EnergyBins(cxr=E),
+        seed=args.seed,
+    )
+    physics = Physics(bremsstrahlung_model="bremslib", radiative_model="uncoupled")
+    case = lower_simulation(resolve_simulation(scene, physics=physics, numerics=numerics))
+    t0 = time.time()
+    tp = runner._transport_case(case, transport_core=args.transport_core)
+    t_transport = time.time() - t0
+    segs, n_hat, ne = tp["segs"], tp["n_hat"], int(tp["Ne_lines"])
+    t0 = time.time()
+    seam = np.asarray(
+        runner._cxr_for_segments(
+            runner._segments_on_device(segs),
+            tp["E_grid"],
+            case,
+            n_hat,
+            case.get("abs_layers"),
+            tp.get("groove"),
+            Ne=ne,
+        )
+    )
+    t_seam = time.time() - t0
+    t0 = time.time()
+    full = runner._spectrum_case(case, tp)
+    t_full = time.time() - t0
+    domain = fiber_domain(case)
+    lookup = domain._thermal_lookup()
+    basal_b = lookup[(0, 0, 2)] if args.basal_b == "tensor" else CRYSTALS["hopg"]["B_ang2"]
+    t0 = time.time()
+    q_arm = np.zeros(E.size)
+    composition = list(case["composition"])
+    for fam in [] if args.no_q_arm else families("hopg", args.g_max):
+        q_arm += family_spectrum(
+            segs,
+            E,
+            "hopg",
+            fam,
+            n_hat,
+            None,
+            composition,
+            basal_b,
+            components=False,
+            phis=list(_quadrature(args.reference)),
+        )[0]
+    t_q = time.time() - t0
+    dE = np.gradient(E)
+    record = dict(
+        E0_keV=args.E0,
+        thick_nm=args.thick_nm,
+        tilt_deg=args.tilt,
+        theta_deg=args.theta,
+        electrons=ne,
+        segments=int(np.asarray(segs["L_ang"]).size),
+        seed=args.seed,
+        g_max=args.g_max,
+        rolls=args.reference,
+        batch=args.batch,
+        basal_b=basal_b,
+        reflections=len(domain.hkls),
+        step_eV=args.step,
+        energy_max_eV=args.energy_max,
+        case_fiber=case["cxr_fiber"],
+        yield_seam=float(np.sum(seam * dE)),
+        yield_q=float(np.sum(q_arm * dE)),
+        yield_full_spec=float(np.sum(np.asarray(full["spec"]) * dE)),
+        seam_vs_q=None if args.no_q_arm else _spectral_error(E, seam, q_arm),
+        full_minus_seam_yield=float(np.sum((np.asarray(full["spec"]) - seam) * dE)),
+        continuum=full.get("brem_lattice_share"),
+        seconds=dict(transport=t_transport, seam=t_seam, full_spectrum=t_full, q_arm=t_q),
+    )
+    print(json.dumps({k: record[k] for k in ("yield_seam", "yield_q", "seam_vs_q", "seconds")}))
+    if args.json:
+        with open(args.json, "w") as handle:
+            json.dump(record, handle, indent=1, default=str)
+        np.savez_compressed(
+            args.json.removesuffix(".json") + ".npz",
+            E_eV=E,
+            seam=seam,
+            q_arm=q_arm,
+            full_spec=np.asarray(full["spec"]),
+        )
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -819,12 +937,29 @@ def main():
         "--save-families", action="store_true", help="save reference family spectra in NPZ"
     )
     p.add_argument("--json")
+    p = sub.add_parser("campaign")
+    p.add_argument("E0", type=float, help="beam kinetic energy [keV]")
+    p.add_argument("thick_nm", type=float)
+    p.add_argument("tilt", type=float, help="target tilt [deg]")
+    p.add_argument("--theta", type=float, default=45.0, help="lab observation angle [deg]")
+    p.add_argument("--electrons", type=int, default=50)
+    p.add_argument("--seed", type=int, default=1)
+    p.add_argument("--g-max", type=float, default=6.0)
+    p.add_argument("--reference", type=int, default=32, help="roll nodes")
+    p.add_argument("--batch", type=int, default=256)
+    p.add_argument("--step", type=float, default=2.0)
+    p.add_argument("--energy-max", type=float, required=True, help="photon band ceiling [eV]")
+    p.add_argument("--basal-b", choices=("tensor", "catalog"), default="tensor")
+    p.add_argument("--transport-core", default="auto")
+    p.add_argument("--no-q-arm", action="store_true", help="campaign cost only")
+    p.add_argument("--json")
     args = parser.parse_args()
     {
         "frozen": cmd_frozen,
         "structure": cmd_structure,
         "kinematics": cmd_kinematics,
         "single-flight": cmd_single_flight,
+        "campaign": cmd_campaign,
     }[args.cmd](args)
 
 
