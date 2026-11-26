@@ -12,12 +12,13 @@
 #   sbatch checks/fiber_nonbasal_cxr_1480.sbatch OUT_DIR frozen CRYSTAL E0 THICK TILT [opts]
 #   sbatch checks/fiber_nonbasal_cxr_1480.sbatch OUT_DIR paired [fiber_paired_1480.py opts]
 #   sbatch checks/fiber_nonbasal_cxr_1480.sbatch OUT_DIR campaign E0 THICK TILT [opts]
-# `frozen` and `campaign` (#1483) write OUT_DIR/result.{json,npz}; `paired`
-# gets --output OUT_DIR/paired.
+#   sbatch checks/fiber_nonbasal_cxr_1480.sbatch OUT_DIR selector [fiber_selector_1484.py opts]
+# `frozen` and `campaign` (#1483) write OUT_DIR/result.{json,npz}; `paired`/`selector`
+# get --output OUT_DIR/{paired,selector}.
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 if (( $# < 2 )); then
-    echo "usage: $0 OUT_DIR {frozen|paired|campaign} [options]" >&2
+    echo "usage: $0 OUT_DIR {frozen|paired|campaign|selector} [options]" >&2
     exit 2
 fi
 OUT=$(mkdir -p "$1" && cd "$1" && pwd)
@@ -52,6 +53,11 @@ case "$MODE" in
         /usr/bin/time -v pixi run --as-is -e "$ENV" python -u \
             checks/fiber_paired_1480.py "$@" --output "$OUT/paired" > "$OUT/run.log" 2>&1
         files=(CODE_SHA arguments.txt run.log paired/spectra.npz paired/summary.json)
+        ;;
+    selector)
+        /usr/bin/time -v pixi run --as-is -e "$ENV" python -u \
+            checks/fiber_selector_1484.py "$@" --output "$OUT/selector" > "$OUT/run.log" 2>&1
+        files=(CODE_SHA arguments.txt run.log selector/spectra.npz selector/summary.json)
         ;;
     *)
         echo "unknown mode $MODE" >&2

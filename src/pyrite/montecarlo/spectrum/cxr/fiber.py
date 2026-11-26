@@ -158,6 +158,17 @@ class FiberCXRModel:
         )
         if not hkls:
             raise ValueError("cutoff contains no allowed reflections")
+        return self.domain(hkls)
+
+    def domain(self, hkls) -> FiberReflectionSet:
+        """The prepared set of exactly ``hkls``, each with its projected tensor B.
+
+        ``hkls`` must be closed under Friedel pairs and 60-degree rolls; a
+        reciprocal shell ``G_lo < |g| <= G_hi`` of the full lattice is.
+
+        Validation: cxr-fiber-intensity-average
+        """
+        hkls = tuple((int(h), int(k), int(ell)) for h, k, ell in hkls)
         lattice = CRYSTALS[self.crystal]["lattice"]
         axis, norm = reciprocal_g_vector((0, 0, 1), lattice)
         axis = axis / norm
