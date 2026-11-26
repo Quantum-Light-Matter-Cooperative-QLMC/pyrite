@@ -305,9 +305,10 @@ class Sampler:
             busy = np.full(times.shape, -1)
         idle = (busy >= 0) & (busy < IDLE_PERCENT)
         # A thread parked in a wait has no pyrite frame or sits in threading/queue.
+        # Match the whole stdlib file name: pyrite's ``_bin_queue.py`` is busy work.
         active = np.array(
             [
-                bool(s[3]) and "threading.py" not in s[2] and "queue.py" not in s[2]
+                bool(s[3]) and s[2].split(":", 1)[0] not in ("threading.py", "queue.py")
                 for s in self.thread_stacks
             ]
         )
@@ -359,7 +360,6 @@ class Sampler:
             index = np.clip(np.searchsorted(ut, times), 0, len(ut) - 1)
             busy = uv[index]
         else:
-            uv = np.array([], dtype=int)
             ut, uv = None, np.array([], dtype=int)
             busy = np.full(times.shape, -1)
         idle = (busy >= 0) & (busy < IDLE_PERCENT)

@@ -3,7 +3,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=30G
-#SBATCH -t 02:30:00
+#SBATCH -t 04:00:00
 #SBATCH -o gfm1463-%j.log
 # #1463 device fast-math: (1) fresh nsys device-time shares on the #1432
 # GPU-host case (gpu_host.py + nsys_gaps.py), (2) capture Fourier flushes of
@@ -67,7 +67,7 @@ if has arms; then
     echo "arms rc=$?"
 fi
 if has ncu && [ "$PYRITE_PIXI_ENV" = nvidia ] && command -v ncu > /dev/null; then
-    timeout 1800 ncu --target-processes all --kernel-name rectangles --launch-skip 0 --launch-count 40 \
+    timeout 1800 ncu --target-processes all --kernel-name 'regex:^rectangles_' --launch-skip 0 --launch-count 40 \
         --metrics gpu__time_duration.sum,sm__pipe_fp64_cycles_active.avg.pct_of_peak_sustained_active,sm__inst_executed_pipe_xu.sum,sm__inst_executed_pipe_fma.sum,smsp__inst_executed.sum \
         --csv --log-file "$OUT/ncu.csv" \
         "${py[@]}" checks/gpu_fast_math_1463.py arms "$OUT/flushes" "$OUT/arms-ncu.json" \

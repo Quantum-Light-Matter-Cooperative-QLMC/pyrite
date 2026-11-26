@@ -10,10 +10,11 @@ of one case). Each flush is planned once by the production
 direct-kernel launch arguments are intercepted, so every arm runs the same
 tiles. Arms recompile the production ``_fourier_cuda._DIRECT_SOURCE`` under
 one compile-option set (NVRTC or hipRTC spelling) or with the hand-placed
-``__sincosf`` intrinsic. Per arm and flush, recorded:
+``__sincosf`` intrinsic, each as device symbol ``rectangles_<arm>`` so profiler
+rows name their arm. Per arm and flush, recorded:
 
-- kernel time (CUDA events, median/min over ``--repeats`` launches into a fresh
-  zeroed buffer; arm order rotates every repeat);
+- kernel time (CUDA events, median/min over ``--repeats`` launches into a
+  buffer zeroed before the start event; arm order rotates every repeat);
 - determinism: whether every repeat is bitwise equal to the first;
 - coefficient error against the ``fp64-strict`` arm (FP64 ``sincos``,
   contraction off), normalized per mode by ``sum_l |c_l(j)|`` (the
@@ -67,10 +68,12 @@ def _is_hip(cp):
     return bool(getattr(cp.cuda.runtime, "is_hip", False))
 
 
-def _source(intrinsic, abs_sum=False):
+def _source(symbol, intrinsic, abs_sum=False):
     from pyrite.montecarlo.spectrum.cxr import _fourier_cuda as fc
 
     src = fc._DIRECT_SOURCE
+    assert src.count("void rectangles(") == 1
+    src = src.replace("void rectangles(", f"void {symbol}(")
     if intrinsic:
         assert src.count("sincosf(") == 1
         src = src.replace("sincosf(", "__sincosf(")
@@ -81,11 +84,12 @@ def _source(intrinsic, abs_sum=False):
     return src
 
 
-def _kernel(cp, precision, options, intrinsic, abs_sum=False):
+def _kernel(cp, arm, precision, options, intrinsic, abs_sum=False):
     flag = "1" if precision == "fp32" else "0"
+    symbol = "rectangles_" + arm.replace("-", "_")
     return cp.RawKernel(
-        _source(intrinsic, abs_sum),
-        "rectangles",
+        _source(symbol, intrinsic, abs_sum),
+        symbol,
         options=(f"-DDIRECT_FP32={flag}", *options),
     )
 
@@ -97,9 +101,8 @@ def _arms(cp, only):
         options = amd if hip else nv
         if options is None or (only and name not in only and name != REFERENCE):
             continue
-        out.append(
-            (name, precision, options, intrinsic, _kernel(cp, precision, options, intrinsic))
-        )
+        kernel = _kernel(cp, name, precision, options, intrinsic)
+        out.append((name, precision, options, intrinsic, kernel))
     return out
 
 
@@ -144,8 +147,8 @@ def _spectrum(fc, kernel, E, a, w, axis, kwargs):
         fc._direct_kernel = real
 
 
-def _launch(cp, kernel, launch, buf):
-    buf.fill(0)
+def _launch(kernel, launch, buf):
+    """One kernel launch, accumulating into ``buf`` (the caller zeroes it)."""
     kernel(
         launch["grid"],
         launch["block"],
@@ -221,15 +224,17 @@ def _cupy_default_options(cp):
 
 
 def arms(flush_dir, out_json, repeats=5, only=(), n_modes=16):
+    paths = sorted(Path(flush_dir).glob("flush-*.npz"))
+    if not paths:
+        raise SystemExit(f"no flush-*.npz in {flush_dir}")
     cp = _cp()
     from pyrite.montecarlo.spectrum.cxr import _fourier_cuda as fc
 
     arm_list = _arms(cp, set(only))
-    abs_kernel = _kernel(
-        cp, "fp64", ("--fmad=false",) if not _is_hip(cp) else ("-ffp-contract=off",), False, True
-    )
+    strict = ("-ffp-contract=off",) if _is_hip(cp) else ("--fmad=false",)
+    abs_kernel = _kernel(cp, "abs-sum", "fp64", strict, False, abs_sum=True)
     flushes = []
-    for path in sorted(Path(flush_dir).glob("flush-*.npz")):
+    for path in paths:
         data = np.load(path)
         E, a, w = (cp.asarray(data[k]) for k in ("E_res", "a_width", "weight"))
         axis = tuple(data["axis"].tolist())
@@ -241,18 +246,19 @@ def arms(flush_dir, out_json, repeats=5, only=(), n_modes=16):
             continue
         launch = launches[0]
         buf = cp.zeros(2 * launch["n_out"], dtype=cp.float64)
-        _launch(cp, abs_kernel, launch, buf)
+        _launch(abs_kernel, launch, buf)
         scale = cp.asnumpy(buf[0::2]).copy()
         first, same, times = {}, {}, {n: [] for n, *_ in arm_list}
         start, stop = cp.cuda.Event(), cp.cuda.Event()
         for _name, _p, _o, _i, kernel in arm_list:  # warm-up/compile
-            _launch(cp, kernel, launch, buf)
+            _launch(kernel, launch, buf)
         cp.cuda.Device().synchronize()
         for r in range(repeats):
             k = r % len(arm_list)
             for name, _p, _o, _i, kernel in arm_list[k:] + arm_list[:k]:
+                buf.fill(0)
                 start.record()
-                _launch(cp, kernel, launch, buf)
+                _launch(kernel, launch, buf)
                 stop.record()
                 stop.synchronize()
                 times[name].append(cp.cuda.get_elapsed_time(start, stop))
@@ -322,6 +328,8 @@ def arms(flush_dir, out_json, repeats=5, only=(), n_modes=16):
         when=time.strftime("%Y-%m-%dT%H:%M:%S%z"),
     )
     Path(out_json).write_text(json.dumps(record, indent=1, default=str))
+    if not any("arms" in f for f in flushes):
+        raise SystemExit(f"no flush reached the direct kernel; nothing measured ({out_json})")
 
 
 def main(argv=None):
