@@ -50,9 +50,10 @@ Then locally: run ``pyrite app analysis <material>`` or ``pyrite app analysis ex
 
 Transport uses ssh/scp and the configured SSH options. Code sync uses rsync
 when both ends have it (``PYRITE_SYNC_TRANSPORT``) and otherwise falls back to
-tar+scp, so rsync is never required. The remote checkout and ``uv`` default to ``~/pyrite`` and
-``~/.local/bin/uv`` (``~`` is the remote login home); set ``PYRITE_REMOTE_DIR``
-and ``PYRITE_REMOTE_UV`` when they differ.
+tar+scp, so rsync is never required. The remote checkout and ``pixi`` default to ``~/pyrite`` and
+``~/.pixi/bin/pixi`` (``~`` is the remote login home); set ``PYRITE_REMOTE_DIR``
+and ``PYRITE_REMOTE_PIXI`` when they differ. Jobs install and run the target's
+pixi environment (its ``environment``, else its GPU vendor's) from ``pixi.lock``.
 """
 
 # ---------------------------------------------------------------------------
@@ -85,7 +86,7 @@ from . import (
 # dynamically through ``config.remote_host()``.
 HOST = env_value("PYRITE_REMOTE_HOST")
 REMOTE_DIR = config.REMOTE_DIR
-REMOTE_UV = config.REMOTE_UV
+REMOTE_PIXI = config.REMOTE_PIXI
 SLURM_GPUS = config.SLURM_GPUS
 SLURM_TIME = config.SLURM_TIME
 DEFAULT_PARALLEL_MATERIALS = config.DEFAULT_PARALLEL_MATERIALS
@@ -98,11 +99,13 @@ SYNC_PATHS = config.SYNC_PATHS
 TEXT_EXTS = config.TEXT_EXTS
 remote_host = config.remote_host
 remote_dir = config.remote_dir
-remote_uv = config.remote_uv
+remote_pixi = config.remote_pixi
+remote_environment = config.remote_environment
 remote_path = config.remote_path
 shell_word = config.shell_word
 shell_remote_dir = config.shell_remote_dir
-shell_remote_uv = config.shell_remote_uv
+shell_remote_pixi = config.shell_remote_pixi
+shell_remote_run = config.shell_remote_run
 scp_remote_path = config.scp_remote_path
 
 # --- from transport ---------------------------------------------------

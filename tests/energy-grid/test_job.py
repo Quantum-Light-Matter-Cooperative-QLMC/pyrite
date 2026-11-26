@@ -174,14 +174,14 @@ def _run_payload(tmp_path, monkeypatch, analysis_exit):
     jobdir = remote_root / "jobs" / jobid
     jobdir.mkdir(parents=True)
     (jobdir / "meta").write_text("slurm_job_id: 219\n")
-    fake_uv = tmp_path / "uv"
-    fake_uv.write_text(f"#!/bin/sh\nexit {analysis_exit}\n")
-    fake_uv.chmod(0o755)
+    fake_pixi = tmp_path / "pixi"
+    fake_pixi.write_text(f"#!/bin/sh\nexit {analysis_exit}\n")
+    fake_pixi.chmod(0o755)
     fake_sbatch = tmp_path / "sbatch"
     fake_sbatch.write_text("#!/bin/sh\nexit 1\n")
     fake_sbatch.chmod(0o755)
     monkeypatch.setattr(job.remote.config, "REMOTE_DIR", str(remote_root))
-    monkeypatch.setattr(job.remote.config, "REMOTE_UV", str(fake_uv))
+    monkeypatch.setattr(job.remote.config, "REMOTE_PIXI", str(fake_pixi))
     payload = job._slice_payload(
         jobid,
         slice_minutes=1.0,
@@ -274,10 +274,10 @@ def test_slice_payload_quotes_hostile_remote_dir(monkeypatch):
     subprocess.run(["bash", "-n"], input=shell, text=True, check=True)
 
 
-def test_slice_payload_rejects_remote_uv_program_text(monkeypatch):
-    monkeypatch.setattr(job.remote.config, "REMOTE_UV", "uv; SENTINEL_LINE_GRID #")
+def test_slice_payload_rejects_remote_pixi_program_text(monkeypatch):
+    monkeypatch.setattr(job.remote.config, "REMOTE_PIXI", "pixi; SENTINEL_LINE_GRID #")
 
-    with pytest.raises(SystemExit, match="PYRITE_REMOTE_UV"):
+    with pytest.raises(SystemExit, match="PYRITE_REMOTE_PIXI"):
         job._slice_payload(
             "j",
             slice_minutes=10.0,

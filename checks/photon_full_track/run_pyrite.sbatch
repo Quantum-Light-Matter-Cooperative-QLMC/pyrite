@@ -18,5 +18,5 @@ CASE=${CASES[$((i / 20))]}
 SHARD=$((i % 20))
 export PYRITE_HOME NUMBA_CACHE_DIR=${NUMBA_CACHE_DIR:-$ROOT/numba-cache}
 cd "$PYRITE_CHECKOUT"
-.venv/bin/python checks/photon_full_track/pyrite_bench.py \
+.pixi/envs/default/bin/python checks/photon_full_track/pyrite_bench.py \
   "$CASE" 1000 $((20 * SHARD)) "$ROOT/results/${CASE}_pyrite_${SHARD}.npz"

@@ -15,10 +15,10 @@ def test_recompute_resumes_each_material_after_its_first_slice(monkeypatch, tmp_
     jobdir = tmp_path / "jobs" / "j"
     jobdir.mkdir(parents=True)
     (jobdir / "meta").write_text("slurm_job_id: 100\n")
-    fake_uv = tmp_path / "uv"
-    fake_uv.write_text(
+    fake_pixi = tmp_path / "pixi"
+    fake_pixi.write_text(
         "#!/bin/bash\n"
-        'if [ "$1" = sync ]; then exit 0; fi\n'
+        'if [ "$1" = install ]; then exit 0; fi\n'
         'case "$*" in *"tables verify"*) exit 0 ;; esac\n'
         f'echo "$*" >> "{tmp_path}/calls"\n'
         'case "$*" in *"-m hopg"*) m=hopg ;; *) m=hbn ;; esac\n'
@@ -34,13 +34,13 @@ def test_recompute_resumes_each_material_after_its_first_slice(monkeypatch, tmp_
         + ('kill -USR1 "$(ps -o ppid= -p "$PPID")"\n' if first_exit == 143 else "")
         + f"exit {first_exit}\n"
     )
-    fake_uv.chmod(0o755)
+    fake_pixi.chmod(0o755)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     (bin_dir / "sbatch").write_text("#!/bin/sh\necho 4242\n")
     (bin_dir / "sbatch").chmod(0o755)
     monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
-    monkeypatch.setattr(config, "REMOTE_UV", str(fake_uv))
+    monkeypatch.setattr(config, "REMOTE_PIXI", str(fake_pixi))
     script = scripts._chunked_queue_script("j", ["hopg", "hbn"], False, None, 10, recompute=True)
     env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
     for _ in range(3 if first_exit == 143 else 2):

@@ -107,13 +107,13 @@ def add_window_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def remote_windows_command(args: argparse.Namespace, uv: str) -> str:
+def remote_windows_command(args: argparse.Namespace, run: str) -> str:
     """The slice body: one budgeted ``convergence_case run-windows`` invocation."""
     parts = [
         "PYRITE_MC_FREE_EVERY=40",
         "PYRITE_MC_FREE_WATERMARK_MB=15000",
-        uv,
-        "run --no-sync python -m pyrite.energy_grid.convergence_case run-windows",
+        run,
+        "python -m pyrite.energy_grid.convergence_case run-windows",
         f"--materials {shlex.quote(args.materials)}",
         f"--energies {shlex.quote(args.energies)}",
         f"--tilts {shlex.quote(args.tilts)}",
@@ -134,13 +134,13 @@ def remote_windows_command(args: argparse.Namespace, uv: str) -> str:
     return " ".join(parts)
 
 
-def remote_run_command(args: argparse.Namespace, uv: str) -> str:
+def remote_run_command(args: argparse.Namespace, run: str) -> str:
     """The slice body: one budgeted ``convergence_case run`` invocation."""
     parts = [
         "PYRITE_MC_FREE_EVERY=40",
         "PYRITE_MC_FREE_WATERMARK_MB=15000",
-        uv,
-        "run --no-sync python -m pyrite.energy_grid.convergence_case run",
+        run,
+        "python -m pyrite.energy_grid.convergence_case run",
         f"--materials {shlex.quote(args.materials)}",
         f"--energies {shlex.quote(args.energies)}",
         f"--tilts {shlex.quote(args.tilts)}",
@@ -160,8 +160,8 @@ def _slice_payload(jobdir: str, command: str, remote, sync_block: str) -> str:
     """The derive job's chained-slice contract with this ladder as the body.
 
     ``sync_block`` is the standard remote dependency sync
-    (``remote.scripts._uv_sync_block``); the body runs ``uv run --no-sync``, so
-    without it a box whose venv predates the lockfile fails on import.
+    (``remote.scripts._pixi_install_block``); the body runs ``pixi run --as-is``,
+    so without it a box whose environment predates the lockfile fails on import.
     """
     from ..remote import config as remote_config
 
@@ -227,15 +227,15 @@ def _validate_windows(args: argparse.Namespace) -> None:
 def start(args: argparse.Namespace) -> str:
     """Sync, stage, and submit slice zero; return the remote job id."""
     from .. import remote
-    from ..remote.scripts import _uv_sync_block
+    from ..remote.scripts import _pixi_install_block
 
     _validate(args)
     jobid = remote._new_jobid()
     jobdir = remote.remote_path(remote.JOBS_SUBDIR, jobid)
-    command = remote_run_command(args, remote.shell_remote_uv())
+    command = remote_run_command(args, remote.shell_remote_run())
     script = remote._slurm_batch_script(
         jobid,
-        _slice_payload(jobdir, command, remote, _uv_sync_block(once=True)),
+        _slice_payload(jobdir, command, remote, _pixi_install_block(once=True)),
         job_name=REMOTE_JOB_KIND,
         time_limit=str(int(args.time_limit_minutes)),
     )
@@ -270,15 +270,15 @@ def start(args: argparse.Namespace) -> str:
 def start_windows(args: argparse.Namespace) -> str:
     """Sync, stage, and submit slice zero of the window ladder; return the job id."""
     from .. import remote
-    from ..remote.scripts import _uv_sync_block
+    from ..remote.scripts import _pixi_install_block
 
     _validate_windows(args)
     jobid = remote._new_jobid()
     jobdir = remote.remote_path(remote.JOBS_SUBDIR, jobid)
-    command = remote_windows_command(args, remote.shell_remote_uv())
+    command = remote_windows_command(args, remote.shell_remote_run())
     script = remote._slurm_batch_script(
         jobid,
-        _slice_payload(jobdir, command, remote, _uv_sync_block(once=True)),
+        _slice_payload(jobdir, command, remote, _pixi_install_block(once=True)),
         job_name=WINDOW_JOB_KIND,
         time_limit=str(int(args.time_limit_minutes)),
     )
@@ -312,14 +312,14 @@ def start_windows(args: argparse.Namespace) -> str:
     return jobid
 
 
-def remote_precision_commands(args: argparse.Namespace, uv: str) -> list[str]:
+def remote_precision_commands(args: argparse.Namespace, run: str) -> list[str]:
     """Transport once (FP64), evaluate under FP64 then float32, compare."""
     stem = args.json_out[: -len(".json")]
-    module = "run --no-sync python -m pyrite.energy_grid.precision_ladder"
+    module = "python -m pyrite.energy_grid.precision_ladder"
     payload, fp64, fp32 = (f"{stem}.segments.pkl", f"{stem}.fp64.npz", f"{stem}.fp32.npz")
     transport = " ".join(
         [
-            f"PYRITE_FP64=1 PYRITE_MC_BACKEND=cuda {uv} {module} transport",
+            f"PYRITE_FP64=1 PYRITE_MC_BACKEND=cuda {run} {module} transport",
             f"--material {shlex.quote(args.material)}",
             f"--energy {float(args.energy):g}",
             f"--tilt {float(args.tilt):g}",
@@ -337,19 +337,19 @@ def remote_precision_commands(args: argparse.Namespace, uv: str) -> list[str]:
     )
     return [
         transport,
-        f"PYRITE_FP64=1 PYRITE_MC_BACKEND=cuda {uv} {evaluate} --expect-dtype float64 "
+        f"PYRITE_FP64=1 PYRITE_MC_BACKEND=cuda {run} {evaluate} --expect-dtype float64 "
         f"--out {shlex.quote(fp64)}",
-        f"env -u PYRITE_FP64 PYRITE_MC_BACKEND=cuda {uv} {evaluate} --expect-dtype float32 "
+        f"env -u PYRITE_FP64 PYRITE_MC_BACKEND=cuda {run} {evaluate} --expect-dtype float32 "
         f"--out {shlex.quote(fp32)}",
-        f"PYRITE_MC_BACKEND=cpu {uv} {module} compare --reference {shlex.quote(fp64)} "
+        f"PYRITE_MC_BACKEND=cpu {run} {module} compare --reference {shlex.quote(fp64)} "
         f"--candidate {shlex.quote(fp32)} --json-out {shlex.quote(args.json_out)}",
     ]
 
 
-def remote_bandwidth_commands(args: argparse.Namespace, uv: str) -> list[str]:
+def remote_bandwidth_commands(args: argparse.Namespace, run: str) -> list[str]:
     """FP64 transport and reference axis, then the float32 measured axis."""
     stem = args.json_out[: -len(".json")]
-    module = "run --no-sync python -m pyrite.energy_grid.bandwidth_check"
+    module = "python -m pyrite.energy_grid.bandwidth_check"
     payload = shlex.quote(f"{stem}.segments.pkl")
     report = shlex.quote(args.json_out)
     if args.attribute:
@@ -364,14 +364,14 @@ def remote_bandwidth_commands(args: argparse.Namespace, uv: str) -> list[str]:
         return [
             " ".join(
                 [
-                    f"env -u PYRITE_FP64 PYRITE_MC_BACKEND=cuda {uv} {module} attribute",
+                    f"env -u PYRITE_FP64 PYRITE_MC_BACKEND=cuda {run} {module} attribute",
                     *common,
                     f"--json-out {report}",
                 ]
             ),
             " ".join(
                 [
-                    f"PYRITE_FP64=1 PYRITE_MC_BACKEND=cuda {uv} {module} attribute",
+                    f"PYRITE_FP64=1 PYRITE_MC_BACKEND=cuda {run} {module} attribute",
                     *common,
                     f"--json-out {fp64_report}",
                 ]
@@ -381,7 +381,7 @@ def remote_bandwidth_commands(args: argparse.Namespace, uv: str) -> list[str]:
         return [
             " ".join(
                 [
-                    f"env -u PYRITE_FP64 PYRITE_MC_BACKEND=cuda {uv} {module} production",
+                    f"env -u PYRITE_FP64 PYRITE_MC_BACKEND=cuda {run} {module} production",
                     f"--material {shlex.quote(args.material)}",
                     f"--energy {float(args.energy):g}",
                     f"--configs {shlex.quote(args.configs)}",
@@ -394,7 +394,7 @@ def remote_bandwidth_commands(args: argparse.Namespace, uv: str) -> list[str]:
     return [
         " ".join(
             [
-                f"PYRITE_FP64=1 PYRITE_MC_BACKEND=cuda {uv} {module} reference",
+                f"PYRITE_FP64=1 PYRITE_MC_BACKEND=cuda {run} {module} reference",
                 f"--material {shlex.quote(args.material)}",
                 f"--energy {float(args.energy):g}",
                 f"--configs {shlex.quote(args.configs)}",
@@ -408,7 +408,7 @@ def remote_bandwidth_commands(args: argparse.Namespace, uv: str) -> list[str]:
                 f"--payload {payload} --json-out {report}",
             ]
         ),
-        f"env -u PYRITE_FP64 PYRITE_MC_BACKEND=cuda {uv} {module} candidate "
+        f"env -u PYRITE_FP64 PYRITE_MC_BACKEND=cuda {run} {module} candidate "
         f"--payload {payload} --json-out {report}",
     ]
 
@@ -434,7 +434,7 @@ echo "done $(date -Is)" > "$JOBDIR/state"
 def start_precision(args: argparse.Namespace) -> str:
     """Submit the float32-versus-FP64 lineshape measurement as one job."""
     from .. import remote
-    from ..remote.scripts import _uv_sync_block
+    from ..remote.scripts import _pixi_install_block
     from .job import _validate_remote_output_name
 
     _validate_remote_output_name(args.json_out)
@@ -446,10 +446,10 @@ def start_precision(args: argparse.Namespace) -> str:
         raise SystemExit("--bands may contain only digits, '.', ',', ':'")
     jobid = remote._new_jobid()
     jobdir = remote.remote_path(remote.JOBS_SUBDIR, jobid)
-    commands = remote_precision_commands(args, remote.shell_remote_uv())
+    commands = remote_precision_commands(args, remote.shell_remote_run())
     script = remote._slurm_batch_script(
         jobid,
-        _precision_payload(jobdir, commands, remote, _uv_sync_block()),
+        _precision_payload(jobdir, commands, remote, _pixi_install_block()),
         job_name=PRECISION_JOB_KIND,
         time_limit=str(int(args.time_limit_minutes)),
     )
@@ -482,7 +482,7 @@ def start_precision(args: argparse.Namespace) -> str:
 def start_bandwidth(args: argparse.Namespace) -> str:
     """Submit the measured-bandwidth comparison as one job."""
     from .. import remote
-    from ..remote.scripts import _uv_sync_block
+    from ..remote.scripts import _pixi_install_block
     from .job import _validate_remote_output_name
 
     _validate_remote_output_name(args.json_out)
@@ -501,10 +501,10 @@ def start_bandwidth(args: argparse.Namespace) -> str:
         raise SystemExit("--configs may contain only digits, '.', ',', ':', 'e'")
     jobid = remote._new_jobid()
     jobdir = remote.remote_path(remote.JOBS_SUBDIR, jobid)
-    commands = remote_bandwidth_commands(args, remote.shell_remote_uv())
+    commands = remote_bandwidth_commands(args, remote.shell_remote_run())
     script = remote._slurm_batch_script(
         jobid,
-        _precision_payload(jobdir, commands, remote, _uv_sync_block(), label="bandwidth"),
+        _precision_payload(jobdir, commands, remote, _pixi_install_block(), label="bandwidth"),
         job_name=BANDWIDTH_JOB_KIND,
         time_limit=str(int(args.time_limit_minutes)),
         mem_per_cpu=args.mem_per_cpu,

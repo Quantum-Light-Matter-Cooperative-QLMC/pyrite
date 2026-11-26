@@ -61,6 +61,8 @@ def _fake_box(monkeypatch, *, remote_rsync=True, fail_rsync=False):
             return ""
         if not remote_rsync:
             command = command.replace("command -v rsync", "false")
+        # The box's pixi is configured, not necessarily on this machine's PATH.
+        command = command.replace('command -v "pixi"', "true")
         return subprocess.check_output(["sh", "-c", command], text=True)
 
     def run(argv, **_kwargs):

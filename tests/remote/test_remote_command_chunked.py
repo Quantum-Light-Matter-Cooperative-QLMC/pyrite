@@ -68,10 +68,10 @@ def test_chunked_script_hands_off_state_before_resubmitting(monkeypatch, tmp_pat
     jobdir = tmp_path / "jobs" / "j"
     jobdir.mkdir(parents=True)
     (jobdir / "meta").write_text("slurm_job_id: 100\n")
-    fake_uv = tmp_path / "uv"
-    fake_uv.write_text(
+    fake_pixi = tmp_path / "pixi"
+    fake_pixi.write_text(
         "#!/bin/sh\n"
-        'if [ "$1" = sync ]; then exit 0; fi\n'
+        'if [ "$1" = install ]; then exit 0; fi\n'
         'case "$*" in *"tables verify"*) exit 0 ;; esac\n'
         'case "$*" in\n'
         "  *hopg*) exit 75 ;;\n"  # stays unresolved: budget hit, not a failure
@@ -79,7 +79,7 @@ def test_chunked_script_hands_off_state_before_resubmitting(monkeypatch, tmp_pat
         "esac\n"
         "exit 9\n"  # unexpected material: fail loudly rather than silently pass
     )
-    fake_uv.chmod(0o755)
+    fake_pixi.chmod(0o755)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     witness = tmp_path / "witness"
@@ -93,7 +93,7 @@ def test_chunked_script_hands_off_state_before_resubmitting(monkeypatch, tmp_pat
     )
     fake_sbatch.chmod(0o755)
     monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
-    monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
+    monkeypatch.setattr(config, "REMOTE_PIXI", fake_pixi.as_posix())
     script = remote._chunked_queue_script(
         "j", ["hopg", "hbn"], quick=False, workers=None, chunk_minutes=10.0
     )
@@ -123,17 +123,17 @@ def test_chunked_script_skips_failed_materials_and_terminates_without_resubmitti
     jobdir = tmp_path / "jobs" / "j"
     jobdir.mkdir(parents=True)
     (jobdir / "log").write_text("failed: hopg\n")
-    fake_uv = tmp_path / "uv"
-    fake_uv.write_text(
+    fake_pixi = tmp_path / "pixi"
+    fake_pixi.write_text(
         "#!/bin/sh\n"
-        'if [ "$1" = sync ]; then exit 0; fi\n'
+        'if [ "$1" = install ]; then exit 0; fi\n'
         'case "$*" in *"tables verify"*) exit 0 ;; esac\n'
         'case "$*" in\n'
         "  *hbn*) exit 0 ;;\n"
         "esac\n"
         "exit 9\n"  # hopg must never be re-scanned once it is marked failed
     )
-    fake_uv.chmod(0o755)
+    fake_pixi.chmod(0o755)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     marker = tmp_path / "sbatch_called"
@@ -141,7 +141,7 @@ def test_chunked_script_skips_failed_materials_and_terminates_without_resubmitti
     fake_sbatch.write_text(f"#!/bin/sh\ntouch '{marker.as_posix()}'\necho 4242\n")
     fake_sbatch.chmod(0o755)
     monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
-    monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
+    monkeypatch.setattr(config, "REMOTE_PIXI", fake_pixi.as_posix())
     script = remote._chunked_queue_script(
         "j", ["hopg", "hbn"], quick=False, workers=None, chunk_minutes=10.0
     )
@@ -171,20 +171,20 @@ def test_chunked_script_fails_closed_when_resubmission_fails(monkeypatch, tmp_pa
     bash = _bash_or_skip(tmp_path)
     jobdir = tmp_path / "jobs" / "j"
     jobdir.mkdir(parents=True)
-    fake_uv = tmp_path / "uv"
-    fake_uv.write_text(
+    fake_pixi = tmp_path / "pixi"
+    fake_pixi.write_text(
         "#!/bin/sh\n"
-        'if [ "$1" = sync ]; then exit 0; fi\n'
+        'if [ "$1" = install ]; then exit 0; fi\n'
         'case "$*" in *"tables verify"*) exit 0 ;; esac\n'
         "exit 75\n"  # budget hit every slice: hopg stays unresolved
     )
-    fake_uv.chmod(0o755)
+    fake_pixi.chmod(0o755)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     (bin_dir / "sbatch").write_text(sbatch_body)
     (bin_dir / "sbatch").chmod(0o755)
     monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
-    monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
+    monkeypatch.setattr(config, "REMOTE_PIXI", fake_pixi.as_posix())
     # Every retry fails the same way; skip the production backoff between them.
     monkeypatch.setattr(_queue_scripts, "_SBATCH_RETRY_SECONDS", 0)
     script = remote._chunked_queue_script(
@@ -207,18 +207,18 @@ def test_chunked_script_honors_stop_sentinel_without_resubmitting(monkeypatch, t
     jobdir = tmp_path / "jobs" / "j"
     jobdir.mkdir(parents=True)
     (jobdir / "STOP").write_text("")
-    fake_uv = tmp_path / "uv"
-    fake_uv.write_text(
-        '#!/bin/sh\nif [ "$1" = sync ]; then exit 0; fi\ncase "$*" in *"tables verify"*) exit 0 ;; esac\nexit 75\n'
+    fake_pixi = tmp_path / "pixi"
+    fake_pixi.write_text(
+        '#!/bin/sh\nif [ "$1" = install ]; then exit 0; fi\ncase "$*" in *"tables verify"*) exit 0 ;; esac\nexit 75\n'
     )
-    fake_uv.chmod(0o755)
+    fake_pixi.chmod(0o755)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     marker = tmp_path / "sbatch_called"
     (bin_dir / "sbatch").write_text(f"#!/bin/sh\ntouch '{marker.as_posix()}'\necho 4242\n")
     (bin_dir / "sbatch").chmod(0o755)
     monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
-    monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
+    monkeypatch.setattr(config, "REMOTE_PIXI", fake_pixi.as_posix())
     script = remote._chunked_queue_script(
         "j", ["hopg"], quick=False, workers=None, chunk_minutes=10.0
     )
@@ -239,13 +239,13 @@ def test_chunked_script_marks_hard_failure_and_never_retries(monkeypatch, tmp_pa
     bash = _bash_or_skip(tmp_path)
     jobdir = tmp_path / "jobs" / "j"
     jobdir.mkdir(parents=True)
-    fake_uv = tmp_path / "uv"
-    fake_uv.write_text(
-        '#!/bin/sh\nif [ "$1" = sync ]; then exit 0; fi\ncase "$*" in *"tables verify"*) exit 0 ;; esac\nexit 7\n'
+    fake_pixi = tmp_path / "pixi"
+    fake_pixi.write_text(
+        '#!/bin/sh\nif [ "$1" = install ]; then exit 0; fi\ncase "$*" in *"tables verify"*) exit 0 ;; esac\nexit 7\n'
     )
-    fake_uv.chmod(0o755)
+    fake_pixi.chmod(0o755)
     monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
-    monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
+    monkeypatch.setattr(config, "REMOTE_PIXI", fake_pixi.as_posix())
     script = remote._chunked_queue_script(
         "j", ["hopg"], quick=False, workers=None, chunk_minutes=10.0
     )
@@ -287,10 +287,10 @@ def test_chunked_prelimit_signal_resumes_only_143_with_checkpoint_progress(
     if not progress:
         (jobdir / "progress").mkdir()
         (jobdir / "progress" / "hopg.json").write_text("{")
-    fake_uv = tmp_path / "uv"
-    fake_uv.write_text(
+    fake_pixi = tmp_path / "pixi"
+    fake_pixi.write_text(
         "#!/bin/sh\n"
-        'if [ "$1" = sync ]; then exit 0; fi\n'
+        'if [ "$1" = install ]; then exit 0; fi\n'
         'case "$*" in *"tables verify"*) exit 0 ;; esac\n'
         + (
             f"printf '%s\\n' '{{\"cached_cases\":0,\"completed_new_cases\":1}}' > '{jobdir}/progress/hopg.json'\n"
@@ -300,14 +300,14 @@ def test_chunked_prelimit_signal_resumes_only_143_with_checkpoint_progress(
         + ('kill -USR1 "$(ps -o ppid= -p "$PPID")"\n' if prelimit else "")
         + f"exit {rc}\n"
     )
-    fake_uv.chmod(0o755)
+    fake_pixi.chmod(0o755)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     marker = tmp_path / "sbatch_called"
     (bin_dir / "sbatch").write_text(f"#!/bin/sh\ntouch '{marker}'\necho 4242\n")
     (bin_dir / "sbatch").chmod(0o755)
     monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
-    monkeypatch.setattr(config, "REMOTE_UV", str(fake_uv))
+    monkeypatch.setattr(config, "REMOTE_PIXI", str(fake_pixi))
     result = subprocess.run(
         [bash, "-c", builder()],
         capture_output=True,
@@ -338,18 +338,18 @@ def test_chunked_no_progress_slices_stop_after_three(monkeypatch, tmp_path):
     jobdir = tmp_path / "jobs" / "j"
     jobdir.mkdir(parents=True)
     (jobdir / "meta").write_text("slurm_job_id: 100\n")
-    fake_uv = tmp_path / "uv"
-    fake_uv.write_text(
-        '#!/bin/sh\nif [ "$1" = sync ]; then exit 0; fi\ncase "$*" in *"tables verify"*) exit 0 ;; esac\nexit 75\n'
+    fake_pixi = tmp_path / "pixi"
+    fake_pixi.write_text(
+        '#!/bin/sh\nif [ "$1" = install ]; then exit 0; fi\ncase "$*" in *"tables verify"*) exit 0 ;; esac\nexit 75\n'
     )
-    fake_uv.chmod(0o755)
+    fake_pixi.chmod(0o755)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     marker = tmp_path / "submissions"
     (bin_dir / "sbatch").write_text(f"#!/bin/sh\necho called >> '{marker}'\necho 4242\n")
     (bin_dir / "sbatch").chmod(0o755)
     monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
-    monkeypatch.setattr(config, "REMOTE_UV", str(fake_uv))
+    monkeypatch.setattr(config, "REMOTE_PIXI", str(fake_pixi))
     script = scripts._chunked_queue_script("j", ["hopg"], False, None, 10)
     env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
     results = [
@@ -375,22 +375,22 @@ def test_slice_overrun_retires_only_material_and_continues_next_slice(monkeypatc
     )
     (jobdir / ".no_progress_slices").write_text("2\n")
     calls = tmp_path / "calls"
-    fake_uv = tmp_path / "uv"
-    fake_uv.write_text(
-        '#!/bin/sh\nif [ "$1" = sync ]; then exit 0; fi\n'
+    fake_pixi = tmp_path / "pixi"
+    fake_pixi.write_text(
+        '#!/bin/sh\nif [ "$1" = install ]; then exit 0; fi\n'
         'case "$*" in *"tables verify"*) exit 0 ;; esac\n'
         f'echo "$*" >> "{calls}"\n'
         'case "$*" in *hopg*) kill -USR1 "$(ps -o ppid= -p "$PPID")"; exit 143 ;; esac\n'
         "exit 0\n"
     )
-    fake_uv.chmod(0o755)
+    fake_pixi.chmod(0o755)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     marker = tmp_path / "submissions"
     (bin_dir / "sbatch").write_text(f'#!/bin/sh\necho called >> "{marker}"\necho 4242\n')
     (bin_dir / "sbatch").chmod(0o755)
     monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
-    monkeypatch.setattr(config, "REMOTE_UV", str(fake_uv))
+    monkeypatch.setattr(config, "REMOTE_PIXI", str(fake_pixi))
     mats = ["hopg", "hbn"]
     if mode == "scan":
         script = scripts._chunked_queue_script("j", mats, False, None, 10)

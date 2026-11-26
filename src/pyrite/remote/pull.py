@@ -410,7 +410,7 @@ def pull(
             # propagates the remote command's status.
             remote_transfer = (
                 f"cd {config.shell_remote_dir()} && "
-                f"{config.host_uv_command()} run --no-sync pyrite checkpoint slim "
+                f"{config.host_run_command()} pyrite checkpoint slim "
                 f"{config.shell_arg(ckpt)}{flags} -o -"
             )
             # Timed so a slow pull is attributable: this covers box slim CPU +
@@ -514,7 +514,7 @@ def _staged_transfer(ckpt: str, flags: str, incoming: Path, stem: str) -> None:
                 config.remote_host(),
                 f"cd {config.shell_remote_dir()} && mkdir -p {PULL_STAGING} "
                 f"&& rm -f {staged_q} {fp_q} && "
-                f"{{ {config.host_uv_command()} run --no-sync pyrite checkpoint slim "
+                f"{{ {config.host_run_command()} pyrite checkpoint slim "
                 f"{config.shell_arg(ckpt)}{flags} -o {partial} || {{ rc=$?; rm -f {partial}; exit $rc; }}; }}",
             )
         )

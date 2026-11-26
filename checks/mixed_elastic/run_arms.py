@@ -3,6 +3,7 @@
 import argparse
 import json
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -35,7 +36,7 @@ def main():
                         pending += 1
                         continue
                     cmd = [
-                        ".venv/bin/python",
+                        sys.executable,
                         str(HERE.parent / "geant4_performance/pyrite_bench.py"),
                         sid,
                         "--histories",

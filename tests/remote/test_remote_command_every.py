@@ -54,8 +54,8 @@ def test_every_generated_bash_payload_quotes_hostile_remote_dir(monkeypatch, bui
 
     expected_jobdir = config.shell_word(config.remote_path(config.JOBS_SUBDIR, "j"))
     assert f"JOBDIR={expected_jobdir}" in script
-    assert "timing: uv sync %d.%03d s" in script
-    assert "sync --package pyrite-mc --no-default-groups --extra" in script
+    assert "timing: pixi install %d.%03d s" in script
+    assert "install --locked -e nvidia" in script
     syntax = subprocess.run(["bash", "-n"], input=script, capture_output=True, text=True)
     assert syntax.returncode == 0, syntax.stderr
 
@@ -127,10 +127,10 @@ def test_every_remote_bash_command_family_quotes_hostile_remote_dir(monkeypatch,
         ),
     ],
 )
-def test_every_generated_bash_payload_rejects_remote_uv_program_text(monkeypatch, build):
-    monkeypatch.setattr(config, "REMOTE_UV", "uv; SENTINEL_REMOTE_UV #")
+def test_every_generated_bash_payload_rejects_remote_pixi_program_text(monkeypatch, build):
+    monkeypatch.setattr(config, "REMOTE_PIXI", "pixi; SENTINEL_REMOTE_PIXI #")
 
-    with pytest.raises(SystemExit, match="PYRITE_REMOTE_UV"):
+    with pytest.raises(SystemExit, match="PYRITE_REMOTE_PIXI"):
         build()
 
 

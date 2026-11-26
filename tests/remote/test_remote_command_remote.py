@@ -87,7 +87,7 @@ def test_remote_defaults_are_home_relative_and_functional(monkeypatch):
         [
             sys.executable,
             "-c",
-            "from pyrite.remote import config; print(config.REMOTE_DIR, config.REMOTE_UV)",
+            "from pyrite.remote import config; print(config.REMOTE_DIR, config.REMOTE_PIXI)",
         ],
         capture_output=True,
         text=True,
@@ -95,7 +95,7 @@ def test_remote_defaults_are_home_relative_and_functional(monkeypatch):
         env=env,
     ).stdout.split()
 
-    assert out == ["~/pyrite", "~/.local/bin/uv"]
+    assert out == ["~/pyrite", "~/.pixi/bin/pixi"]
 
 
 def test_remote_home_expansion_resolves_tilde_over_one_cached_ssh_call(monkeypatch):
@@ -109,10 +109,10 @@ def test_remote_home_expansion_resolves_tilde_over_one_cached_ssh_call(monkeypat
     monkeypatch.setattr(config, "HOST", "box")
     monkeypatch.setattr(config.subprocess, "run", fake_run)
     monkeypatch.setattr(config, "REMOTE_DIR", "~/pyrite")
-    monkeypatch.setattr(config, "REMOTE_UV", "~/.local/bin/uv")
+    monkeypatch.setattr(config, "REMOTE_PIXI", "~/.pixi/bin/pixi")
     try:
         assert config.remote_dir() == "/home/lab/pyrite"
-        assert config.remote_uv() == "/home/lab/.local/bin/uv"
+        assert config.remote_pixi() == "/home/lab/.pixi/bin/pixi"
         assert config.remote_path("jobs") == "/home/lab/pyrite/jobs"
     finally:
         config._remote_home.cache_clear()
@@ -124,11 +124,11 @@ def test_remote_home_expansion_resolves_tilde_over_one_cached_ssh_call(monkeypat
 
 def test_remote_home_expansion_leaves_absolute_values_without_ssh(monkeypatch):
     monkeypatch.setattr(config, "REMOTE_DIR", "/srv/pyrite")
-    monkeypatch.setattr(config, "REMOTE_UV", "uv")
+    monkeypatch.setattr(config, "REMOTE_PIXI", "pixi")
 
     # The autouse ssh guard would raise if either call reached ssh.
     assert config.remote_dir() == "/srv/pyrite"
-    assert config.remote_uv() == "uv"
+    assert config.remote_pixi() == "pixi"
 
 
 @pytest.mark.parametrize("stdout, returncode", [("", 0), ("relative\n", 0), ("/home/lab\n", 255)])

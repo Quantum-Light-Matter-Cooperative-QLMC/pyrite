@@ -146,7 +146,7 @@ def _pin_remote_paths(monkeypatch):
     There is no built-in remote host, so an unpinned test would resolve whatever
     ``remote.target`` the developer's own config store holds.
 
-    The real defaults are ``~/pyrite`` and ``~/.local/bin/uv``, which resolve
+    The real defaults are ``~/pyrite`` and ``~/.pixi/bin/pixi``, which resolve
     against the remote login home over ssh; tests must never do that. Tests that
     exercise the ``~`` expansion or the real defaults set their own values.
     """
@@ -156,7 +156,7 @@ def _pin_remote_paths(monkeypatch):
         return
     monkeypatch.setattr(config, "HOST", "remote-host")
     monkeypatch.setattr(config, "REMOTE_DIR", "/path/to/pyrite")
-    monkeypatch.setattr(config, "REMOTE_UV", "uv")
+    monkeypatch.setattr(config, "REMOTE_PIXI", "pixi")
     # The SLURM target profile likewise resolves through the developer's store.
     monkeypatch.setattr(config, "REMOTE_GPU_VENDOR", "nvidia")
     monkeypatch.setattr(config, "SLURM_PARTITION", "gpu")
@@ -178,7 +178,7 @@ def _pin_remote_paths(monkeypatch):
     if package is not None:
         monkeypatch.setattr(package, "HOST", "remote-host")
         monkeypatch.setattr(package, "REMOTE_DIR", "/path/to/pyrite")
-        monkeypatch.setattr(package, "REMOTE_UV", "uv")
+        monkeypatch.setattr(package, "REMOTE_PIXI", "pixi")
 
 
 @pytest.fixture(scope="session")

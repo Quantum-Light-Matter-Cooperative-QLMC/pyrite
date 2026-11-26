@@ -23,7 +23,7 @@ from tests.remote._remote_test_helpers import (
 
 def test_queue_script_has_per_material_scan_calls():
     s = remote._queue_script("20260101-000000", ["mose2", "wse2"], quick=True, workers=8)
-    assert 'scan_launcher=("uv" run --no-sync python)' in s
+    assert 'scan_launcher=("pixi" run --as-is -e nvidia python)' in s
     assert '"${scan_launcher[@]}" -u -m pyrite._entry.scan' in s
     assert "--quick" in s and "--workers 8" in s
     assert "mose2" in s and "wse2" in s
@@ -46,28 +46,30 @@ def test_queue_script_accepts_three_parallel_materials():
     assert "wait -n" in script
 
 
-def test_queue_script_records_uv_sync_timing_and_preserves_failure_state(monkeypatch, tmp_path):
+def test_queue_script_records_pixi_install_timing_and_preserves_failure_state(
+    monkeypatch, tmp_path
+):
     bash = _bash_or_skip(tmp_path)
     jobdir = tmp_path / "jobs" / "j"
     jobdir.mkdir(parents=True)
-    fake_uv = tmp_path / "uv"
-    fake_uv.write_text("#!/bin/sh\nexit 7\n")
-    fake_uv.chmod(0o755)
+    fake_pixi = tmp_path / "pixi"
+    fake_pixi.write_text("#!/bin/sh\nexit 7\n")
+    fake_pixi.chmod(0o755)
     monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
-    monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
+    monkeypatch.setattr(config, "REMOTE_PIXI", fake_pixi.as_posix())
     script = remote._queue_script("j", ["hopg"], quick=False, workers=None)
 
     result = subprocess.run([bash, "-c", script], capture_output=True, text=True)
 
     assert result.returncode != 0
-    assert (jobdir / "state").read_text().startswith("FAILED (uv sync)")
-    assert "timing: uv sync " in (jobdir / "log").read_text()
+    assert (jobdir / "state").read_text().startswith("FAILED (pixi install)")
+    assert "timing: pixi install " in (jobdir / "log").read_text()
 
 
-def test_queue_script_syncs_runtime_member_without_test_tools():
+def test_queue_script_installs_the_locked_vendor_environment():
     script = remote._queue_script("j", ["hopg"], quick=False, workers=None)
 
-    assert "sync --package pyrite-mc --no-default-groups --extra" in script
+    assert '"pixi" install --locked -e nvidia >>' in script
 
 
 def test_queue_script_no_flags_when_unset():
@@ -158,7 +160,7 @@ def test_queue_script_wraps_single_profile_session_with_nsys():
     assert 'if [ -n "${PYRITE_MC_NSYS_PYSTACK:-}" ]; then' in script
     assert "--python-backtrace=cuda" in script
     assert '--output="$trace_base"' in script
-    assert 'scan_launcher=("/path/to/pyrite/.venv/bin/python")' in script
+    assert 'scan_launcher=("/path/to/pyrite/.pixi/envs/nvidia/bin/python")' in script
     assert '--checkpoint-dir "$PERFCKPT/$m/$repetition"' in script
     assert "nsys stats" in script
     assert "--report cuda_api_sum,cuda_gpu_kern_sum,cuda_kern_exec_sum,nvtx_sum" in script
@@ -299,14 +301,14 @@ def test_queue_metadata_distinguishes_cpu_modes_from_nsys():
 def test_queue_script_cpu_failure_is_terminal_and_keeps_primary_artifacts(
     monkeypatch, tmp_path, cpu_only
 ):
-    fake_uv = tmp_path / "fake-uv"
-    fake_uv.write_text(
+    fake_pixi = tmp_path / "fake-pixi"
+    fake_pixi.write_text(
         '#!/usr/bin/env bash\ncase " $* " in *" pyrite._entry.profile_module "*) exit 9 ;; esac\nexit 0\n',
         encoding="utf-8",
     )
-    fake_uv.chmod(0o755)
+    fake_pixi.chmod(0o755)
     monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
-    monkeypatch.setattr(config, "REMOTE_UV", str(fake_uv))
+    monkeypatch.setattr(config, "REMOTE_PIXI", str(fake_pixi))
     artifact = tmp_path / "pyrite-output" / "performance" / "j" / "baseline" / "mos2.ndjson"
     artifact.parent.mkdir(parents=True)
     artifact.write_text("primary artifact\n", encoding="utf-8")
@@ -395,7 +397,7 @@ def test_queue_script_wraps_sessions_with_py_spy_and_isolates_checkpoints():
     )
 
     assert "py_spy_enabled=1" in script
-    assert 'tool run --from "py-spy>=0.4" py-spy' in script
+    assert '"pixi" exec --spec "py-spy>=0.4" py-spy' in script
     assert '"--output" "$trace_base.py-spy.json" "--"' in script
     assert '"--subprocesses"' in script and '"--nonblocking"' in script
     assert '-m pyrite.perf.py_spy \\\n        "$trace_base.py-spy.status" --' in script

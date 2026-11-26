@@ -198,7 +198,7 @@ def _physics_preflight_block(expected) -> str:
 
     payload = config.shell_arg(json.dumps(expected, sort_keys=True, separators=(",", ":")))
     verify = (
-        f"{config.remote_runtime_env()} {config.shell_remote_uv()} run --no-sync "
+        f"{config.remote_runtime_env()} {config.shell_remote_run()} "
         f"python -m pyrite.remote.physics_identity {payload}"
     )
     return f"""if ! {verify} >> "$JOBDIR/log" 2>&1; then
@@ -207,40 +207,39 @@ def _physics_preflight_block(expected) -> str:
 fi"""
 
 
-def _uv_sync_block(once: bool = False) -> str:
-    """Bash that records dependency-sync wall time without changing exit semantics.
+def _pixi_install_block(once: bool = False) -> str:
+    """Bash that records environment-install wall time without changing exit semantics.
 
-    once=True guards the sync behind a ``$JOBDIR/.synced`` sentinel so a
-    self-resubmitting chunked chain syncs on its FIRST slice only -- every later
-    slice runs in the same checked-out tree with the same lockfile, so re-syncing
-    is pure per-slice startup overhead. The sentinel is written only after a
-    successful sync, so a failed sync still exits 1 and the next slice retries.
-    Delete ``$JOBDIR/.synced`` to force a re-sync (e.g. after a mid-chain
-    dependency bump).
+    ``pixi install --locked`` installs the target's pixi environment exactly as
+    ``pixi.lock`` records it and refuses a stale lock. once=True guards the
+    install behind a ``$JOBDIR/.synced`` sentinel so a self-resubmitting chunked
+    chain installs on its FIRST slice only -- every later slice runs in the same
+    checked-out tree with the same lockfile, so reinstalling is pure per-slice
+    startup overhead. The sentinel is written only after a successful install,
+    so a failed install still exits 1 and the next slice retries. Delete
+    ``$JOBDIR/.synced`` to force a reinstall (e.g. after a mid-chain dependency
+    bump).
 
-    The target's ``extras`` (for example ``dask``) are synced beside the
-    vendor extra so the exact sync keeps them in a shared venv.
-
-    AMD targets build CuPy from source against the node's ROCm toolchain, which
-    ``CUPY_INSTALL_USE_HIP=1`` selects; NVIDIA installs the prebuilt wheel."""
-    vendor = config.remote_gpu_vendor()
-    build_env = "CUPY_INSTALL_USE_HIP=1 " if vendor == "amd" else ""
-    # An exact sync removes undeclared extras; the target's ``extras`` keep them.
-    extras = "".join(f" --extra {name}" for name in (vendor, *config.remote_extras()))
-    sync = f"""uv_sync_start_ns=$(date +%s%N)
-uv_sync_rc=0
-{build_env}{config.shell_remote_uv()} sync --package pyrite-mc --no-default-groups{extras} >> "$JOBDIR/log" 2>&1 || uv_sync_rc=$?
-uv_sync_elapsed_ms=$((($(date +%s%N) - uv_sync_start_ns) / 1000000))
-printf 'timing: uv sync %d.%03d s\\n' \
-  "$((uv_sync_elapsed_ms / 1000))" "$((uv_sync_elapsed_ms % 1000))" >> "$JOBDIR/log"
-if [ "$uv_sync_rc" -ne 0 ]; then
-  echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"
+    Each environment is its own ``.pixi/envs/<name>`` directory, so NVIDIA and
+    AMD jobs sharing one checkout never rebuild each other's packages. AMD
+    targets build CuPy from source against the node's ROCm toolchain, which
+    ``CUPY_INSTALL_USE_HIP=1`` selects."""
+    build_env = "CUPY_INSTALL_USE_HIP=1 " if config.remote_gpu_vendor() == "amd" else ""
+    environment = config.remote_environment()
+    sync = f"""pixi_install_start_ns=$(date +%s%N)
+pixi_install_rc=0
+{build_env}{config.shell_remote_pixi()} install --locked -e {environment} >> "$JOBDIR/log" 2>&1 || pixi_install_rc=$?
+pixi_install_elapsed_ms=$((($(date +%s%N) - pixi_install_start_ns) / 1000000))
+printf 'timing: pixi install %d.%03d s\\n' \
+  "$((pixi_install_elapsed_ms / 1000))" "$((pixi_install_elapsed_ms % 1000))" >> "$JOBDIR/log"
+if [ "$pixi_install_rc" -ne 0 ]; then
+  echo "FAILED (pixi install) $(date -Is)" > "$JOBDIR/state"
   exit 1
 fi"""
     if not once:
         return sync
     return f"""if [ -f "$JOBDIR/.synced" ]; then
-  printf 'timing: uv sync skipped (already synced this chain)\\n' >> "$JOBDIR/log"
+  printf 'timing: pixi install skipped (already installed this chain)\\n' >> "$JOBDIR/log"
 else
 {sync}
   : > "$JOBDIR/.synced"
@@ -260,14 +259,14 @@ def _cpu_profile_block(catalog_profile, performance_profile, cpu_flags):
   mkdir -p "$(dirname "$cpu_prof_base")" "$cpu_ckpt"
   printf '%s\\n' "cProfile pass (serial CPU)" >> "$JOBDIR/log"
   cpu_prof_rc=0
-  env -u PYRITE_MC_NSYS PYRITE_MC_BACKEND=cpu {config.shell_remote_uv()} run --no-sync python \\
+  env -u PYRITE_MC_NSYS PYRITE_MC_BACKEND=cpu {config.shell_remote_run()} python \\
     -m pyrite._entry.profile_module "$cpu_prof_base.prof" \\
     pyrite._entry.scan {config.shell_word(catalog_profile)} -m "$m"{cpu_flags} --workers 0 \\
     --max-minutes 10 \\
     --checkpoint-dir "$cpu_ckpt" --progress-file "$JOBDIR/progress/$m.cpu.json" \\
     --progress-phase cpu --no-progress >> "$JOBDIR/log" 2>&1 || cpu_prof_rc=$?
   if [ "$cpu_prof_rc" -eq 0 ] && [ -f "$cpu_prof_base.prof" ]; then
-    {config.shell_remote_uv()} run --no-sync python -c '{pstats_dump}' \\
+    {config.shell_remote_run()} python -c '{pstats_dump}' \\
       "$cpu_prof_base.prof" > "$cpu_prof_base.txt" 2>&1 || cpu_prof_rc=$?
   fi
   if [ "$cpu_prof_rc" -ne 0 ] || [ ! -f "$cpu_prof_base.prof" ] || [ ! -f "$cpu_prof_base.txt" ]; then
@@ -398,7 +397,7 @@ PERFCKPT={config.shell_word(config.remote_output_path("checkpoints", "performanc
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{_uv_sync_block(once=True)}
+{_pixi_install_block(once=True)}
 {_tables_preflight_block(allow_physics_fallback)}
 {_physics_preflight_block(expected_physics)}
 mats=({mats})
@@ -441,9 +440,9 @@ run_material() {{
       printf '%s\\n' "py-spy uncached sampling profile" >> "$JOBDIR/log"
     fi
     if [ "$nsys_enabled" -eq 1 ] || [ "$py_spy_enabled" -eq 1 ]; then
-      scan_launcher=({config.shell_remote_path(".venv", "bin", "python")})
+      scan_launcher=({config.shell_remote_env_python()})
     else
-      scan_launcher=({config.shell_remote_uv()} run --no-sync python)
+      scan_launcher=({config.shell_remote_run()} python)
     fi
     scan_command=(
       "${{scan_launcher[@]}}" -u -m pyrite._entry.scan {config.shell_word(catalog_profile)} -m "$m"{flags}
@@ -493,9 +492,9 @@ run_material() {{
       # --subprocesses it exits 0 whatever the scan does; the status wrapper
       # records the scan's own exit status instead.
       rm -f "$trace_base{PY_SPY_STATUS_SUFFIX}"
-      {config.shell_remote_uv()} tool run --from {config.shell_word(PY_SPY_REQUIREMENT)} py-spy \\
+      {config.shell_remote_pixi()} exec --spec {config.shell_word(PY_SPY_REQUIREMENT)} py-spy \\
         {py_spy_args} \\
-        {config.shell_remote_path(".venv", "bin", "python")} -m pyrite.perf.py_spy \\
+        {config.shell_remote_env_python()} -m pyrite.perf.py_spy \\
         "$trace_base{PY_SPY_STATUS_SUFFIX}" -- \\
         "${{scan_command[@]}}" >> "$JOBDIR/log" 2>&1
       scan_rc=$(cat "$trace_base{PY_SPY_STATUS_SUFFIX}" 2>/dev/null || echo 1)
@@ -713,7 +712,7 @@ PERFCKPT={config.shell_word(config.remote_output_path("checkpoints", "performanc
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{_uv_sync_block(once=True)}
+{_pixi_install_block(once=True)}
 {_tables_preflight_block(allow_physics_fallback)}
 {_physics_preflight_block(expected_physics)}
 mats=({mats})
@@ -739,12 +738,12 @@ for m in "${{mats[@]}}"; do
   rm -f "$JOBDIR/.child_rc"
 {resume_setup}
   (
-    uv_pid=
-    trap '[ -z "$uv_pid" ] || {{ kill -TERM "$uv_pid" 2>/dev/null || true; wait "$uv_pid" 2>/dev/null || true; }}; echo 143 > "$JOBDIR/.child_rc"; exit 143' TERM
-    {config.shell_remote_uv()} run --no-sync python -u -m pyrite._entry.scan {config.shell_word(catalog_profile)} -m "$m"{flags} "${{resume_flags[@]}}" --max-minutes "$remaining_min" \
+    job_pid=
+    trap '[ -z "$job_pid" ] || {{ kill -TERM "$job_pid" 2>/dev/null || true; wait "$job_pid" 2>/dev/null || true; }}; echo 143 > "$JOBDIR/.child_rc"; exit 143' TERM
+    {config.shell_remote_run()} python -u -m pyrite._entry.scan {config.shell_word(catalog_profile)} -m "$m"{flags} "${{resume_flags[@]}}" --max-minutes "$remaining_min" \
       --progress-file "$JOBDIR/progress/$m.json" --no-progress >> "$JOBDIR/log" 2>&1 &
-    uv_pid=$!
-    wait "$uv_pid"
+    job_pid=$!
+    wait "$job_pid"
     echo "$?" > "$JOBDIR/.child_rc"
   ) &
 {_chunked_run_wait()}
@@ -778,10 +777,10 @@ def _zhai_queue_script(jobid, ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     return f"""JOBDIR={config.shell_word(jobdir)}
 cd {config.shell_remote_dir()} || exit 1
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{_uv_sync_block(once=True)}
+{_pixi_install_block(once=True)}
 {_tables_preflight_block()}
 echo "running zhai reproduction since $(date -Is)" > "$JOBDIR/state"
-if ! {config.shell_remote_uv()} run --no-sync python -m pyrite._entry.reproduce_zhai{flags} >> "$JOBDIR/log" 2>&1
+if ! {config.shell_remote_run()} python -m pyrite._entry.reproduce_zhai{flags} >> "$JOBDIR/log" 2>&1
 then
   echo "FAILED $(date -Is)" > "$JOBDIR/state"
   exit 1
@@ -835,7 +834,7 @@ def _rebrem_queue_script(
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{_uv_sync_block(once=True)}
+{_pixi_install_block(once=True)}
 {_tables_preflight_block()}
 mats=({mats})
 total=${{#mats[@]}}
@@ -845,7 +844,7 @@ for m in "${{mats[@]}}"; do
   n=$((n + 1))
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
-  if ! {config.shell_remote_uv()} run --no-sync pyrite checkpoint recompute brem "$m"{flags} \
+  if ! {config.shell_remote_run()} pyrite checkpoint recompute brem "$m"{flags} \
     --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1
   then
     echo "WARNING: rebrem failed for $m; continuing" >> "$JOBDIR/log"
@@ -893,7 +892,7 @@ def _rebrem_chunked_queue_script(
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{_uv_sync_block(once=True)}
+{_pixi_install_block(once=True)}
 {_tables_preflight_block()}
 mats=({mats})
 total=${{#mats[@]}}
@@ -916,12 +915,12 @@ for m in "${{mats[@]}}"; do
   rc=0
   rm -f "$JOBDIR/.child_rc"
   (
-    uv_pid=
-    trap '[ -z "$uv_pid" ] || {{ kill -TERM "$uv_pid" 2>/dev/null || true; wait "$uv_pid" 2>/dev/null || true; }}; echo 143 > "$JOBDIR/.child_rc"; exit 143' TERM
-    {config.shell_remote_uv()} run --no-sync pyrite checkpoint recompute brem "$m"{flags} --max-minutes "$remaining_min" \
+    job_pid=
+    trap '[ -z "$job_pid" ] || {{ kill -TERM "$job_pid" 2>/dev/null || true; wait "$job_pid" 2>/dev/null || true; }}; echo 143 > "$JOBDIR/.child_rc"; exit 143' TERM
+    {config.shell_remote_run()} pyrite checkpoint recompute brem "$m"{flags} --max-minutes "$remaining_min" \
       --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1 &
-    uv_pid=$!
-    wait "$uv_pid"
+    job_pid=$!
+    wait "$job_pid"
     echo "$?" > "$JOBDIR/.child_rc"
   ) &
 {_chunked_run_wait()}
@@ -1009,7 +1008,7 @@ def _recxr_queue_script(
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{_uv_sync_block(once=True)}
+{_pixi_install_block(once=True)}
 {_tables_preflight_block()}
 mats=({mats})
 total=${{#mats[@]}}
@@ -1019,7 +1018,7 @@ for m in "${{mats[@]}}"; do
   n=$((n + 1))
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
-  if ! {config.shell_remote_uv()} run --no-sync pyrite checkpoint recompute cxr "$m"{flags} \
+  if ! {config.shell_remote_run()} pyrite checkpoint recompute cxr "$m"{flags} \
     --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1
   then
     echo "WARNING: reline failed for $m; continuing" >> "$JOBDIR/log"
@@ -1067,7 +1066,7 @@ def _recxr_chunked_queue_script(
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{_uv_sync_block(once=True)}
+{_pixi_install_block(once=True)}
 {_tables_preflight_block()}
 mats=({mats})
 total=${{#mats[@]}}
@@ -1090,12 +1089,12 @@ for m in "${{mats[@]}}"; do
   rc=0
   rm -f "$JOBDIR/.child_rc"
   (
-    uv_pid=
-    trap '[ -z "$uv_pid" ] || {{ kill -TERM "$uv_pid" 2>/dev/null || true; wait "$uv_pid" 2>/dev/null || true; }}; echo 143 > "$JOBDIR/.child_rc"; exit 143' TERM
-    {config.shell_remote_uv()} run --no-sync pyrite checkpoint recompute cxr "$m"{flags} --max-minutes "$remaining_min" \
+    job_pid=
+    trap '[ -z "$job_pid" ] || {{ kill -TERM "$job_pid" 2>/dev/null || true; wait "$job_pid" 2>/dev/null || true; }}; echo 143 > "$JOBDIR/.child_rc"; exit 143' TERM
+    {config.shell_remote_run()} pyrite checkpoint recompute cxr "$m"{flags} --max-minutes "$remaining_min" \
       --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1 &
-    uv_pid=$!
-    wait "$uv_pid"
+    job_pid=$!
+    wait "$job_pid"
     echo "$?" > "$JOBDIR/.child_rc"
   ) &
 {_chunked_run_wait()}

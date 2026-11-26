@@ -17,14 +17,14 @@ def configured(monkeypatch, tmp_path):
     monkeypatch.delenv("PYRITE_REMOTE_TARGET", raising=False)
     monkeypatch.setattr(config, "_remote_home", lambda host: "/home/remote")
     targets.save_target(
-        "nvidia", {"host": "box", "remote_dir": "/srv/nvidia", "uv": "uv", "partition": "gpu"}
+        "nvidia", {"host": "box", "remote_dir": "/srv/nvidia", "pixi": "pixi", "partition": "gpu"}
     )
     targets.save_target(
         "amd",
         {
             "host": "box",
             "remote_dir": "/srv/amd",
-            "uv": "uv",
+            "pixi": "pixi",
             "gpu_vendor": "amd",
             "partition": "gpu-amd",
             "nodelist": "ace",
@@ -64,7 +64,7 @@ def test_legacy_selection(configured, monkeypatch):
         {"host": "-bad"},
         {"host": "box", "partition": "bad\ntext"},
         {"host": "box", "remote_dir": "../relative"},
-        {"host": "box", "uv": "uv;bad"},
+        {"host": "box", "pixi": "pixi;bad"},
     ],
 )
 def test_invalid_target(values):
@@ -159,7 +159,7 @@ def _hoffman(**extra):
     values = {
         "host": "h2",
         "remote_dir": "/srv/h2",
-        "uv": "uv",
+        "pixi": "pixi",
         "partition": "campus",
         "account": "pi_lab",
         "constraint": "A100|H200|RTXPRO6000Bw",
@@ -311,15 +311,15 @@ def test_slurm_time_seconds(value, seconds):
 def test_host_exec_wraps_host_side_python(configured):
     _hoffman(host_exec="srun --time=00:30:00 --cpus-per-task=2 --mem=8G")
     with config.use_target("nvidia"):
-        plain = config.host_uv_command()
-    assert plain.startswith("PYRITE_DATA_DIR=") and plain.endswith(' "uv"')
+        plain = config.host_run_command()
+    assert plain.startswith("PYRITE_DATA_DIR=") and plain.endswith(' "pixi" run --as-is -e nvidia')
     with config.use_target("h2"):
-        wrapped = config.host_uv_command("PYRITE_REMOTE_DIR=/srv/h2")
+        wrapped = config.host_run_command("PYRITE_REMOTE_DIR=/srv/h2")
         gc = scripts._prune_checkpoint_stems_command("gcjob", ["hopg"], catalog_profile="standard")
     assert wrapped.startswith(
         "srun --time=00:30:00 --cpus-per-task=2 --mem=8G /usr/bin/env PYRITE_DATA_DIR="
     )
-    assert wrapped.endswith(' PYRITE_REMOTE_DIR=/srv/h2 "uv"')
+    assert wrapped.endswith(' PYRITE_REMOTE_DIR=/srv/h2 "pixi" run --as-is -e nvidia')
     assert "srun --time=00:30:00 --cpus-per-task=2 --mem=8G /usr/bin/env " in gc
 
 
@@ -426,3 +426,72 @@ def test_profile_pull_uses_target_that_ran_the_profile(configured, monkeypatch):
         ("/srv/nvidia", ["hopg@quickstart"]),
         ("/srv/nvidia", ["hopg"]),
     ]
+
+
+def _store_raw_target(name, values):
+    document = store._load_document()
+    document.setdefault("remote", {}).setdefault("targets", {})[name] = values
+    store._write_document(document)
+
+
+def test_uv_era_target_fields_load_with_one_warning(configured, monkeypatch, capsys):
+    """#1462: a stored target written before the pixi move keeps working."""
+    monkeypatch.setattr(targets, "_WARNED", set())
+    _store_raw_target("old", {"host": "box", "uv": "~/.local/bin/uv", "extras": "dask"})
+
+    first = targets.resolve_target("old")
+    targets.resolve_target("old")
+
+    assert (first.pixi, first.environment) == (config.REMOTE_PIXI, "")
+    err = capsys.readouterr().err
+    assert err.count("uv-era fields") == 1
+    assert "uv -> pixi, extras -> environment" in err
+    assert "pyrite remote target edit old --pixi PATH --environment ENV" in err
+
+
+def test_editing_a_uv_era_target_retires_its_legacy_fields(configured, monkeypatch):
+    monkeypatch.setattr(targets, "_WARNED", set())
+    _store_raw_target("old", {"host": "box", "uv": "uv", "extras": "dask"})
+
+    assert invoke(remote_targets.command, ["edit", "old", "--environment", "svml"]).exit_code == 0
+
+    stored = store._load_document()["remote"]["targets"]["old"]
+    assert dict(stored) == {"host": "box", "environment": "svml"}
+    with config.use_target("old"):
+        assert config.remote_environment() == "svml"
+
+
+def test_job_records_from_uv_era_targets_still_resolve(configured):
+    document = store._load_document()
+    document["remote_jobs"] = {"oldjob": {"k": {"host": "box", "uv": "uv", "extras": ""}}}
+    store._write_document(document)
+
+    assert targets.job_target("oldjob").host == "box"
+
+
+def test_remote_uv_environment_variable_only_warns(configured, monkeypatch, capsys):
+    monkeypatch.setattr(targets, "_WARNED", set())
+    monkeypatch.setattr(config, "HOST", "box")
+    monkeypatch.setenv("PYRITE_REMOTE_UV", "/opt/uv")
+
+    assert targets.resolve_target().pixi == config.REMOTE_PIXI
+    assert "PYRITE_REMOTE_UV is ignored" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("option", "replacement"), [("--uv", "--pixi PATH"), ("--extras", "--environment ENV")]
+)
+def test_retired_target_options_name_their_replacement(configured, option, replacement):
+    result = invoke(remote_targets.command, ["edit", "amd", option, "x"])
+
+    assert result.exit_code == 2
+    assert f"{option} was removed; use {replacement}" in result.stderr
+    assert targets.resolve_target("amd").partition == "gpu-amd"
+
+
+def test_target_environment_defaults_to_the_gpu_vendor(configured):
+    with config.use_target("amd"):
+        assert config.remote_environment() == "amd"
+        assert config.shell_remote_env_python().endswith('/.pixi/envs/amd/bin/python"')
+    with config.use_target("nvidia"):
+        assert config.shell_remote_run() == '"pixi" run --as-is -e nvidia'

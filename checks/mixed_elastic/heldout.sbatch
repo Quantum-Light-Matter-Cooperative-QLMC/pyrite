@@ -14,4 +14,4 @@ export PATH="$HOME/.pixi/bin:$PATH" PYRITE_HOME="$HOME/pyrite" PYRITE_MC_BACKEND
 export PYRITE_CATALOG="$PWD/src/pyrite/data/catalog" PYRITE_USER_CATALOG="$(mktemp -d)/catalog"
 export XDG_CONFIG_HOME="$(mktemp -d)" OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 pixi install --locked -e nvidia || exit 1
-.venv/bin/python checks/mixed_elastic/run_arms.py "$1" --out "$2" --stop-after-minutes 60
+.pixi/envs/nvidia/bin/python checks/mixed_elastic/run_arms.py "$1" --out "$2" --stop-after-minutes 60

@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Sourced by the AMD SLURM prelude (pyrite.remote.scripts._amd_prelude) before
-# `uv sync --extra amd` builds CuPy from source with CUPY_INSTALL_USE_HIP=1.
+# `pixi install -e amd` builds CuPy from source with CUPY_INSTALL_USE_HIP=1.
 #
 # Every step only detects and fills a gap, so a node with AMD's full ROCm under
 # /opt/rocm and a host C++ compiler passes through unchanged. The gaps are the

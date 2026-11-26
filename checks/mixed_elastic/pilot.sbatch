@@ -20,7 +20,7 @@ out="evidence/pilot/$SLURM_JOB_ID"; mkdir -p "$out"
 echo "$sha" > "$out/sha.txt"
 run() {  # tag scene histories [bench options...]
     local tag=$1 scene=$2 n=$3; shift 3
-    .venv/bin/python checks/geant4_performance/pyrite_bench.py "$scene" --histories "$n" \
+    .pixi/envs/nvidia/bin/python checks/geant4_performance/pyrite_bench.py "$scene" --histories "$n" \
         --warmup-histories -1 --seed 91001 --rows-per-round 1024 --device-staging \
         --no-audit --output "$out/$tag-$scene.json" "$@" > "$out/$tag-$scene.log" 2>&1
     echo "DONE $tag $scene rc=$?"

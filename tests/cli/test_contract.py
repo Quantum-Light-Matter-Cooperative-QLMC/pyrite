@@ -148,6 +148,12 @@ _REMOVED_OPTIONS.update(
 )
 
 
+# Issue #1462: remote targets moved from uv to pixi (`--pixi`, `--environment`).
+_REMOVED_OPTIONS.update(
+    (("remote", "target", verb), flag) for verb in ("add", "edit") for flag in ("--uv", "--extras")
+)
+
+
 # The 0.32 physics-on-numerics cohort reached removal at 0.34.
 _REMOVED_OPTIONS.update(
     (("profile", "numerics", "set"), flag)
