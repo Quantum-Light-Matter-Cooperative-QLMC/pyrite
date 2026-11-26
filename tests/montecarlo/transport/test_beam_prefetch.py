@@ -222,3 +222,29 @@ def test_shrinking_blocks_reuse_the_carried_rows(block):
         np.testing.assert_array_equal(got[0], whole[a:b])
     assert (prefetch.misses, prefetch.partial, prefetch.hits) == (1, 0, 3)
     assert prefetch.prefetched_rows == n - 40
+
+
+def test_prefetch_worker_sees_the_callers_context():
+    """The look-ahead sample runs off-thread under the caller's ContextVars (#1423)."""
+    import threading
+    from contextvars import ContextVar
+
+    var = ContextVar("probe", default="unset")
+    calls = []
+
+    def sample(seed, n, **kwargs):
+        calls.append((kwargs.get("start", 0), var.get(), threading.get_ident()))
+        return initial_beam_positions(seed, n, **kwargs)
+
+    kw = _beam("spot")
+    token = var.set("caller")
+    try:
+        with BeamEntryPrefetch(40) as prefetch:
+            run = partial(prefetch.run, sample_beam_positions, sample)
+            for start in (0, 10):
+                run(SimpleNamespace(seed=11, Ne=10, gdf_source=None), "cuda", start=start, **kw)
+    finally:
+        var.reset(token)
+    assert prefetch.hits == 1
+    off_thread = [c for c in calls if c[2] != threading.get_ident()]
+    assert off_thread and all(value == "caller" for _, value, _ in calls)

@@ -509,3 +509,55 @@ def test_stability_blocks_is_a_deprecated_alias():
     stored = {**policy.to_dict(), "stability_blocks": 1}
     del stored["stability_checks"]
     assert pr.config.AdaptiveSampling.from_dict(stored).stability_checks == 1
+
+
+def _arrays(value, path=""):
+    if isinstance(value, dict):
+        for key, item in value.items():
+            yield from _arrays(item, f"{path}.{key}")
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            yield from _arrays(item, f"{path}[{index}]")
+    elif isinstance(value, np.ndarray) and value.size:
+        yield path, value
+
+
+@pytest.mark.filterwarnings("ignore::pyrite._cxr_grid_policy.CxrYieldStatisticsWarning")
+def test_adaptive_cases_on_threads_match_serial_and_own_their_arrays(scene, numerics):
+    """Adaptive seeds are schedule-independent and outputs alias nothing (#1423).
+
+    Two threads run three seeds submitted in reverse order: each output equals
+    the serial one bit for bit, with the same realized history count, and no
+    output array shares memory with another case's output or with any case.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    base = api.build_case(scene, numerics)
+    cases = {seed: replace(base, seed=seed) for seed in (1, 2, 3)}
+
+    def run(case):
+        return runner.run_case(case, transport_core="per-electron")
+
+    serial = {seed: run(case) for seed, case in cases.items()}
+    with ThreadPoolExecutor(2) as pool:
+        futures = {seed: pool.submit(run, cases[seed]) for seed in reversed(cases)}
+        threaded = {seed: future.result() for seed, future in futures.items()}
+
+    for seed, output in threaded.items():
+        assert (
+            output["adaptive_sampling"]["realized_electrons"]
+            == (serial[seed]["adaptive_sampling"]["realized_electrons"])
+        )
+        expected = dict(_arrays(serial[seed]))
+        got = dict(_arrays(output))
+        assert got.keys() == expected.keys() and got
+        for path, array in got.items():
+            np.testing.assert_array_equal(array, expected[path], err_msg=f"seed {seed} {path}")
+    assert len({serial[1]["spec"].tobytes(), serial[2]["spec"].tobytes()}) == 2
+
+    outputs = [list(_arrays(o)) for o in threaded.values()]
+    inputs = [a for case in cases.values() for _, a in _arrays(dict(case))]
+    for i, mine in enumerate(outputs):
+        others = [a for j, o in enumerate(outputs) if j != i for _, a in o] + inputs
+        for path, array in mine:
+            assert not any(np.shares_memory(array, other) for other in others), path

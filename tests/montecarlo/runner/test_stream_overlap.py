@@ -170,3 +170,24 @@ def test_small_blocks_stream_serially_by_default(fake_cuda, monkeypatch):
 
     _run(consume)
     assert threads and all(t is threading.main_thread() for t in threads)
+
+
+def test_scoring_thread_sees_the_callers_context(fake_cuda):
+    """Caller ContextVars reach the scoring thread; its writes stay there (#1423)."""
+    from contextvars import ContextVar
+
+    var = ContextVar("probe", default="unset")
+    seen = []
+
+    def consume(block):
+        seen.append((var.get(), threading.get_ident()))
+        var.set("scorer")
+
+    token = var.set("caller")
+    try:
+        _run(consume)
+        assert var.get() == "caller"
+    finally:
+        var.reset(token)
+    assert [value for value, _ in seen] == ["caller"] * 4
+    assert threading.get_ident() not in {ident for _, ident in seen}
