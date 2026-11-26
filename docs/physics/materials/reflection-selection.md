@@ -91,6 +91,8 @@ the matched lattice share from the BremsLib continuum. Texture stays a
 catalog fact; the domain is a numerics choice
 ([ADR-0024](../../adr/0024-texture-versus-reflection-domain.md)). The option
 is HOPG only, needs an explicit line grid, and replaces measured selection.
+Profiles select it with a `cxr_fiber` table
+(`cutoff_invang`, `azimuth_count`, `reflection_batch_size`).
 
 At the default 2 Å⁻¹ shell width the retired `(002)/(004)` pins are the first
 two shells, rather than a hard limit. Fixed-count routes rank the same domain:

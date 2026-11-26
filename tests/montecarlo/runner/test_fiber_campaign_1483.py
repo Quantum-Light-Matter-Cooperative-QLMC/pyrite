@@ -3,6 +3,7 @@
 Validation: cxr-fiber-intensity-average
 """
 
+import json
 from dataclasses import replace
 
 import numpy as np
@@ -233,3 +234,63 @@ def test_campaign_spectrum_matches_the_paired_scorer_on_one_transport():
     assert record["elements"] == paired["continuum_correction"]["elements"]
     assert record["shells"] == paired["continuum_correction"]["shells"]
     assert np.all(np.isfinite(brem))
+
+
+def _fiber_profile_catalog(monkeypatch, table):
+    from types import MappingProxyType
+
+    from pyrite.campaign import config
+    from pyrite.materials import CATALOG
+
+    custom = replace(
+        CATALOG,
+        profile_transport_numerics=MappingProxyType(
+            {
+                **CATALOG.profile_transport_numerics,
+                "standard": MappingProxyType({"cxr_fiber": table}),
+            }
+        ),
+    )
+    monkeypatch.setattr(config, "CATALOG", custom)
+    return config
+
+
+def test_profile_selects_the_fiber_domain_and_forks_dataset_identity(monkeypatch):
+    from pyrite.campaign.config import default_settings, material_sweep
+    from pyrite.campaign.profiles import dataset_identity
+    from pyrite.campaign.sweep import build_cases
+
+    grid = np.arange(200.0, 3000.0, 40.0)
+    baseline = material_sweep("hopg", energy_bins=EnergyBins(cxr=grid))
+    config = _fiber_profile_catalog(monkeypatch, {"cutoff_invang": 6.0, "azimuth_count": 8})
+    sweep = config.material_sweep("hopg", energy_bins=EnergyBins(cxr=grid))
+    assert sweep.cxr_fiber == FiberAverage(cutoff_invang=6.0, azimuth_count=8)
+    settings = default_settings()
+    fiber_id = dataset_identity("hopg", settings, sweep)["parameter_sha256"]
+    basal_id = dataset_identity("hopg", settings, baseline)["parameter_sha256"]
+    assert fiber_id != basal_id
+    # A basal sweep's payload carries no fiber key at all (historical digest).
+    assert "cxr_fiber" not in json_payload(baseline, settings)
+    cases = build_cases(sweep, n_electrons=1, n_electrons_brem=1)
+    assert cases and all(c["cxr_fiber"]["cutoff_invang"] == 6.0 for c in cases)
+    assert all(c.get("reflection_selection") is None for c in cases)
+    # Without an explicit line grid a profile refuses before transport.
+    stored = config.material_sweep("hopg")
+    with pytest.raises(ValueError, match="explicit line grid"):
+        build_cases(stored, n_electrons=1, n_electrons_brem=1)
+
+
+def json_payload(sweep, settings):
+    from pyrite.campaign.profiles import dataset_identity
+
+    return json.dumps(dataset_identity("hopg", settings, sweep))
+
+
+def test_profile_numerics_validate_the_fiber_table():
+    from pyrite._numerics import validate_profile_numerics
+
+    validate_profile_numerics({"cxr_fiber": {"cutoff_invang": 6.0}})
+    with pytest.raises(TypeError):
+        validate_profile_numerics({"cxr_fiber": {"cutoff": 6.0}})
+    with pytest.raises(ValueError, match="owns the reflection domain"):
+        validate_profile_numerics({"cxr_fiber": {"cutoff_invang": 6.0}, "n_families": 3})

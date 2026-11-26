@@ -137,6 +137,7 @@ def resolve_numerics(
         "n_families": convergence.n_families,
         "max_reflections": None,
         "line_yield_tolerance": None,
+        "cxr_fiber": None,
         "mosaic_nodes": convergence.mosaic_nodes,
         "mosaic_route": convergence.mosaic_route,
         "straggling": physics.straggling,
@@ -583,7 +584,9 @@ def _identity_v1(
     # only when actually set, so pre-existing runs keep their historical
     # parameter_sha256 (and therefore their checkpoint identity) bit-for-bit.
     # The measured reflection selection (#1173) follows the same rule.
-    for key in ("n_electrons", "n_electrons_brem", "line_grid_policy", "line_yield_tolerance"):
+    # So does the opt-in full-fiber domain (#1483).
+    keys = ("n_electrons", "n_electrons_brem", "line_grid_policy", "line_yield_tolerance")
+    for key in (*keys, "cxr_fiber"):
         if sweep_payload.get(key) is None:
             sweep_payload.pop(key, None)
     # Same compatibility rule for catalog_profile (Phase 3 decision 2): only

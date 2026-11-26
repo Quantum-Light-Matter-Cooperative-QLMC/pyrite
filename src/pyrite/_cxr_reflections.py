@@ -4,12 +4,31 @@ Split from ``_numerics`` (which re-exports both names) so the reflection
 controls own one module; ``pyrite._numerics.CxrReflections`` stays valid.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
 from ._fiber_average import FiberAverage
 
 MosaicRoute = Literal["analytic", "mc", "mc-sampled"]
+
+
+def fiber_average(value: object) -> FiberAverage | None:
+    """A :class:`FiberAverage` from itself, a profile/preset table, or ``None``."""
+    if value is None or isinstance(value, FiberAverage):
+        return value
+    if not isinstance(value, Mapping):
+        raise TypeError("cxr_fiber must be a table of FiberAverage fields")
+    return FiberAverage(**dict(value))
+
+
+def reflection_controls_from_values(values: Mapping[str, object]) -> "CxrReflections":
+    """``CxrReflections`` from flat profile ``CONVERGENCE_KEYS`` values.
+
+    The profile spelling of ``fiber`` is the ``cxr_fiber`` table (#1483).
+    """
+    kwargs: dict = {key: value for key, value in values.items() if key != "cxr_fiber"}
+    return CxrReflections(**kwargs, fiber=fiber_average(values.get("cxr_fiber")))
 
 
 @dataclass(frozen=True)

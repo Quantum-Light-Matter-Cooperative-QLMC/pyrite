@@ -18,7 +18,7 @@ def reflection_controls(numerics: Numerics, physics: Physics, channeling: object
     if controls.fiber is not None:
         # The fiber domain owns the line reflections; the four catalog basal
         # families only name the diffracted-brem and Kossel rows (#1483). The
-        # case carries the fiber record instead (:func:`fiber_case_fields`).
+        # sweep carries the fiber numerics instead (:func:`fiber_case_fields`).
         return replace(controls, fiber=None, n_families=4)
     # Streamed scoring selects on the electron prefix since #1281, so it no
     # longer falls back.
@@ -44,7 +44,8 @@ def resolve_reflection_sweep(
     from .sweep import _stack_line_radiators, sweep_crystal_params
 
     automatic = (
-        sweep.n_families is None
+        sweep.cxr_fiber is None
+        and sweep.n_families is None
         and sweep.max_reflections is None
         and sweep.line_yield_tolerance is None
         and not coherent_emission
@@ -64,30 +65,52 @@ def resolve_reflection_sweep(
     ), automatic
 
 
-def fiber_case_fields(numerics: Numerics) -> dict[str, object]:
+def sweep_fiber(sweep: Sweep):
+    """``sweep.cxr_fiber`` as a :class:`FiberAverage` (or ``None``), validated.
+
+    A profile table becomes a ``FiberAverage``. The fiber domain owns the line
+    reflections, so it excludes an explicit family count other than the four
+    basal DBR/Kossel families, a reflection cap and a measured tolerance.
+    """
+    from .._cxr_reflections import fiber_average
+
+    fiber = fiber_average(sweep.cxr_fiber)
+    if fiber is not None and (
+        sweep.n_families not in (None, 4)
+        or sweep.max_reflections is not None
+        or sweep.line_yield_tolerance is not None
+    ):
+        raise ValueError(
+            "cxr_fiber owns the reflection domain; n_families, max_reflections and "
+            "line_yield_tolerance must be unset"
+        )
+    return fiber
+
+
+def fiber_case_fields(sweep: Sweep) -> dict[str, object]:
     """Case keys of the opt-in full-fiber domain (#1483); ``{}`` when basal-only.
 
     The fiber domain has no qualified automatic or stored line grid: stored
     catalog rows and automatic seeding know only the basal ``(00l)`` lines,
-    so an explicit ``EnergyBins.cxr`` grid is required. Lines are scored as
-    bin means (``line_quadrature="bin-mean"``).
+    so an explicit ``EnergyBins.cxr`` grid without a per-call line-grid
+    policy is required. Lines are scored as bin means
+    (``line_quadrature="bin-mean"``), as the paired scorer and the #1480 arms
+    integrate them.
 
     Validation: cxr-fiber-intensity-average
     """
-    fiber = numerics.cxr_reflections.fiber
+    fiber = sweep.cxr_fiber
     if fiber is None:
         return {}
-    bins = numerics.energy_bins
-    if bins is None or bins.cxr is None or numerics.line_resolution is not None:
+    if sweep.energy_bins.cxr is None or sweep.cxr_grid_policy:
         raise ValueError(
-            "full-fiber CXR requires an explicit line grid (Numerics.energy_bins with "
-            "EnergyBins.cxr, no line_resolution): stored and automatic line grids "
+            "full-fiber CXR requires an explicit line grid (EnergyBins.cxr, no "
+            "line_resolution or line_grid_policy): stored and automatic line grids "
             "know only the basal (00l) lines (#1483)"
         )
     from .._fiber_average import FiberAverage
     from ..montecarlo.spectrum.cxr.fiber import FiberCXRModel
 
-    # Bin means, as the paired scorer and the #1480 arms integrate the lines.
     fields: dict[str, object] = {
         "cxr_fiber": FiberCXRModel.from_numerics(fiber).case_record(),
         "line_quadrature": "bin-mean",

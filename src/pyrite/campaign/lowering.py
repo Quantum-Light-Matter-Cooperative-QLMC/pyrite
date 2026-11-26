@@ -82,6 +82,7 @@ def lower_simulation(request: ResolvedSimulation) -> Case:
         n_families=convergence.n_families,
         max_reflections=convergence.max_reflections,
         line_yield_tolerance=convergence.line_yield_tolerance,
+        cxr_fiber=numerics.cxr_reflections.fiber,
         spec_chunk=numerics.cxr_chunk,
         brem_chunk=numerics.brem_chunk,
         mosaic_route=convergence.mosaic_route,
@@ -153,11 +154,6 @@ def _with_run_options(cases: list[Case], numerics: Numerics) -> list[Case]:
     if numerics.cone_split is not None:
         record = numerics.cone_split.to_dict()
         cases = [replace(case, cone_split=record) for case in cases]
-    # Opt-in full-fiber CXR domain (#1483); absent keeps basal-only identity.
-    from .reflection_selection import fiber_case_fields
-
-    if fiber := fiber_case_fields(numerics):
-        cases = [replace(case, **fiber) for case in cases]
     # Execution-only (#1455): a case key, never in content or dataset identity.
     execution = numerics.resolved_execution
     chunk = execution.characteristic_chunk
@@ -233,6 +229,7 @@ def build_sweep_cases(
                 n_families=convergence.n_families,
                 max_reflections=convergence.max_reflections,
                 line_yield_tolerance=convergence.line_yield_tolerance,
+                cxr_fiber=resolved_numerics.cxr_reflections.fiber,
                 mosaic_nodes=convergence.mosaic_nodes,
                 mosaic_route=convergence.mosaic_route,
                 spec_chunk=resolved_numerics.cxr_chunk,

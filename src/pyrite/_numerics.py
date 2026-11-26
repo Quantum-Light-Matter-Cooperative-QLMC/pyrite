@@ -77,6 +77,7 @@ CONVERGENCE_KEYS = (
     "mosaic_nodes",
     "mosaic_route",
     "line_yield_tolerance",
+    "cxr_fiber",
 )
 CHANNELING_KEYS = (
     "channeling_model",
@@ -1167,7 +1168,9 @@ def validate_profile_numerics(values: Mapping[str, object]) -> None:
     transport_values: dict[str, Any] = {
         key: values[key] for key in TRANSPORT_KEYS if key in values and key not in CHANNELING_KEYS
     }
-    reflections = CxrReflections(**convergence_values)
+    from ._cxr_reflections import reflection_controls_from_values
+
+    reflections = reflection_controls_from_values(convergence_values)
     # Partial frozen overrides may inherit an explicit continuous/auto preset.
     # Full effective combinations are validated after preset/profile resolution.
     if (

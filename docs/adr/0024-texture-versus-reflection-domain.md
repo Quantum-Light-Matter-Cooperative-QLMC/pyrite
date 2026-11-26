@@ -27,7 +27,10 @@ campaign path refused it.
    roll count, batch size) is the full fiber domain. It sits beside the mosaic
    controls because it is a quadrature over crystallite orientation. It
    excludes `n_families`, `max_reflections` and `line_yield_tolerance`: the
-   fiber domain owns the line reflections.
+   fiber domain owns the line reflections. A profile spells it as a
+   `cxr_fiber` table of the same fields
+   (`[profiles.NAME.cxr_fiber] cutoff_invang = 8.0`), which lowers to
+   `Sweep.cxr_fiber` and joins the dataset identity only when set.
 3. **Identity.** A lowered case carries the resolved
    `FiberCXRModel.case_record()` as `Case.cxr_fiber`: model marker
    `FIBER_CXR_MODEL`, crystal, cutoff, roll count, tensor temperature and
