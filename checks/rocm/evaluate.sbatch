@@ -32,9 +32,9 @@ if has build; then
         # job-private pixi cache so no cached wheel is reused and the stage
         # proves the source build itself; the shared cache stays untouched.
         pyrite_gpu_sync -q > "$out/build.log" 2>&1 \
-            && PIXI_CACHE_DIR="$out/pixi-cache" pixi reinstall --locked -e "$PYRITE_PIXI_ENV" -vv cupy \
+            && PIXI_CACHE_DIR="$PWD/$out/pixi-cache" pixi reinstall --locked -e "$PYRITE_PIXI_ENV" -vv cupy \
                 >> "$out/build.log" 2>&1; rc=$?
-        rm -rf "$out/pixi-cache"
+        rm -rf "$PWD/$out/pixi-cache"
     else
         # NVIDIA CuPy is a conda-forge binary: there is nothing to build.
         pyrite_gpu_sync -v > "$out/build.log" 2>&1; rc=$?
