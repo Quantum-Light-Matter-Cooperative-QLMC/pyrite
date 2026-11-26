@@ -5,7 +5,7 @@ from dataclasses import asdict
 
 import click
 
-from ...console.output import confirm_destructive, emit_diagnostic, emit_result, output_option
+from ...console.output import confirm_destructive, emit_result, output_option
 from ...console.tables import emit_object, emit_table, flatten
 from ...remote import targets
 from .._deprecations import removed_option
@@ -85,18 +85,9 @@ def _fields(function):
 
 
 def _save(name, values, edit):
-    target = targets.save_target(
-        name, {k: v for k, v in values.items() if v is not None}, edit=edit
-    )
-    for other in targets.named_targets().values():
-        if (
-            other.name != name
-            and (other.host, other.remote_dir) == (target.host, target.remote_dir)
-            and other.gpu_vendor != target.gpu_vendor
-        ):
-            emit_diagnostic(
-                f"warning: {name} and {other.name} share host and remote_dir with different GPU vendors; use separate remote directories"
-            )
+    # Targets of different GPU vendors may share a checkout: each installs its
+    # own pixi environment (.pixi/envs/<env>), so neither rebuilds the other's.
+    targets.save_target(name, {k: v for k, v in values.items() if v is not None}, edit=edit)
     emit_result(f"saved remote target {name}")
 
 
