@@ -208,6 +208,18 @@ qlmc-queen (jobs 16045 at 1 thread and 16046 at 4 threads; spread under
 | layered | 4 | reproducible | 24.42 | 1.00x | 2.27 | 0 |
 | layered | 4 | `sinc2` + `arcp,contract` | 22.84 | 1.07x | 0.80 | 1.1e-16 |
 
+In the pixi `svml` environment (job 16047, 1 thread), SVML-fast is no faster
+than `sinc2` with FMA on complete cases:
+
+| Case | Arm | Warm wall (s) | Speedup | Reducer (s) | Change |
+|---|---|---:|---:|---:|---:|
+| photon-case | reproducible | 7.48 | 1.00x | 2.62 | 0 |
+| photon-case | `npsin` + `fastmath=True` (SVML-fast) | 5.89 | 1.27x | 1.02 | 1.7e-16 |
+| photon-case | `sinc2` + `arcp,contract` | 5.76 | 1.30x | 0.92 | 1.7e-16 |
+| layered | reproducible | 30.07 | 1.00x | 8.74 | 0 |
+| layered | `npsin` + `fastmath=True` (SVML-fast) | 24.72 | 1.22x | 3.47 | 2.1e-16 |
+| layered | `sinc2` + `arcp,contract` | 24.47 | 1.23x | 3.08 | 1.1e-16 |
+
 At 4 threads the reducer already runs in parallel and the serial NumPy
 remainder dominates, so the complete-case gain falls to 7–9 %.
 
