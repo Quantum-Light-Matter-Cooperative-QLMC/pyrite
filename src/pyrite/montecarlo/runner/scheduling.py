@@ -909,6 +909,7 @@ class _CaseRun:
         """
         bounded = self.should_stop is not None
         if self.stop_requested():
+            self.activity("idle", in_flight_case_count=0)
             return self.results
         _single_thread_blas()
         from concurrent.futures import ProcessPoolExecutor
@@ -959,22 +960,34 @@ class _CaseRun:
         Bounded: after the consumer handles each completion (a skipped failure
         included) the stop check runs and, if false, the next unsubmitted case
         refills the window; once true nothing more is submitted and the rest
-        drain.
+        drain. A refill refused by a broken pool is raised only after the
+        remaining futures have been yielded, finished results first.
+
+        Each future leaves ``pending`` as it is yielded, so a delivered output
+        is not pinned for the rest of the run.
         """
         from concurrent.futures import FIRST_COMPLETED, as_completed, wait
+        from concurrent.futures.process import BrokenProcessPool
 
         if not bounded:
             for fut in as_completed(list(pending)):
-                yield fut, pending[fut]
+                yield fut, pending.pop(fut)
             return
         next_i = len(pending)
         stopped = False
+        broken = None
         while pending:
             done, _ = wait(pending, return_when=FIRST_COMPLETED)
-            for fut in done:
+            # A broken-pool failure aborts the run: hand over the rest first.
+            for fut in sorted(done, key=lambda f: isinstance(f.exception(), BrokenProcessPool)):
                 i = pending.pop(fut)
                 yield fut, i
                 stopped = stopped or self.stop_requested()
-                if not stopped and next_i < self.n:
-                    submit(next_i)
+                if not stopped and broken is None and next_i < self.n:
+                    try:
+                        submit(next_i)
+                    except BrokenProcessPool as exc:
+                        broken = exc
                     next_i += 1
+        if broken is not None:
+            raise broken

@@ -7,6 +7,7 @@ cancellable) and only executes when the driver blocks on a completion.
 """
 
 import concurrent.futures as cf
+from concurrent.futures.process import BrokenProcessPool
 
 import pytest
 
@@ -24,6 +25,7 @@ class _LazyPool:
         self.submitted: list[str] = []
         self.unfinished: list[tuple[cf.Future, object, tuple, dict]] = []
         self.max_unfinished = 0
+        self.broken = False
         type(self).instances.append(self)
 
     def __enter__(self):
@@ -33,6 +35,8 @@ class _LazyPool:
         return False
 
     def submit(self, fn, *args, **kwargs):
+        if self.broken:
+            raise BrokenProcessPool("worker died")
         future = cf.Future()
         future.set_running_or_notify_cancel()  # call-queue items cannot be cancelled
         self.submitted.append(args[0]["name"])
@@ -59,6 +63,8 @@ def pool(monkeypatch):
     _LazyPool.instances = []
     monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", False)
     monkeypatch.setattr(scheduling, "_process_pool_kwargs", lambda: {})
+    # The window under test must not shrink with the host's free memory.
+    monkeypatch.setattr(scheduling, "_cpu_pool_workers", min)
     monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _LazyPool)
     real_wait, real_as_completed = cf.wait, cf.as_completed
 
@@ -104,9 +110,35 @@ def test_bounded_stop_submits_nothing_after_deadline(pool):
 
 
 def test_bounded_stop_already_true_submits_nothing(pool):
-    results = runner.run_cases(_cases(4), max_workers=2, progress=False, should_stop=lambda: True)
+    events = []
+    results = runner.run_cases(
+        _cases(4),
+        max_workers=2,
+        progress=False,
+        should_stop=lambda: True,
+        on_activity=events.append,
+    )
     assert not pool.instances or pool.instances[0].submitted == []
     assert results == [None] * 4
+    assert [(e["phase"], e["in_flight_case_count"]) for e in events] == [("idle", 0)]
+
+
+def test_bounded_broken_refill_delivers_in_flight_results_then_raises(pool):
+    delivered = []
+
+    def callback(i, case, out):
+        delivered.append(case["name"])
+        pool.instances[0].broken = True  # a worker dies during the first delivery
+
+    with pytest.raises(BrokenProcessPool):
+        runner.run_cases(
+            _cases(4),
+            max_workers=2,
+            progress=False,
+            callback=callback,
+            should_stop=lambda: False,
+        )
+    assert delivered == ["c0", "c1"]
 
 
 def test_bounded_never_stopping_runs_every_case_within_window(pool):
