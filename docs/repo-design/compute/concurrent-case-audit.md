@@ -6,14 +6,18 @@ first taken at main `42413c99c`, rebased onto the #1432 native-CPU audit
 topology this page extends. Question: do concurrent cases in one interpreter
 offer enough throughput or memory benefit to justify a production executor?
 
-**Recommendation: defer a production executor, but keep the question open.**
-On full cases, four threads reached 2.6-2.9x serial throughput at about 1.8x
-the process-tree PSS, against 3.1x at about 4.1x for a four-process pool, with
-digests equal to serial. That is a real memory benefit, measured on one local
-workstation and one case family. Pure transport does not scale on threads
-until its kernels release the GIL. Adoption needs the remaining blockers below
-fixed, the arms repeated on the remote box, and a separate reviewed plan. No
-executor, default, tolerance, seed semantics or checkpoint format changed.
+**Recommendation: defer a production executor; threads are not a general
+replacement for the process pool.** On the HOPG slab case, four threads nearly
+match a four-process pool (2.4-2.6x against 2.5-2.9x serial) at well under half
+its PSS, on the workstation and on the remote box. On other case families they
+do not. Planar channeling scales only 1.8x on threads against 3.75x on
+processes, because its time is Python-level work under the GIL. The layered
+MoS2-on-Si case reaches 1.5-1.7x on either arm. Pure transport does not
+scale on threads until its kernels release the GIL (#1458). The memory benefit
+is real but family-dependent. A thread executor would have to be opt-in per
+workload, with the blockers below fixed and a separate reviewed plan. Digests
+equalled serial in every arm. No executor, default, tolerance, seed semantics
+or checkpoint format changed.
 
 ## Measurement
 
@@ -100,20 +104,51 @@ yet running. `ProcessPoolExecutor` moves up to `max_workers + 1` jobs into its
 call queue ahead of execution, and `cancel()` fails on those, so after a stop
 it ran work that had not started: at four workers nothing could be cancelled.
 The #928 contract (drain started tasks, start no more) is therefore easier to
-meet with threads. The production `cpu_pool` has the same flaw on a bounded
-sweep: it submits every case up front, so after the deadline up to
-`max_workers + 1` queued cases still begin ([#1478](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1478));
-`gpu_pipeline` already keeps one case in flight when bounded. Running jobs cannot be interrupted in either arm; drain time is the
+meet with threads. The production `cpu_pool` had the same flaw on a bounded
+sweep: it submitted every case up front, so after the deadline up to
+`max_workers + 1` queued cases still began. It now keeps at most `max_workers`
+cases submitted when bounded ([#1478](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1478)),
+as `gpu_pipeline` already did. Running jobs cannot be interrupted in either arm; drain time is the
 remainder of the running cases.
+
+**Remote box and more case families (2026-11-26).** qlmc-queen (Ryzen 9
+9950X3D, 32 logical CPUs), Python 3.14.10, NumPy/Numba as above, math
+`reproducible` (the built-in default). Slurm allocated 8 CPUs but did not bind
+them (affinity 0-31), so the node was otherwise idle rather than pinned. Jobs
+16062 (`a63978c31`) and 16063 (`434508e53`). `PROBE_FAMILY=layered` is the
+#1432 MoS2-on-Si stack (100 keV, 4 histories). `PROBE_FAMILY=channeling` is
+the admitted planar Si demo (17 MeV, 2 um, plane (1-10), 50 histories) through
+`pyrite.simulate`. HOPG rows are best of 3; the other families are one sample.
+Process pools were not run at 8 workers for those families, to stay inside the
+node's memory.
+
+| Family | Arm | 1 | 2 | 4 | 8 | PSS at 4 |
+|---|---|---|---|---|---|---|
+| HOPG, 1024 histories | threads | 4.73 s | 3.03 s | 1.97 s (2.4x) | 1.86 s (2.5x) | 1583 MiB |
+| HOPG, 1024 histories | processes | 4.74 s | 2.85 s | 1.90 s (2.5x) | 1.62 s (2.9x) | 2922 MiB |
+| HOPG, 128 histories | threads | 2.15 s | 1.58 s | 1.34 s (1.6x) | 1.46 s | 1120 MiB |
+| layered MoS2/Si | threads | 130.8 s | 93.0 s | 85.7 s (1.53x) | 83.3 s (1.57x) | 5313 MiB |
+| layered MoS2/Si | processes | 130.2 s | 85.4 s | 76.9 s (1.69x) | – | 7337 MiB |
+| planar channeling | threads | 98.8 s | 66.3 s | 55.6 s (1.78x) | 54.2 s (1.82x) | 870 MiB |
+| planar channeling | processes | 99.2 s | 50.2 s | 26.4 s (3.75x) | – | 1977 MiB |
+
+USS tracks PSS within 3 % for threads and 5-10 % for processes. At 8 HOPG
+workers the process tree reached 5138 MiB against 2058 MiB for threads.
+Channeling's thread arm stalls at about 1.8x: the planar path spends its time
+in Python and in NumPy calls too small to release the GIL usefully, so only
+processes scale. Layered stalls on both arms, consistent with #1432's finding
+that its node-window reducer dominates. Its share after #1469 was not profiled
+here. Memory favours threads in every family, by 1.4x (layered) to 2.3x
+(channeling) at four workers.
 
 **Not measured, so not claimed.**
 
-- Only one case family on one hybrid-core workstation. The #1432 audit measured
-  four processes at 1.21x for four identical `crystal300` cases on four bound
-  CPUs of a shared GPU node; its allocation differs from this probe's, so the two
-  topology results are not directly comparable. Repeat on the remote box under a
-  bound CPU allocation before relying on the ratios.
-- Adaptive precision, cone split, channeling, photon, axial MCWF and GPU paths.
+- The #1432 audit measured four processes at 1.21x for four identical
+  `crystal300` cases on four bound CPUs of a shared GPU node. Its allocation
+  differs from this probe's, so the two topology results are not directly
+  comparable.
+- Adaptive precision, cone split, photon, axial MCWF and GPU paths. Repeated
+  samples for layered and channeling.
 - More than one Numba thread per job with concurrent launches (see row 10).
 - A free-threaded interpreter: none could be installed (#1421).
 - Memory sampling is PSS and USS of the process tree at 50 ms; no allocator
@@ -184,7 +219,7 @@ not evaluated; **n/a** = not reachable by the CPU case path.
 | 14 | Host-memory admission | `runner/host_admission.py`, `transport/host_memory.py` read `MemAvailable`/cgroup headroom per call; the docstring says a projection is not a reservation | check-then-act | N threads admit against the same headroom and can over-commit together; needs a shared reservation ledger | **blocker** |
 | 15 | Worker-count and memory budget | `host_admission._cpu_pool_workers` (`worker_mem_mb`, about 5.5 GiB per full-case process measured earlier) | sized for processes | a thread budget needs its own measured per-case footprint (this probe: about 0.19 GiB marginal PSS per extra thread at 1024 histories, against about 0.7 GiB per extra process) | open |
 | 16 | Device contexts, streams, pools | `runner/stream_overlap.py` one scoring thread on a non-blocking stream | one owner by design; #1411 owns multi-GPU | none for a CPU slice | n/a |
-| 17 | Callbacks, stop and drain | `execution/protocol.py` requires `callback` in the coordinating process and draining of started tasks on `should_stop` | #928 contract; `LocalExecutor` delegates to `run_cases` | probe: exceptions reach the coordinator, completions are observed there, and threads cancel every unstarted job, while a process pool runs up to `max_workers + 1` queued jobs after a stop (above); a production executor still needs these as tests; the process `cpu_pool` overruns a bounded stop (#1478) | ok for threads (probe only) |
+| 17 | Callbacks, stop and drain | `execution/protocol.py` requires `callback` in the coordinating process and draining of started tasks on `should_stop` | #928 contract; `LocalExecutor` delegates to `run_cases` | probe: exceptions reach the coordinator, completions are observed there, and threads cancel every unstarted job, while a process pool runs up to `max_workers + 1` queued jobs after a stop (above); a production executor still needs these as tests; the bounded process `cpu_pool` no longer overruns a stop (#1478, fixed) | ok for threads (probe only) |
 | 18 | Checkpoint and result isolation | callback owns persistence; results returned by value | a process boundary copies today | threads return arrays by reference (the process arm's times already include pickling the 8 results); ownership rules must be stated | open |
 | 19 | Concurrent tests | `test_montecarlo.py` and `test_gpu_oom_retry.py` replace `ProcessPoolExecutor` with a synchronous fake | none ran two cases at once; this branch adds the two tests named in rows 2 and 5 | digest-parity test for two threads, ContextVar propagation | **blocker** |
 
@@ -196,17 +231,21 @@ must not be disabled around extensions that have not.
 
 ## Decision and follow-ups
 
-- **Defer** adoption; do not reject. The memory result (about 1.8x versus 4.1x
-  PSS for comparable throughput) is the strongest argument for a bounded
-  opt-in thread executor, and it has not been refuted. It rests on one host and
-  case family.
+- **Defer** adoption; do not reject. Threads match processes only where the
+  case's time is GIL-releasing native work (HOPG slab). There they use about
+  half the memory, on two hosts. Channeling, which is Python-heavy, scales half
+  as well on threads. An executor would therefore be an opt-in per workload,
+  never a replacement default.
+- Fixed beside this audit: the bounded `cpu_pool` no longer starts queued
+  cases after a stop (#1478).
 - Done here, valid without any executor: the core pin no longer touches
   `os.environ` (row 2) and the two `OrderedDict` memos are locked (row 5).
-- Before a plan can be written: repeat the topology comparison on the remote
-  box with bound CPUs and more than one case family (adaptive, channeling);
-  resolve rows 3, 4, 10, 11 and 14; decide whether `nogil` on the per-electron
+- Before a plan can be written: resolve rows 3, 4, 10, 11 and 14; measure
+  adaptive precision; decide whether `nogil` on the per-electron
   entry points is worth its parity evidence (row 1), which matters for
-  transport-only workloads and not for full cases.
+  transport-only workloads and not for full cases (#1458). #1458 also
+  covers thread-fed CPU transport for the GPU pipeline. A free-threaded arm,
+  the only lever for channeling's Python-level work, waits for #1421.
 - Not pursued: a new `prange` over electrons. SVML and `fastmath` now belong
   to #1459 and #1468.
 - Raw logs and the SHA-256 manifest are kept locally in
