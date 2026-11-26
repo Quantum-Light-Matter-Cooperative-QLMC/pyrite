@@ -83,6 +83,14 @@ Options:
   --maximum-fractional-energy-loss FRACTION
                                   Cap one row's fractional mean energy loss; positive
                                   values require midpoint.  [x>=0.0]
+  --math [fast|reproducible]      Floating-point math mode (#1468): reproducible keeps
+                                  bit-for-bit results where they are pinned; fast lets
+                                  adopted kernels use fast-math flags, approximate
+                                  transcendentals and FMA contraction (not bit-for-bit
+                                  across hosts or devices). Unset defers to PYRITE_MATH,
+                                  then the numerics.math config key, then reproducible.
+                                  fast joins case identity, so its checkpoints never mix
+                                  with reproducible ones.
   --sampling [fixed|adaptive]     Select adaptive or fixed sampling. Adaptive options
                                   select adaptive; --cxr-histories or --brem-histories
                                   select fixed. Switching replaces the previous sampling
@@ -212,6 +220,14 @@ Options:
   --maximum-fractional-energy-loss FRACTION
                                   Cap one row's fractional mean energy loss; positive
                                   values require midpoint.  [x>=0.0]
+  --math [fast|reproducible]      Floating-point math mode (#1468): reproducible keeps
+                                  bit-for-bit results where they are pinned; fast lets
+                                  adopted kernels use fast-math flags, approximate
+                                  transcendentals and FMA contraction (not bit-for-bit
+                                  across hosts or devices). Unset defers to PYRITE_MATH,
+                                  then the numerics.math config key, then reproducible.
+                                  fast joins case identity, so its checkpoints never mix
+                                  with reproducible ones.
   --sampling [fixed|adaptive]     Select adaptive or fixed sampling. Adaptive options
                                   select adaptive; --cxr-histories or --brem-histories
                                   select fixed. Switching replaces the previous sampling

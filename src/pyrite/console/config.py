@@ -56,6 +56,8 @@ _SETTINGS = {
     "xsgen.elsepa_source": ("PYRITE_XSGEN_ELSEPA_SOURCE", "../elsepa-2020"),
     "xsgen.sbethe_source": ("PYRITE_XSGEN_SBETHE_SOURCE", "../sbethe"),
     "mott.tables_dir": ("PYRITE_MOTT_TABLES_DIR", ""),
+    # Literal mirrors pyrite._math_mode.DEFAULT_MATH_MODE; a test keeps them in step.
+    "numerics.math": ("PYRITE_MATH", "reproducible"),
 }
 
 # One-line help per key, shown by ``pyrite config --help`` / ``config set --help``.
@@ -83,6 +85,7 @@ _DESCRIPTIONS = {
     "xsgen.elsepa_source": "ELSEPA source tree for table generation.",
     "xsgen.sbethe_source": "SBETHE source tree for table generation.",
     "mott.tables_dir": "NIST SRD 64 tables you downloaded, for 'mott'.",
+    "numerics.math": "Floating-point math mode when a run sets none: reproducible or fast.",
 }
 # Built-in defaults that read better as a phrase than as their raw value.
 _DEFAULT_LABELS = {
@@ -122,6 +125,8 @@ def domain(key: str) -> str:
         return "existing NIST SRD 64 table directory"
     if key in ("workspace.root", "catalog.user"):
         return "directory path (expanded and made absolute; need not exist yet)"
+    if key == "numerics.math":
+        return "fast | reproducible"
     raise KeyError(f"unknown config key: {key}")
 
 

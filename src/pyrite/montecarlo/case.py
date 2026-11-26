@@ -156,6 +156,7 @@ _CASE_KEY_ORDER = (
     "cxr_source",
     "transport_realization",
     "cone_split",
+    "math",
 )
 
 
@@ -211,6 +212,10 @@ class Case(Mapping[str, Any]):
     characteristic_chunk
         Optional characteristic-line segment chunk (#1455); absent selects the
         automatic size. Execution-only, like the other chunks.
+    math
+        ``"fast"`` when the case was lowered under the fast math mode (#1468);
+        absent is ``"reproducible"``. Unlike the chunks it stays in content
+        and dataset identity, so cached results never mix modes.
     bunch_charge_pc, rep_rate_hz
         Optional source-normalization values.
     energy_spread_frac, long_shape, bunch_length_fs, long_offsets_fs
@@ -434,13 +439,16 @@ class Case(Mapping[str, Any]):
     cone_split: dict[str, object] | _Absent = _ABSENT
     # Characteristic segment chunk (#1455), appended for pickle offsets.
     characteristic_chunk: int | _Absent = _ABSENT
+    # Floating-point math mode (#1468), appended for pickle offsets; absent is
+    # "reproducible", so existing case keys stay valid.
+    math: Literal["fast"] | _Absent = _ABSENT
 
     def __getstate__(self) -> list[Any]:
         """Keep the historical frozen-slot pickle: drop trailing absent appended fields."""
         state = [getattr(self, field.name) for field in fields(self)]
-        # Only characteristic_chunk, cone_split and transport_realization
+        # Only math, characteristic_chunk, cone_split and transport_realization
         # postdate the legacy layout.
-        for _ in range(3):
+        for _ in range(4):
             if state[-1] is not _ABSENT:
                 break
             state.pop()
@@ -456,6 +464,15 @@ class Case(Mapping[str, Any]):
             if value is MISSING:
                 raise ValueError(f"Case pickle is missing required field {field.name}")
             object.__setattr__(self, field.name, value)
+
+    def _validate_execution(self) -> None:
+        """Chunk sizes and the math mode (#1468): ``"fast"`` or absent (reproducible)."""
+        for name in ("spec_chunk", "brem_chunk", "characteristic_chunk"):
+            value = getattr(self, name)
+            if value not in (None, _ABSENT):
+                _positive_int(name, value)
+        if self.math not in (_ABSENT, "fast"):
+            raise ValueError("math must be absent (reproducible) or 'fast'")
 
     def __post_init__(self) -> None:
         """Reject malformed values before they reach transport or identity."""
@@ -495,10 +512,7 @@ class Case(Mapping[str, Any]):
                 raise ValueError("adaptive case Ne and Ne_brem must equal precision.max_histories")
         if isinstance(self.seed, bool) or not isinstance(self.seed, int):
             raise ValueError("seed must be an integer")
-        for name in ("spec_chunk", "brem_chunk", "characteristic_chunk"):
-            value = getattr(self, name)
-            if value not in (None, _ABSENT):
-                _positive_int(name, value)
+        self._validate_execution()
         for name in (
             "coherent_emission",
             "temporal_profile",

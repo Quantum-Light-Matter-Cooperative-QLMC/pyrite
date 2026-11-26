@@ -173,6 +173,14 @@ class ExecutionConfig:
     leave the grid bitwise unchanged and never enter case identity. A path is
     stored as ``str``; ``pyrite.simulate`` creates it and refuses an
     unwritable one before transport.
+    ``math`` (#1468) is the floating-point math mode: ``"reproducible"``
+    (bitwise parity where pinned; no fast-math), ``"fast"`` (adopted kernels
+    may use fast-math flags, approximate transcendentals and FMA contraction;
+    not bit-for-bit across hosts, devices or versions), or ``None`` for
+    ``PYRITE_MATH``, then the ``numerics.math`` config key, then the built-in
+    ``"reproducible"``. Unlike the other fields it **enters case identity**
+    when it resolves to ``"fast"``: checkpoints never mix modes and switching
+    recomputes. See ``docs/repo-design/compute/math-mode.md``.
     """
 
     transport_core: str = "auto"
@@ -186,10 +194,15 @@ class ExecutionConfig:
     stream_spill_dir: str | None = None
     stream_spill_mib: int | None = None
     characteristic_chunk: int | None = None
+    math: Literal["fast", "reproducible"] | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.transport_core, str) or not self.transport_core:
             raise ValueError("transport_core must be a nonempty string")
+        if self.math is not None:
+            from ._math_mode import validate_math_mode
+
+            validate_math_mode(self.math)
         for name in (
             "cxr_chunk",
             "brem_chunk",
@@ -235,7 +248,8 @@ class ExecutionConfig:
     def __setstate__(self, state: dict[str, object]) -> None:
         # Pickles from before #776 carry no ``transport`` entry, before #825 no
         # CXR launch controls, before #865/#868 no streaming controls, before
-        # #1283 no spill controls, before #1455 no characteristic chunk.
+        # #1283 no spill controls, before #1455 no characteristic chunk, before
+        # #1468 no math mode.
         state.setdefault("transport", TransportKernelTuning())
         state.setdefault("cxr_threads", None)
         state.setdefault("cxr_energies_per_block", None)
@@ -244,6 +258,7 @@ class ExecutionConfig:
         state.setdefault("stream_spill_dir", None)
         state.setdefault("stream_spill_mib", None)
         state.setdefault("characteristic_chunk", None)
+        state.setdefault("math", None)
         self.__dict__.update(state)
 
 

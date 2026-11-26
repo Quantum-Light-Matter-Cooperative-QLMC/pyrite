@@ -202,7 +202,11 @@ def run_provenance(
     source checkout and are ``None`` outside one (for example an installed wheel).
     ``transport_precision`` (#838) records the CUDA kernel precision policy,
     from ``numerics``' ``KernelTuning.transport.precision`` when given.
+    ``math`` (#1468) records the case's math mode and the stack that shapes
+    its floating-point results: Numba version, SVML state, host CPU and its
+    vector features, and the GPU model (``None`` on the CPU).
     """
+    from ._math_mode import case_math_mode, math_provenance
     from .campaign.physics_view import resolved_physics_view
     from .montecarlo.runner.transport_options import transport_kernel_tuning
     from .montecarlo.transport.precision import precision_provenance
@@ -223,6 +227,10 @@ def run_provenance(
         "device": BACKEND.device,
         "transport_precision": precision_provenance(
             BACKEND.name, getattr(transport_kernel_tuning(numerics), "precision", None)
+        ),
+        "math": math_provenance(
+            case_math_mode(case),
+            gpu_model=None if BACKEND.name == "cpu" else BACKEND.device.name,
         ),
         "git_sha": git_sha,
         "git_dirty": git_dirty,

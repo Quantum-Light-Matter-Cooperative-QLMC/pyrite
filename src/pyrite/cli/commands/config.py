@@ -35,6 +35,15 @@ def _validated(key: str, value: str) -> str:
         if backend not in ("auto", "cpu", "cuda", "rocm", "sycl"):
             raise click.BadParameter("expected auto, cpu, cuda, rocm or sycl", param_hint="VALUE")
         return backend
+    if key == "numerics.math":
+        from ..._math_mode import MATH_MODES
+
+        mode = value.strip().lower()
+        if mode not in MATH_MODES:
+            raise click.BadParameter(
+                f"expected {' or '.join(MATH_MODES)}; got {value!r}", param_hint="VALUE"
+            )
+        return mode
     if key == "remote.target":
         try:
             return validate_remote_target(value)

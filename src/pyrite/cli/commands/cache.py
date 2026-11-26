@@ -109,19 +109,31 @@ def command() -> None:
 )
 @output_option
 def status_command(backend: str, json_output: bool) -> None:
-    """Report cache locations, sizes, and per-family Numba freshness.
+    """Report cache locations, sizes, per-family Numba freshness, and math mode.
 
     A Numba index is current when its recorded source stamp and Numba version
     match this installation, so its signatures load without compiling (cache
     hits); stale indexes recompile on next use (misses). CuPy files are
-    hash-named and reported only as a total. Read-only.
+    hash-named and reported only as a total. The math mode is the one a run
+    that sets none would use (PYRITE_MATH, then the numerics.math config key,
+    then the built-in default); fast-mode Numba kernels keep separate
+    __math_fast cache indexes. Read-only.
     """
     from ... import _jit_cache
+    from ..._math_mode import resolve_math_mode
+    from ...console.config import ConfigError
 
+    try:
+        math = resolve_math_mode()
+    except (ConfigError, ValueError) as exc:
+        raise CLIError(str(exc)) from exc
     records = [_jit_cache.location_summary(loc) for loc in _selected(backend)]
     records.extend(_family_records(backend))
     if json_output:
-        emit_json("pyrite.cache.status.v1", {"locations": records})
+        emit_json(
+            "pyrite.cache.status.v1",
+            {"locations": records, "math": {"mode": math.mode, "source": math.source}},
+        )
         return
     rows = []
     for record in records:
@@ -152,6 +164,8 @@ def status_command(backend: str, json_output: bool) -> None:
                 for f in families
             ],
         )
+    emit_result("")
+    emit_result(f"math mode: {math.mode} ({math.source})")
 
 
 @command.command("clear")

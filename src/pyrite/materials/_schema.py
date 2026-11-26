@@ -8,7 +8,7 @@ from typing import Literal, cast
 
 import numpy as np
 
-from .._numerics import CONVERGENCE_KEYS, TRANSPORT_KEYS
+from .._numerics import CONVERGENCE_KEYS, EXECUTION_KEYS, TRANSPORT_KEYS
 from .._precision import Precision
 from .._sampling import AdaptiveSampling
 from .._units import reject_quantity
@@ -34,7 +34,7 @@ _SCAN_KEYS = (
 #: would cycle back through ``results/tables.py``'s ``from ..materials import
 #: CATALOG``.
 _EMISSION_VALUES = ("incoherent", "coherent", "both")
-_PROFILE_SCALAR_NUMERICS_KEYS = (*CONVERGENCE_KEYS, *TRANSPORT_KEYS)
+_PROFILE_SCALAR_NUMERICS_KEYS = (*CONVERGENCE_KEYS, *TRANSPORT_KEYS, *EXECUTION_KEYS)
 # Catalog continuum default; case lowering resolves its floor and endpoint.
 DEFAULT_BREM_GRID = (0.0, 30000.0, 25.0)
 _DEFAULT_PROFILE_DETECTOR_SPEC: Mapping[str, object] = MappingProxyType({})

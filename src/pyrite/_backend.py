@@ -432,6 +432,29 @@ def exact_rawkernel_options(module: ModuleType) -> tuple[str, ...]:
     return ("--std=c++17", "--fmad=false")
 
 
+def rawkernel_options(
+    module: ModuleType, math: str | None = None, *, fast: tuple[str, ...] = ()
+) -> tuple[str, ...]:
+    """Compile options for a device kernel under a math mode (#1468).
+
+    ``"reproducible"`` returns exactly :func:`exact_rawkernel_options`.
+    ``"fast"`` permits FMA contraction (``--fmad=true`` / ``-ffp-contract=fast``)
+    and appends the owner's validated ``fast`` flags (for example
+    ``--use_fast_math`` or ``-ffast-math``). ``None`` reads
+    :func:`pyrite._math_mode.active_math_mode`. A kernel builder that caches
+    its module must key that cache on the mode; CuPy's own cache already
+    separates option sets.
+    """
+    from ._math_mode import active_math_mode, validate_math_mode
+
+    mode = active_math_mode() if math is None else validate_math_mode(math)
+    if mode == "reproducible":
+        return exact_rawkernel_options(module)
+    if getattr(module.cuda.runtime, "is_hip", False):
+        return ("-std=c++17", "-ffp-contract=fast", *fast)
+    return ("--std=c++17", "--fmad=true", *fast)
+
+
 BACKEND = select_backend()
 xp = BACKEND.xp
 cp: ModuleType | None = BACKEND.cp if isinstance(BACKEND, CuPyBackend) else None

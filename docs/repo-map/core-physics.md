@@ -25,6 +25,9 @@ Import-light private `Precision` base of the public `AdaptiveSampling` (`_sampli
 ## `_backend.py`
 Portable array backend shared by every device-dispatching kernel: NumPy, CUDA/ROCm CuPy, and Intel dpnp/SYCL adapters behind a deterministic `PYRITE_MC_BACKEND` selection. Exports `xp`, `cp`, `REAL`, `_to_cpu`, `_GPU`, `is_device_array`. Lives at the package root, not under `montecarlo/`, because `materials.attenuation` dispatches on it too — that is what keeps `materials` out of the `montecarlo` import cycle. Importing it runs the accelerator probe, so cheap-import callers (CLI, catalog parsing) reach for it inside the function that needs a device. Deps: `_util.env`.
 
+## `_math_mode.py`
+Floating-point math mode (#1468): `MATH_MODES` (`fast`, `reproducible`), `DEFAULT_MATH_MODE`, `resolve_math_mode` (explicit > `PYRITE_MATH` > `numerics.math` config > default), the process-wide `math_mode_scope`/`active_math_mode` the runner enters per case (`with_case_math_mode`), `mode_njit`/`MathModeKernel` per-mode Numba dispatchers (the `fast` copy gets its own cache index), and `math_provenance`. `_backend.rawkernel_options` is its GPU counterpart. Contract: `docs/repo-design/compute/math-mode.md`. Deps: `_util.env`, `console.config` (lazy), `numba`/`llvmlite` (lazy).
+
 ## `_energy_grid_artifacts.py`
 Immutable, content-addressed energy-grid artifact store: canonical `cxr.energy-grid-artifact.v1` identity bytes, SHA-256 naming, sharded storage, atomic dedup publication, and corruption checks. Imports nothing first-party. Read by `materials.catalog` when resolving `[profiles.*.energy_grid_refs]` at catalog-load time and written by `energy_grid.apply` / collected by `energy_grid.gc`, so it sits below both rather than inside `energy_grid/`. Deps: none (leaf; stdlib only).
 

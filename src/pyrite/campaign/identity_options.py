@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from .._cascade_rng_policy import CASCADE_RNG_MODEL
 from .._hard_loss_policy import hard_loss_markers
+from .._math_mode import resolve_math_mode
 from .._mixed_elastic_policy import mixed_case_keys
 from .._numerics import DEFAULT_INELASTIC_CUTOFF_EV, DEFAULT_RADIATIVE_CUTOFF_EV
 from .._radiative_moment_policy import RADIATIVE_MOMENT_MODEL
@@ -93,6 +94,7 @@ class IdentityOptions:
     mixed_c1: Any = None
     mixed_c2: Any = None
     mixed_max_step_um: Any = None
+    math: str = "reproducible"
 
 
 def pop_identity_options(settings_payload: dict[str, Any]) -> IdentityOptions:
@@ -118,6 +120,8 @@ def pop_identity_options(settings_payload: dict[str, Any]) -> IdentityOptions:
         mixed_c1=settings_payload.pop("mixed_c1", None),
         mixed_c2=settings_payload.pop("mixed_c2", None),
         mixed_max_step_um=settings_payload.pop("mixed_max_step_um", None),
+        # Absent before #1468: reproducible, as it ran. None resolves now.
+        math=resolve_math_mode(settings_payload.pop("math", None)).mode,
     )
 
 

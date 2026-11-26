@@ -20,6 +20,7 @@ streamed-scoring
 history-shards
 extending-physics
 photon-aperture
+math-mode
 ```
 
 ```{toctree}

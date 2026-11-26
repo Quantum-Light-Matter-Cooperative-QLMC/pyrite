@@ -61,6 +61,12 @@ Its `precision` field (`"fp64"`, `"mixed"`, or `None` for
 `PYRITE_MC_TRANSPORT_PRECISION`, then the `mixed` default; #838) selects the exact CUDA kernel's
 arithmetic. It changes trajectories at rounding scale, is recorded in run
 provenance as `transport_precision`, and stays out of case identity.
+`KernelTuning.math` (`"fast"`, `"reproducible"`, or `None` for `PYRITE_MATH`, then the
+`numerics.math` config key, then `reproducible`; #1468) selects the floating-point math mode.
+`reproducible` keeps bit-for-bit results where they are pinned; `fast` lets adopted kernels use
+fast-math flags and approximate transcendentals. Unlike the other fields, `fast` enters case
+identity and is recorded in run provenance as `math`; see
+[Floating-point math mode](../../repo-design/compute/math-mode.md).
 `KernelTuning.cxr_threads` and `KernelTuning.cxr_energies_per_block`
 (experimental) select the CUDA CXR line-reduction launch: threads per block
 and energy nodes per block. They regroup the float sum only and never enter
