@@ -28,12 +28,26 @@ def _wrappers() -> list[Path]:
 
 
 def _code_lines(path: Path) -> list[tuple[int, str]]:
-    """Non-comment lines, with SLURM ``#SBATCH`` directives treated as comments."""
-    return [
-        (number, line)
-        for number, line in enumerate(path.read_text().splitlines(), start=1)
-        if not line.lstrip().startswith("#")
-    ]
+    """Non-comment logical lines, with SLURM ``#SBATCH`` directives treated as comments.
+
+    Backslash continuations are joined and numbered by their first line, so a flag
+    cannot hide on a different physical line from its command.
+    """
+    joined: list[tuple[int, str]] = []
+    start, pending = 0, ""
+    for number, line in enumerate(path.read_text().splitlines(), start=1):
+        if not pending:
+            if line.lstrip().startswith("#"):
+                continue
+            start = number
+        if line.endswith("\\"):
+            pending += line[:-1]
+            continue
+        joined.append((start, pending + line))
+        pending = ""
+    if pending:
+        joined.append((start, pending))
+    return joined
 
 
 def _sources_env_sh(path: Path) -> bool:
@@ -45,6 +59,12 @@ WRAPPERS = _wrappers()
 
 def test_wrappers_found() -> None:
     assert any(_sources_env_sh(p) for p in WRAPPERS)
+
+
+def test_code_lines_join_continuations(tmp_path: Path) -> None:
+    wrapper = tmp_path / "job.sbatch"
+    wrapper.write_text("# comment \\\npyrite_gpu_sync -v \\\n    --no-cache\necho done\n")
+    assert _code_lines(wrapper) == [(2, "pyrite_gpu_sync -v     --no-cache"), (4, "echo done")]
 
 
 @pytest.mark.parametrize("path", WRAPPERS, ids=lambda p: str(p.relative_to(CHECKS)))

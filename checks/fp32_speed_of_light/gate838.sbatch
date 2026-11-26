@@ -7,7 +7,7 @@
 # e.g. "--warmup-histories -1 --block-rows 16000000" (#1013: one-block warmup, and a
 # smaller block for the 26 GB unified-memory ROCm node; neither changes the scores).
 # ROCm (#888): add -p gpu-amd -w qlmc-ace --gres=gpu:radeon8060s:1; checks/rocm/env.sh
-# picks the vendor, venv and CuPy-HIP build environment from the node.
+# picks the vendor, pixi environment and CuPy-HIP build settings from the node.
 #SBATCH --job-name=gate838
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1

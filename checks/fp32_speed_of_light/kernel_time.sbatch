@@ -1,6 +1,6 @@
 #!/bin/bash
 # #1013 kernel cost: production exact-kernel time per retained row, tree against tree.
-# Usage (from this checkout's root; each tree is a synced checkout with its own venv):
+# Usage (from this checkout's root; each tree is a synced checkout with its own pixi environment):
 #   sbatch checks/fp32_speed_of_light/kernel_time.sbatch "<tree dirs>" "<scene:histories ...>" \
 #       "<seeds>" "<precisions>"
 # Runs every (tree, precision) arm per scene and seed, rotating the arm order per seed.
