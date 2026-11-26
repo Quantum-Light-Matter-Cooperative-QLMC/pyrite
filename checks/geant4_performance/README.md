@@ -20,12 +20,12 @@ at most four concurrently after validating the runtime on a compute node.
 The runtime and Python environment must already be staged and verified.
 
 ```bash
-uv run python checks/geant4_performance/accuracy_reference.py plan \
+pixi run python checks/geant4_performance/accuracy_reference.py plan \
     checks/geant4_performance/precision-plan-v3.json --output reference-plan.json
 # LAST is len(plan["tasks"]) - 1. RUNTIME is an absolute shared-filesystem path.
 sbatch --array=0-LAST%4 checks/geant4_performance/accuracy-reference.sbatch \
     reference-plan.json "$RUNTIME" evidence/accuracy-reference/shards
-uv run python checks/geant4_performance/accuracy_reference.py summarize \
+pixi run python checks/geant4_performance/accuracy_reference.py summarize \
     reference-plan.json evidence/accuracy-reference/shards --output reference-summary.json
 ```
 
@@ -103,9 +103,9 @@ or measured verdict is supplied by this compiler.
 
 ```bash
 # Read-only reproducibility check; no archives, tables, GPU or histories needed.
-uv run python checks/geant4_performance/convergence_manifest.py --check
+pixi run python checks/geant4_performance/convergence_manifest.py --check
 # Reconstruct from the original backup into a new file; compare before adoption.
-uv run python checks/geant4_performance/convergence_manifest.py \
+pixi run python checks/geant4_performance/convergence_manifest.py \
     --archives /path/to/verified/archives --output scratch/reconstructed-design.json
 ```
 
@@ -157,7 +157,7 @@ appended (IDs `comparison-07074` onward), so the multiplicity grows from
 7,074 to 7,182 and the row alpha becomes `0.05/7182`.
 
 ```bash
-uv run python checks/geant4_performance/amend_convergence_design.py --check
+pixi run python checks/geant4_performance/amend_convergence_design.py --check
 ```
 
 ## PyRITE numerical and table controls (#1041)
@@ -234,7 +234,7 @@ changes the frozen design. Every expected row and the original multiplicity
 remain present, including unsupported, unresolved and missing rows.
 
 ```bash
-uv run python checks/geant4_performance/prepare_convergence_resources.py \
+pixi run python checks/geant4_performance/prepare_convergence_resources.py \
     --pilots path/to/pilot-summary.json --output scratch/confirmation-resources.json
 ```
 
@@ -351,10 +351,10 @@ its wall time must never enter nominal `T(epsilon)` analysis.
 
 ```bash
 # Retention audit only: no scorer/table imports, GPU or histories.
-uv run python checks/geant4_performance/replay_cone.py path/to/capture \
+pixi run python checks/geant4_performance/replay_cone.py path/to/capture \
     --audit-only --output scratch/capture-audit.json
 # Explicit scorer computation on existing tracks; schedule remotely when heavy.
-PYRITE_MC_BACKEND=numpy uv run python checks/geant4_performance/replay_cone.py \
+PYRITE_MC_BACKEND=numpy pixi run python checks/geant4_performance/replay_cone.py \
     path/to/capture --output scratch/cone-replay.json
 ```
 
@@ -384,7 +384,7 @@ scene family. All requests remain `requires-independent-generation`; output
 payload and raw-generator-evidence hashes are null. No generator was run.
 
 ```bash
-uv run python checks/geant4_performance/prepare_convergence_tables.py \
+pixi run python checks/geant4_performance/prepare_convergence_tables.py \
     --levels 1 2 3 --output scratch/new-elsepa-request-plan.json
 ```
 
@@ -399,7 +399,7 @@ requirement. Native angular/inverse-CDF convergence remains unsupported.
 For a CPU-only, read-only preflight before requesting a GPU:
 
 ```bash
-uv run python checks/geant4_performance/pyrite_bench.py si-300keV-100um \
+pixi run python checks/geant4_performance/pyrite_bench.py si-300keV-100um \
     --histories 2 --seed 301 --tables-only --electron-cutoff-kev 1.25 \
     --output scratch/table-audit.json
 ```
@@ -564,7 +564,7 @@ slope. `analyze.py` then applies `scenes.json` `amendment_v3` (floor, skew,
 tail and FOM rules; see the equal-precision protocol):
 
 ```bash
-uv run python checks/geant4_performance/precision_plan.py evidence/precision/{14460,14462,14463,14464} \
+pixi run python checks/geant4_performance/precision_plan.py evidence/precision/{14460,14462,14463,14464} \
     --variance-margin 1.10 --max-run-s 1800 --drop-config geant4-16t --only-at geant4-1t=0.05 \
     --tail-histories 200000 --protocol-version 3 --output precision-plan-v3.json
 ```
