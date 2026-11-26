@@ -897,8 +897,22 @@ class _CaseRun:
     # ---- CPU pool: full cases, completion order ------------------------------
 
     def cpu_pool(self, max_workers):
+        """Run full cases in a worker pool, delivering in completion order.
+
+        An unbounded run submits every case up front. A bounded run
+        (``should_stop`` given) keeps at most ``max_workers`` cases submitted
+        and submits the next only after a completion whose stop check is false:
+        ``ProcessPoolExecutor`` marks up to ``max_workers + 1`` queued items
+        running as it moves them to its call queue, so ``Future.cancel()`` could
+        not stop them and they would begin after the deadline. Never-started
+        cases keep their ``None`` slots; in-flight cases still drain.
+        """
+        bounded = self.should_stop is not None
+        if self.stop_requested():
+            self.activity("idle", in_flight_case_count=0)
+            return self.results
         _single_thread_blas()
-        from concurrent.futures import ProcessPoolExecutor, as_completed
+        from concurrent.futures import ProcessPoolExecutor
 
         with ProcessPoolExecutor(
             max_workers=max_workers,
@@ -906,25 +920,28 @@ class _CaseRun:
             initargs=(not self.use_gpu and _RESOURCE_POLICY.gpu,),
             **_process_pool_kwargs(),
         ) as ex:
-            futures = {
+            pending = {}
+
+            def submit(i):
+                c = self.cases[i]
                 # Workers run the spectrum on NumPy and the transport on the CPU
                 # core (_worker_init) -- a pool of CUDA contexts is what this pool
                 # exists to avoid.
-                ex.submit(
-                    _pool_worker(c, transport=False),
-                    c,
-                    *self.timing_args,
-                    **self.capture_kw,
-                    **self.direction_kwargs(i),
-                ): i
-                for i, c in enumerate(self.cases)
-            }
-            self.activity("cpu_pool", in_flight_case_count=len(futures))
-            stopped = False
-            for fut in self.maybe_bar(as_completed(futures)):
-                if fut.cancelled():
-                    continue
-                i = futures[fut]
+                pending[
+                    ex.submit(
+                        _pool_worker(c, transport=False),
+                        c,
+                        *self.timing_args,
+                        **self.capture_kw,
+                        **self.direction_kwargs(i),
+                    )
+                ] = i
+
+            for i in range(min(max_workers, self.n) if bounded else self.n):
+                submit(i)
+            self.activity("cpu_pool", in_flight_case_count=len(pending))
+            completions = self._pool_completions(pending, submit, bounded)
+            for fut, i in self.maybe_bar(completions):
                 try:
                     out = fut.result()
                 except Exception as exc:
@@ -933,10 +950,44 @@ class _CaseRun:
                     continue
                 self.collect_timing(i, out)
                 self.deliver(i, out)
-                if not stopped and self.stop_requested():
-                    stopped = True
-                    for f in futures:
-                        f.cancel()
         self.activity("idle", in_flight_case_count=0)
         self.report_timing("CPU-pool", nw=max_workers)
         return self.results
+
+    def _pool_completions(self, pending, submit, bounded):
+        """Yield ``(future, case_index)`` pairs as pool futures finish.
+
+        Bounded: after the consumer handles each completion (a skipped failure
+        included) the stop check runs and, if false, the next unsubmitted case
+        refills the window; once true nothing more is submitted and the rest
+        drain. A refill refused by a broken pool is raised only after the
+        remaining futures have been yielded, finished results first.
+
+        Each future leaves ``pending`` as it is yielded, so a delivered output
+        is not pinned for the rest of the run.
+        """
+        from concurrent.futures import FIRST_COMPLETED, as_completed, wait
+        from concurrent.futures.process import BrokenProcessPool
+
+        if not bounded:
+            for fut in as_completed(list(pending)):
+                yield fut, pending.pop(fut)
+            return
+        next_i = len(pending)
+        stopped = False
+        broken = None
+        while pending:
+            done, _ = wait(pending, return_when=FIRST_COMPLETED)
+            # A broken-pool failure aborts the run: hand over the rest first.
+            for fut in sorted(done, key=lambda f: isinstance(f.exception(), BrokenProcessPool)):
+                i = pending.pop(fut)
+                yield fut, i
+                stopped = stopped or self.stop_requested()
+                if not stopped and broken is None and next_i < self.n:
+                    try:
+                        submit(next_i)
+                    except BrokenProcessPool as exc:
+                        broken = exc
+                    next_i += 1
+        if broken is not None:
+            raise broken
