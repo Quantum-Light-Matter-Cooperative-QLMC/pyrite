@@ -25,15 +25,11 @@ import numpy as np
 from ..._cascade_rng_policy import CASCADE_RNG_MODEL
 from .kinematics import (
     _SM64_GOLDEN,
-    _SM64_MIX1,
-    _SM64_MIX2,
     _SM64_ONE,
     _SM64_S11,
-    _SM64_S27,
-    _SM64_S30,
-    _SM64_S31,
     _U53_SCALE,
 )
+from .kinematics import _splitmix64_array as _mix
 
 __all__ = [
     "CASCADE_RNG_MODEL",
@@ -61,12 +57,6 @@ PROCESS_PAIR_POSITRON = np.uint64(0xC4E81B3A905F7D26)
 PROCESS_ANNIHILATION_IN_FLIGHT = np.uint64(0x71D3F0A8B6C2E957)
 PROCESS_ANNIHILATION_EMISSION = np.uint64(0xE5274C9D3A1B60F8)
 PROCESS_HARD_PHOTON_DIRECTION = np.uint64(0x3D8B6E05F2C9A714)
-
-
-def _mix(x):
-    x = (x ^ (x >> _SM64_S30)) * _SM64_MIX1
-    x = (x ^ (x >> _SM64_S27)) * _SM64_MIX2
-    return x ^ (x >> _SM64_S31)
 
 
 def daughter_keys(parent_keys, process, ordinal):

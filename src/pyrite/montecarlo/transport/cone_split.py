@@ -33,15 +33,11 @@ from numba import njit
 
 from .kinematics import (
     _SM64_GOLDEN,
-    _SM64_MIX1,
-    _SM64_MIX2,
     _SM64_ONE,
-    _SM64_S27,
-    _SM64_S30,
-    _SM64_S31,
     _splitmix64,
     _stream_uniform_scalar,
 )
+from .kinematics import _splitmix64_array as _mix
 from .scattering import _elsepa_bracket, _elsepa_invert_row
 from .stopping import _MC2_KEV
 
@@ -118,12 +114,6 @@ class ConeSplit:
         """Core policy vector ``[target_weight, min_energy_keV, angle_scale or 0]``."""
         scale = self.angle_scale if math.isfinite(self.angle_scale) else 0.0
         return np.array([self.target_weight, self.min_energy_keV, scale], dtype=np.float64)
-
-
-def _mix(x):
-    x = (x ^ (x >> _SM64_S30)) * _SM64_MIX1
-    x = (x ^ (x >> _SM64_S27)) * _SM64_MIX2
-    return x ^ (x >> _SM64_S31)
 
 
 def split_stream_keys(stream_keys):

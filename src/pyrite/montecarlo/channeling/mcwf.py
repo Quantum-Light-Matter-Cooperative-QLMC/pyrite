@@ -57,13 +57,9 @@ import numpy as np
 from ...materials.crystal import HBARC_EV_ANG
 from ..transport.kinematics import (
     _SM64_GOLDEN,
-    _SM64_MIX1,
-    _SM64_MIX2,
     _SM64_ONE,
-    _SM64_S27,
-    _SM64_S30,
-    _SM64_S31,
 )
+from ..transport.kinematics import _splitmix64_array as _mix
 from .bloch import longitudinal_kinematics
 from .density import DensityMatrixSolver
 
@@ -71,12 +67,6 @@ _MCWF_STREAM_SALT = np.uint64(0x1F83D9AB5BE0CD19)
 # Kernel eigenvalues below this fraction of the block maximum are dropped as
 # numerical zeros of a positive semidefinite matrix.
 _CHANNEL_RTOL = 1e-12
-
-
-def _mix(x):
-    x = (x ^ (x >> _SM64_S30)) * _SM64_MIX1
-    x = (x ^ (x >> _SM64_S27)) * _SM64_MIX2
-    return x ^ (x >> _SM64_S31)
 
 
 def mcwf_stream_key(seed, electron):

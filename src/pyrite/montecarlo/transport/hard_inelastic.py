@@ -22,13 +22,9 @@ from scipy.constants import c, e, m_e
 
 from .core_geometry import _rotate_direction_scalar
 from .kinematics import (
-    _SM64_MIX1,
-    _SM64_MIX2,
     _SM64_ONE,
-    _SM64_S27,
-    _SM64_S30,
-    _SM64_S31,
     _splitmix64,
+    _splitmix64_array,
     _stream_uniform_scalar,
     stream_keys,
 )
@@ -98,10 +94,7 @@ def hard_stream_keys(seed, Ne, *, start=0):
 
 def hard_keys_from_stream_keys(keys):
     """Host twin of :func:`_hard_stream_key_scalar` over explicit stream keys."""
-    x = np.asarray(keys, dtype=np.uint64) ^ _HARD_STREAM_SALT
-    x = (x ^ (x >> _SM64_S30)) * _SM64_MIX1
-    x = (x ^ (x >> _SM64_S27)) * _SM64_MIX2
-    return x ^ (x >> _SM64_S31)
+    return _splitmix64_array(np.asarray(keys, dtype=np.uint64) ^ _HARD_STREAM_SALT)
 
 
 @njit(cache=True)
