@@ -2,7 +2,8 @@
 # Shared job environment for #888 evaluation scripts, sourced from the synced
 # checkout root on either GPU partition. AMD nodes get the same CuPy-HIP build
 # environment as `pyrite run --remote` (src/pyrite/remote/rocm_build_env.sh)
-# and a separate project venv; NVIDIA nodes keep the default venv.
+# and the pixi `amd` environment; NVIDIA nodes use `nvidia`. Pass
+# `-e "$PYRITE_PIXI_ENV"` to `pixi run`.
 export PATH="$HOME/.pixi/bin:$PATH"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$PWD/user-catalog" XDG_CONFIG_HOME="$PWD/.xdg-config"
@@ -16,8 +17,11 @@ else
     export PYRITE_GPU_VENDOR=nvidia PYRITE_MC_BACKEND=cuda
 fi
 
+# pixi GPU environment of this node: `nvidia` or `amd` (#1462).
+export PYRITE_PIXI_ENV="$PYRITE_GPU_VENDOR"
+
 pyrite_gpu_sync() {
-    pixi install --extra "$PYRITE_GPU_VENDOR" --locked "$@"
+    pixi install --locked -e "$PYRITE_PIXI_ENV" "$@"
 }
 
 pyrite_gpu_info() {
