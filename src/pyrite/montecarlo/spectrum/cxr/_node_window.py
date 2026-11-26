@@ -34,8 +34,9 @@ Validation: node-support-window-tail
 import numpy as np
 from numba import njit, prange
 
+from ...._math_mode import active_math_mode, mode_njit
 from ....materials.crystal import HBARC_EV_ANG
-from ._vector_sin import VECTOR_SIN_LIMIT, vector_sin
+from ._vector_sin import VECTOR_SIN_LIMIT, sinc2_fast, vector_sin
 
 #: Default window parameter: exact within ``|v| <= x_c`` of each flight.
 DEFAULT_NODE_SUPPORT_CUTOFF = 100.0
@@ -520,6 +521,76 @@ def _sincsq_window_reduce(  # pragma: no cover - numba
                         out[c, t, e] += weights[t, j] * v
 
 
+@mode_njit(fast={"contract"}, parallel=True, cache=True)
+def _sincsq_window_reduce_fast(  # pragma: no cover - numba
+    E_r, a_width, weights, E_grid, node, lo, hi, mode, mu, step, bounds, out
+):
+    # ``math="fast"`` twin of ``_sincsq_window_reduce`` (#1469): only the sinc^2
+    # loop differs. It takes the direct argument y = a (E - E_r) (no /pi, *pi
+    # round trip), the fused ``sinc2_fast``, and FMA contraction. Only its
+    # ``for_mode("fast")`` dispatcher is ever compiled.
+    n_l = E_r.shape[0]
+    n_E = E_grid.shape[0]
+    for c in prange(bounds.shape[0] - 1):
+        buf = np.empty(n_E)
+        for j in range(bounds[c], bounds[c + 1]):
+            if j >= n_l or mode[j] == 2:
+                continue
+            lo_j, hi_j, nd = lo[j], hi[j], node[j]
+            m2, m3, m4 = mu[0, j], mu[1, j], mu[2, j]
+            if hi_j >= lo_j:
+                aj, ej = a_width[j], E_r[j]
+                Es = E_grid[lo_j : hi_j + 1]
+                b = buf[: hi_j - lo_j + 1]
+                if abs(aj) * max(abs(Es[0] - ej), abs(Es[-1] - ej)) < VECTOR_SIN_LIMIT:
+                    for i in range(Es.shape[0]):
+                        y = aj * (Es[i] - ej)
+                        if y == 0.0:
+                            y = np.pi * 1.0e-20
+                        b[i] = sinc2_fast(y)
+                else:
+                    for i in range(Es.shape[0]):
+                        x = aj * (Es[i] - ej) / np.pi
+                        if x == 0.0:
+                            x = 1.0e-20
+                        y = np.pi * x
+                        s = np.sin(y) / y
+                        b[i] = s * s
+                if mode[j] == 0:
+                    for i in range(Es.shape[0]):
+                        b[i] += _tail_correction(lo_j + i, nd, step, 0, m2, m3, m4, n_E)
+                for t in range(weights.shape[0]):
+                    wt = weights[t, j]
+                    o = out[c, t, lo_j : hi_j + 1]
+                    for i in range(Es.shape[0]):
+                        o[i] += wt * b[i]
+            if mode[j] == 1:
+                for e in range(0, min(lo_j, n_E)):
+                    v = _tail_value(m2, m3, m4, (e - nd) * step)
+                    for t in range(weights.shape[0]):
+                        out[c, t, e] += weights[t, j] * v
+                for e in range(max(hi_j + 1, 0), n_E):
+                    v = _tail_value(m2, m3, m4, (e - nd) * step)
+                    for t in range(weights.shape[0]):
+                        out[c, t, e] += weights[t, j] * v
+
+
+def _window_reducer():
+    """The reducer for the active math mode: exact under ``reproducible``.
+
+    ``fast`` (#1469): ``sinc2_fast`` plus FMA contraction, 2.9x on the kernel
+    (qlmc-queen, photon-case calls). The reduced spectrum moves by at most
+    2.9e-14 relative on those calls and 1.5e-13 of the peak on synthetic
+    far-pole rows (contraction against the tail correction), far inside the
+    1e-4 windowing error; the long-double error stays summation-limited.
+    Bits are identical on AVX2 and AVX-512 FMA hosts (measured), not on hosts
+    without FMA. Design: ``docs/repo-design/compute/cpu-fast-math.md``.
+    """
+    if active_math_mode() == "fast":
+        return _sincsq_window_reduce_fast.for_mode("fast")
+    return _sincsq_window_reduce
+
+
 def accumulate_sincsq_windowed(E_r, a_width, weights, E_grid, targets, tail, target_ids):
     """Windowed :func:`._cpu_reduce.accumulate_sincsq` plus tail deposits.
 
@@ -541,7 +612,7 @@ def accumulate_sincsq_windowed(E_r, a_width, weights, E_grid, targets, tail, tar
     out = np.zeros((bounds.size - 1, w.shape[0], tail.n))
     E_grid = np.ascontiguousarray(E_grid, dtype=np.float64)
     mu = np.ascontiguousarray(np.stack((mu2, mu3, mu4)))
-    _sincsq_window_reduce(E_r, a_width, w, E_grid, node, lo, hi, mode, mu, tail.step, bounds, out)
+    _window_reducer()(E_r, a_width, w, E_grid, node, lo, hi, mode, mu, tail.step, bounds, out)
     total = out.sum(0)
     keep = mode != _MODE_DIRECT
     for t, (tgt, slot) in enumerate(zip(targets, target_ids, strict=True)):

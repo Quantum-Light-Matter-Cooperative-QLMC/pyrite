@@ -631,7 +631,10 @@ def _identity_v1(
     # Math mode (#1468) is case identity, divergence-only: reproducible keeps
     # every digest; fast gets its own stem, so resume never mixes modes.
     if options.math != "reproducible":
+        from .._math_mode import MATH_FAST_MODEL
+
         resolved["math"] = options.math
+        resolved["math_fast_model"] = MATH_FAST_MODEL
     grooved = sweep_payload.get("groove_spacing_ang") is not None
     transport_numerics = transport_numerics_payload(
         options, sweep, crystallography["crystal"], grooved=grooved
@@ -857,6 +860,10 @@ def case_content_key(
             from ..montecarlo.spectrum.dtr_history import DTR_MODEL
 
             payload["transition_model"] = DTR_MODEL
+    if case.get("math", "reproducible") != "reproducible":  # #1469, divergence-only
+        from .._math_mode import MATH_FAST_MODEL
+
+        payload["math_fast_model"] = MATH_FAST_MODEL
     if xsgen_tables:
         payload["xsgen_tables"] = {str(key): str(value) for key, value in xsgen_tables.items()}
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()

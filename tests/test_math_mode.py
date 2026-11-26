@@ -243,13 +243,16 @@ def test_dataset_identity_is_divergence_only(store, monkeypatch):
     fast = identity(replace(default_settings(), math="fast"))
     assert fast["resolved_parameters"]["math"] == "fast"
     assert "math" not in base["resolved_parameters"]
+    # The fast kernels' generation (#1469) separates fast digests only.
+    assert fast["resolved_parameters"]["math_fast_model"] == _math_mode.MATH_FAST_MODEL
+    assert "math_fast_model" not in base["resolved_parameters"]
     assert fast["parameter_sha256"] != base["parameter_sha256"]
     # An unset mode resolves like the lowering does: resume never mixes modes.
     monkeypatch.setenv("PYRITE_MATH", "fast")
     assert identity(default_settings()) == fast
 
 
-def test_configured_campaign_lowers_settings_math(store):
+def test_configured_campaign_lowers_settings_math(store, monkeypatch):
     from pyrite.api import build_configured_cases
     from pyrite.campaign.config import material_sweep as configured_sweep
 
@@ -267,6 +270,12 @@ def test_configured_campaign_lowers_settings_math(store):
         _bytes(replace(case, math=_ABSENT)) for case in fast
     ]
     assert all("math" not in case.to_dict() for case in reproducible)
+    from pyrite.campaign.profiles import case_content_key
+
+    key = case_content_key(fast[0], xsgen_tables={})
+    assert key != case_content_key(replace(fast[0], math=_ABSENT), xsgen_tables={})
+    monkeypatch.setattr(_math_mode, "MATH_FAST_MODEL", _math_mode.MATH_FAST_MODEL + "-next")
+    assert case_content_key(fast[0], xsgen_tables={}) != key
 
 
 # ---- provenance ------------------------------------------------------------------

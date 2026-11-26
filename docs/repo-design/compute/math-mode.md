@@ -13,9 +13,8 @@ adopts the `fast` variant. Kernel adoption lives in the CPU (#1469) and GPU
 | `reproducible` | Today's guarantees, unchanged: no Numba `fastmath`, device kernels compiled with `_backend.exact_rawkernel_options` (`--fmad=false` / `-ffp-contract=off`, #888), the exact `vector_sin` (#1459), and bitwise parity wherever it is pinned now. Identity pins, physics baselines and validation evidence use it. |
 | `fast` | Adopted kernels may use fast-math flags, approximate transcendentals (SVML, a reduced-accuracy sine, device intrinsics) and FMA contraction. See [the `fast` guarantee](#the-fast-guarantee). |
 
-The built-in default is `reproducible`. The issue's goal is `fast` by default;
-the flip waits for at least one adopted kernel and passing validation
-([Default flip](#default-flip)).
+The built-in default is `reproducible`. The goal is `fast` by default, once
+the adopted kernels give a larger whole-case gain ([Default flip](#default-flip)).
 
 ## Where it lives and precedence
 
@@ -67,6 +66,10 @@ the `KernelTuning` rounding knobs:
   content-store keys: resume never mixes modes, and switching modes recomputes.
   Scoring saved trajectories under a different mode is refused like any other
   case-field mismatch.
+- A fast run's dataset identity and `case_content_key` also carry
+  `math_fast_model` (`_math_mode.MATH_FAST_MODEL`, #1469), the generation of the
+  kernels `fast` swaps in. Bump it whenever a `fast` variant's output changes;
+  `reproducible` digests never see it.
 - Run provenance (`provenance["math"]`) records the mode, Numba version, SVML
   state (`numba.config.USING_SVML`), host CPU name and vector features, and the
   GPU model (`None` on the CPU).
@@ -101,6 +104,16 @@ its module (`lru_cache`) must key that cache on the mode.
 Each adoption adds a test that `reproducible` is bitwise unchanged and that
 `fast` stays within the stated bound.
 
+**Adopted kernels.**
+
+| Kernel | `fast` variant | Bound | Issue |
+|---|---|---|---|
+| CPU node-window reducer (`cxr/_node_window.py`) | `_sincsq_window_reduce_fast`: fused `sinc2_fast` (reduction by pi, one polynomial) and `fastmath={"contract"}` | spectrum within 2.9e-14 relative (photon-case calls), 5e-13 of the peak (tested) | #1469, [CPU fast math](cpu-fast-math.md) |
+
+A `fast` variant whose body differs from the reproducible kernel is its own
+function, decorated with `mode_njit` and called through `for_mode("fast")`
+only; the reproducible kernel stays the untouched `njit` original.
+
 ## Tests and CI
 
 `tests/conftest.py` sets `PYRITE_MATH=reproducible` for the whole suite, so
@@ -114,12 +127,17 @@ explicit Monte Carlo tolerances; the `math-fast` CI job runs it with
 
 ## Default flip
 
-Deferred. Flip to `fast` when at least one sub-issue has adopted a kernel and
-the #1468 validation (photon-case, layered, channeling and one GPU case on
+Deferred (owner decision, 2026-11-26). #1469 adopted the CPU node-window
+reducer and passed the validation below, but the whole-case gain was 1.07-1.09x
+at 4 threads and 1.23-1.30x at 1 thread: too small to give up bit-for-bit
+results by default. Revisit when more adopted kernels (CPU, or GPU in #1463)
+give a larger gain. The flip as prepared then is commit `13ae802e5`.
+
+Flip to `fast` when the gain justifies it and the #1468 validation (photon-case, layered, channeling and one GPU case on
 qlmc, within Monte Carlo error; evidence in `~/dev/pyrite-benches/`) passes.
 The flip changes `DEFAULT_MATH_MODE` and the `numerics.math` built-in together,
 bumps the affected `*_MODEL` markers, re-mints pins with
 `pyrite-dev test-suite identity-pins --update-pins`, and names
 `math="reproducible"` in the release notes as the way to get bit-for-bit
-results. Until then no kernel differs between modes, so `fast` results equal
-`reproducible` results bit for bit while carrying a distinct identity.
+results. Until then `fast` is opt-in; it differs from `reproducible` only in the
+adopted kernels above.
