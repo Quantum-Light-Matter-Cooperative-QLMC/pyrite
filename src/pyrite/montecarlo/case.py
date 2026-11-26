@@ -273,7 +273,8 @@ class Case(Mapping[str, Any]):
         ``"kawrakow"`` atomic-electron angular deflection as a ``Z(Z + xi)``
         elastic-rate correction, which :class:`~pyrite.Numerics` lowers to by
         default; absent is elastic-only deflection, so earlier case keys stay
-        valid. Shell soft/hard transport needs ``elastic_model``.
+        valid. With shell soft/hard transport it needs
+        ``elastic_model="elsepa"``.
     shell_ionization_model
         Opt-in ``"bote-salvat"`` characteristic primary-vacancy cross sections
         (#92); absent is EEDL, so existing case keys stay valid.

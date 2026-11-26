@@ -147,7 +147,7 @@ support is still decided by `transport/api.py` and the existing backend owners.
 
 | Route | Preparation/state requirement | Existing scoring contract / restriction |
 | --- | --- | --- |
-| Legacy Mott | Absent case elastic key; explicit Mott dispatch; SRD 64 table requirement | Historical omitted keys and case/identity payload retained |
+| Legacy Mott | Explicit `"mott"` case key (stored omissions decode to it); explicit Mott dispatch; SRD 64 table requirement | Historical omitted-key case/identity payload retained |
 | ELSEPA | Tables for every layer element, covering transport energies | Native tables/samplers unchanged; preparation tested with synthetic arrays |
 | EEDL fallback | `auto` chooses EEDL when complete BremsLib inventory is unavailable | No BremsLib/radiative keys; fixed resolved choice at scoring |
 | Coupled BremsLib | Midpoint integration, resolved BremsLib and hard-photon cutoff | Coupled expected-value continuum only; repair replays the same transport |
