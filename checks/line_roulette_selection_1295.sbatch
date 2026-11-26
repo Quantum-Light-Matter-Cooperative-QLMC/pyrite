@@ -15,6 +15,7 @@ cd "$SLURM_SUBMIT_DIR"
 export PATH="$HOME/.pixi/bin:$PATH"
 if [ "${SLURM_JOB_PARTITION:-gpu}" = cpu ]; then
     export PYRITE_MC_BACKEND=cpu PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
+    export PYRITE_PIXI_ENV=default
 else
     . checks/rocm/env.sh
 fi
@@ -28,7 +29,7 @@ if [ "${SLURM_JOB_PARTITION:-gpu}" != cpu ]; then
     pyrite_gpu_sync -q || exit 1
     pyrite_gpu_info > "$OUT/gpu-info.txt" 2>&1
 else
-    pixi install --locked -e amd || exit 1
+    pixi install --locked -e "$PYRITE_PIXI_ENV" || exit 1
 fi
 H=checks/line_roulette_selection_1295.py
 read -ra case_list <<< "$CASES"
@@ -36,9 +37,9 @@ for spec in "${case_list[@]}"; do
     IFS=: read -r material e0 tilt <<< "$spec"
     stem="$OUT/$material-$e0-$tilt-n$HISTORIES-s$SEED"
     echo "== $(date -Is) $stem"
-    timeout "$CASE_TIMEOUT" pixi run --as-is -e amd python -u $H run "$material" "$e0" "$tilt" \
+    timeout "$CASE_TIMEOUT" pixi run --as-is -e "$PYRITE_PIXI_ENV" python -u $H run "$material" "$e0" "$tilt" \
         "$HISTORIES" "$SEED" "$stem" > "$stem.log" 2>&1
     echo "rc=$? $(tail -c 600 "$stem.log" | tr '\n' ' ' | cut -c1-600)"
 done
-pixi run --as-is -e amd python $H table "$OUT" | tee "$OUT/table.txt"
+pixi run --as-is -e "$PYRITE_PIXI_ENV" python $H table "$OUT" | tee "$OUT/table.txt"
 sha256sum "$OUT"/* > "$OUT/SHA256SUMS" 2>/dev/null

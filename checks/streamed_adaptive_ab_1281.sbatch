@@ -28,15 +28,15 @@ for spec in "${arm_list[@]}"; do
     IFS=: read -r route material e0 tilt nmax <<< "$spec"
     stem="$OUT/$material-$e0-$tilt-n$nmax-$route"
     echo "== $(date -Is) $stem"
-    timeout "$ARM_TIMEOUT" pixi run --as-is -e amd python -u $H run "$route" "$material" "$e0" "$tilt" \
+    timeout "$ARM_TIMEOUT" pixi run --as-is -e "$PYRITE_PIXI_ENV" python -u $H run "$route" "$material" "$e0" "$tilt" \
         "$nmax" "$stem" > "$stem.log" 2>&1
     echo "rc=$? $(tail -c 400 "$stem.log" | tr '\n' ' ' | cut -c1-400)"
-    pixi run --as-is -e amd python $H table "$OUT" > "$OUT/table.txt" 2>&1
+    pixi run --as-is -e "$PYRITE_PIXI_ENV" python $H table "$OUT" > "$OUT/table.txt" 2>&1
 done
 read -ra pair_list <<< "$PAIRS"
 for pair in "${pair_list[@]}"; do
     IFS=, read -r ref other <<< "$pair"
-    pixi run --as-is -e amd python $H compare "$OUT/$ref" "$OUT/$other" > "$OUT/compare-$other.json" 2>&1
+    pixi run --as-is -e "$PYRITE_PIXI_ENV" python $H compare "$OUT/$ref" "$OUT/$other" > "$OUT/compare-$other.json" 2>&1
     echo "compare $pair rc=$?"
 done
 cat "$OUT/table.txt"

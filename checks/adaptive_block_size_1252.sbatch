@@ -19,10 +19,10 @@ SHIPPED_XDG="$PWD/.xdg-config"
 if [ "${PROBE_CPU:-0}" = 1 ]; then
     # CPU stopping captures (no GPU): per-electron core, numba threads = CPUs.
     export PATH="$HOME/.pixi/bin:$PATH" PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
-    export PYRITE_USER_CATALOG="$PWD/user-catalog" PYRITE_MC_BACKEND=cpu
+    export PYRITE_USER_CATALOG="$PWD/user-catalog" PYRITE_MC_BACKEND=cpu PYRITE_PIXI_ENV=default
     export NUMBA_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
     mkdir -p "$PYRITE_USER_CATALOG"
-    pyrite_gpu_sync() { pixi install --locked -e amd "$@"; }
+    pyrite_gpu_sync() { pixi install --locked -e "$PYRITE_PIXI_ENV" "$@"; }
     pyrite_gpu_info() { lscpu | head -20; }
 else
     . checks/rocm/env.sh
@@ -45,16 +45,16 @@ for spec in "${case_list[@]}"; do
     for block in "${block_list[@]}"; do
         stem="$OUT/$material-$e0-$tilt-b$block"
         echo "== $(date -Is) $stem"
-        timeout "$ARM_TIMEOUT" pixi run --as-is -e amd python -u $H run "$material" "$e0" "$tilt" "$block" "$stem" \
+        timeout "$ARM_TIMEOUT" pixi run --as-is -e "$PYRITE_PIXI_ENV" python -u $H run "$material" "$e0" "$tilt" "$block" "$stem" \
             > "$stem.log" 2>&1
         echo "rc=$? $(tail -c 400 "$stem.log" | tr '\n' ' ' | cut -c1-400)"
     done
     best=$(ls -S "$OUT/$material-$e0-$tilt"-b*.values.npz 2>/dev/null | head -1)
     if [ -n "$best" ]; then
-        pixi run --as-is -e amd python $H replay "$best" "$OUT/$material-$e0-$tilt.replay.json" \
+        pixi run --as-is -e "$PYRITE_PIXI_ENV" python $H replay "$best" "$OUT/$material-$e0-$tilt.replay.json" \
             1000 2000 3000 6000 12000 24000 48000 > /dev/null 2>&1
         echo "replay rc=$? from $best"
     fi
 done
-pixi run --as-is -e amd python $H table "$OUT" | tee "$OUT/table.txt"
+pixi run --as-is -e "$PYRITE_PIXI_ENV" python $H table "$OUT" | tee "$OUT/table.txt"
 sha256sum "$OUT"/* > "$OUT/SHA256SUMS" 2>/dev/null

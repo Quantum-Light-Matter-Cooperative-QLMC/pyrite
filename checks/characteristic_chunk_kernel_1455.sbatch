@@ -9,17 +9,15 @@
 # Gates B vs A and B vs the NumPy twin at rtol 1e-12 plus bitwise rerun, records
 # warm wall per arm, then (NSYS=1) counts kernels per arm and chunk under Nsight.
 # usage (from a synced checkout root): sbatch checks/characteristic_chunk_kernel_1455.sbatch [OUTDIR] [NSYS] [SEGMENTS]
-# Set PYRITE_MC_BACKEND=rocm at submit for an AMD node.
+# checks/rocm/env.sh selects the backend and pixi environment from the node vendor.
 set -uo pipefail
-export PATH=$HOME/.pixi/bin:$PATH
 cd "$SLURM_SUBMIT_DIR"
+. checks/rocm/env.sh
 export TMPDIR="$HOME/tmp-nsys"; mkdir -p "$TMPDIR"
 export PYRITE_HOME=$HOME/pyrite PYRITE_CATALOG=$PWD/src/pyrite/data/catalog PYRITE_USER_CATALOG=$(mktemp -d)/catalog
-export PYRITE_MC_BACKEND=${PYRITE_MC_BACKEND:-cuda}
-EXTRA=$([ "$PYRITE_MC_BACKEND" = rocm ] && echo amd || echo nvidia)
 [ -f CODE_SHA ] && echo "code $(cat CODE_SHA)"
-pixi install --locked -e amd
-B=(pixi run --as-is -e amd python checks/characteristic_chunk_kernel_1455.py)
+pyrite_gpu_sync || exit 1
+B=(pixi run --as-is -e "$PYRITE_PIXI_ENV" python checks/characteristic_chunk_kernel_1455.py)
 ROOT=${1:-c1455_out}
 NSYS=${2:-1}
 SEGMENTS=${3:-2000000}
