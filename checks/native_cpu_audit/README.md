@@ -35,7 +35,11 @@ reproducible protocol, the route inventory, the retained measurements
 | `gpu.sbatch` | GPU job over `MATERIAL:E0_KEV:TILT` cases, arms `warm`, `sampler`, `prof`, `nsys` (`ARMS` env) |
 | `gpu_host.py` | One GPU-host arm: production `_nsys_push` ranges, harness-only host-owner ranges (`HOST_SPANS`), a 10 ms stack sampler joined with NVML utilization (`by_range_frame_*` attribute idle to code lines), phase walls, digests |
 | `nsys_gaps.py` | Reduces an Nsight SQLite export: device busy (union of kernel/memcpy/memset), idle by innermost range, gap-size histogram, top kernels/API calls |
-| `bind.sh` | Sourced by both sbatch files |
+| `bind.sh` | Sourced by every sbatch file |
+| `fastmath.sbatch` | #1469 CPU job: `cases` (complete cases under global fastmath flag sets, a reducer variant, or `asm` vectorization records) and `replay` (sine micro + captured reducer replay); `PIXI_ENV=svml` for SVML Numba |
+| `fastmath_arms.py` | One complete case under one #1469 arm (`--fastmath`, `--reducer`, `--asm`, `--arrays`) |
+| `fast_variants.py` | #1469 prototypes: reduced-accuracy sines and node-window reducer variants rebuilt from the production source by named edits; not used by production |
+| `sin_micro.py`, `reducer_replay.py`, `capture_window_inputs.py` | #1469 sine speed/ulp micro, replay of captured reducer calls per `EDIT:FLAGSET` arm, and the input capture (from #1459) |
 | `inventory.json` | Code-referenced routes and explicit unknowns |
 | `report.md` | Findings, rank, coverage gaps, evidence index |
 | `results/job-<id>/` | Retained evidence per job: `summary.json`, `manifest.json` (SHA-256 of retained and dropped files), selected raw JSON |
@@ -68,6 +72,9 @@ ARMS="warm sampler" sbatch -J gpuhost1432-<sha> checks/native_cpu_audit/gpu.sbat
   documented example (5 MeV Si <001>, 32x32, 9-node beam, OAM 0, 1000 A in 5 A
   steps, 1000 histories, seed 627); `axial-prod-cache8` differs only in
   `max_cached_solvers=8` and must be bit-identical.
+- `transport-si300` (#1469): transport only, default physics (shell-soft-hard,
+  ELSEPA single scattering), 2048 primaries, 300 keV, 200 um Si, 5 deg, seed
+  1469, explicit 5 keV cutoff (engine call, no transport reuse; not scorable).
 
 ## Parallelism and free threading
 
