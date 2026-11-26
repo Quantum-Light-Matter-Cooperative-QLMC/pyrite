@@ -262,8 +262,9 @@ ROCm (job 16056).
   repeats differ, and on ROCm photon-case's repeats differ in both modes. That
   is run-to-run nondeterminism on that device, not a math-mode effect.
 
-On this evidence the default is `fast` (#1469). The flip is a separate commit;
-see [math mode](math-mode.md#default-flip).
+The validation passes, but the default stays `reproducible`. The whole-case
+gain (1.07-1.09x at 4 threads, 1.23-1.30x at 1 thread) is too small to give up
+bit-for-bit results by default; see [math mode](math-mode.md#default-flip).
 
 ## Reproduce
 
