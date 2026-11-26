@@ -184,7 +184,9 @@ Costs carried by users of the opt-in:
 - A frozen stack with no upstream future, since Numba 0.62 removed SVML.
 
 An alternative with no stack change is a reduced-accuracy `vector_sin`
-variant. It would not need SVML at all; it is not yet measured.
+variant. #1469 measured it and adopted a fused `sinc²` form under
+`math="fast"`. It matches SVML-fast's kernel speed without SVML; see
+[CPU kernels under `math="fast"`](cpu-fast-math.md).
 
 Raw evidence (scripts, replay JSON, ISA probes, dry-run logs and report) is in
 the benchmark archive `issue-1459/` with `SHA256SUMS.all`.

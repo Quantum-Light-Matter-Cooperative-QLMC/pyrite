@@ -37,6 +37,7 @@ continuum-grid-benchmarks
 density-matrix-benchmarks
 reflection-selection-benchmarks
 cpu-sine-vectorization
+cpu-fast-math
 ```
 
 Earlier optimization rounds and paired phase-retention measurements remain in
