@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from numba import njit
 
-from pyrite.montecarlo.spectrum.cxr._vector_sin import VECTOR_SIN_LIMIT, vector_sin
+from pyrite.montecarlo.spectrum.cxr._vector_sin import VECTOR_SIN_LIMIT, sinc2_fast, vector_sin
 
 
 @njit
@@ -61,3 +61,28 @@ def test_vector_sin_bits_are_pinned():
 @pytest.mark.parametrize("x", [0.0, -0.0, 1e-300, np.pi / 4, np.pi / 2, np.pi, 3 * np.pi / 2])
 def test_vector_sin_special_points(x):
     assert vector_sin(x) == pytest.approx(np.sin(x), rel=2.5e-16, abs=1e-300)
+
+
+@njit
+def _sinc2_fast_array(x):  # pragma: no cover - numba
+    out = np.empty_like(x)
+    for i in range(x.shape[0]):
+        out[i] = sinc2_fast(x[i])
+    return out
+
+
+@pytest.mark.skipif(
+    np.finfo(np.longdouble).eps >= np.finfo(np.float64).eps, reason="needs extended long double"
+)
+def test_sinc2_fast_is_within_its_stated_bound():
+    """math="fast" sinc^2 (#1469): <= 7 ulp of (sin y / y)^2 off the zeros of sin."""
+    x = _arguments()
+    x = x[x != 0.0]
+    got = _sinc2_fast_array(x)
+    xl = x.astype(np.longdouble)
+    ref = (np.sin(xl) / xl) ** 2
+    err = np.abs(got.astype(np.longdouble) - ref)
+    assert float(np.max(err * xl**2)) < 1e-15  # absolute error of sin(y)**2, everywhere
+    away = np.abs(np.sin(xl)) > 1e-3
+    ulp = err[away] / np.spacing(np.abs(ref[away].astype(np.float64)))
+    assert float(ulp.max()) < 7.0

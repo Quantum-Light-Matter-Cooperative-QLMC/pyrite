@@ -101,6 +101,16 @@ its module (`lru_cache`) must key that cache on the mode.
 Each adoption adds a test that `reproducible` is bitwise unchanged and that
 `fast` stays within the stated bound.
 
+**Adopted kernels.**
+
+| Kernel | `fast` variant | Bound | Issue |
+|---|---|---|---|
+| CPU node-window reducer (`cxr/_node_window.py`) | `_sincsq_window_reduce_fast`: fused `sinc2_fast` (reduction by pi, one polynomial) and `fastmath={"contract"}` | spectrum within 2.9e-14 relative (photon-case calls), 5e-13 of the peak (tested) | #1469, [CPU fast math](cpu-fast-math.md) |
+
+A `fast` variant whose body differs from the reproducible kernel is its own
+function, decorated with `mode_njit` and called through `for_mode("fast")`
+only; the reproducible kernel stays the untouched `njit` original.
+
 ## Tests and CI
 
 `tests/conftest.py` sets `PYRITE_MATH=reproducible` for the whole suite, so
@@ -121,5 +131,5 @@ The flip changes `DEFAULT_MATH_MODE` and the `numerics.math` built-in together,
 bumps the affected `*_MODEL` markers, re-mints pins with
 `pyrite-dev test-suite identity-pins --update-pins`, and names
 `math="reproducible"` in the release notes as the way to get bit-for-bit
-results. Until then no kernel differs between modes, so `fast` results equal
-`reproducible` results bit for bit while carrying a distinct identity.
+results. Until then `fast` is opt-in; it differs from `reproducible` only in the
+adopted kernels above.

@@ -433,3 +433,44 @@ def test_cpu_window_reductions_do_not_depend_on_the_thread_count():
         for a, b in zip(results[0][0], got[0], strict=True):
             np.testing.assert_array_equal(a, b)
         np.testing.assert_array_equal(results[0][1], got[1])
+
+
+def _windowed_rows(rows, weights, mode):
+    from pyrite._math_mode import math_mode_scope
+
+    with math_mode_scope(mode):
+        return _rows(E_BAND, 100.0, *rows, weights)[1]
+
+
+def test_reproducible_window_reducer_is_the_exact_kernel():
+    """``reproducible`` dispatches the unchanged #1459 kernel (#1469)."""
+    from pyrite._math_mode import math_mode_scope
+    from pyrite.montecarlo.spectrum.cxr import _node_window
+
+    with math_mode_scope("reproducible"):
+        assert _node_window._window_reducer() is _node_window._sincsq_window_reduce
+    with math_mode_scope("fast"):
+        assert _node_window._window_reducer() is not _node_window._sincsq_window_reduce
+
+
+@pytest.mark.skipif(
+    os.environ.get("NUMBA_DISABLE_JIT") == "1",
+    reason="fastmath flags and the fused sinc^2 act only under JIT",
+)
+def test_fast_window_reducer_stays_within_its_stated_bound():
+    """``fast`` (fused ``sinc2_fast`` + FMA) stays within 5e-13 of the peak (#1469).
+
+    FMA contraction dominates: 1.5e-13 of the peak on these far-pole rows,
+    2.9e-14 relative on the captured photon-case reducer calls, against a
+    windowing error of 1e-4 versus the full-node reference.
+    """
+    rng = np.random.default_rng(1469)
+    n = 600
+    rows = (rng.uniform(-3000.0, 15000.0, n), np.pi / rng.uniform(1.0, 60.0, n))
+    weights = [rng.uniform(0.5, 1.0, n) for _ in range(2)]
+    exact = _windowed_rows(rows, weights, "reproducible")
+    fast = _windowed_rows(rows, weights, "fast")
+    for a, b in zip(exact, fast, strict=True):
+        scale = np.max(np.abs(a))
+        assert np.max(np.abs(b - a)) <= 5e-13 * scale
+        assert not np.array_equal(a, b)  # the fast kernel actually ran
