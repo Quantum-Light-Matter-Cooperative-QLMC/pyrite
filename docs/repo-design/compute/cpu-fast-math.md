@@ -16,6 +16,8 @@ node-window reducer vectorize and rejected `fastmath` without SVML.
   - It compiles with `fastmath={"contract"}` (FMA).
   - Kernel speedup: 2.9x on qlmc-queen and 2.6x on the AVX2 laptop. The
     reduced spectrum moves by at most 2.9e-14 relative on real calls.
+  - Complete cases: 1.30x on photon-case and 1.23x on layered (qlmc-queen,
+    1 thread), with outputs within 2e-16 of their peak ([Validation](#validation)).
   - `reproducible` still runs the unchanged #1459 kernel. Identity pins and
     physics baselines pass without a re-mint.
 - **Not adopted:**
@@ -186,14 +188,83 @@ What the rows show:
   kernels other than the reducer. That is why the adopted variant applies
   flags to the reducer alone.
 
-Reducer variants alone (`--reducer`, everything else reproducible), on the
-AVX2 laptop (i7-13620H, photon-case, 1 thread, 2 warm samples):
+Reducer variants alone (`--reducer`, everything else reproducible) on
+qlmc-queen (jobs 16045 at 1 thread and 16046 at 4 threads; spread under
+0.5 %). "Change" is over the peak, as above:
+
+| Case | Threads | Arm | Warm wall (s) | Speedup | Reducer (s) | Change |
+|---|---:|---|---:|---:|---:|---:|
+| photon-case | 1 | reproducible | 7.64 | 1.00x | 2.66 | 0 |
+| photon-case | 1 | `u35` strict | 6.73 | 1.14x | 1.75 | 1.7e-16 |
+| photon-case | 1 | `sinc2` strict | 6.33 | 1.21x | 1.34 | 1.7e-16 |
+| photon-case | 1 | `sinc2` + `contract` (adopted) | 5.89 | 1.30x | 0.92 | 1.7e-16 |
+| photon-case | 1 | `sinc2` + `arcp,contract` | 6.01 | 1.27x | 0.92 | 1.7e-16 |
+| photon-case | 4 | reproducible | 5.53 | 1.00x | 0.69 | 0 |
+| photon-case | 4 | `sinc2` + `arcp,contract` | 5.08 | 1.09x | 0.24 | 1.7e-16 |
+| layered | 1 | reproducible | 31.10 | 1.00x | 8.83 | 0 |
+| layered | 1 | `u35` strict | 27.98 | 1.11x | 5.84 | 2.1e-16 |
+| layered | 1 | `sinc2` strict | 26.61 | 1.17x | 4.44 | 2.1e-16 |
+| layered | 1 | `sinc2` + `contract` (adopted) | 25.43 | 1.22x | 3.04 | 1.1e-16 |
+| layered | 4 | reproducible | 24.42 | 1.00x | 2.27 | 0 |
+| layered | 4 | `sinc2` + `arcp,contract` | 22.84 | 1.07x | 0.80 | 1.1e-16 |
+
+In the pixi `svml` environment (job 16047, 1 thread), SVML-fast is no faster
+than `sinc2` with FMA on complete cases:
+
+| Case | Arm | Warm wall (s) | Speedup | Reducer (s) | Change |
+|---|---|---:|---:|---:|---:|
+| photon-case | reproducible | 7.48 | 1.00x | 2.62 | 0 |
+| photon-case | `npsin` + `fastmath=True` (SVML-fast) | 5.89 | 1.27x | 1.02 | 1.7e-16 |
+| photon-case | `sinc2` + `arcp,contract` | 5.76 | 1.30x | 0.92 | 1.7e-16 |
+| layered | reproducible | 30.07 | 1.00x | 8.74 | 0 |
+| layered | `npsin` + `fastmath=True` (SVML-fast) | 24.72 | 1.22x | 3.47 | 2.1e-16 |
+| layered | `sinc2` + `arcp,contract` | 24.47 | 1.23x | 3.08 | 1.1e-16 |
+
+At 4 threads the reducer already runs in parallel and the serial NumPy
+remainder dominates, so the complete-case gain falls to 7–9 %.
+
+The same variants on the AVX2 laptop (i7-13620H, photon-case, 1 thread, 2 warm samples):
 
 | Arm | Warm wall (s) | Speedup | Reducer (s) | Change |
 |---|---:|---:|---:|---:|
 | reproducible | 15.54 | 1.00x | 7.84 | 0 |
 | `sinc2` strict | 12.17 | 1.28x | 3.39 | 3.3e-16 |
 | `sinc2` + `arcp,contract` | 10.45 | 1.49x | 2.32 | 3.3e-16 |
+
+## Validation
+
+The adopted kernel against `reproducible` on complete cases (#1468's
+validation, moved here). Each mode ran in its own process with its own Numba
+cache. "Change" is the largest absolute change of any output array as a
+fraction of its peak; "sum change" is the largest relative change of an
+array's sum. CPU rows are qlmc-queen at 1 thread unless marked (jobs 16050–16053, 16054/16055;
+mean of 2 warm samples). The GPU row is qlmc-ace, Radeon 8060S with FP64,
+ROCm (job 16056).
+
+| Case | Backend | `reproducible` (s) | `fast` (s) | Speedup | Change | Sum change |
+|---|---|---:|---:|---:|---:|---:|
+| photon-case | CPU | 7.64 | 5.90 | 1.30x | 1.7e-16 | 0 |
+| layered | CPU | 31.06 | 25.27 | 1.23x | 1.1e-16 | 0 |
+| channeling-demo (admitted planar case) | CPU | 13.36 | 13.03 | – | 0 (same bits) | 0 |
+| layered | GPU (ROCm) | 5.71 | 5.70 | – | 0 (same bits) | 0 |
+| photon-case, 4 threads | CPU | 5.54 | 5.09 | 1.09x | 1.7e-16 | 0 |
+| layered, 4 threads | CPU | 24.38 | 22.83 | 1.07x | 1.1e-16 | 0 |
+
+- Both modes are far inside Monte Carlo error. These cases' relative MC error
+  is about 1e-2 or larger per bin (the channeling case's budget is 6 %), and
+  the largest change is 1.7e-16 of the peak.
+- The `reproducible` photon-case arrays are bit-identical to the
+  pre-adoption run (job 16044), so adoption left `reproducible` unchanged.
+- Channeling and the GPU path do not call the CPU node-window reducer, and no
+  GPU kernel has a `fast` variant yet (#1463). Their outputs are identical in
+  both modes, which confirms the mode switch changes nothing else.
+- GPU photon-case did not run. The harness refuses a case whose two warm
+  repeats differ, and on ROCm photon-case's repeats differ in both modes. That
+  is run-to-run nondeterminism on that device, not a math-mode effect.
+
+The validation passes, but the default stays `reproducible`. The whole-case
+gain (1.07-1.09x at 4 threads, 1.23-1.30x at 1 thread) is too small to give up
+bit-for-bit results by default; see [math mode](math-mode.md#default-flip).
 
 ## Reproduce
 
@@ -204,6 +275,11 @@ All scripts are in `checks/native_cpu_audit/`; `README.md` there lists them.
 sbatch -w qlmc-queen --mem=12G checks/native_cpu_audit/fastmath.sbatch cases asm contract afn arcp_contract no_nnan_ninf true
 CASES="photon-case layered" sbatch -w qlmc-queen checks/native_cpu_audit/fastmath.sbatch cases strict reducer=sinc2:contract
 PYRITE_MATH=fast CASES="photon-case layered" sbatch -w qlmc-queen checks/native_cpu_audit/fastmath.sbatch cases strict
+PYRITE_MATH=reproducible CASES="photon-case layered" sbatch -w qlmc-queen checks/native_cpu_audit/fastmath.sbatch cases strict
+# validation: channeling case under each mode, one GPU case, then compare
+PYRITE_MATH=fast CASES=channeling-demo sbatch -w qlmc-queen checks/native_cpu_audit/fastmath.sbatch cases strict
+CASES="layered" sbatch -w qlmc-ace checks/native_cpu_audit/math_gpu.sbatch
+pixi run python checks/native_cpu_audit/compare_modes.py REPRODUCIBLE.npz FAST.npz
 # sine micro + reducer replay (captures photon-case inputs once)
 sbatch -w qlmc-queen checks/native_cpu_audit/fastmath.sbatch replay prod:strict sinc2:contract
 PIXI_ENV=svml sbatch -w qlmc-queen checks/native_cpu_audit/fastmath.sbatch replay prod:strict npsin:true
