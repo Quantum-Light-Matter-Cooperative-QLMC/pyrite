@@ -285,7 +285,7 @@ jobs:
             ~/.local/share/pyrite/xsgen/tables
             ~/.local/share/pyrite/xsgen/reference-data
           key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
-      - run: pixi run -e ${{ matrix.environment }} pyrite tables fetch
+      - run: pixi run -e py314 pyrite tables fetch
       - name: Suites with JIT disabled and online checks enabled
         shell: bash
         run: |
@@ -326,6 +326,15 @@ jobs:
           locked: true
           cache: true
           cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+      - name: Cache pinned physics tables
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/pyrite/datasets
+            ~/.local/share/pyrite/xsgen/tables
+            ~/.local/share/pyrite/xsgen/reference-data
+          key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
+      - run: pixi run -e svml pyrite tables fetch
       - name: Require operational SVML
         run: |
           pixi run -e svml numba -s | tee numba-sysinfo.txt
