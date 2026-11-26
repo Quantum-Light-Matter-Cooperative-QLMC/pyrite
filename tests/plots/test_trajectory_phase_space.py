@@ -11,6 +11,7 @@ from matplotlib.collections import LineCollection
 
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
 from pyrite.montecarlo.transverse import TransverseDistribution
+from pyrite.plots import _frames
 from pyrite.plots.mpl.trajectories import (
     _beam_phase_space,
     _draw_incident_bundle,
@@ -42,6 +43,30 @@ def test_phase_space_kwargs_are_inert_without_a_beam_block():
     # The spot stays the caller's business: a 2D cross-section wants a point
     # source, and the 3D view supplies its own display width.
     assert "beam_fwhm_mm" not in forwarded
+
+
+@pytest.mark.parametrize(
+    ("stored", "expected"), [(None, "elsepa"), ("elsepa", "elsepa"), ("mott", "mott")]
+)
+def test_replot_transports_the_case_elastic_model(monkeypatch, stored, expected):
+    case = dict(_case(BeamSpec()))
+    if stored is None:
+        del case["elastic_model"]
+    else:
+        case["elastic_model"] = stored
+    seen = []
+
+    class Captured(Exception):
+        pass
+
+    def capture(*args, **kwargs):
+        seen.append(kwargs["elastic_model"])
+        raise Captured
+
+    monkeypatch.setattr(_frames, "simulate_trajectories", capture)
+    with pytest.raises(Captured):
+        _trajectory_data(case, 1, 0)
+    assert seen == [expected]
 
 
 def test_trajectory_data_is_unchanged_when_no_phase_space_is_set():

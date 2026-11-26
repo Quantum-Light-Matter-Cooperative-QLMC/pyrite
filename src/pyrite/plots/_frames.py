@@ -352,6 +352,8 @@ def _trajectory_data(
         Ne,
         total_thickness_ang,
         composition=case["composition"],
+        # A replot must not swap a stored Mott case onto the transport default.
+        elastic_model=case.get("elastic_model", "elsepa"),
         seed=seed,
         beam_dir=beam,
         layers=abs_layers,
