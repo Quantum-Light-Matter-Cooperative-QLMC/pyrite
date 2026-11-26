@@ -71,3 +71,58 @@ def vector_sin(x):  # pragma: no cover - numba
     cos_r = wc + (((1.0 - wc) - hz) + (z * pc - r * y))
     s = cos_r if (q & 1) else sin_r
     return -s if (q & 2) else s
+
+
+# ---- math="fast" (#1469) -------------------------------------------------------
+# pi in three 33-bit parts (twice the pi/2 parts above, an exact doubling): with
+# |n| < 2**15 for |y| < VECTOR_SIN_LIMIT, n * _PI_1 and n * _PI_2 are exact.
+_PI_1 = 2.0 * _PIO2_1
+_PI_2 = 2.0 * _PIO2_2
+_PI_3 = 2.0 * _PIO2_3
+_INVPI = 3.18309886183790671538e-01
+# Odd minimax polynomial for sin on [-pi/2, pi/2], coefficients of d^19 .. d^3
+# (SLEEF ``xsin_u35``).
+_U9, _U8, _U7, _U6, _U5, _U4, _U3, _U2, _U1 = (
+    -7.97255955009037868891952e-18,
+    2.81009972710863200091251e-15,
+    -7.64712219118158833288484e-13,
+    1.60590430605664501629054e-10,
+    -2.50521083763502045810755e-08,
+    2.75573192239198747630416e-06,
+    -0.000198412698412696162806809,
+    0.00833333333333332974823815,
+    -0.166666666666666657414808,
+)
+
+
+@njit(inline="always", cache=True)
+def sinc2_fast(y):  # pragma: no cover - numba
+    """``(sin(y) / y)**2`` for ``0 < |y| < VECTOR_SIN_LIMIT``; ``math="fast"`` only.
+
+    Reduces ``y`` by ``pi`` (not ``pi/2``) with a three-part Cody-Waite step
+    and evaluates one degree-19 polynomial; the quadrant sign drops out of the
+    square, so there is no sin/cos select and no head/tail correction. Measured
+    against a long-double reference (#1469): at most 6.6 ulp of the result for
+    arguments uniform on ``|y| < 1e5`` (the exact ``(vector_sin(y)/y)**2``:
+    3.6 ulp); the error of ``sin(y)**2`` stays below 1e-15 absolute, so near
+    the zeros of ``sin`` the relative error grows while the absolute stays
+    bounded. It uses IEEE add, multiply,
+    divide and conversion only, so it vectorizes without SVML and, compiled
+    without ``reassoc``, gives the same bits on AVX2 and AVX-512 hosts.
+    ``reassoc`` together with ``nsz`` folds the ``_ROUND`` rounding step
+    away and must never be enabled for it.
+    """
+    n = (y * _INVPI + _ROUND) - _ROUND
+    d = ((y - n * _PI_1) - n * _PI_2) - n * _PI_3
+    s = d * d
+    u = _U9
+    u = u * s + _U8
+    u = u * s + _U7
+    u = u * s + _U6
+    u = u * s + _U5
+    u = u * s + _U4
+    u = u * s + _U3
+    u = u * s + _U2
+    u = u * s + _U1
+    r = (d + s * (u * d)) / y
+    return r * r
