@@ -14652,7 +14652,7 @@ packages:
   - nvidia-cuda-runtime-cu12>=12.9.79,<13 ; extra == 'nvidia'
   - nvidia-cufft-cu12>=11.4.1.4,<12 ; extra == 'nvidia'
   - nvidia-nvjitlink-cu12>=12.9.86,<13 ; extra == 'nvidia'
-  - cupy>=13.4.0 ; extra == 'amd'
+  - cupy>=14.2.0 ; extra == 'amd'
   - dpctl>=0.22.1 ; extra == 'intel'
   - dpnp>=0.20.0 ; extra == 'intel'
   - datashader>=0.19.1 ; extra == 'plots'
