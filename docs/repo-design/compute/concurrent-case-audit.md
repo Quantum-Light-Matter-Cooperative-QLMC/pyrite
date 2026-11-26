@@ -100,8 +100,10 @@ yet running. `ProcessPoolExecutor` moves up to `max_workers + 1` jobs into its
 call queue ahead of execution, and `cancel()` fails on those, so after a stop
 it ran work that had not started: at four workers nothing could be cancelled.
 The #928 contract (drain started tasks, start no more) is therefore easier to
-meet with threads; the current process path should be checked against it
-separately. Running jobs cannot be interrupted in either arm; drain time is the
+meet with threads. The production `cpu_pool` has the same flaw on a bounded
+sweep: it submits every case up front, so after the deadline up to
+`max_workers + 1` queued cases still begin ([#1478](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1478));
+`gpu_pipeline` already keeps one case in flight when bounded. Running jobs cannot be interrupted in either arm; drain time is the
 remainder of the running cases.
 
 **Not measured, so not claimed.**
@@ -182,7 +184,7 @@ not evaluated; **n/a** = not reachable by the CPU case path.
 | 14 | Host-memory admission | `runner/host_admission.py`, `transport/host_memory.py` read `MemAvailable`/cgroup headroom per call; the docstring says a projection is not a reservation | check-then-act | N threads admit against the same headroom and can over-commit together; needs a shared reservation ledger | **blocker** |
 | 15 | Worker-count and memory budget | `host_admission._cpu_pool_workers` (`worker_mem_mb`, about 5.5 GiB per full-case process measured earlier) | sized for processes | a thread budget needs its own measured per-case footprint (this probe: about 0.19 GiB marginal PSS per extra thread at 1024 histories, against about 0.7 GiB per extra process) | open |
 | 16 | Device contexts, streams, pools | `runner/stream_overlap.py` one scoring thread on a non-blocking stream | one owner by design; #1411 owns multi-GPU | none for a CPU slice | n/a |
-| 17 | Callbacks, stop and drain | `execution/protocol.py` requires `callback` in the coordinating process and draining of started tasks on `should_stop` | #928 contract; `LocalExecutor` delegates to `run_cases` | probe: exceptions reach the coordinator, completions are observed there, and threads cancel every unstarted job, while a process pool runs up to `max_workers + 1` queued jobs after a stop (above); a production executor still needs these as tests | ok for threads (probe only) |
+| 17 | Callbacks, stop and drain | `execution/protocol.py` requires `callback` in the coordinating process and draining of started tasks on `should_stop` | #928 contract; `LocalExecutor` delegates to `run_cases` | probe: exceptions reach the coordinator, completions are observed there, and threads cancel every unstarted job, while a process pool runs up to `max_workers + 1` queued jobs after a stop (above); a production executor still needs these as tests; the process `cpu_pool` overruns a bounded stop (#1478) | ok for threads (probe only) |
 | 18 | Checkpoint and result isolation | callback owns persistence; results returned by value | a process boundary copies today | threads return arrays by reference (the process arm's times already include pickling the 8 results); ownership rules must be stated | open |
 | 19 | Concurrent tests | `test_montecarlo.py` and `test_gpu_oom_retry.py` replace `ProcessPoolExecutor` with a synchronous fake | none ran two cases at once; this branch adds the two tests named in rows 2 and 5 | digest-parity test for two threads, ContextVar propagation | **blocker** |
 
