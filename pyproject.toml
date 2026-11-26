@@ -14,7 +14,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Physics",
-    "Environment :: GPU :: NVIDIA CUDA :: 13"
+    "Environment :: GPU :: NVIDIA CUDA :: 13",
 ]
 keywords = [
     "monte carlo",
@@ -56,16 +56,9 @@ dependencies = [
 [project.optional-dependencies]
 # Compatibility spelling: Pint is now installed by the core dependency set.
 units = []
-dask = [
-    "distributed>=2025.1",
-    "dask-jobqueue>=0.9",
-]
-optimization = [
-    "optuna>=5.0,<6",
-]
-external-db = [
-    "mp-api>=0.46",
-]
+dask = ["distributed>=2025.1", "dask-jobqueue>=0.9"]
+optimization = ["optuna>=5.0,<6"]
+external-db = ["mp-api>=0.46"]
 nvidia = [
     "cupy-cuda13x[ctk]>=14.1.1",
     # Fourier-domain incoherent line reduction (#1192). The only cuFINUFFT
@@ -79,13 +72,8 @@ nvidia = [
 # AMD's current ``amd-cupy`` wheels are CPython 3.10-only. PyRITE requires
 # Python 3.13+, so this extra builds upstream CuPy against ROCm instead. It must
 # not be installed beside the CUDA CuPy distribution in one environment.
-amd = [
-    "cupy>=13.4.0",
-]
-intel = [
-    "dpctl>=0.22.1",
-    "dpnp>=0.20.0",
-]
+amd = ["cupy-rocm-7-0>=14.2.0"]
+intel = ["dpctl>=0.22.1", "dpnp>=0.20.0"]
 # Runtime of ``pyrite.plots`` (and lazy matplotlib figures in ``perf``/``validation``).
 plots = [
     "datashader>=0.19.1",
@@ -96,11 +84,7 @@ plots = [
     "plotly>=6.8.0",
 ]
 # Runtime of the shipped marimo apps (``pyrite app ... launch|export``).
-apps = [
-    "pyrite-mc[plots]",
-    "anywidget>=0.11.0",
-    "marimo[recommended]>=0.26.0",
-]
+apps = ["pyrite-mc[plots]", "anywidget>=0.11.0", "marimo[recommended]>=0.26.0"]
 
 [project.scripts]
 pyrite = "pyrite.cli:main"
@@ -174,14 +158,9 @@ oracle = [
 
 # Browser-driven plotting evidence (checks/plotly_*_622.py): drives system
 # Firefox (geckodriver) and Chrome/Chromium; never imported by ``src/``.
-browser = [
-    "selenium>=4.53.0",
-]
+browser = ["selenium>=4.53.0"]
 
-dev = [
-    { include-group = "test" },
-    { include-group = "lint" },
-]
+dev = [{ include-group = "test" }, { include-group = "lint" }]
 # Contributor checkout: the shipped app/plot extras plus notebook conversion
 # tools nothing in ``src/`` imports.
 notebooks = [
@@ -200,10 +179,7 @@ testpaths = ["tests"]
 # Allow importlib-mode tests to import top-level checks/ helpers without
 # relying on `python -m pytest` to put the checkout root on sys.path.
 pythonpath = [".", "src"]
-addopts = [
-    "-q",
-    "--import-mode=importlib"
-]
+addopts = ["-q", "--import-mode=importlib"]
 # A full run writes ~1 GB under the basetemp, and /tmp is often a quota'd
 # tmpfs (RAM): keep only failed tests' directories for post-mortem.
 tmp_path_retention_policy = "failed"
@@ -233,10 +209,7 @@ source = ["src/pyrite", "*/site-packages/pyrite"]
 precision = 1
 show_missing = true
 skip_covered = true
-exclude_also = [
-    "if TYPE_CHECKING:",
-    "if __name__ == .__main__.:",
-]
+exclude_also = ["if TYPE_CHECKING:", "if __name__ == .__main__.:"]
 # No `omit` for the compiled paths; read totals with the environment in mind
 # instead of hiding modules.
 #   - the CUDA kernel modules (`montecarlo/transport/_jit_*device.py`,
@@ -320,11 +293,7 @@ exclude_type_checking_imports = true
 id = "physics-core-stays-below-drivers"
 name = "Physics core stays below driver and rendering packages"
 type = "forbidden"
-source_modules = [
-    "pyrite.detectors",
-    "pyrite.materials",
-    "pyrite.montecarlo",
-]
+source_modules = ["pyrite.detectors", "pyrite.materials", "pyrite.montecarlo"]
 forbidden_modules = [
     "pyrite.apps",
     "pyrite.campaign",
@@ -379,9 +348,7 @@ allow_indirect_imports = true
 id = "materials-imports-no-peer-domain"
 name = "Materials imports no peer domain package"
 type = "forbidden"
-source_modules = [
-    "pyrite.materials",
-]
+source_modules = ["pyrite.materials"]
 forbidden_modules = [
     "pyrite.detectors",
     "pyrite.energy_grid",
@@ -400,13 +367,8 @@ allow_indirect_imports = true
 id = "montecarlo-imports-no-detectors"
 name = "Monte Carlo imports no detector package"
 type = "forbidden"
-source_modules = [
-    "pyrite.montecarlo",
-]
-forbidden_modules = [
-    "pyrite.detectors",
-    "pyrite.instrument",
-]
+source_modules = ["pyrite.montecarlo"]
+forbidden_modules = ["pyrite.detectors", "pyrite.instrument"]
 allow_indirect_imports = false
 
 # ``xsgen`` is the table-generation layer that the Monte Carlo runner calls
@@ -417,12 +379,8 @@ allow_indirect_imports = false
 id = "xsgen-imports-no-montecarlo"
 name = "Table generation imports no Monte Carlo package"
 type = "forbidden"
-source_modules = [
-    "pyrite.xsgen",
-]
-forbidden_modules = [
-    "pyrite.montecarlo",
-]
+source_modules = ["pyrite.xsgen"]
+forbidden_modules = ["pyrite.montecarlo"]
 allow_indirect_imports = false
 
 [[tool.importlinter.contracts]]
@@ -458,9 +416,7 @@ source_modules = [
     "pyrite.runs",
     "pyrite.validation",
 ]
-forbidden_modules = [
-    "pyrite.apps",
-]
+forbidden_modules = ["pyrite.apps"]
 allow_indirect_imports = true
 
 # `cli` drives; `checkpoints`, `runs` and `remote` report progress and emit
@@ -483,9 +439,7 @@ source_modules = [
     "pyrite.runs",
     "pyrite.validation",
 ]
-forbidden_modules = [
-    "pyrite.cli",
-]
+forbidden_modules = ["pyrite.cli"]
 allow_indirect_imports = true
 
 # `console` is the bottom of the presentation stack: colour, prompts, JSON
@@ -499,9 +453,7 @@ allow_indirect_imports = true
 id = "console-stays-below-every-driver"
 name = "Console imports no driver or domain package"
 type = "forbidden"
-source_modules = [
-    "pyrite.console",
-]
+source_modules = ["pyrite.console"]
 forbidden_modules = [
     "pyrite.apps",
     "pyrite.campaign",
@@ -522,10 +474,7 @@ allow_indirect_imports = true
 id = "plots-backends-stay-independent"
 name = "Plot backends (mpl, plotly) do not import each other"
 type = "independence"
-modules = [
-    "pyrite.plots.mpl",
-    "pyrite.plots.plotly",
-]
+modules = ["pyrite.plots.mpl", "pyrite.plots.plotly"]
 
 [[tool.importlinter.contracts]]
 id = "campaign-stays-below-api"
@@ -563,9 +512,16 @@ name = "Shared component and executor contracts import no domain drivers"
 type = "forbidden"
 source_modules = ["pyrite._component_support", "pyrite._executor_contract"]
 forbidden_modules = [
-    "pyrite.campaign", "pyrite.checkpoints", "pyrite.energy_grid",
-    "pyrite.execution", "pyrite.montecarlo", "pyrite.observations",
-    "pyrite.perf", "pyrite.remote", "pyrite.results", "pyrite.runs",
+    "pyrite.campaign",
+    "pyrite.checkpoints",
+    "pyrite.energy_grid",
+    "pyrite.execution",
+    "pyrite.montecarlo",
+    "pyrite.observations",
+    "pyrite.perf",
+    "pyrite.remote",
+    "pyrite.results",
+    "pyrite.runs",
     "pyrite.validation",
 ]
 
@@ -614,21 +570,23 @@ exclude = [
 [tool.ruff.lint]
 # core useful rules without the “style noise overload”
 select = [
-    "E",   # pycodestyle errors
-    "F",   # pyflakes
-    "I",   # import sorting
-    "UP",  # pyupgrade (keeps Python 3.12/3.13 modern)
-    "B",   # bugbear (real bugs, not stylistic nitpicks)
+    "E",  # pycodestyle errors
+    "F",  # pyflakes
+    "I",  # import sorting
+    "UP", # pyupgrade (keeps Python 3.12/3.13 modern)
+    "B",  # bugbear (real bugs, not stylistic nitpicks)
 ]
 
 ignore = [
-    "E501",  # long lines in physics formulas/comments
-    "E402",  # import-not-at-top — notebook cells have docstrings before imports
-    "B008",  # np.deg2rad() in default args — pure math call, not a real bug
+    "E501", # long lines in physics formulas/comments
+    "E402", # import-not-at-top — notebook cells have docstrings before imports
+    "B008", # np.deg2rad() in default args — pure math call, not a real bug
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"*.ipynb" = ["F821"]  # cross-cell references are always undefined to static analysis
+"*.ipynb" = [
+    "F821",
+] # cross-cell references are always undefined to static analysis
 # marimo apps display a cell's value as its bare last
 # expression (e.g. a UI element on its own line) -- that's the framework's render
 # mechanism, not a useless statement.
@@ -644,13 +602,5 @@ cache-dir = "/tmp/pyrite-uv-cache"
 # all contributor groups; the `notebooks` group pulls `pyrite-mc[apps]`, which
 # tests need (plotly, marimo). Runtime-only installs pass `--no-default-groups`.
 default-groups = "all"
-constraint-dependencies = [
-    "boto3>=1.35.0",
-]
-conflicts = [
-    [
-        { extra = "nvidia" },
-        { extra = "amd" },
-        { extra = "intel" },
-    ],
-]
+constraint-dependencies = ["boto3>=1.35.0"]
+conflicts = [[{ extra = "nvidia" }, { extra = "amd" }, { extra = "intel" }]]
