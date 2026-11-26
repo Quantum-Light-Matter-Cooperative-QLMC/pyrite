@@ -30,7 +30,7 @@ install with `--locked`, so a manifest edit without `pixi lock` fails fast.
 | `py314` | linux-64, osx-arm64, win-64 | `default` on Python 3.14 (CI's second interpreter) |
 | `docs` | linux-64, osx-arm64, win-64 | Python 3.13 with the `docs` group only (documentation workflow, release notes) |
 | `nvidia` | linux-64 (CUDA 13 driver) | conda-forge `cupy`, `cufinufft` and `cuda-version 13.*`; `test`, `docs`, `notebooks`, `dask`, `optimization` |
-| `amd` | linux-64 | PyPI `amd` extra (CuPy built against ROCm with `CUPY_INSTALL_USE_HIP=1`); same groups as `nvidia` without `docs` |
+| `amd` | linux-64 | PyPI `amd` extra: CuPy sdist built on the node against the host's ROCm for its GPU (`CUPY_INSTALL_USE_HIP=1`, `HCC_AMDGPU_TARGET` from `rocminfo`); same groups as `nvidia` without `docs` |
 | `intel` | linux-64 | PyPI `intel` extra (`dpnp`, `dpctl`); same groups as `amd` |
 | `svml` | linux-64 | Intel SVML Numba from Anaconda `pkgs/main`; `test` only. Separate terms: [`LICENSE-SVML.md`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/LICENSE-SVML.md) |
 | `viz` | linux-64 | One-off research viewers and digitizers (conda-forge `vtk-base`, `pyvista`, `pymupdf`, `scikit-image`; PyPI `trame`) |
@@ -57,6 +57,16 @@ Design decisions (#1462):
   `xraylib` stays on PyPI: the conda-forge build carries no PyPI identity,
   so pixi would install it twice. `nvidia` never includes the PyPI `nvidia`
   extra, which would install CuPy twice.
+- **ROCm.** ROCm itself is host-provided, like the GPU driver, and is not in
+  `pixi.lock`. conda-forge ships HIP, comgr, device libraries and rocFFT but
+  not rocBLAS, rocRAND, rocSPARSE, rocSOLVER, rocPRIM, hipCUB or rocThrust,
+  which CuPy's HIP build needs; CuPy's prebuilt ROCm wheels do not target
+  every GPU (on qlmc-ace's Radeon 8060S, gfx1151, the `cupy-rocm-7-0` wheel
+  segfaulted). The `amd` job prelude sources `rocm_build_env.sh`, which
+  locates the ROCm root, picks the HIP compiler when the node has no host
+  C++, and detects the GPU architecture, so `pixi install --locked -e amd`
+  builds CuPy for that GPU. On qlmc-ace (Ubuntu 26.04 ROCm 7.1 under `/usr`)
+  the first build takes about 11 minutes; the built wheel is cached.
 - **GPU versions.** GPU environments cannot share a solve-group with
   `default` (different platforms), so the `gpu-stack` feature pins numpy and
   numba to `default`'s minor releases. SciPy stays free: conda-forge CuPy
