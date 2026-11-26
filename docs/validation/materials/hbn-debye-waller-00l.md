@@ -7,6 +7,7 @@
 - Source: R. S. Pease, *Acta Cryst.* **5**, 356–361 (1952), doi:10.1107/S0365110X52001064. Table 1, Fig. 3 and the text on p. 358. Local PDF: Zotero `RV4Z2ZWJ`.
 - Ledgered check: a weighted fit of $\ln[(F_o/F_c)^2]$ against $l^2$ over $002$–$008$ gives slope $-0.03888(834)$. That yields $B_{33}=-2c^2\cdot\text{slope}=3.45(74)$ Å$^2$ and $U_{33}=0.0437(94)$ Å$^2$.
 - Intended quantity and units: an amplitude Debye–Waller coefficient for the $c^*$ direction, in Å$^2$. It enters as $\exp(-B_{33}s^2)$ with $s=\sin\theta/\lambda$.
+- Scope (#1480): $B_{33}$ is valid **only for g parallel to c**. Non-basal h-BN reflections need $W=\tfrac12(U_\perp g_\perp^2+U_{33}g_z^2)$ with a sourced in-plane $U_\perp$, which PyRITE does not package; graphite values must not be reused.
 
 This pass is a fresh-context verification. The derivation and fit below come from the source PDF and the ledger row only. They were written before reading the TOML, the CIF, `debye_waller`, or any other Debye–Waller write-up.
 

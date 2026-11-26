@@ -66,10 +66,23 @@ so older measured-selection checkpoints do not resume.
 
 ## Fiber texture
 
-The catalog's HOPG and pyrolytic h-BN use an axial coherent-line model:
-grains have random in-plane azimuths, and retained reciprocal vectors are
-parallel to the declared fiber axis `surface_hkl`. For the basal axis this
-means `(00l)`, with systematic extinctions still removed by the structure factor.
+The catalog's HOPG and pyrolytic h-BN use a **basal-only reflection domain**:
+retained reciprocal vectors are parallel to the declared fiber axis
+`surface_hkl`. For the basal axis this means `(00l)`, with systematic
+extinctions still removed by the structure factor.
+
+This is a deliberate restricted approximation, not a consequence of the
+texture. Random in-plane grain azimuths average each non-basal reflection's
+intensity over azimuth; they do not remove it, because
+$\langle\lvert A_g\rvert^2\rangle_\phi>0$ even where
+$\langle A_g\rangle_\phi=0$. Distinct reflections add as intensities
+whether or not their lines overlap (final-state orthogonality,
+[`cross-reflection-coherence`](../../validation/radiation-physics/cross-reflection-coherence.md#final-state-orthogonality-1480)).
+Under the production per-reflection model, the omitted non-basal families
+`(112)`, `(101)`, `(103)` and, at oblique incidence, `(110)` carry yield
+comparable to the basal set in most measured geometries. The measured
+envelope is in the
+[#1480 research note](../../research/physics/fiber-nonbasal-cxr-1480.md).
 At the default 2 Å⁻¹ shell width the retired `(002)/(004)` pins are the first
 two shells, rather than a hard limit. Fixed-count routes rank the same domain:
 `n_families=4` gives `(002)`–`(008)` for HOPG/h-BN. The existing tolerance determines the last shell.
@@ -88,9 +101,13 @@ The metric floor, shells, tail estimate and reconstructed continuum-share
 set all use this domain. Both axis signs describe the same set; a general
 nonorthogonal cell needs no Cartesian-angle tolerance.
 
-This is the catalog's axial model, rather than a claim that textured specimens
-have no diffuse or powder-ring radiation. For basal HOPG/h-BN, it keeps the
-directional B33 thermal factor on its valid reciprocal axis. Ordered h-BN flakes
+This is the catalog's restricted model, rather than a claim that textured
+specimens have no non-basal, diffuse or powder-ring radiation. For basal
+HOPG/h-BN, it keeps the directional B33 thermal factor on its valid
+reciprocal axis. Lifting the restriction requires the anisotropic thermal
+factor $W=\tfrac12(U_\perp g_\perp^2+U_\parallel g_z^2)$; B33 applied
+isotropically underweights in-plane-heavy families by about 30 % in
+intensity. Ordered h-BN flakes
 require in-plane displacement data and are outside this default. The mosaic
 FWHM is unchanged.
 

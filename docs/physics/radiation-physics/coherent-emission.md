@@ -41,7 +41,7 @@ from this production line path: its absolute phase relative to the Feranchuk
 PXR/CBS amplitude has not been reconciled. Adding its intensity to this path
 would discard the required cross term and is unsupported.
 
-Polarizations, reciprocal vectors, and mosaic orientations still add as intensities. The phased sum runs within one (reflection, orientation, polarization) row. The cross-reflection approximation is bounded for the tested basal-plane families under `cross-reflection-coherence` (`filtered`); near-degenerate reflection sets are outside that validation scope.
+Polarizations, reciprocal vectors, and mosaic orientations still add as intensities. The phased sum runs within one (reflection, orientation, polarization) row. The cross-reflection approximation is bounded for the tested basal-plane families under `cross-reflection-coherence` (`filtered`). For unshaped electrons, final-state orthogonality also covers near-degenerate sets such as HOPG `(102)`/`(112)`/`(002)` (#1480).
 
 `components=True` is rejected under the coherent policy: once the $A_{\rm PXR}A_{\rm CBS}^{*}$ cross term survives the sum, no uniquely additive PXR/CBS split exists.
 
