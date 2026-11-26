@@ -41,6 +41,11 @@ MATH_MODES: tuple[MathMode, ...] = ("fast", "reproducible")
 #: Built-in default. Stays ``"reproducible"`` until a sub-issue adopts a
 #: ``fast`` kernel and the #1468 validation passes (the default flip).
 DEFAULT_MATH_MODE: MathMode = "reproducible"
+#: Generation of the kernels ``fast`` swaps in (#1469: the CPU node-window
+#: reducer's fused sinc^2 with FMA contraction). Joins the dataset identity and
+#: content key of ``fast`` cases only, so ``reproducible`` digests never move;
+#: bump it whenever a ``fast`` variant's output changes.
+MATH_FAST_MODEL = "cpu-node-window-sinc2-contract-v1"
 #: Environment override, below an explicit value and above the config store.
 MATH_ENV = "PYRITE_MATH"
 #: ``pyrite config`` key.

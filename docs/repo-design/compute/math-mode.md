@@ -67,6 +67,10 @@ the `KernelTuning` rounding knobs:
   content-store keys: resume never mixes modes, and switching modes recomputes.
   Scoring saved trajectories under a different mode is refused like any other
   case-field mismatch.
+- A fast run's dataset identity and `case_content_key` also carry
+  `math_fast_model` (`_math_mode.MATH_FAST_MODEL`, #1469), the generation of the
+  kernels `fast` swaps in. Bump it whenever a `fast` variant's output changes;
+  `reproducible` digests never see it.
 - Run provenance (`provenance["math"]`) records the mode, Numba version, SVML
   state (`numba.config.USING_SVML`), host CPU name and vector features, and the
   GPU model (`None` on the CPU).
