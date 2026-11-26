@@ -1,7 +1,8 @@
 """#1469 sine micro: speed (4 M args, best of 5, 1 thread) and ulp vs long double.
 
 Usage (worktree root): pixi run [-e svml] python checks/native_cpu_audit/sin_micro.py HOSTTAG > OUT.jsonl
-Adds np.sin under strict and fastmath=True (SVML-fast where USING_SVML).
+Adds np.sin under strict and fastmath=True (SVML-fast where USING_SVML) and the
+sinc^2 forms (ulp then of (sin(y)/y)**2).
 """
 
 import hashlib
@@ -17,6 +18,7 @@ from numba import njit, prange
 
 sys.path.insert(0, str(Path(__file__).parent))
 from fast_variants import SINES as VARIANTS
+from fast_variants import sinc2_pi, vector_sin
 
 tag = sys.argv[1]
 rng = np.random.default_rng(5)
@@ -28,7 +30,7 @@ k = np.arange(-30000, 30000, dtype=np.float64)
 near = np.concatenate(
     [k * np.pi / 2, np.nextafter(k * np.pi / 2, np.inf), np.nextafter(k * np.pi / 2, -np.inf)]
 )
-near = near[np.abs(near) < 1e5]
+near = near[(np.abs(near) < 1e5) & (near != 0)]
 sets["near_k_pi_2"] = near
 x_all = np.concatenate(list(sets.values()))
 
@@ -53,9 +55,22 @@ def np_sin(v):
 
 
 np_sin = njit(inline="always")(np_sin)
+
+
+def vs_sinc2(v):
+    return (vector_sin(v) / v) ** 2
+
+
+vs_sinc2 = njit(inline="always")(vs_sinc2)
+
 arms = [(name, fn, False) for name, fn in VARIANTS.items()]
-arms += [(name + " contract", fn, {"contract"}) for name, fn in VARIANTS.items() if name != "vector_sin"]
+arms += [
+    (name + " contract", fn, {"contract"}) for name, fn in VARIANTS.items() if name != "vector_sin"
+]
 arms += [("np.sin strict", np_sin, False), ("np.sin fastmath=True", np_sin, True)]
+# sinc^2 = (sin(y)/y)^2 arms: the reproducible form and the fused #1469 candidate.
+arms += [("sinc2 vector_sin", vs_sinc2, False), ("sinc2_pi", sinc2_pi, False)]
+arms += [("sinc2_pi contract", sinc2_pi, {"contract"})]
 cpu = next(
     (ln.split(":", 1)[1].strip() for ln in open("/proc/cpuinfo") if ln.startswith("model name")),
     platform.processor(),
@@ -87,6 +102,9 @@ for name, fn, fm in arms:
     off = 0
     for sname, xs in sets.items():
         ref = np.sin(xs.astype(np.longdouble))
+        if name.startswith("sinc2"):
+            xl = xs.astype(np.longdouble)
+            ref = np.where(xl == 0, 1.0, (ref / xl) ** 2)
         got = o[off : off + xs.size]
         off += xs.size
         ulp = (
