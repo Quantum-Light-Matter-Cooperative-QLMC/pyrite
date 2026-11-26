@@ -24,15 +24,18 @@ trial counts, precision and execution controls. Deprecated physics inputs on
 
 `Physics.validate_transport` validates combinations; campaign lowering resolves
 material-dependent choices before serialization or execution. A resolved `Case`
-has historical omission rules: missing elastic means Mott, missing continuum
-means EEDL, missing radiative keys mean uncoupled, and a missing `channeling`
-record means amorphous transport (channeling off; #506). The `channeling` record
-and its `CHANNELING_MODEL` identity marker join a case and its content key only
-when a planar `pyrite.quantum.Channeling` section is selected, so channeling-off payloads, keys and
-RNG streams are unchanged. Profiles and checkpoints cannot select it until the
-persisted channel (#507). The direct transport API's
-ELSEPA default does not change an old case. Do not resolve `auto` again at scoring
-time or fill absent keys while reading a checkpoint.
+has omission rules: missing elastic means ELSEPA in a live mapping (stored legacy
+omissions decode to explicit `"mott"`; see
+[case compatibility](../storage/result-schema.md#case-elastic-model-compatibility)),
+missing continuum means EEDL, missing radiative keys mean uncoupled, and a
+missing `channeling` record means amorphous transport (channeling off; #506).
+The `channeling` record and its `CHANNELING_MODEL` identity marker join a case
+and its content key only when a planar `pyrite.quantum.Channeling` section is
+selected, so channeling-off payloads, keys and RNG streams are unchanged.
+Profiles and checkpoints cannot select it until the persisted channel (#507).
+The ELSEPA default does not change an old case. Do not resolve `auto` again at
+scoring time; the only absent key a checkpoint reader fills is the legacy elastic
+choice.
 
 ## Boundary, units, shapes and normalization
 

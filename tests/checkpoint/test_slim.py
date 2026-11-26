@@ -27,7 +27,13 @@ def _record(tilt_deg: float, E0: float) -> dict[str, Any]:
         fwhm=30.0,
         eta=2.0,
         scale=1.0,
-        case={"name": f"t{tilt_deg}", "E0_keV": E0, "tilt_deg": tilt_deg, "crystal": "hopg"},
+        case={
+            "name": f"t{tilt_deg}",
+            "E0_keV": E0,
+            "tilt_deg": tilt_deg,
+            "crystal": "hopg",
+            "elastic_model": "elsepa",
+        },
     )
 
 

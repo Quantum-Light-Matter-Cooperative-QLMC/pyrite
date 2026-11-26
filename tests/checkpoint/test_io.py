@@ -9,6 +9,7 @@ from pathlib import Path
 
 import h5py
 import numpy as np
+import pytest
 
 from pyrite.checkpoints import _checkpoint_io as ckio
 
@@ -403,3 +404,70 @@ def test_load_reads_zstd_pickle(tmp_path):
     loaded = ckio.load(str(path))
     assert set(loaded) == set(payload)
     assert np.array_equal(loaded["cfg_a"][30.0]["spec"], payload["cfg_a"][30.0]["spec"])
+
+
+@pytest.mark.parametrize("encoding", ["plain", "gzip", "zstd", "hdf5"])
+def test_legacy_omitted_elastic_model_keeps_mott(tmp_path, encoding):
+    payload = {"hopg": {30.0: {"case": {"E0_keV": 30.0, "crystal": "hopg"}}}}
+    path = tmp_path / "legacy.pkl"
+    if encoding == "hdf5":
+        ckio.dump(payload, str(path))
+        with h5py.File(path, "r+") as handle:
+            del handle.attrs[ckio.CASE_ELASTIC_DEFAULT_ATTR]
+    else:
+        raw = pickle.dumps(payload)
+        if encoding == "gzip":
+            raw = gzip.compress(raw)
+        elif encoding == "zstd":
+            raw = zstd.compress(raw)
+        path.write_bytes(raw)
+    assert ckio.load(str(path))["hopg"][30.0]["case"]["elastic_model"] == "mott"
+    assert (
+        ckio.load_selected(str(path), {("hopg", 30.0)})["hopg"][30.0]["case"]["elastic_model"]
+        == "mott"
+    )
+    assert ckio.load_metadata(str(path))["hopg"][30.0]["case"]["elastic_model"] == "mott"
+    rewritten = tmp_path / "rewritten.h5"
+    ckio.dump(ckio.load(str(path)), str(rewritten))
+    assert ckio.load(str(rewritten))["hopg"][30.0]["case"]["elastic_model"] == "mott"
+
+
+def test_legacy_staged_executor_input_keeps_mott(tmp_path):
+    path = tmp_path / "0.h5"
+    ckio.dump({"cases": [{"index": 0, "case": {"crystal": "hopg"}}]}, str(path))
+    with h5py.File(path, "r+") as handle:
+        del handle.attrs[ckio.CASE_ELASTIC_DEFAULT_ATTR]
+    (row,) = ckio.load(str(path))["cases"]
+    assert row["case"]["elastic_model"] == "mott"
+
+
+def test_new_stored_omission_resolves_to_elsepa(tmp_path):
+    from pyrite._physics_provenance import resolved_physics_view
+
+    path = tmp_path / "new.h5"
+    ckio.dump({"case": {"E0_keV": 30.0}}, str(path))
+    case = ckio.load(str(path))["case"]
+    assert (
+        "transport.elastic/elsepa" in resolved_physics_view(case, table_markers={}).descriptor_ids
+    )
+
+
+def test_legacy_default_marker_preserves_explicit_elsepa(tmp_path):
+    path = tmp_path / "legacy.h5"
+    ckio.dump({"case": {"elastic_model": "elsepa"}}, str(path))
+    with h5py.File(path, "r+") as handle:
+        del handle.attrs[ckio.CASE_ELASTIC_DEFAULT_ATTR]
+    assert ckio.load(str(path))["case"]["elastic_model"] == "elsepa"
+
+
+def test_unknown_stored_elastic_default_fails_closed(tmp_path):
+    path = tmp_path / "future.h5"
+    ckio.dump({"hopg": {30.0: {"case": {"E0_keV": 30.0}}}}, str(path))
+    with h5py.File(path, "r+") as handle:
+        handle.attrs[ckio.CASE_ELASTIC_DEFAULT_ATTR] = "future-model"
+    with pytest.raises(ValueError, match="unsupported stored case_elastic_default"):
+        ckio.load(str(path))
+    with pytest.raises(ValueError, match="unsupported stored case_elastic_default"):
+        ckio.load_metadata(str(path))
+    with pytest.raises(ValueError, match="unsupported stored case_elastic_default"):
+        ckio.load_selected(str(path), {("hopg", 30.0)})

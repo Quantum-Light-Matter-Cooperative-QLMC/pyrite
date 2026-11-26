@@ -447,6 +447,22 @@ def test_preflight_rejects_a_cached_artifact_of_different_physics(tmp_path, stal
         preflight_capture(capture, [case], [])
 
 
+@pytest.mark.parametrize("requested", ["mott", "elsepa", None])
+def test_preflight_matches_a_legacy_artifact_only_as_mott(tmp_path, requested):
+    legacy = _case()
+    legacy.pop("elastic_model", None)
+    capture = TrajectoryCapture(root=str(tmp_path))
+    with h5py.File(_seed(capture, legacy), "r+") as handle:
+        del handle["case"].attrs["elastic_default"]
+    case = legacy if requested is None else {**legacy, "elastic_model": requested}
+
+    if requested == "mott":
+        assert preflight_capture(capture, [case], []).kept == 1
+    else:
+        with pytest.raises(TrajectoryArtifactError, match="different physics"):
+            preflight_capture(capture, [case], [])
+
+
 # ---- run pipeline ----------------------------------------------------------
 
 
@@ -1253,3 +1269,38 @@ def test_pre_adapter_seeded_scoring_baseline(kind, monkeypatch):
     if kind == "coherent":
         actual["spectra"]["spec_coherent"] = output["spec_coherent"].tolist()
     assert_output_baseline(kind, actual)
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+def test_artifact_omitted_elastic_model_obeys_recorded_default(tmp_path, legacy):
+    _, path = _captured(tmp_path)
+    if legacy:
+        with h5py.File(path, "r+") as handle:
+            del handle["case"].attrs["elastic_default"]
+    artifact = read_trajectory_artifact(path, load_transport=False)
+    assert artifact.case.get("elastic_model", "elsepa") == ("mott" if legacy else "elsepa")
+
+
+def test_legacy_mott_snapshot_replays_after_explicit_decoding(tmp_path, monkeypatch):
+    import json
+    import shutil
+    from dataclasses import replace
+
+    from pyrite.campaign.physics_view import resolved_physics_view
+    from pyrite.montecarlo.runner import artifacts, case_tables
+
+    path = tmp_path / "legacy-snapshot.h5"
+    shutil.copyfile(SCHEMA2_FIXTURE, path)
+    legacy = read_trajectory_artifact(path, load_transport=False)
+    view = resolved_physics_view(legacy.case, table_markers={})
+    parameters = view.parameters
+    parameters.pop("elastic_model")
+    view = replace(view, parameters_json=json.dumps(parameters))
+    with h5py.File(path, "r+") as handle:
+        settings = json.loads(handle["settings"].attrs["json"])
+        settings["resolved_physics"] = view.to_json()
+        handle["settings"].attrs["json"] = json.dumps(settings)
+    monkeypatch.setattr(case_tables, "case_table_markers", lambda case: {})
+    decoded = read_trajectory_artifact(path, load_transport=False)
+    case, _ = artifacts._checked_case_and_inputs(decoded, None)
+    assert case["elastic_model"] == "mott"

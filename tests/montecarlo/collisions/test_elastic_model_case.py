@@ -22,14 +22,15 @@ def test_physics_accepts_only_known_elastic_models():
 
 
 def test_mott_cases_name_mott_and_resolve_no_elastic_tables():
-    """Absent key is Mott; it is spelled out since transport defaults to ELSEPA (#293)."""
-    case = {"composition": [("Si", 0.05)]}
+    """Deprecated Mott stays selectable explicitly and needs no ELSEPA tables."""
+    case = {"elastic_model": "mott", "composition": [("Si", 0.05)]}
 
     assert _case_elastic_kwargs(case) == {"elastic_model": "mott"}
     assert _case_elastic_table_records(case) == []
 
 
-def test_elsepa_cases_resolve_one_entry_per_layer_element(monkeypatch):
+@pytest.mark.parametrize("explicit", [False, True])
+def test_elsepa_cases_resolve_one_entry_per_layer_element(monkeypatch, explicit):
     calls = []
 
     def fake(composition):
@@ -50,6 +51,8 @@ def test_elsepa_cases_resolve_one_entry_per_layer_element(monkeypatch):
         ],
     }
 
+    if not explicit:
+        case.pop("elastic_model")
     kwargs = _case_elastic_kwargs(case)
 
     assert kwargs["elastic_model"] == "elsepa"
@@ -61,20 +64,22 @@ def test_elsepa_cases_resolve_one_entry_per_layer_element(monkeypatch):
     assert calls[:2] == [case["abs_layers"][0][2], si]
 
 
-def test_case_carries_only_the_opt_in_elastic_model():
-    """Absent is the default, so a case never spells ``"mott"`` explicitly."""
-    case = _any_case()
+def test_case_names_both_models_and_defaults_to_elsepa():
+    from pyrite.montecarlo.case import Case
 
+    case = _any_case()
+    payload = dict(case)
+    payload.pop("elastic_model")
+    assert Case(**payload)["elastic_model"] == "elsepa"
     assert replace(case, elastic_model="elsepa")["elastic_model"] == "elsepa"
-    with pytest.raises(ValueError, match="elastic_model"):
-        replace(case, elastic_model="mott")
+    assert replace(case, elastic_model="mott")["elastic_model"] == "mott"
 
 
 def _any_case():
     from pyrite.campaign.config import material_sweep
     from pyrite.campaign.sweep import build_cases
 
-    return build_cases(material_sweep("silicon"), 4, 4)[0]
+    return build_cases(material_sweep("silicon"), 4, 4, atomic_electron_deflection="none")[0]
 
 
 def test_elastic_kwargs_are_numpy_ready(monkeypatch):
@@ -89,7 +94,7 @@ def test_elastic_kwargs_are_numpy_ready(monkeypatch):
     assert kwargs["elastic_tables"][0][0] is table
 
 
-@pytest.mark.parametrize("model", ["mott", "elsepa"])
+@pytest.mark.parametrize("model", [None, "mott", "elsepa"])
 def test_every_transport_call_site_names_the_case_elastic_model(monkeypatch, model):
     """Live transport, brem repair and the penetration gate all pass the case model (#293)."""
     from pyrite.campaign import config
@@ -101,7 +106,10 @@ def test_every_transport_call_site_names_the_case_elastic_model(monkeypatch, mod
         "pyrite.xsgen.elsepa.catalog.resolve_layer_tables",
         lambda composition: (SimpleNamespace(arrays={}, tables=()),),
     )
-    case = build_cases(material_sweep("silicon"), 4, 4, elastic_model=model)[0]
+    case = build_cases(material_sweep("silicon"), 4, 4, elastic_model=model or "elsepa")[0]
+    if model is None:
+        case = dict(case)
+        case.pop("elastic_model")
     seen = []
 
     def stop(*_args, **kwargs):
@@ -122,7 +130,7 @@ def test_every_transport_call_site_names_the_case_elastic_model(monkeypatch, mod
         runner._brem_for_case(case, np.array([5000.0]))
     config.gate_cases_by_penetration([case], Ne=10)
 
-    assert seen == [model, model, model]
+    assert seen == [model or "elsepa"] * 3
 
 
 @pytest.mark.parametrize("model", ["mott", "elsepa"])
@@ -211,3 +219,13 @@ def test_runtime_adapter_catalog_is_immutable_and_matches_descriptor_ids():
     assert set(case_tables._ELASTIC_PREPARERS) == ids
     with pytest.raises(TypeError):
         case_tables._ELASTIC_PREPARERS["transport.elastic/new"] = lambda entries: {}
+
+
+def test_live_omission_hashes_as_elsepa_and_cannot_reuse_mott():
+    from pyrite.campaign.profiles import case_content_key
+
+    case = dict(_any_case())
+    explicit_elsepa = case_content_key(case)
+    case.pop("elastic_model")
+    assert case_content_key(case) == explicit_elsepa
+    assert case_content_key({**case, "elastic_model": "mott"}) != explicit_elsepa

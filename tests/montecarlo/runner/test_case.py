@@ -173,6 +173,8 @@ def test_pre_adapter_case_and_identity_baseline(monkeypatch, identity_pin, kind)
     actual = json.loads(json.dumps(actual, default=lambda array: array.tolist()))
     assert actual.keys() == expected.keys()
     # The payload is a compatibility fixture: `--update-pins` never rewrites it.
+    # The frozen record predates explicit Mott; decode its historical meaning.
+    expected["case"].setdefault("elastic_model", "mott")
     assert actual["case"] == expected["case"]
     for field in ("case_content_key", "parameter_sha256"):
         identity_pin.in_file(path, (kind, field), actual[field])
@@ -197,6 +199,8 @@ def test_channeling_case_and_identity_baseline(identity_pin):
     expected = json.loads(path.read_text())
     actual = json.loads(json.dumps(actual, default=lambda array: array.tolist()))
     assert actual.keys() == expected.keys()
+    # The frozen record predates explicit Mott; decode its historical meaning.
+    expected["case"].setdefault("elastic_model", "mott")
     assert actual["case"] == expected["case"]
     identity_pin.in_file(path, ("case_content_key",), actual["case_content_key"])
 
@@ -222,3 +226,13 @@ def test_node_support_cutoff_restores_old_slots_and_round_trips_new_key():
 def test_node_support_cutoff_rejects_invalid_values(cutoff):
     with pytest.raises(ValueError, match="node_support_cutoff"):
         Case(**dict(_legacy_case(), node_support_cutoff=cutoff))
+
+
+def test_legacy_frozen_slot_pickle_omission_keeps_mott():
+    from pyrite.montecarlo.case import _ABSENT
+
+    case = Case(**_legacy_case())
+    object.__setattr__(case, "elastic_model", _ABSENT)
+    restored = pickle.loads(pickle.dumps(case))
+    assert restored["elastic_model"] == "mott"
+    assert pickle.loads(pickle.dumps(restored))["elastic_model"] == "mott"

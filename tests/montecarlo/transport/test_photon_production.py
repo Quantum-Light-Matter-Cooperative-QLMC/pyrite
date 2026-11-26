@@ -84,6 +84,18 @@ def test_mode_off_case_and_identity_remain_unchanged(selected):
         pr.Physics(photon_transport=True)
 
 
+def test_legacy_mott_source_digest_survives_explicit_decoding(selected):
+    mott = dict(replace(selected.base, elastic_model="mott"))
+    legacy = {key: value for key, value in mott.items() if key != "elastic_model"}
+    record = photon.photon_case_record(legacy, "0" * 64, selected.context)
+    decoded = {**mott, "photon_transport": record}
+
+    photon.prepare_photon_case(decoded, "lockstep")
+    for changed in ({"elastic_model": "elsepa"}, {"seed": mott["seed"] + 1}):
+        with pytest.raises(ValueError, match="source Case changed"):
+            photon.prepare_photon_case({**decoded, **changed}, "lockstep")
+
+
 @pytest.mark.slow
 def test_real_primary_transport_and_aperture_are_replayed_once(selected, monkeypatch, tmp_path):
     from pyrite.montecarlo.runner import case_tables

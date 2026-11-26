@@ -11,7 +11,9 @@ execution, replay, identity and validation responsibilities.
 
 `_case_elastic_kwargs` selects a fixed preparation callable using the resolved
 `transport.elastic/mott` or `transport.elastic/elsepa` descriptor ID. An absent
-case key selects Mott, regardless of the direct transport API's ELSEPA default.
+live case key selects ELSEPA, matching the direct transport API; stored legacy
+omissions decode to explicit `"mott"` first (see
+[case compatibility](../storage/result-schema.md#case-elastic-model-compatibility)).
 Unresolved `auto` and unknown case model strings are rejected before loading
 ELSEPA tables. The direct API's developer-only `sr` model is not a Case selector.
 

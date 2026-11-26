@@ -828,6 +828,12 @@ def case_content_key(
             }
         ),
     }
+    # Preserve historical explicit-ELSEPA and omitted-Mott CAS identities.
+    # Live omission now means ELSEPA; persistence readers name legacy Mott.
+    if case.get("elastic_model", "elsepa") == "mott":
+        payload["case"].pop("elastic_model", None)
+    else:
+        payload["case"]["elastic_model"] = case.get("elastic_model", "elsepa")
     payload.update(_adaptive_sampling_markers(case.get("adaptive_precision")))
     payload.update(hard_loss_markers(case.get("inelastic_model")))  # #916
     payload.update(_bin_reduction_markers(case))

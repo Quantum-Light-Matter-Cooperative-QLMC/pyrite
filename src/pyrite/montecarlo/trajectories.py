@@ -204,6 +204,28 @@ def case_digest(case: Mapping[str, Any]) -> str:
     return hashlib.sha256(_dumps(case).encode("utf-8")).hexdigest()
 
 
+def _recorded_case_matches(case: Mapping[str, Any], digest: object) -> bool:
+    """Whether a stored :func:`case_digest` names ``case``.
+
+    Mott records written before #1383 hashed the case without ``elastic_model``,
+    which stored-case readers and campaign lowering now name.
+    """
+    if case_digest(case) == digest:
+        return True
+    if case.get("elastic_model") != "mott":
+        return False
+    return case_digest({k: v for k, v in case.items() if k != "elastic_model"}) == digest
+
+
+def _artifact_case_matches(header: Mapping[str, Any], case: Mapping[str, Any]) -> bool:
+    """Whether an artifact with root attributes ``header`` records ``case``."""
+    digest = header.get("case_sha256")
+    if header.get("case_elastic_default") != "mott":
+        return case_digest(case) == digest
+    # An old artifact's omitted key ran Mott; a live omission selects ELSEPA.
+    return "elastic_model" in case and _recorded_case_matches(case, digest)
+
+
 @dataclass(frozen=True)
 class TrajectoryCapture:
     """Where and how a run writes per-case transport artifacts.
@@ -646,6 +668,7 @@ def write_trajectory_artifact(
             case_group = handle.create_group("case")
             case_group.attrs["json"] = _dumps(case)
             case_group.attrs["case_type"] = _case_type(case)
+            case_group.attrs["elastic_default"] = "elsepa"
             _write_node(case_group, "payload", dict(case), {}, None)
             handle.create_group("provenance").attrs["json"] = _dumps(provenance or {})
             handle.attrs["parameter_sha256"] = str((provenance or {}).get("parameter_sha256", ""))
@@ -896,6 +919,7 @@ def _header_attrs(handle) -> dict[str, Any]:
     for key, value in handle.attrs.items():
         attrs[key] = value.item() if isinstance(value, np.generic) else value
     attrs["fields"] = json.loads(attrs.get("fields", "[]"))
+    attrs["case_elastic_default"] = handle["case"].attrs.get("elastic_default", "mott")
     return attrs
 
 
@@ -1071,9 +1095,14 @@ def _electron_boundary(ids, start: int, stop: int) -> int:
 
 
 def _read_case(group) -> Mapping[str, Any]:
-    if "payload" not in group:  # schema 1: JSON only
-        return json.loads(group.attrs["json"])
-    payload = _read_node(group["payload"])
+    payload = (
+        _read_node(group["payload"]) if "payload" in group else json.loads(group.attrs["json"])
+    )
+    default = group.attrs.get("elastic_default", "mott")
+    if default not in {"mott", "elsepa"}:
+        raise TrajectoryArtifactError(f"unsupported stored elastic_default: {default!r}")
+    if default == "mott":
+        payload.setdefault("elastic_model", "mott")
     if group.attrs.get("case_type") == "Case":
         from .case import Case
 
@@ -1158,7 +1187,7 @@ def preflight_capture(
             continue
         header = read_trajectory_header(path)
         stored_parameters = header.get("parameter_sha256") or None
-        mismatched = header.get("case_sha256") != case_digest(case) or (
+        mismatched = not _artifact_case_matches(header, case) or (
             expected_parameters is not None
             and stored_parameters is not None
             and stored_parameters != expected_parameters

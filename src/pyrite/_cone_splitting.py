@@ -139,7 +139,7 @@ class ConeSplitting:
                 raise ValueError(f"detector-cone splitting does not support {key}: {reason}")
         if case.get("transport_mode") == "mixed":
             raise ValueError("detector-cone splitting does not support transport_mode='mixed'")
-        elastic = case.get("elastic_model", "mott")
+        elastic = case.get("elastic_model", "elsepa")
         if elastic != "elsepa":
             raise ValueError(
                 f"detector-cone splitting needs elastic_model='elsepa', not {elastic!r}"

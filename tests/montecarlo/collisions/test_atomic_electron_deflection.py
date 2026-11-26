@@ -256,11 +256,13 @@ def test_physics_models_mirror_transport_plus_opt_out():
 
 
 def test_case_key_reaches_the_transport_kwargs():
-    assert _case_elastic_kwargs({"atomic_electron_deflection": "kawrakow"}) == {
+    assert _case_elastic_kwargs(
+        {"elastic_model": "mott", "atomic_electron_deflection": "kawrakow"}
+    ) == {
         "elastic_model": "mott",
         "atomic_electron_deflection": "kawrakow",
     }
-    assert _case_elastic_kwargs({}) == {"elastic_model": "mott"}
+    assert _case_elastic_kwargs({"elastic_model": "mott"}) == {"elastic_model": "mott"}
     assert "atomic_electron_deflection" in Case.__dataclass_fields__
 
 

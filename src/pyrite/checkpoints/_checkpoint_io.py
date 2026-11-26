@@ -20,6 +20,7 @@ import os
 import pickle
 import sys
 import tempfile
+from collections.abc import Mapping
 from contextlib import contextmanager
 from typing import IO, Any, cast
 
@@ -45,6 +46,7 @@ SCHEMA_VERSION = _result_v2.SCHEMA_VERSION
 #: forever; there is no flag day and no migration script.
 READABLE_SCHEMA_VERSIONS = (1, SCHEMA_VERSION)
 IDENTITY_VERSION = 1
+CASE_ELASTIC_DEFAULT_ATTR = "case_elastic_default"
 
 # Retained as the public CLI compatibility range, but only half of it still
 # does anything. `LEVEL_RANGE` is the accepted 1--22 interface, validated on
@@ -100,6 +102,7 @@ def _write_container(obj: Any, target: str, *, shuffle: bool) -> None:
         h5.attrs["schema"] = SCHEMA
         h5.attrs["schema_version"] = SCHEMA_VERSION
         h5.attrs["identity_version"] = IDENTITY_VERSION
+        h5.attrs[CASE_ELASTIC_DEFAULT_ATTR] = "elsepa"
         h5.attrs[COMPONENTS_ATTR] = SEPARATE_CONTRACT
         _result_v2.write(h5, obj, shuffle=shuffle)
 
@@ -167,9 +170,35 @@ def load(path: str) -> Any:
     return obj if separate else separate_legacy(obj)
 
 
+def _restore_case_models(obj: Any, h5: h5py.File | None = None) -> Any:
+    """Name omitted legacy Mott selections before any replay or provenance read."""
+    default = "mott" if h5 is None else h5.attrs.get(CASE_ELASTIC_DEFAULT_ATTR, "mott")
+    if default not in {"mott", "elsepa"}:
+        raise ValueError(f"unsupported stored case_elastic_default: {default!r}")
+    if default == "elsepa":
+        return obj
+    _name_legacy_mott_cases(obj)
+    return obj
+
+
+def _name_legacy_mott_cases(obj: Any) -> None:
+    if isinstance(obj, (list, tuple)):  # staged executor inputs: {"cases": [row, ...]}
+        for item in obj:
+            _name_legacy_mott_cases(item)
+        return
+    if not isinstance(obj, Mapping):
+        return
+    case = obj.get("case")
+    if isinstance(case, dict) and case:
+        case.setdefault("elastic_model", "mott")
+    for key, value in obj.items():
+        if key != "case":
+            _name_legacy_mott_cases(value)
+
+
 def _read_h5(h5: h5py.File) -> tuple[Any, bool]:
     separate = h5.attrs.get(COMPONENTS_ATTR) == SEPARATE_CONTRACT
-    return _read_container(h5), separate
+    return _restore_case_models(_read_container(h5), h5), separate
 
 
 def _load_raw(path: str) -> tuple[Any, bool]:
@@ -187,12 +216,12 @@ def _load_raw(path: str) -> tuple[Any, bool]:
                 with h5py.File(payload, "r") as h5:
                     return _read_h5(h5)
             stream.seek(0)
-            return pickle.load(stream), False
+            return _restore_case_models(pickle.load(stream)), False
     if head[:2] == _GZIP_MAGIC:
         with gzip.GzipFile(path, "rb") as stream:
-            return pickle.load(stream), False
+            return _restore_case_models(pickle.load(stream)), False
     with open(path, "rb") as stream:
-        return pickle.load(stream), False
+        return _restore_case_models(pickle.load(stream)), False
 
 
 def load_selected(path: str, cases: set[tuple[str, float]]) -> dict:
@@ -210,6 +239,7 @@ def load_selected(path: str, cases: set[tuple[str, float]]) -> dict:
             if h5.attrs.get("schema") == SCHEMA and h5.attrs.get("schema_version") == 2:
                 selected = _result_v2.read_selected(h5, cases)
                 separate = h5.attrs.get(COMPONENTS_ATTR) == SEPARATE_CONTRACT
+                selected = _restore_case_models(selected, h5)
                 return selected if separate else separate_legacy(selected)
     loaded = load(path)
     return {
@@ -226,7 +256,9 @@ def load_metadata(path: str) -> dict:
     if bare:
         with h5py.File(path, "r") as h5:
             if h5.attrs.get("schema") == SCHEMA and h5.attrs.get("schema_version") == 2:
-                return _result_v2.read_selected(h5, None, metadata_only=True)
+                return _restore_case_models(
+                    _result_v2.read_selected(h5, None, metadata_only=True), h5
+                )
     return {
         name: {energy: {"case": record["case"]} for energy, record in values.items()}
         for name, values in load(path).items()
@@ -240,6 +272,7 @@ def config_writer(names: list[str], path: str):
         h5.attrs["schema"] = SCHEMA
         h5.attrs["schema_version"] = SCHEMA_VERSION
         h5.attrs["identity_version"] = IDENTITY_VERSION
+        h5.attrs[CASE_ELASTIC_DEFAULT_ATTR] = "elsepa"
         h5.attrs[COMPONENTS_ATTR] = SEPARATE_CONTRACT
         writer = _result_v2.ConfigWriter(h5, names)
         yield writer

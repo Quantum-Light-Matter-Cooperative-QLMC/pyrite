@@ -19,7 +19,7 @@ from ..._photon_support import (
     _scene_feedback,
 )
 from ...materials.photon_cross_sections import EPDL_E_MAX_EV, EPDL_E_MIN_EV
-from ..trajectories import case_digest
+from ..trajectories import _recorded_case_matches, case_digest
 from ..transport.photon_histories import PhotonAperture, PhotonBox
 from .case_tables import _case_bremslib_tables, case_table_markers
 from .photon_emission import score_bremslib_continuum, score_photon_sources
@@ -231,7 +231,7 @@ def prepare_photon_case(case, transport_core="auto"):
         for key, value in case.items()
         if key != "photon_transport" and not str(key).startswith("_")
     }
-    if case_digest(source_case) != record["source_case_digest"]:
+    if not _recorded_case_matches(source_case, record["source_case_digest"]):
         raise ValueError("photon transport source Case changed; lower the Scene again")
     if case_table_markers(source_case) != record["source_table_markers"]:
         raise ValueError("photon transport source table pins changed")

@@ -27,6 +27,13 @@ def _case(E0_keV, thickness_ang, tilt_deg=0.0, composition="C", abs_layers=None)
     }
 
 
+@pytest.fixture
+def no_elastic_tables(monkeypatch):
+    """Mocked-transport cases carry placeholder compositions; resolve no tables."""
+    monkeypatch.setattr(config, "_case_elastic_kwargs", lambda case: {})
+
+
+@pytest.mark.usefixtures("no_elastic_tables")
 def test_gate_cases_by_penetration_keeps_dying_case_drops_thicker_ones(monkeypatch):
     calls = []
 
@@ -48,6 +55,7 @@ def test_gate_cases_by_penetration_keeps_dying_case_drops_thicker_ones(monkeypat
     assert calls == [(30.0, 100.0), (30.0, 200.0), (30.0, 400.0)]
 
 
+@pytest.mark.usefixtures("no_elastic_tables")
 def test_gate_cases_by_penetration_is_independent_per_energy(monkeypatch):
     def fake_simulate_trajectories(E0_keV, Ne, thickness_ang, **kwargs):
         fraction = 0.01 if (E0_keV == 30.0 and thickness_ang >= 200.0) else 1.0
@@ -63,6 +71,7 @@ def test_gate_cases_by_penetration_is_independent_per_energy(monkeypatch):
     assert {c["thickness_ang"] for c in dropped} == {400.0}
 
 
+@pytest.mark.usefixtures("no_elastic_tables")
 def test_gate_cases_by_penetration_keeps_everything_when_nothing_dies(monkeypatch):
     monkeypatch.setattr(
         config,
@@ -77,6 +86,7 @@ def test_gate_cases_by_penetration_keeps_everything_when_nothing_dies(monkeypatc
     assert dropped == []
 
 
+@pytest.mark.usefixtures("no_elastic_tables")
 def test_gate_cases_by_penetration_uses_normal_incidence_reference(monkeypatch):
     seen_compositions = []
 
@@ -164,6 +174,7 @@ def _step_limited(monkeypatch, fail_below):
     return budgets
 
 
+@pytest.mark.usefixtures("no_elastic_tables")
 def test_gate_cases_by_penetration_retries_the_step_budget(monkeypatch):
     # Thick MeV cases outlive the default budget (#315); the gate doubles it
     # like the runner does instead of aborting the sweep.
@@ -178,6 +189,7 @@ def test_gate_cases_by_penetration_retries_the_step_budget(monkeypatch):
     assert budgets == [base, 2 * base, base, 2 * base]
 
 
+@pytest.mark.usefixtures("no_elastic_tables")
 def test_gate_cases_by_penetration_step_budget_stops_at_the_ceiling(monkeypatch):
     budgets = _step_limited(monkeypatch, fail_below=math.inf)
     with pytest.raises(TransportStepLimitError):

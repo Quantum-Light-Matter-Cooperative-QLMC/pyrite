@@ -18,6 +18,7 @@ from ..groove import blazed_groove_spec
 from ..trajectories import (
     TrajectoryArtifact,
     TrajectoryArtifactError,
+    _artifact_case_matches,
     artifact_spectrum_inputs,
     case_digest,
     iter_electron_row_blocks,
@@ -163,7 +164,7 @@ def _checked_case_and_inputs(artifact, case):
         raise TrajectoryArtifactError(str(error)) from error
     inputs = artifact_spectrum_inputs(artifact)
     stored = artifact.case
-    if case_digest(stored) != artifact.attrs.get("case_sha256"):
+    if not _artifact_case_matches(artifact.attrs, stored):
         raise TrajectoryArtifactError(f"trajectory artifact {artifact.path} case is corrupt")
     if case is not None and case_digest(case) != case_digest(stored):
         raise TrajectoryArtifactError(
@@ -216,16 +217,19 @@ def _check_physics_provenance(artifact) -> None:
             raise TrajectoryArtifactError(
                 f"trajectory artifact {artifact.path} physics provenance cannot be verified: {error}"
             ) from error
+        recorded_parameters = recorded.parameters
+        if artifact.attrs.get("case_elastic_default") == "mott":
+            recorded_parameters.setdefault("elastic_model", "mott")
         if (
             recorded.descriptor_ids,
             recorded.model_markers,
             recorded.table_markers,
-            recorded.parameters_json,
+            recorded_parameters,
         ) != (
             current.descriptor_ids,
             current.model_markers,
             current.table_markers,
-            current.parameters_json,
+            current.parameters,
         ):
             raise TrajectoryArtifactError(
                 f"trajectory artifact {artifact.path} physics model or table identity changed; "

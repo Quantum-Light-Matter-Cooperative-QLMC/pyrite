@@ -38,9 +38,10 @@ def resolved_physics_view(
 ) -> ResolvedPhysicsView:
     """Snapshot a resolved case and supplied consumed-table digests.
 
-    Use existing campaign lowering first. Compatibility mappings retain their
-    historical omissions; this descriptive view does not decode them as today's
-    ``Case`` schema. Case and execution owners retain input validation.
+    Use existing campaign lowering first. An omitted elastic key follows the
+    ELSEPA case default; persistence readers name legacy Mott before this call.
+    Other compatibility omissions retain their historical meaning. Case and
+    execution owners retain input validation.
     Descriptor requirements do not certify energy coverage or physical validity.
     """
     from ._numerics import Physics
@@ -64,7 +65,7 @@ def resolved_physics_view(
             raise ValueError(f"{key} must be resolved before recording physics provenance")
     selections = {
         "transport.stopping": "sbethe",
-        "transport.elastic": resolved.get("elastic_model", "mott"),
+        "transport.elastic": resolved.get("elastic_model", "elsepa"),
         "transport.inelastic": resolved.get("inelastic_model", "continuous"),
         "transport.radiative": resolved.get("radiative_model", "uncoupled"),
         "transport.atomic-electron": resolved.get("atomic_electron_deflection", "none"),

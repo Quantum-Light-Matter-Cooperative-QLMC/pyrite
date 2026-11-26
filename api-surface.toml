@@ -1,3 +1,4 @@
+# Case.elastic_model defaults to ELSEPA; explicit Mott and stored legacy Mott remain supported (#1383).
 # Inventory of supported imports, preserving the contract at main ec61aac9.
 # target is the *current* concrete binding; domain is the intended public owner.
 # root_role records ownership/stability; root_policy separately classifies root compatibility.
