@@ -30,7 +30,8 @@ export NUMBA_NUM_THREADS=$threads
 mkdir -p runs
 audit=checks/native_cpu_audit
 pixi install --locked -e "$env_name"
-run() { pixi run --as-is -e "$env_name" python "$@"; }
+py=(pixi run --as-is -e "$env_name" python)
+run() { "${py[@]}" "$@"; }
 run -c 'from pyrite.validation.check_records import current_revision; print(current_revision())'
 run -c 'import numba; print("numba", numba.__version__, "svml", numba.config.USING_SVML)'
 tag=$env_name-t$threads
@@ -47,7 +48,7 @@ cases)
         for c in "${cases[@]}"; do
             export NUMBA_CACHE_DIR=$PWD/runs/nc-$tag-$name-$c
             rm -rf "$NUMBA_CACHE_DIR"
-            timeout "${ARM_TIMEOUT_S:-1500}" run $audit/fastmath_arms.py --case "$c" "${opts[@]}" \
+            timeout "${ARM_TIMEOUT_S:-1500}" "${py[@]}" $audit/fastmath_arms.py --case "$c" "${opts[@]}" \
                 --repeats "${REPEATS:-2}" --out "runs/$c-$tag-$name.json" \
                 --arrays "runs/$c-$tag-$name.npz" || echo "ARM_FAILED $c $arm $?"
         done
