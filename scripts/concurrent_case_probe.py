@@ -7,11 +7,14 @@ time, and checks every threaded result digest equals the serial one.
     PYRITE_MC_BACKEND=cpu pixi run python scripts/concurrent_case_probe.py \
         transport|case [Ne]
 
-Jobs are the maintained #611 HOPG slab case (``checks/streamed_scoring_memory.py``:
+Jobs are, by default (``PROBE_FAMILY=hopg``), the maintained #611 HOPG slab case (``checks/streamed_scoring_memory.py``:
 ELSEPA elastic, BremsLib continuum with ``bremslib-soft-hard`` coupling, fixed
 400-node line grid, per-electron core), one seed per job. ``transport`` times
 ``runner._transport_case``; ``case`` times the full ``run_case``. Both need the
-fetched tables (``pyrite tables verify``). ``PROBE_WORKERS`` (default
+fetched tables (``pyrite tables verify``). ``PROBE_FAMILY=layered`` uses the
+#1432 MoS2-on-Si stack (100 keV, same physics) and ``PROBE_FAMILY=channeling``
+the admitted planar Si demo (17 MeV, 2 um, plane (1-10)) through the public
+``pyrite.simulate`` with ``Numerics(seed=...)``; both run in ``case`` mode only. ``PROBE_WORKERS`` (default
 ``1,2,4``) and ``PROBE_REPEATS`` (default 3) narrow the sweep; ``PROBE_KIND=procs``
 times a warmed ``spawn`` process pool instead of threads, including result
 pickling. Each row also reports peak aggregate PSS and USS of the process tree,
@@ -23,6 +26,7 @@ completed and cancelled, and whether callbacks ran on the coordinator thread.
 Measurement only: it changes no executor or default.
 """
 
+import dataclasses
 import hashlib
 import os
 import platform
@@ -44,10 +48,71 @@ from pyrite.montecarlo import runner
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = runpy.run_path(str(ROOT / "checks/streamed_scoring_memory.py"))["_case"]
 ENERGY_KEV = float(os.environ.get("PROBE_ENERGY_KEV", "30"))
+FAMILY = os.environ.get("PROBE_FAMILY", "hopg")
 
 
 def case(seed):
+    if FAMILY == "layered":
+        return dataclasses.replace(_layered_case(), seed=seed)
     return BUILD("hopg", NE, ENERGY_KEV, 1.0e4, seed)
+
+
+def _layered_case():
+    import pyrite as pr
+    from pyrite import api
+    from pyrite.detectors import EnergyBins
+
+    beam = pr.Beam(energy_keV=100, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch())
+    stack = pr.geometry.Stack.on_substrate(
+        "mos2", 1e4, "silicon", 1e5, tilt_deg=30, footprint=pr.geometry.Footprint(5, 5)
+    )
+    physics = pr.Physics(
+        bremsstrahlung_model="bremslib",
+        radiative_model="bremslib-soft-hard",
+        radiative_cutoff_eV=1000,
+    )
+    numerics = pr.Numerics(
+        sampling=pr.config.FixedSampling(NE, NE),
+        energy_model="midpoint",
+        energy_bins=EnergyBins(cxr=np.linspace(1000, 20000, 400), brem=np.arange(1000, 1e5, 1000)),
+    )
+    return api.build_case(pr.Scene(beam, stack, pr.Detector(), physics=physics), numerics)
+
+
+def _channeling(seed):
+    import pyrite as pr
+
+    beam = pr.Beam(
+        energy_keV=17_000, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()
+    )
+    target = pr.geometry.Slab(
+        "silicon",
+        thickness_ang=20_000,
+        tilt_deg=3,
+        tilt_azim_deg=45,
+        footprint=pr.geometry.Footprint(5, 5),
+    )
+    detector = pr.Detector(
+        0, acceptance=pr.detectors.SensorAcceptance(distance_mm=1_000, width_mm=3, height_mm=3)
+    )
+    result = pr.simulate(
+        beam,
+        target,
+        detector,
+        physics=pr.Physics(radiative_model="uncoupled"),
+        channeling=pr.quantum.Channeling("planar", plane=(1, -1, 0)),
+        numerics=pr.Numerics(
+            seed=seed,
+            sampling=pr.config.FixedSampling(cxr_histories=NE, brem_histories=NE),
+            energy_bins=pr.detectors.EnergyBins(
+                cxr=np.arange(1_000, 24_000, 50), brem=np.arange(1_000, 17_000_000, 500)
+            ),
+        ),
+    )
+    parts = ("characteristic", "brem", "channeling")
+    out = {p: getattr(result, p) for p in parts}
+    out["cxr_incoherent"], out["cxr_coherent"] = result.cxr.incoherent, result.cxr.coherent
+    return {k: np.asarray(v.density) for k, v in out.items() if v is not None}
 
 
 def digest(obj):
@@ -79,6 +144,8 @@ JOBS = 8
 def job(seed):
     if seed < 0:
         raise RuntimeError("injected failure")
+    if FAMILY == "channeling":
+        return _channeling(seed)
     if MODE == "transport":
         return runner._transport_case(case(seed), transport_core="per-electron")
     return runner.run_case(case(seed), transport_core="per-electron")
@@ -169,7 +236,7 @@ def main():
     kind = os.environ.get("PROBE_KIND", "threads")
     print(
         f"python {platform.python_version()} gil={sys._is_gil_enabled()} numba {numba.__version__} "
-        f"numba_threads={numba.get_num_threads()} mode={MODE} kind={kind} Ne={NE} jobs={JOBS} "
+        f"numba_threads={numba.get_num_threads()} mode={MODE} family={FAMILY} kind={kind} Ne={NE} jobs={JOBS} "
         f"pyrite={Path(runner.__file__).parents[2]}"
     )
     job(0)  # warm JIT / caches outside timing
