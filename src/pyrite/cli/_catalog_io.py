@@ -1,4 +1,9 @@
-"""Shared TOML helpers for catalog-editing CLI commands."""
+"""Shared TOML helpers for catalog-editing CLI commands.
+
+Catalog document accessors (``RANGES``, ``*_rows``, ``range_values`` ...) are
+owned by :mod:`pyrite.campaign._profile_document`; they are re-exported here so
+CLI commands keep one import surface.
+"""
 
 from pathlib import Path
 
@@ -10,17 +15,23 @@ from pyrite._catalog_layout import (
     read_text,
     write_text,
 )
+from pyrite.campaign._profile_document import (  # noqa: F401
+    RANGES,
+    beam_rows,
+    detector_rows,
+    display,
+    material_rows,
+    profile_overrides,
+    profile_rows,
+    range_values,
+    values_item,
+)
+from pyrite.campaign.profile_filters import filter_rows  # noqa: F401
 from pyrite.catalog_edit import validate as validate_draft
 from pyrite.console.config import catalog_path
 from pyrite.console.output import CLIError
 from pyrite.energy_grid.apply import _CATALOG_PATH
 
-RANGES = {
-    "thickness": "thickness_ang",
-    "energy": "energy_keV",
-    "polar": "tilt_deg",
-    "azimuth": "tilt_azim_deg",
-}
 DEFAULT_PROFILE = "standard"
 
 
@@ -45,17 +56,6 @@ def require_new_object(rows, kind, name):
             f"{kind} {name!r} already exists as {existing!r}; "
             f"choose a new name or edit it with: pyrite {kind} set {existing}"
         )
-
-
-def range_values(row, key):
-    value = row.get(key)
-    if not isinstance(value, dict) or not isinstance(value.get("values"), list):
-        raise ValueError(f"{key} must be a values grid")
-    return [float(item) for item in value["values"]]
-
-
-def display(values):
-    return ", ".join(f"{value:g}" for value in values)
 
 
 def current_text(path=None):
@@ -113,35 +113,6 @@ def atomic_write(path, text):
         raise CLIError(str(exc)) from None
 
 
-def values_item(values):
-    item = tomlkit.inline_table()
-    item["values"] = values
-    return item
-
-
-def profile_rows(document):
-    profiles = document.get("profiles", {})
-    if not isinstance(profiles, dict):
-        raise ValueError("catalog profiles table is missing")
-    return profiles
-
-
-def material_rows(document):
-    materials = document.get("materials", {})
-    if not isinstance(materials, dict):
-        raise ValueError("catalog materials table is missing")
-    return materials
-
-
-def beam_rows(document):
-    """Return ``[beams.*]`` rows, or ``{}`` -- unlike materials/profiles,
-    ``beams`` is an optional top-level table."""
-    beams = document.get("beams", {})
-    if not isinstance(beams, dict):
-        raise ValueError("catalog beams table must be a table")
-    return beams
-
-
 def beams_table(document):
     """Return the writable top-level ``[beams]`` table, creating it if absent."""
     beams = document.get("beams")
@@ -153,14 +124,6 @@ def beams_table(document):
     return beams
 
 
-def detector_rows(document):
-    """Return optional top-level ``[detectors.*]`` rows."""
-    detectors = document.get("detectors", {})
-    if not isinstance(detectors, dict):
-        raise ValueError("catalog detectors table must be a table")
-    return detectors
-
-
 def detectors_table(document):
     """Return writable top-level ``[detectors]``, creating it if absent."""
     detectors = document.get("detectors")
@@ -170,21 +133,6 @@ def detectors_table(document):
     elif not isinstance(detectors, dict):
         raise ValueError("catalog detectors table must be a table")
     return detectors
-
-
-def profile_overrides(profile):
-    overrides = profile.get("overrides", {})
-    if not isinstance(overrides, dict):
-        raise ValueError("profile overrides table must be a table")
-    return overrides
-
-
-def filter_rows(profile):
-    """Return ``[[profiles.NAME.filters]]`` rows, validating its TOML shape."""
-    filters = profile.get("filters", [])
-    if not isinstance(filters, list) or not all(isinstance(row, dict) for row in filters):
-        raise ValueError("profile filters must be an array of tables")
-    return filters
 
 
 def existing_profile(document, name):
