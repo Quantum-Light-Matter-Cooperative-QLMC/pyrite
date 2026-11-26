@@ -280,9 +280,6 @@ jobs:
           tests/test_root_namespace.py
           tests/test_paths.py
 
-      # Plain pip venvs from PyPI. Fails at the `apps` extra while
-      # marimo[recommended] requires marimo-lens, which declares Python <3.15
-      # (0.2.4); pip enforces that cap, pixi's resolver does not.
       - name: Wheel and editable install smoke
         run: pixi run -e py315 pyrite-dev package-smoke
 

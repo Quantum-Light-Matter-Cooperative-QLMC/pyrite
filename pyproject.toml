@@ -86,7 +86,19 @@ plots = [
     "plotly>=6.8.0",
 ]
 # Runtime of the shipped marimo apps (``pyrite app ... launch|export``).
-apps = ["pyrite-mc[plots]", "anywidget>=0.11.0", "marimo[recommended]>=0.26.0"]
+# ``marimo-lens`` declares Python <3.15, so from 3.15 the extra spells out
+# marimo 0.26's ``recommended`` set without it (#1421).
+apps = [
+    "pyrite-mc[plots]",
+    "anywidget>=0.11.0",
+    "marimo[recommended]>=0.26.0; python_version < '3.15'",
+    "marimo[sql,sandbox]>=0.26.0; python_version >= '3.15'",
+    "altair>=5.4.0; python_version >= '3.15'",
+    "cryptography>=42.0.0; python_version >= '3.15'",
+    "nbformat>=5.7.0; python_version >= '3.15'",
+    "pydantic-ai-slim[openai]>=2.34.0,<3; python_version >= '3.15'",
+    "ruff; python_version >= '3.15'",
+]
 
 [project.scripts]
 pyrite = "pyrite.cli:main"

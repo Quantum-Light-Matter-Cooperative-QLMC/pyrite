@@ -4098,7 +4098,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/8a/8c/824a686c4ba815ddb0722f9e66272088bccd4e1ae1d2f7015375e4a4fc7f/pydantic-2.14.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/8a/cf/e3ad894ed5909a7c44b0707e89bc25d19a3d78b3a7aec846119443b6ae56/watchfiles-1.3.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/8b/99/fad906311e48fce22e4db71ee4c3df29bdb17b29eb36878f52b8dcd79237/uv-0.13.10-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/8b/e0/fce035140da2730aaf0816dd49b6660d9feb91c6fe5cad7485517c80affd/agent_plugins-0.2.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/8c/b2/23f4032cd1c9744aa8e9ecda43cd4d755fcb209f7f40fae035248f31a679/pyct-0.6.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/8d/3f/95338030883d8c8b91223b4e21744b04d11b161a3ef117295d8241f50ab4/accessible_pygments-0.0.5-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/8d/59/b4572118e098ac8e46e399a1dd0f2d85403ce8bbaad9ec79373ed6badaf9/PySocks-1.7.1-py3-none-any.whl
@@ -4129,7 +4128,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/ad/9b/9fb3585dabcd73a1b2a6267f63f62649347c9e6d072c9fde365b105abb2c/build-1.6.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b0/51/096a5495b33ff2da32f0c84f5bf8e042cf76f72641cba06ee9618ad01f4d/pyyaml-6.0.4-cp315-cp315-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/b0/54/890510a2c9841aff63258e085d15d4e140c7eef559d4da81ef2d2d867436/msgpack-1.2.4-cp315-cp315-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/b0/bf/87d01addcc68055c293f67f54b1f1e0e4bbc5a5fcfdab47680947912ac46/marimo_lens-0.2.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b1/dd/ead9d8ea85bf202d90cc513b533f9c363121c7792674f78e0d8a854b63b4/jupyterlab_pygments-0.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b4/a1/49cd0780d5a1adffc29d0062eafcc2447156a2d64d49634f201ef19e7497/dask-2026.11.0-py3-none-any.whl
@@ -15708,7 +15706,13 @@ packages:
   - plotly>=6.8.0 ; extra == 'plots'
   - pyrite-mc[plots] ; extra == 'apps'
   - anywidget>=0.11.0 ; extra == 'apps'
-  - marimo[recommended]>=0.26.0 ; extra == 'apps'
+  - marimo[recommended]>=0.26.0 ; python_full_version < '3.15' and extra == 'apps'
+  - marimo[sql,sandbox]>=0.26.0 ; python_full_version >= '3.15' and extra == 'apps'
+  - altair>=5.4.0 ; python_full_version >= '3.15' and extra == 'apps'
+  - cryptography>=42.0.0 ; python_full_version >= '3.15' and extra == 'apps'
+  - nbformat>=5.7.0 ; python_full_version >= '3.15' and extra == 'apps'
+  - pydantic-ai-slim[openai]>=2.34.0,<3 ; python_full_version >= '3.15' and extra == 'apps'
+  - ruff ; python_full_version >= '3.15' and extra == 'apps'
   requires_python: '>=3.13'
 - pypi: https://files.pythonhosted.org/packages/01/21/bddeab25d7a9112223498d2f07fdc0976b63b02ee0e8ab25ea1ebd5d2bd4/ty-0.0.111-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
   name: ty

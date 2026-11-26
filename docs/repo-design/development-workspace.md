@@ -255,11 +255,11 @@ from source with `nanobind<3`. The job runs the packaging and identity-pin
 suites, focused RNG, baseline, checkpoint and bounded transport/radiation
 modules, and `pyrite-dev package-smoke`, whose plain pip venvs build `h5py`,
 `gemmi` and `endf-parserpy` from source because none publishes cp315 wheels.
-That last step currently fails on the `apps` extra: `marimo[recommended]`
-requires `marimo-lens`, which declares Python <3.15. The `oracle` group is
-skipped (no cp315 pyFFTW), and the NVIDIA and Intel extras have no cp315
-builds. Classifiers and install docs change only with an explicit support
-decision (#1421).
+On 3.15 the `apps` extra
+leaves out `marimo-lens`, which declares Python <3.15, and lists the rest of
+`marimo[recommended]` itself. The `oracle` group is skipped (no cp315 pyFFTW),
+and the NVIDIA and Intel extras have no cp315 builds. Classifiers and install
+docs change only with an explicit support decision (#1421).
 
 The suites read hash-pinned fetched data rather than packaged data (ADR-0014): the EPICS2025 EEDL and EADL files, the derived EPDL photon table, SBETHE's `sdbase/` and catalogue stopping tables, and the ELSEPA and BremsLib tables, with the positron SBETHE and ELSEPA pins alongside the electron ones. Install all of it once per machine with `pyrite tables fetch` (about 140 MB; one code with `pyrite tables fetch CODE`, a positron pin with `pyrite tables fetch {sbethe-tables,elsepa} --projectile positron`, or `--archive PATH` from a local copy); a test that needs one fails naming the command. Positron tests check every table their pinned release lists (`tests/helpers/positron_tables.py`): none installed skips, naming the fetch command (fails instead when `CI` is set, so CI never skips a positron anchor silently); some installed fails, naming the command. Tests never see a developer's `PYRITE_HOME` or config store, so they read the default user-data location, `~/.local/share/pyrite/datasets/` on Linux; fetch without `PYRITE_HOME` set. PyRITE's own archives (EPDL, SBETHE tables, ELSEPA, BremsLib, and the EEDL/EADL mirrors) are public GitHub Release assets, so fetching them needs no GitHub token. CI caches the datasets, `xsgen/tables` and `xsgen/reference-data` directories under a key derived from `src/pyrite/datasets.py`, `src/pyrite/xsgen/fetch.py` (the `sdbase/` pin) and `src/pyrite/data/xsgen/*-tables.json`, and runs `pyrite tables fetch`; they verify a cached copy and need no network on a hit. The `elastic_model="mott"` tests read the synthetic SRD 64-format tables in `tests/data/mott_srd64_synthetic/` (regenerate with `pixi run python -m tests.helpers.mott_synthetic`).
 
