@@ -164,3 +164,20 @@ def test_unsupported_warm_profile_never_runs_a_case(monkeypatch, profile):
     assert profile in result.stderr
     with pytest.raises(ValueError, match="unknown warm profile"):
         _jit_warm.warm(profile)
+
+
+def test_status_reports_the_math_mode_and_its_source(managed, monkeypatch):
+    monkeypatch.setenv("PYRITE_MATH", "fast")
+    result = invoke(cache_command.command, ["status", "--backend", "cupy", "-o", "json"])
+    assert_clean_result(result)
+    assert json.loads(result.stdout)["payload"]["math"] == {
+        "mode": "fast",
+        "source": "PYRITE_MATH",
+    }
+    text = invoke(cache_command.command, ["status", "--backend", "cupy"])
+    assert_clean_result(text)
+    assert text.stdout.splitlines()[-1] == "math mode: fast (PYRITE_MATH)"
+    monkeypatch.setenv("PYRITE_MATH", "turbo")
+    bad = invoke(cache_command.command, ["status", "--backend", "cupy"])
+    assert bad.exit_code == 1
+    assert "PYRITE_MATH must be one of" in bad.stderr

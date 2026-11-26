@@ -171,6 +171,10 @@ class Settings:
         ``"incoherent"``, ``"coherent"``, or ``"both"`` line policy.
     temporal_profile
         Also compute the line temporal intensity profile ``I(t)`` (#292).
+    math
+        Floating-point math mode, ``"fast"`` or ``"reproducible"`` (#1468);
+        ``None`` resolves ``PYRITE_MATH``, then the ``numerics.math`` config
+        key, then ``"reproducible"``. ``"fast"`` joins dataset identity.
     """
 
     beam_current_na: float = DEFAULT_BEAM_CURRENT_NA
@@ -224,6 +228,10 @@ class Settings:
     temporal_profile: bool = False
     precision: Precision | None = None
     allow_fallback: bool = False
+    # Floating-point math mode (#1468); None resolves PYRITE_MATH, then the
+    # numerics.math config key, then "reproducible". Joins dataset identity
+    # only as "fast" (divergence-only), so reproducible stems never move.
+    math: Literal["fast", "reproducible"] | None = None
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         """Keep omitted historical model selectors on their original auto policies."""
@@ -243,6 +251,10 @@ class Settings:
         )
         if not isinstance(self.allow_fallback, bool):
             raise TypeError("allow_fallback must be a bool")
+        if self.math is not None:
+            from .._math_mode import validate_math_mode
+
+            validate_math_mode(self.math)
         if self.precision is not None and not isinstance(self.precision, Precision):
             raise TypeError("precision must be a Precision or None")
         if not isinstance(self.temporal_profile, bool):

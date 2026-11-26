@@ -93,6 +93,7 @@ def test_queue_script_no_flags_when_unset():
         ("PYRITE_MC_RESOURCE_POLICY", "throughput", "max"),
         ("PYRITE_MC_MIN_CHUNK", "100", "0"),
         ("PYRITE_MC_CHARACTERISTIC_CHUNK", "65536", "-1"),
+        ("PYRITE_MATH", "fast", "exact"),
     ],
 )
 def test_queue_scripts_forward_local_runtime_pins(monkeypatch, build, name, value, invalid):
@@ -101,6 +102,7 @@ def test_queue_scripts_forward_local_runtime_pins(monkeypatch, build, name, valu
     monkeypatch.delenv("PYRITE_MC_RESOURCE_POLICY", raising=False)
     monkeypatch.delenv("PYRITE_MC_MIN_CHUNK", raising=False)
     monkeypatch.delenv("PYRITE_MC_CHARACTERISTIC_CHUNK", raising=False)
+    monkeypatch.delenv("PYRITE_MATH", raising=False)
     assert name not in build()
 
     monkeypatch.setenv(name, value.upper())

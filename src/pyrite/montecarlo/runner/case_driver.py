@@ -27,6 +27,7 @@ from typing import Any
 import numpy as np
 
 from ..._backend import BACKEND
+from ..._math_mode import with_case_math_mode
 from ..._physics_fallback import collect_physics_fallbacks
 from ..case import (
     AxialAdmissionError,
@@ -92,6 +93,7 @@ def _spectrum_stage_done(stage):
         sink(stage, SPECTRUM_STAGES.index(stage) + 1, len(SPECTRUM_STAGES))
 
 
+@with_case_math_mode
 @with_realization
 def run_case(
     case: Case | Mapping[str, Any],
@@ -161,6 +163,7 @@ def _directional_outputs(case, transport, n_hats, spectrum=None) -> dict[str, An
     )
 
 
+@with_case_math_mode
 @with_realization
 def run_case_directions(
     case: Case | Mapping[str, Any],
@@ -216,6 +219,7 @@ def _resident_transport(case, core, channeling):
     return core == "cuda" and not channeling and not ("radiative_model" in case and cascade)
 
 
+@with_case_math_mode
 @with_realization
 def _transport_case(
     case,
@@ -818,6 +822,7 @@ def _cxr_for_case(case, E_grid, *, coherent=None):
     ).values
 
 
+@with_case_math_mode
 @with_realization
 def _cxr_pair_for_case(
     case, E_grid, *, want_coherent, return_characteristic=False, return_transition=False
@@ -876,6 +881,7 @@ def _cxr_pair_for_case(
     return spec, spec_coherent, characteristic, case_transition_spectrum(case, transport)
 
 
+@with_case_math_mode
 @with_realization
 def _spectrum_case(case, tp, record_timing=False):
     """GPU phase of run_case: CXR spectrum + brem from the already-transported

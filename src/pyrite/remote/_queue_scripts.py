@@ -36,6 +36,7 @@ _FORWARDED_ENV = (
     "PYRITE_MC_RESOURCE_POLICY",
     "PYRITE_MC_MIN_CHUNK",
     "PYRITE_MC_CHARACTERISTIC_CHUNK",
+    "PYRITE_MATH",
 )
 
 
@@ -54,6 +55,10 @@ def _forwarded_env_choices(name):
         from .._numerics import TRANSPORT_PRECISIONS
 
         return TRANSPORT_PRECISIONS
+    if name == "PYRITE_MATH":
+        from .._math_mode import MATH_MODES
+
+        return MATH_MODES
     from ..montecarlo._resources import _VALID_POLICIES
 
     return _VALID_POLICIES

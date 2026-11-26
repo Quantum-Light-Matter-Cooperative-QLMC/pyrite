@@ -400,6 +400,9 @@ load_physics = { target = "pyrite._config_presets:load_physics", status = "advan
 AngularSampling = { target = "pyrite.config:AngularSampling", status = "advanced-stable" }
 # #1455: KernelTuning.characteristic_chunk (None: automatic) is execution-only; it never
 # enters case identity. No new export.
+# #1468: KernelTuning.math ("fast" | "reproducible" | None) selects the floating-point
+# math mode; unlike the chunks, "fast" enters case and dataset identity. No new export;
+# contract in docs/repo-design/compute/math-mode.md.
 KernelTuning = { target = "pyrite._numerics_groups:KernelTuning", status = "advanced-stable" }
 TransportKernelTuning = { target = "pyrite._numerics_groups:TransportKernelTuning", status = "experimental" }
 Timepix3ResponseNumerics = { target = "pyrite.config:Timepix3ResponseNumerics", status = "advanced-stable" }

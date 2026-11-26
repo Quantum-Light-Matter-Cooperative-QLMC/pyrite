@@ -13,6 +13,7 @@ from typing import Any
 import numpy as np
 
 from .._numerics import CHANNELING_KEYS, _emission_selection
+from .._numerics_groups import ExecutionConfig
 from .._off_settings import NONE, off_value
 from .._sampling import FixedSampling, SamplingPolicy, adaptive_sampling
 from ..quantum import Channeling
@@ -153,11 +154,20 @@ def numerics_from_legacy(old_sweep: Any, settings: Any) -> Numerics:
         if precision is None
         else adaptive_sampling(precision)
     )
+    math = getattr(settings, "math", None)
+    chunks: dict[str, Any] = (
+        {"cxr_chunk": old_sweep.spec_chunk, "brem_chunk": old_sweep.brem_chunk}
+        if math is None
+        else {
+            "execution": ExecutionConfig(
+                cxr_chunk=old_sweep.spec_chunk, brem_chunk=old_sweep.brem_chunk, math=math
+            )
+        }
+    )
     return Numerics(
         sampling=sampling,
         energy_bins=old_sweep.energy_bins,
-        cxr_chunk=old_sweep.spec_chunk,
-        brem_chunk=old_sweep.brem_chunk,
+        **chunks,
         energy_model=getattr(settings, "energy_model", "frozen"),
         max_dE_frac=getattr(settings, "max_dE_frac", 0.0),
         cxr_reflections=CxrReflections(

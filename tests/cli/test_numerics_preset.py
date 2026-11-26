@@ -285,3 +285,23 @@ def test_numerics_preset_removed_budget_flags_name_histories(_isolate_user_catal
     result = invoke(command, ["numerics", "create", "fast", flag, "200"])
     assert result.exit_code == 2
     assert f"{flag} was removed; use --{flag.split('-')[2]}-histories" in result.stderr
+
+
+def test_math_mode_preset_and_profile_key(_isolate_user_catalog):
+    """``math`` (#1468) is a numerics preset/profile key that lowers to KernelTuning."""
+    ok("numerics", "create", "fastmath", "--math", "fast")
+    numerics = pyrite.config.load_numerics("fastmath", catalog=load_material_catalog())
+    assert numerics.resolved_execution.math == "fast"
+    ok("profile", "create", "campaign", "--from", "quickstart")
+    ok("profile", "set", "campaign", "--numerics", "fastmath")
+    catalog = load_material_catalog(profile="campaign")
+    assert catalog.profile_numerics("campaign")["math"] == "fast"
+    from pyrite.campaign.config import default_settings
+    from pyrite.campaign.profiles import profile_run_settings
+
+    assert profile_run_settings(default_settings(), "campaign", catalog).math == "fast"
+    ok("profile", "numerics", "set", "campaign", "--math", "reproducible")
+    catalog = load_material_catalog(profile="campaign")
+    assert catalog.profile_numerics("campaign")["math"] == "reproducible"
+    refused = invoke(command, ["profile", "numerics", "set", "campaign", "--math", "exact"])
+    assert refused.exit_code == 2

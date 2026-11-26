@@ -160,6 +160,8 @@ def resolve_numerics(
         "transition_lattice_origin_ang": physics.transition_lattice_origin_ang,
         "shell_ionization_model": physics.shell_ionization_model,
         "cxr_source": physics.cxr_source,
+        # None defers to PYRITE_MATH, the numerics.math config key, then the default.
+        "math": None,
     }
     effective.update(CHANNELING_OFF_FIELDS, channeling_model=OFF_VALUES["channeling_model"])
     sources = {
@@ -626,6 +628,10 @@ def _identity_v1(
     # Opt-in line I(t) (#292): divergence-only, so off keeps every digest.
     if options.temporal_profile:
         resolved["temporal_profile"] = True
+    # Math mode (#1468) is case identity, divergence-only: reproducible keeps
+    # every digest; fast gets its own stem, so resume never mixes modes.
+    if options.math != "reproducible":
+        resolved["math"] = options.math
     grooved = sweep_payload.get("groove_spacing_ang") is not None
     transport_numerics = transport_numerics_payload(
         options, sweep, crystallography["crystal"], grooved=grooved
@@ -945,6 +951,8 @@ def profile_run_settings(
         settings = replace(settings, temporal_profile=True)
     numerics = resolve_numerics(catalog.profile_numerics(catalog_profile))
     settings = replace(settings, **{key: numerics.effective[key] for key in TRANSPORT_KEYS})
+    if numerics.effective["math"] is not None:  # a profile or preset pin (#1468)
+        settings = replace(settings, math=numerics.effective["math"])
     precision, _source = profile_precision_source(settings, catalog_profile, catalog, sweep=sweep)
     return replace(settings, precision=precision)
 

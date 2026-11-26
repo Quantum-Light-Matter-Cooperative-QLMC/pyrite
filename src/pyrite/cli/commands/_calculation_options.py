@@ -103,6 +103,7 @@ FIELD_NAMES = {
     "channeling-bloch-cells": "channeling_bloch_cells",
     "channeling-dz-ang": "channeling_dz_ang",
     "channeling-zone-max-ang": "channeling_zone_max_ang",
+    "math": "math",
 }
 
 
@@ -378,6 +379,17 @@ class ChannelingSectionCommand(click.Command):
     "--channeling-zone-max-ang",
     type=unit_float(click.FloatRange(min=0, min_open=True), "angstrom", "length"),
     help="Zone length cap in angstrom (table zone_max_ang; default first layer thickness).",
+)
+@click.option(
+    "--math",
+    type=click.Choice(("fast", "reproducible")),
+    help=(
+        "Floating-point math mode (#1468): reproducible keeps bit-for-bit results where they "
+        "are pinned; fast lets adopted kernels use fast-math flags, approximate "
+        "transcendentals and FMA contraction (not bit-for-bit across hosts or devices). "
+        "Unset defers to PYRITE_MATH, then the numerics.math config key, then reproducible. "
+        "fast joins case identity, so its checkpoints never mix with reproducible ones."
+    ),
 )
 def _options_holder(**_values):
     """Parameter holder; never invoked."""

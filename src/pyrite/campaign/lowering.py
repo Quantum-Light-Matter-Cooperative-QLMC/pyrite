@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, cast
 import numpy as np
 
 from .._energy_bins import EnergyBins
+from .._math_mode import resolve_math_mode
 from .._mixed_elastic_policy import refuse_mixed_cxr
 from .._numerics import Numerics, Physics
 from .._sampling import case_budget
@@ -140,7 +141,7 @@ def _with_line_resolution(
 
 
 def _with_run_options(cases: list[Case], numerics: Numerics) -> list[Case]:
-    """Apply the seed stream, opt-in line roulette/cone splitting and characteristic chunk.
+    """Apply the seed stream, line roulette/cone splitting, characteristic chunk and math mode.
 
     Replacing re-runs case validation, which refuses non-additive line routes.
     """
@@ -153,9 +154,14 @@ def _with_run_options(cases: list[Case], numerics: Numerics) -> list[Case]:
         record = numerics.cone_split.to_dict()
         cases = [replace(case, cone_split=record) for case in cases]
     # Execution-only (#1455): a case key, never in content or dataset identity.
-    chunk = numerics.resolved_execution.characteristic_chunk
+    execution = numerics.resolved_execution
+    chunk = execution.characteristic_chunk
     if chunk is not None:
         cases = [replace(case, characteristic_chunk=chunk) for case in cases]
+    # Math mode (#1468): the one resolution point. "fast" enters identity;
+    # "reproducible" stays absent so existing keys are unchanged.
+    if resolve_math_mode(execution.math).mode == "fast":
+        cases = [replace(case, math="fast") for case in cases]
     return cases
 
 

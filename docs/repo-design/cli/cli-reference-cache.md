@@ -32,7 +32,7 @@ Options:
 
 Commands:
   clear   Delete PyRITE-owned compiled kernels and regenerable caches; preview...
-  status  Report cache locations, sizes, and per-family Numba freshness.
+  status  Report cache locations, sizes, per-family Numba freshness, and math mode.
   warm    Compile and cache common kernels ahead of the first simulation.
 ```
 
@@ -59,12 +59,14 @@ Options:
 ```text
 Usage: pyrite cache status [OPTIONS]
 
-  Report cache locations, sizes, and per-family Numba freshness.
+  Report cache locations, sizes, per-family Numba freshness, and math mode.
 
   A Numba index is current when its recorded source stamp and Numba version match this
   installation, so its signatures load without compiling (cache hits); stale indexes
   recompile on next use (misses). CuPy files are hash-named and reported only as a
-  total. Read-only.
+  total. The math mode is the one a run that sets none would use (PYRITE_MATH, then the
+  numerics.math config key, then the built-in default); fast-mode Numba kernels keep
+  separate __math_fast cache indexes. Read-only.
 
 Options:
   --backend [all|numba|cupy|line-grids|analysis|viewer-renders|zhai_reproduction|line-grid-spill]

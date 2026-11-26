@@ -276,3 +276,16 @@ def test_config_set_mott_tables_dir_requires_a_directory(monkeypatch, tmp_path):
     stored = invoke(config_command.command, ["set", "mott.tables_dir", str(tables)])
     assert_clean_result(stored, stdout=f"mott.tables_dir = {tables.resolve()}\n")
     assert _config.resolve("mott.tables_dir").value == str(tables.resolve())
+
+
+def test_config_math_mode_key_validates_and_resolves(monkeypatch, tmp_path):
+    from pyrite import _math_mode
+
+    _isolated_store(monkeypatch, tmp_path)
+    monkeypatch.delenv("PYRITE_MATH", raising=False)
+    stored = invoke(config_command.command, ["set", "numerics.math", "FAST"])
+    assert_clean_result(stored, stdout="numerics.math = fast\n")
+    assert _math_mode.resolve_math_mode() == _math_mode.ResolvedMathMode("fast", "config store")
+    rejected = invoke(config_command.command, ["set", "numerics.math", "exact"])
+    assert rejected.exit_code == 2
+    assert "expected fast or reproducible" in rejected.stderr

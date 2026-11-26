@@ -42,6 +42,11 @@ os.environ["PYRITE_USER_CATALOG"] = str(USER_CATALOG_FIXTURE)
 # session-scoped fixtures see it too; tests of the missing-table error unset it.
 MOTT_SYNTHETIC_DIR = Path(__file__).parent / "data" / "mott_srd64_synthetic"
 os.environ["PYRITE_MOTT_TABLES_DIR"] = str(MOTT_SYNTHETIC_DIR)
+# Identity pins and physics baselines are bitwise, so the suite runs the
+# reproducible math mode (#1468) whatever the developer's PYRITE_MATH or
+# numerics.math config. PYRITE_TEST_MATH=fast selects the fast mode on purpose
+# for the statistical-equivalence CI job; tests of resolution set their own.
+os.environ["PYRITE_MATH"] = os.environ.get("PYRITE_TEST_MATH") or "reproducible"
 
 try:
     import pyarrow  # noqa: F401

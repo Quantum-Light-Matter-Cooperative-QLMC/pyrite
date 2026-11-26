@@ -345,3 +345,44 @@ jobs:
           tests/montecarlo/spectrum/test_node_support_window.py
           tests/montecarlo/spectrum/test_vector_sin.py
           tests/test_jit_cache.py
+      - name: Fast math mode under SVML
+        env:
+          PYRITE_TEST_MATH: fast
+          PYRITE_SLOW_TESTS: "1"
+        run: >
+          pixi run -e svml pyrite-dev test
+          tests/montecarlo/runner/test_math_mode_equivalence.py
+          tests/test_math_mode.py
+
+  # Fast math mode (#1468): the statistical-equivalence subset with the
+  # suite's reproducible pin lifted (PYRITE_TEST_MATH=fast). Tolerances live in
+  # tests/montecarlo/runner/test_math_mode_equivalence.py.
+  math-fast:
+    runs-on: ubuntu-latest
+    env:
+      PYRITE_MC_BACKEND: cpu
+      PYRITE_TEST_MATH: fast
+      PYRITE_SLOW_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
+        with:
+          pixi-version: v0.85.0
+          environments: default
+          locked: true
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+      - name: Cache pinned physics tables
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/pyrite/datasets
+            ~/.local/share/pyrite/xsgen/tables
+            ~/.local/share/pyrite/xsgen/reference-data
+          key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
+      - run: pixi run pyrite tables fetch
+      - name: Statistical-equivalence subset in fast mode
+        run: >
+          pixi run pyrite-dev test
+          tests/montecarlo/runner/test_math_mode_equivalence.py
+          tests/test_math_mode.py

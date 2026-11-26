@@ -13,6 +13,7 @@ from ._cxr_vocabulary import catalog_key
 from ._energy_bins import EnergyBins
 from ._line_resolution import validate_line_resolution
 from ._line_roulette import LineRoulette
+from ._math_mode import EXECUTION_KEYS, validate_optional_math_mode
 from ._mixed_elastic_policy import MIXED_URBAN_REFUSAL, validate_transport_mode
 from ._off_settings import DEPRECATED_OFF, NONE, off_value
 from ._pair_production_policy import PAIR_PRODUCTION_MODELS as PAIR_PRODUCTION_MODELS
@@ -165,7 +166,7 @@ CHANNELING_MODELS = ("off", "planar", "axial")
 #: history's boundary crossings coherently; ``"bunch"`` also keeps the
 #: cross-history (CTR) terms with the physical bunch population.
 TRANSITION_RADIATION_MODES = ("none", "history", "bunch", "two-beam")
-PROFILE_NUMERICS_KEYS = (*SAMPLING_KEYS, *CONVERGENCE_KEYS, *TRANSPORT_KEYS)
+PROFILE_NUMERICS_KEYS = (*SAMPLING_KEYS, *CONVERGENCE_KEYS, *TRANSPORT_KEYS, *EXECUTION_KEYS)
 
 
 @dataclass(frozen=True)
@@ -1218,6 +1219,7 @@ def validate_profile_numerics(values: Mapping[str, object]) -> None:
                 history_counts(values[key])
             except ValueError as exc:
                 raise ValueError(f"{catalog_key(key)} {exc}") from None
+    validate_optional_math_mode(values.get("math"))
     convergence_values: dict[str, Any] = {
         key: values[key] for key in CONVERGENCE_KEYS if key in values
     }

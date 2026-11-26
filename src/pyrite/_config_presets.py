@@ -21,6 +21,7 @@ from ._cxr_vocabulary import catalog_key
 from ._numerics import (
     CHANNELING_KEYS,
     CONVERGENCE_KEYS,
+    EXECUTION_KEYS,
     PHYSICS_FIELDS,
     PROFILE_NUMERICS_KEYS,
     SAMPLING_KEYS,
@@ -227,8 +228,13 @@ def numerics_from_values(values: Mapping[str, Any]) -> Numerics:
     fields = {
         key: value
         for key, value in values.items()
-        if key in NUMERICS.scalar_keys and key not in (*CONVERGENCE_KEYS, *SAMPLING_KEYS)
+        if key in NUMERICS.scalar_keys
+        and key not in (*CONVERGENCE_KEYS, *SAMPLING_KEYS, *EXECUTION_KEYS)
     }
+    if values.get("math") is not None:  # an execution pin (#1468)
+        from ._numerics_groups import ExecutionConfig
+
+        fields["execution"] = ExecutionConfig(math=values["math"])
     sampling: SamplingPolicy
     if "precision" in values:
         sampling = AdaptiveSampling.from_dict(values["precision"], source="numerics preset")
@@ -295,7 +301,8 @@ def load_numerics(name: str, *, catalog: Any = None) -> Numerics:
         The preset's ``sampling`` policy (``cxr_histories``/``brem_histories``
         counts or an ``adaptive_sampling`` table), integration,
         and reflection/mosaic numerics over the built-in defaults.
-        Energy bins and execution-only fields keep their defaults; a
+        Energy bins and execution-only fields keep their defaults, except a
+        ``math`` pin, which sets ``execution=KernelTuning(math=...)``; a
         ``line_grid_policy`` applies only to catalog profiles. Adjust the
         result with :func:`dataclasses.replace`.
 

@@ -37,6 +37,7 @@ Each context value resolves independently in this order:
 | `remote.host_exec` | `PYRITE_REMOTE_HOST_EXEC` | unset (host-side PyRITE runs on the login node) |
 | `remote.nice` | `PYRITE_REMOTE_NICE` | `10000` |
 | `workspace.root` | `PYRITE_HOME` | current directory |
+| `numerics.math` | `PYRITE_MATH` | `reproducible` (a run's explicit `KernelTuning.math` or profile/preset `math` wins; see [math mode](compute/math-mode.md)) |
 
 `pyrite config keys [PREFIX]` lists supported persistent keys without resolving live values;
 `pyrite config list [PREFIX]` shows effective values and their sources.
@@ -81,6 +82,7 @@ change scheduling, memory, or profiling only.
 | `PYRITE_DATA_DIR` | Shared tables, datasets, grid artifacts; unset uses platformdirs. Remote jobs export the box checkout root. | Environment > platform default; `paths`. | input storage |
 | `PYRITE_STATE_DIR` | App state root; unset uses platformdirs. | Environment > platform default; `paths`. | app state |
 | `PYRITE_MC_SYCL_DEVICE` | A dpctl SYCL device selector; unset chooses the first usable GPU. | Used only when the SYCL backend resolves; `_backend`. | hardware choice |
+| `PYRITE_MATH` | `fast` or `reproducible`; unset reads `numerics.math` from the config store (built-in `reproducible`). `fast` enters case identity. | Explicit `KernelTuning.math` / profile or preset `math` > environment > config store > built-in; `_math_mode`. Forwarded to remote job scripts. | **numerics** |
 | `PYRITE_FP64` | Set to `1` for float64 accelerator calculations; any other or unset value retains the normal CPU float64/GPU float32 behavior. | Process-wide; `_backend`. | **numerics**, resources |
 | `PYRITE_MC_TRANSPORT_CORE` | `lockstep`, `per-electron`, `cuda`, or `auto`; unset leaves the requested/automatic core selection in force. | Process-wide transport pin; `montecarlo.transport.batching`. | **numerics**, resources |
 | `PYRITE_MC_RESOURCE_POLICY` | `auto`, `conservative`, `balanced`, or `throughput`; unset is `auto` (`conservative` below 8 GiB, otherwise `balanced`). | Process-wide resource policy; `montecarlo._resources`. | **resources** |

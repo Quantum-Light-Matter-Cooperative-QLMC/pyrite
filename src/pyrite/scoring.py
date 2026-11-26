@@ -65,6 +65,7 @@ _DETECTOR_FIELDS = ("theta_obs_rad", "dtheta_obs_rad", "domega_sr")
 #: User-facing owner of the case fields most often refused.
 _FIELD_OWNERS = {
     "seed": "numerics.seed",
+    "math": "numerics.execution.math (math mode)",
     "Ne": "numerics.sampling (line history population)",
     "Ne_brem": "numerics.sampling (continuum history population)",
     "adaptive_precision": "numerics.sampling",
