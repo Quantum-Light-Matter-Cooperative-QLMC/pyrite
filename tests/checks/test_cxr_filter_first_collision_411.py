@@ -44,9 +44,7 @@ def test_plate_thickness_obliquity_sidewall_and_limit():
     assert c.plate_path_mm((0, 0, 0), (1, 0, 0), plate) == 0
     assert c.plate_path_mm((5, 0, 0), (0, 0, 1), plate) == 0
     assert c.plate_path_mm((0, 0, 0), (0, 0, 1), plate, limit_mm=9.0) == 0
-    assert c.plate_path_mm((0, 0, 0), (0, 0, 1), plate, limit_mm=10.0) == pytest.approx(
-        0.00025
-    )
+    assert c.plate_path_mm((0, 0, 0), (0, 0, 1), plate, limit_mm=10.0) == pytest.approx(0.00025)
     # A side-entry path is set by radius, not thickness. Ray starts inside the slab.
     assert c.plate_path_mm((3, 0, 10), (1, 0, 0), plate) == pytest.approx(1.0)
     # A grazing tangent contributes no nonzero length.
@@ -90,8 +88,7 @@ def test_bounds_include_off_cone_and_controls_do_not_double_count(monkeypatch):
     expected_first = 2 * (-np.expm1(-1)) + 3 * (-np.expm1(-2000 * off_length))
     assert result.first_collision_per_primary["coherent"] == pytest.approx(expected_first)
     assert (
-        result.uncollided_detector_per_primary
-        + sum(result.first_collision_per_primary.values())
+        result.uncollided_detector_per_primary + sum(result.first_collision_per_primary.values())
     ) <= 10.0
 
 
@@ -136,18 +133,26 @@ def test_reject_undefined_epdl_coefficients_and_geometry(monkeypatch):
         c.first_collision_probabilities(np.array([1.0]), _rates(1, photo=-1))
     # Mock only the data boundary. Catch a missing or undefined EPDL value.
     from unittest.mock import patch
+
     fake = {name: np.array([np.nan]) for name in c.CHANNELS}
-    with patch.dict("sys.modules", {"pyrite.materials.photon_cross_sections": SimpleNamespace(
-        photon_cross_sections_ang2=lambda el, e: fake
-    )}):
+    with patch.dict(
+        "sys.modules",
+        {
+            "pyrite.materials.photon_cross_sections": SimpleNamespace(
+                photon_cross_sections_ang2=lambda el, e: fake
+            )
+        },
+    ):
         with pytest.raises(ValueError, match="undefined"):
             c.carbon_epdl_coefficients_inv_mm(np.array([500.0]))
 
 
 def test_empty_boundary_is_conservative_without_epdl_data():
     source = SimpleNamespace(
-        position_ang=np.empty((0, 3)), direction=np.empty((0, 3)),
-        energy_eV=np.empty(0), weight_per_primary=np.empty(0),
+        position_ang=np.empty((0, 3)),
+        direction=np.empty((0, 3)),
+        energy_eV=np.empty(0),
+        weight_per_primary=np.empty(0),
     )
     result = c.boundary_controls(source, _plate(), _detector())
     assert result.vacuum_detector_per_primary == 0
@@ -157,8 +162,10 @@ def test_empty_boundary_is_conservative_without_epdl_data():
 
 def test_unscaled_boundary_directions_fail_closed():
     source = SimpleNamespace(
-        position_ang=np.zeros((1, 3)), direction=np.array([[0, 0, 2]]),
-        energy_eV=np.array([500.0]), weight_per_primary=np.array([1.0]),
+        position_ang=np.zeros((1, 3)),
+        direction=np.array([[0, 0, 2]]),
+        energy_eV=np.array([500.0]),
+        weight_per_primary=np.array([1.0]),
     )
     with pytest.raises(ValueError, match="unit vectors"):
         c.boundary_controls(source, _plate(), _detector())

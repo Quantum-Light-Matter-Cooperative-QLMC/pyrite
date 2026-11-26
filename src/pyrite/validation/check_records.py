@@ -13,6 +13,8 @@ SCHEMA_REVISION = 1
 Verdict = Literal["pass", "fail", "skip"]
 
 CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
+    "checks/cxr_boundary_contract_411.py": (),  # #411 synthetic bookkeeping, no physics claim
+    "checks/cxr_filter_first_collision_411.py": (),  # #411 research diagnostic, no physics claim
     "checks/code_duplication.py": (),  # #1467 code-health report, no physics claim
     "checks/native_cpu_audit.py": (),  # #1432 performance inventory, no physics claim
     "checks/gpu_fast_math_1463.py": (),  # #1463 device fast-math arms, no physics claim

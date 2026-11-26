@@ -153,14 +153,22 @@ def test_polarization_requires_a_declared_transverse_basis():
     coherency[:, 0, 0] = source.weight_per_primary
     with pytest.raises(ValueError, match="supplied together"):
         BoundaryCells(
-            source.position_ang, source.normal, source.direction,
-            source.energy_eV, source.weight_per_primary, coherency
+            source.position_ang,
+            source.normal,
+            source.direction,
+            source.energy_eV,
+            source.weight_per_primary,
+            coherency,
         )
     with pytest.raises(ValueError, match="transverse"):
         BoundaryCells(
-            source.position_ang, source.normal, source.direction,
-            source.energy_eV, source.weight_per_primary, coherency,
-            np.tile([0.0, 0.0, 1.0], (8, 1))
+            source.position_ang,
+            source.normal,
+            source.direction,
+            source.energy_eV,
+            source.weight_per_primary,
+            coherency,
+            np.tile([0.0, 0.0, 1.0], (8, 1)),
         )
 
 
