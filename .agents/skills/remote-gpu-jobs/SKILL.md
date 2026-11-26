@@ -21,13 +21,19 @@ Run before every submission; most failed remote runs were stale state.
 3. Scheduler: `ssh <host> sinfo -p gpu`; do not submit to a `drain`/`down`
    node (`--exclude=<node>`). A job pending for minutes is checked with
    `squeue`/`sacct`, not waited on.
-4. Ad-hoc `sbatch` scripts (not `pyrite run --remote`) must
-   `export PATH=$HOME/.local/bin:$PATH` (SLURM batch env lacks `uv`), set
+4. Environment: the box needs `pixi` (default `~/.pixi/bin/pixi`, target
+   field `pixi`); jobs run `pixi install --locked -e <env>` from the synced
+   `pixi.lock`, where `<env>` is the target's `environment` or its GPU
+   vendor's (`nvidia`/`amd`). CPU-only jobs (qlmc-queen) use `default`.
+5. Ad-hoc `sbatch` scripts (not `pyrite run --remote`) must
+   `export PATH=$HOME/.pixi/bin:$PATH` (SLURM batch env lacks `pixi`), run
+   Python through `pixi run --as-is -e <env>` after one
+   `pixi install --locked -e <env>`, set
    `PYRITE_HOME`, `PYRITE_CATALOG`, and `PYRITE_USER_CATALOG` to the synced
    checkout paths as `pyrite.remote.config.remote_runtime_env()` does (the box
    config pins a stale catalog), and set `--mem`. The `gpu` partition rejects
    `--exclusive`.
-5. Record job IDs in the issue's `## Progress` section and keep working; post
+6. Record job IDs in the issue's `## Progress` section and keep working; post
    results when the job ends. To collect results without a live session, a
    headless follow-up works:
    `claude -p "Collect results of job <id> for issue #<n> and update its Progress section"`.

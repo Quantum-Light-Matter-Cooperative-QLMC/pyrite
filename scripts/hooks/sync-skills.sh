@@ -7,5 +7,5 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
-uv run pyrite-dev sync-skills
+pixi run pyrite-dev sync-skills
 git add -- .claude/skills

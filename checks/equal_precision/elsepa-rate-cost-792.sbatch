@@ -12,11 +12,10 @@ set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 exec 9>.pyrite-sync.lock
 flock -s -w 30 9
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$PWD/user-catalog"
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache
 out="evidence/elsepa-rate792/$SLURM_JOB_ID"
 mkdir -p "$out"
 cp .pyrite-sync "$out/sync.txt"
@@ -40,7 +39,7 @@ for repeat in 1 2 3; do
                 fi
                 stem="$out/$core-$scene-k$k-r$repeat"
                 PYRITE_MC_BACKEND=$backend timeout --signal=TERM --kill-after=5s 300s \
-                    uv run --no-sync python checks/equal_precision/probe_elsepa_rate_cost.py \
+                    pixi run --as-is -e nvidia python checks/equal_precision/probe_elsepa_rate_cost.py \
                     "$k" "$stem-audit.json" "$scene" --histories "${histories[$core]}" \
                     --seed 79201 --core "$core" --arm transport --radiative-loss none \
                     --probe-electrons 0 --scratch-mib 4096 --max-steps 200000 --output "$stem.json" \

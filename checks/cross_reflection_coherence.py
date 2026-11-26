@@ -34,8 +34,8 @@ Numbers from this script back
 
 Validation: cross-reflection-coherence
 
-Run:  uv run python checks/cross_reflection_coherence.py
-      uv run python checks/cross_reflection_coherence.py --quick
+Run:  pixi run python checks/cross_reflection_coherence.py
+      pixi run python checks/cross_reflection_coherence.py --quick
 """
 
 import argparse

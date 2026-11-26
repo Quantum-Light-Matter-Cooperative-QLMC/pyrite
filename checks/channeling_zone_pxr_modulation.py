@@ -56,7 +56,7 @@ stationary depth-averaged density (finite state lifetimes omitted), diagonal
 populations in the frequency-dependent term, CBS distorted-wave resolvents
 not included. Report only: exit 0 when every number is finite, 1 otherwise.
 
-    uv run python checks/channeling_zone_pxr_modulation.py --order 3 \\
+    pixi run python checks/channeling_zone_pxr_modulation.py --order 3 \\
         --centre "(-1 -1 3) mirror" --json scratch/pxr_modulation.json
 
 Validation: cr-planar-zone-pxr-modulation

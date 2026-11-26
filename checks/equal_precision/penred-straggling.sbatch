@@ -16,7 +16,6 @@ ENGINE="$1"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_MC_BACKEND=cuda
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache
 PIN=145a8a357f08affa551f592300fa6dfcab98a762
 EXE="$HOME/.local/opt/penred-510/$PIN/source/src/compiled/mains/penmain/pen_main"
 OUT="evidence/penred-straggling/$ENGINE-$SLURM_JOB_ID"
@@ -34,7 +33,7 @@ SCENES=(
 run() {
   local scene="$1"; shift
   local rc=0
-  timeout 140 "$HOME/.local/bin/uv" run --no-sync python "$@" \
+  timeout 140 "${PYRITE_REMOTE_PIXI:-$HOME/.pixi/bin/pixi}" run --as-is -e nvidia python "$@" \
     > "$OUT/$scene.stdout" 2>&1 || rc=$?
   if [ "$rc" -ne 0 ]; then
     echo "$scene exit $rc (124 = timeout)" | tee -a "$OUT/failures.txt"

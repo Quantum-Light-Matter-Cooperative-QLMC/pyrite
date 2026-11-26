@@ -13,7 +13,7 @@
 set -uo pipefail
 cd "$SLURM_SUBMIT_DIR"
 . checks/rocm/env.sh
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 export XDG_CONFIG_HOME="$PWD/.xdg-config" PYRITE_USER_CATALOG="$PWD/.xdg-config/pyrite"
 export PYRITE_HOME="${PROBE_WORKSPACE:-$HOME/.pyrite/workspace}"
 export PROBE_SHA=$(cat CODE_SHA)
@@ -23,10 +23,10 @@ echo "code $PROBE_SHA host $(hostname) backend ${PYRITE_MC_BACKEND:-}"
 pyrite_gpu_sync -q || exit 1
 pyrite_gpu_info > "$OUT/gpu-info.txt" 2>&1
 H=checks/fourier_mode_cap_1320.py
-uv run --no-sync python -u $H capture "$MATERIAL" "$E0" "$TILT" "$HISTORIES" "$OUT" > "$OUT/capture.log" 2>&1
+pixi run --as-is -e amd python -u $H capture "$MATERIAL" "$E0" "$TILT" "$HISTORIES" "$OUT" > "$OUT/capture.log" 2>&1
 echo "capture rc=$?"
 if ls "$OUT"/flush-*.npz > /dev/null 2>&1; then
-    uv run --no-sync python -u $H replay "$OUT" > "$OUT/replay.log" 2>&1
+    pixi run --as-is -e amd python -u $H replay "$OUT" > "$OUT/replay.log" 2>&1
     echo "replay rc=$?"
 fi
 sha256sum "$OUT"/*.json > "$OUT/SHA256SUMS" 2>/dev/null

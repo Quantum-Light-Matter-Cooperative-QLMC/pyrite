@@ -25,7 +25,7 @@ both from EADL2025, so a Compton vacancy uses EADL designators.
 
 Usage::
 
-    UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run --group oracle \\
+    pixi run \\
         python scripts/generate_compton_profiles.py [--write]
 
 Without ``--write`` the script checks that the packaged table is reproduced

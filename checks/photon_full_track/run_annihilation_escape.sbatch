@@ -1,6 +1,6 @@
 #!/bin/bash
 # 511 keV escape comparison (issue #341; annihilation_escape.py).
-# Submit from an isolated git-archive checkout after `uv sync --locked` there
+# Submit from an isolated git-archive checkout after `pixi install --locked` there
 # and `annihilation_escape.py macros macros --events $EVENTS --shards 10`.
 # Tasks 1..40: Geant4 (config-major, 10 shards each); 41..80: PyRITE shards.
 # PHOTON_G4_PHYSICS=emlivermore (macros written with --physics, --array=1-40)
@@ -13,7 +13,7 @@
 #SBATCH --array=1-80
 #SBATCH --output=results/%x_%A_%a.log
 set -euo pipefail
-export PATH=$HOME/.local/bin:$PATH
+export PATH=$HOME/.pixi/bin:$PATH
 ROOT=${SLURM_SUBMIT_DIR}
 export PYRITE_HOME=${PHOTON_DATA_ROOT:?set PHOTON_DATA_ROOT to the pinned issue-341 home}
 export PYRITE_CATALOG="$ROOT/src/pyrite/data/catalog"
@@ -42,11 +42,11 @@ if ((engine == 0)); then
     /usr/bin/time -v "$MICROMAMBA" run -p "$ENV_ROOT" "$G4_ROOT/build/TestEm5" \
         "$ROOT/macros/$NAME$SUFFIX.mac" > "$NAME.log" 2> resources.txt
     gzip -f "$NAME.log"
-    uv run --project "$ROOT" --locked python "$CHECK" reduce-geant4 \
+    pixi run --locked --manifest-path "$ROOT" python "$CHECK" reduce-geant4 \
         "$ROOT/results/${NAME}_geant4$SUFFIX.json.gz" --config "$CONFIG" --events "$EVENTS" \
         --log "$NAME.log.gz" --physics "$PHYSICS"
 elif [[ -z $SUFFIX ]]; then
-    /usr/bin/time -v uv run --project "$ROOT" --locked python "$CHECK" pyrite \
+    /usr/bin/time -v pixi run --locked --manifest-path "$ROOT" python "$CHECK" pyrite \
         "$ROOT/results/${NAME}_pyrite.json.gz" --config "$CONFIG" --events "$EVENTS" \
         --shard $((10#$SHARD)) 2> resources.txt
 else

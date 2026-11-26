@@ -19,7 +19,7 @@ tip is reported, not gated. Every element's range is printed. Exit 0 pass,
 Validation: bremslib-angular-schiff
 
 Run:
-  PYRITE_MC_BACKEND=cpu uv run python checks/brem_angular_comparison.py [--output REPORT.json]
+  PYRITE_MC_BACKEND=cpu pixi run python checks/brem_angular_comparison.py [--output REPORT.json]
 """
 
 import argparse

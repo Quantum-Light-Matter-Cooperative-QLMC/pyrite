@@ -12,7 +12,6 @@ TAPE_SHA=59bbd8c559685dda0bf0de2762bc43126f599cd154d635940f17b6a59c1c43fd
 # Pinned by pyrite.datasets.EPDL_DIFFERENTIAL and photon_differential.EPDL_DIFFERENTIAL_SHA256.
 PIN_SHA=d36a50d1add5c6f0b3df80a108e83aa8db8a4822445ca192534f6bc0a55bb166
 OUT=build/xsgen-release
-export UV_CACHE_DIR=${UV_CACHE_DIR:-/tmp/pyrite-uv-cache}
 
 sha() { sha256sum "$1" | cut -d' ' -f1; }
 
@@ -29,7 +28,7 @@ fi
 [[ "$(sha "$OUT/EPDL2025.ALL")" == "$TAPE_SHA" ]] || { echo "EPDL2025.ALL digest mismatch" >&2; exit 1; }
 
 # 2. Deterministic derived table; must reproduce the committed pin.
-uv run python scripts/release_epdl_table.py \
+pixi run python scripts/release_epdl_table.py \
   --source "$OUT/EPDL2025.ALL" --table differential --output "$OUT/$ASSET" --write
 GOT=$(sha "$OUT/$ASSET")
 [[ "$GOT" == "$PIN_SHA" ]] || { echo "built $GOT, pinned $PIN_SHA: use a new tag and repin" >&2; exit 1; }
@@ -63,6 +62,6 @@ BACK=$(gh release download "$TAG" --repo "$REPO" -p "$ASSET" -O - | sha256sum | 
 
 # 6. Install through the public URL into a scratch workspace, as CI does.
 SCRATCH=$(mktemp -d)
-PYRITE_HOME="$SCRATCH" uv run pyrite tables fetch epdl-differential
+PYRITE_HOME="$SCRATCH" pixi run pyrite tables fetch epdl-differential
 rm -rf "$SCRATCH"
 echo "published and verified $TAG"

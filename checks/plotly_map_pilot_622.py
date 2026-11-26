@@ -1,7 +1,7 @@
 """Browser gate for the Plotly analysis Map cell selection (#622).
 
 Run:
-    uv run python checks/plotly_map_pilot_622.py \
+    pixi run python checks/plotly_map_pilot_622.py \
         --grid 8 --out scratch/plotly_map_pilot_622_g8.json
 
 Writes a synthetic azimuth x polar-tilt HOPG checkpoint (no transport: a
@@ -531,7 +531,8 @@ def main(argv=None) -> int:
         import selenium
     except ImportError:
         print(
-            "selenium missing: install the `browser` dependency group (`uv sync`)", file=sys.stderr
+            "selenium missing: install the `browser` dependency group (`pixi install`)",
+            file=sys.stderr,
         )
         return 2
     import marimo

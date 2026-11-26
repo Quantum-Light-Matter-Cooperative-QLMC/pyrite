@@ -6,7 +6,7 @@ harness unchanged (``--kernel specialized``). The kernel and its arguments are
 the production ones for ``--transport-precision``; only the timing is added.
 Writes the kernel seconds and retained rows of the measured (warm) request:
 
-    uv run python checks/fp32_speed_of_light/kernel_time.py --stats out.stats.json \\
+    pixi run python checks/fp32_speed_of_light/kernel_time.py --stats out.stats.json \\
         si-3MeV-1mm --histories 7000 --seed 1 --rows-per-round 1024 --device-staging \\
         --transport-precision mixed --no-audit --output out.json
 

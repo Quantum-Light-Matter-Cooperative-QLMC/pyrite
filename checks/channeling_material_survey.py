@@ -1,6 +1,6 @@
 """Inventory real channeling prerequisites without substituting missing data (#525).
 
-Run with ``PYRITE_MC_BACKEND=cpu uv run python checks/channeling_material_survey.py``.
+Run with ``PYRITE_MC_BACKEND=cpu pixi run python checks/channeling_material_survey.py``.
 Print JSON for every bundled crystal and material. This is an availability
 inventory, not a physics-validation verdict or a simulation support guarantee.
 No transport, frozen-phonon ensemble, or synthetic thermal rows are used.

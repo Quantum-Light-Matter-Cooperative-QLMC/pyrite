@@ -13,8 +13,8 @@ Usage: pyrite remote [OPTIONS] COMMAND [ARGS]...
 
   [dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.
 
-  Host, remote directory, and executable come from PYRITE_REMOTE_HOST,
-  PYRITE_REMOTE_DIR, and PYRITE_REMOTE_UV. Command-line options take precedence over
+  Host, remote directory, and pixi executable come from PYRITE_REMOTE_HOST,
+  PYRITE_REMOTE_DIR, and PYRITE_REMOTE_PIXI. Command-line options take precedence over
   workflow defaults where offered.
 
   Examples:
@@ -445,7 +445,7 @@ Usage: pyrite remote target add [OPTIONS] NAME
 Options:
   --host TEXT           SSH alias of the SLURM login node.
   --remote-dir TEXT     Checkout directory on the host (absolute or ~/path).
-  --uv TEXT             uv executable on the host.
+  --pixi TEXT           pixi executable on the host (default ~/.pixi/bin/pixi).
   --gpu-vendor TEXT     nvidia or amd.
   --partition TEXT      SLURM partition.
   --nodelist TEXT       SLURM node list, or 'any'.
@@ -471,8 +471,9 @@ Options:
   --transfer-host TEXT  SSH alias of a data-transfer node that shares remote_dir (e.g. a
                         site DTN); sync uploads and pull/trajectory/performance
                         downloads go there. Empty uses --host.
-  --extras TEXT         Comma-separated uv extras every job's uv sync keeps beside the
-                        GPU vendor's, e.g. dask; empty syncs only the vendor extra.
+  --environment TEXT    pixi environment every job installs (pixi install --locked) and
+                        runs in, e.g. svml; empty uses the GPU vendor's (nvidia, amd or
+                        intel).
   --description TEXT    Free-text note shown by list.
   -h, --help            Show this message and exit.
 ```
@@ -487,7 +488,7 @@ Usage: pyrite remote target edit [OPTIONS] NAME
 Options:
   --host TEXT           SSH alias of the SLURM login node.
   --remote-dir TEXT     Checkout directory on the host (absolute or ~/path).
-  --uv TEXT             uv executable on the host.
+  --pixi TEXT           pixi executable on the host (default ~/.pixi/bin/pixi).
   --gpu-vendor TEXT     nvidia or amd.
   --partition TEXT      SLURM partition.
   --nodelist TEXT       SLURM node list, or 'any'.
@@ -513,8 +514,9 @@ Options:
   --transfer-host TEXT  SSH alias of a data-transfer node that shares remote_dir (e.g. a
                         site DTN); sync uploads and pull/trajectory/performance
                         downloads go there. Empty uses --host.
-  --extras TEXT         Comma-separated uv extras every job's uv sync keeps beside the
-                        GPU vendor's, e.g. dask; empty syncs only the vendor extra.
+  --environment TEXT    pixi environment every job installs (pixi install --locked) and
+                        runs in, e.g. svml; empty uses the GPU vendor's (nvidia, amd or
+                        intel).
   --description TEXT    Free-text note shown by list.
   -h, --help            Show this message and exit.
 ```

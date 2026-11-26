@@ -2,10 +2,10 @@
 """Benchmark PyRITE issue #610 capture policies on an SSH CUDA host.
 
 Local (streams this script over SSH, no scp needed):
-    uv run python checks/pyrite_issue610_overlap_benchmark.py --host qlmc --ne 8000 --repeats 3
+    pixi run python checks/pyrite_issue610_overlap_benchmark.py --host qlmc --ne 8000 --repeats 3
 
 Already on a GPU host in a PyRITE checkout:
-    PYRITE_MC_BACKEND=cuda uv run python checks/pyrite_issue610_overlap_benchmark.py --local
+    PYRITE_MC_BACKEND=cuda pixi run python checks/pyrite_issue610_overlap_benchmark.py --local
 
 Benchmark source: identical, seeded CUDA-transport result for every write.
 Run GPU work in a scheduler allocation after the remote-gpu-jobs pre-flight.
@@ -43,7 +43,7 @@ def cli():
     p.add_argument(
         "--remote-dir", default="~/pyrite", help="Remote PyRITE checkout (default: ~/pyrite)"
     )
-    p.add_argument("--uv", default="~/.local/bin/uv", help="Remote uv executable")
+    p.add_argument("--pixi", default="~/.pixi/bin/pixi", help="Remote pixi executable")
     p.add_argument("--local", action="store_true", help="Run in this Python process (do not SSH)")
     p.add_argument(
         "--ne", type=int, default=8000, help="Electron count for one CUDA run (default: 8000)"
@@ -131,15 +131,15 @@ def ssh_launch(args):
     if args.overlap_only:
         pass_args += ["--overlap-only"]
     checkout = shell_path(args.remote_dir)
-    uv = shell_path(args.uv)
+    pixi = shell_path(args.pixi)
     command = (
         f"cd {checkout} && "
         f'PYRITE_MC_BACKEND=cuda PYRITE_HOME="$PWD" '
-        f"{uv} run python - {shlex.join(pass_args)}"
+        f"{pixi} run --as-is -e nvidia python - {shlex.join(pass_args)}"
     )
     print(f"Connecting to {args.host}; remote checkout: {args.remote_dir}", flush=True)
     print(
-        "NOTE: Run `uv run pyrite remote sync` locally first if the #610 patch is not on qlmc.",
+        "NOTE: Run `pixi run pyrite remote sync` locally first if the #610 patch is not on qlmc.",
         flush=True,
     )
     data = Path(__file__).read_bytes()
@@ -368,7 +368,7 @@ def run_benchmark(args):
 
     # Override host-specific catalog settings for this synthetic transport test.
     # PyRITE's ordinary remote launcher explicitly selects the synchronized
-    # catalog and user layer; a direct `uv run python` doesn't. Older user-layer
+    # catalog and user layer; a direct `pixi run python` doesn't. Older user-layer
     # crystals may still carry removed E_grid keys. This benchmark needs neither
     # user profiles nor crystal catalog entries, so use a private empty layer.
     # Set all variables BEFORE importing PyRITE (which may load the catalog).
@@ -396,7 +396,7 @@ def run_benchmark(args):
     if "storage_policy" not in signature.parameters:
         raise SystemExit(
             "The remote PyRITE checkout does not have the #610 throughput patch.\n"
-            "Apply the patch locally and sync it with `uv run pyrite remote sync`,\n"
+            "Apply the patch locally and sync it with `pixi run pyrite remote sync`,\n"
             "or update the remote checkout before trying again."
         )
 

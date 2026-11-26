@@ -195,7 +195,7 @@ def _():
         mo.callout(
             mo.md(
                 "Demo data has not been exported yet. Run "
-                "`uv run python scripts/export_docs_demo.py` from a checkout."
+                "`pixi run python scripts/export_docs_demo.py` from a checkout."
             ),
             kind="warn",
         ),

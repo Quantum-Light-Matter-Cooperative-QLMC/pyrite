@@ -11,7 +11,7 @@ index -- ``--pin`` copies it into ``src/pyrite/data/xsgen/`` -- so that
 
 Usage::
 
-    UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run python scripts/release_elsepa_tables.py \\
+    pixi run python scripts/release_elsepa_tables.py \\
         --generate --url https://.../elsepa-tables.zip --pin
 
 Run it when the catalogue admits a new transport element or elementary

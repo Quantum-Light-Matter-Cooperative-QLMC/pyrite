@@ -12,15 +12,15 @@
 #SBATCH --output=cxr825-%j.log
 set -uo pipefail
 cd "$SLURM_SUBMIT_DIR"
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$PWD/user-catalog" XDG_CONFIG_HOME="$PWD/.xdg-config"
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache PYRITE_MC_BACKEND=cuda
+export PYRITE_MC_BACKEND=cuda
 mkdir -p "$XDG_CONFIG_HOME" "$PYRITE_USER_CATALOG"
 out="evidence/cxr825/$SLURM_JOB_ID"; mkdir -p "$out"; cp .pyrite-sync "$out/sync.json"
-uv sync --extra nvidia --locked -q
+pixi install --locked -e nvidia
 rev=$(sed -n 's/^code_revision: //p' .pyrite-sync)
-py=(uv run --no-sync python -W ignore checks/cxr_reduction_benchmark.py)
+py=(pixi run --as-is -e nvidia python -W ignore checks/cxr_reduction_benchmark.py)
 # material:profile:electrons
 for a in hbn:high_energy_demo:4000 hopg:standard:4000 silicon:standard:4000; do
     IFS=: read -r m p n <<< "$a"

@@ -6,7 +6,7 @@ inner_shell_ionization``) and prints the geometric-mean ``model/measured``
 ratio and one-sigma agreement per shell and overvoltage band, then the K-shell
 near-threshold (U < 1.5) ratios per element. Report only: no gate.
 
-    uv run python checks/inner_shell_experiment_comparison.py
+    pixi run python checks/inner_shell_experiment_comparison.py
 
 Exit 0 on a report, 2 when the opt-in ``bote-salvat`` dataset is not installed
 (``pyrite tables fetch bote-salvat``). Issue #92.

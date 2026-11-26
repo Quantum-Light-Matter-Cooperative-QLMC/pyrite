@@ -1,6 +1,6 @@
 """Microbenchmark unit normalization at scalar and NumPy-array boundaries.
 
-Run with ``uv run --extra units python checks/unit_conversion_overhead.py``.
+Run with ``pixi run python checks/unit_conversion_overhead.py``.
 Values are already-constructed inputs; registry creation and quantity creation
 are outside the timed region.
 """

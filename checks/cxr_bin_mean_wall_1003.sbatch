@@ -10,11 +10,10 @@
 # h-BN from scratch/bin1003/grid-hbn-seed0.npy, silicon frozen here first.
 # Run from a clean isolated checkout at the pushed SHA.
 set -euo pipefail
-export PATH="$HOME/.local/bin:/usr/local/cuda/bin:$PATH"
+export PATH="$HOME/.pixi/bin:/usr/local/cuda/bin:$PATH"
 cd "$SLURM_SUBMIT_DIR"
 here="$PWD"
 out="$here/scratch/bin1003"
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache
 export PYRITE_MC_BACKEND=cuda PYRITE_FP64=0 PYRITE_MC_TRANSPORT_PRECISION=fp64
 export OPENBLAS_NUM_THREADS=1
 nvidia-smi --query-gpu=name,driver_version --format=csv
@@ -29,11 +28,11 @@ checkout_env() {
   cd "$1"
   git rev-parse HEAD
   git status --short
-  uv sync -q --locked --no-default-groups --extra nvidia --group dev
+  pixi install --locked -e nvidia
 }
 
 checkout_env "$here"
-uv run --no-sync python "$script" grid --material silicon --core cuda \
+pixi run --as-is -e nvidia python "$script" grid --material silicon --core cuda \
   --out "$out/grid-silicon-n128.npy"
 
 cases=(hbn silicon)
@@ -47,7 +46,7 @@ for side in before after; do
     run=("$script")
   fi
   for i in 0 1; do
-    uv run --no-sync python "${run[@]}" wall --material "${cases[$i]}" --core cuda \
+    pixi run --as-is -e nvidia python "${run[@]}" wall --material "${cases[$i]}" --core cuda \
       --grid "${grids[$i]}" --out "$out/wall-${cases[$i]}-$side.npz" \
       || echo "FAILED wall ${cases[$i]} $side rc=$?"
   done
@@ -55,7 +54,7 @@ done
 
 cd "$here"
 for i in 0 1; do
-  uv run --no-sync python "$script" compare "$out/wall-${cases[$i]}-before.npz" \
+  pixi run --as-is -e nvidia python "$script" compare "$out/wall-${cases[$i]}-before.npz" \
     "$out/wall-${cases[$i]}-after.npz" --grid "${grids[$i]}" \
     --out "$out/wall-${cases[$i]}-compare.json" || echo "FAILED compare ${cases[$i]} rc=$?"
 done

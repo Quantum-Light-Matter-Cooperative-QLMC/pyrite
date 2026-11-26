@@ -31,7 +31,7 @@ The reported shift is ``Delta = [Y(+d) + Y(-d)]/2 - Y(0)`` plus
 all-row (detector) yield of each component. Characteristic emission is isotropic,
 so its shift tests the method (only the escape path changes).
 
-    PYRITE_MC_BACKEND=cpu uv run python checks/channeling_zone_angular_spread.py \
+    PYRITE_MC_BACKEND=cpu pixi run python checks/channeling_zone_angular_spread.py \
         --electrons 16 --json scratch/zone_angular_spread.json
 
 Detector-face arms reuse ``checks/channeling_detector_components.py``

@@ -4,7 +4,7 @@ Lightweight by design: MyST renders the existing Markdown design notes and
 autosummary/autodoc pull the curated API from package docstrings. Build
 with::
 
-    uv run --group docs sphinx-build -j auto -b html docs docs/_build/html
+    pixi run -e docs sphinx-build -j auto -b html docs docs/_build/html
 
 then open ``docs/_build/html/index.html``.
 """
@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 os.environ.setdefault("MPLCONFIGDIR", os.path.join(tempfile.gettempdir(), "pyrite-matplotlib"))
 
 # Make the package importable for autodoc even from a non-installed checkout
-# (an editable ``uv sync`` also puts it on the path).
+# (every pixi environment also installs it editable).
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent

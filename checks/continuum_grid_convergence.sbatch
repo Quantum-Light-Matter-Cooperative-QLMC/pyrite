@@ -13,22 +13,22 @@
 #SBATCH --output=cgc278-%j.log
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$PWD/user-catalog" XDG_CONFIG_HOME="$PWD/.xdg-config"
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache PYRITE_MC_BACKEND=cuda
+export PYRITE_MC_BACKEND=cuda
 mkdir -p "$XDG_CONFIG_HOME" "$PYRITE_USER_CATALOG"
-uv sync --extra nvidia --locked -q
+pixi install --locked -e nvidia
 out="evidence/cgc278/$SLURM_JOB_ID"; mkdir -p "$out"
 cp .pyrite-sync "$out/sync.json"
 grids=(--geometric-nodes 257 --geometric-nodes 513 --geometric-nodes 1025
        --geometric-nodes 2049 --geometric-nodes 4097
        --gl-order 2 --gl-order 4 --gl-order 8 --gl-ratio 2 --gl-ratio 1.25)
-uv run --no-sync python checks/continuum_grid_convergence.py --material hopg \
+pixi run --as-is -e nvidia python checks/continuum_grid_convergence.py --material hopg \
     --energy-kev 300 --energy-kev 29999 --n-electrons 150 "${grids[@]}" \
     --output "$out/hopg.json" > "$out/hopg.log" 2>&1 || echo "FAIL hopg"
 echo "DONE hopg"
-uv run --no-sync python checks/continuum_grid_convergence.py --material tungsten \
+pixi run --as-is -e nvidia python checks/continuum_grid_convergence.py --material tungsten \
     --energy-kev 1000 --thickness-ang 1e6 --tilt-deg 5 --tilt-azim-deg 0 \
     --n-electrons 150 "${grids[@]}" \
     --output "$out/tungsten.json" > "$out/tungsten.log" 2>&1 || echo "FAIL tungsten"

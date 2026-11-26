@@ -31,8 +31,8 @@ is evaluated too with ``--coherent``.
 Validation: shell-soft-hard-transport
 
 Run (GPU; use the remote box):
-  uv run python checks/soft_deflection_line_sensitivity.py --quick
-  uv run python checks/soft_deflection_line_sensitivity.py --output REPORT.json
+  pixi run python checks/soft_deflection_line_sensitivity.py --quick
+  pixi run python checks/soft_deflection_line_sensitivity.py --output REPORT.json
 """
 
 import argparse

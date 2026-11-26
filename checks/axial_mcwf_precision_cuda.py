@@ -3,7 +3,7 @@
 Research measurement only; production axial MCWF stays complex128. Run in a
 bounded remote GPU allocation (remote-gpu-jobs skill)::
 
-    uv run --extra nvidia python checks/axial_mcwf_precision_cuda.py --out mcwf-precision.json
+    pixi run -e nvidia python checks/axial_mcwf_precision_cuda.py --out mcwf-precision.json
 
 Each seed chunk runs the production CUDA MCWF batch (``_axial_cuda._Batch``;
 Validation: cr-axial-realspace-propagation, cr-axial-realspace-dissipator)

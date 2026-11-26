@@ -103,8 +103,8 @@ def _reject_all_with_values(command_name, all_, values):
     },
     help=(
         "[dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.\n\n"
-        "Host, remote directory, and executable come from PYRITE_REMOTE_HOST, "
-        "PYRITE_REMOTE_DIR, and PYRITE_REMOTE_UV. Command-line options take precedence over workflow defaults "
+        "Host, remote directory, and pixi executable come from PYRITE_REMOTE_HOST, "
+        "PYRITE_REMOTE_DIR, and PYRITE_REMOTE_PIXI. Command-line options take precedence over workflow defaults "
         "where offered.\n\n"
         "\b\n"
         "Examples:\n"

@@ -2,9 +2,9 @@
 
 Heavy arms run on the lab box (remote-gpu-jobs skill); local pilots::
 
-    uv run python checks/axial_outgoing_convergence.py run control 0 200 --out c.npz
-    uv run python checks/axial_outgoing_convergence.py analyze c.npz other.npz ...
-    uv run python checks/axial_outgoing_convergence.py record <source-sha> runs/out/*.npz
+    pixi run python checks/axial_outgoing_convergence.py run control 0 200 --out c.npz
+    pixi run python checks/axial_outgoing_convergence.py analyze c.npz other.npz ...
+    pixi run python checks/axial_outgoing_convergence.py record <source-sha> runs/out/*.npz
 
 Si [001], 5 MeV, independent-string continuum TDS + electronic kicks,
 absorbing no-return fibre model (``axial_fiber_unraveling``). Each arm changes

@@ -20,12 +20,12 @@ are scored from the primary step before stacking.
 Use a dedicated linked issue worktree. Stage with the maintained remote sync:
 
 ```bash
-PYRITE_REMOTE_DIR='~/pyrite-510-benchmarks' uv run pyrite remote sync
+PYRITE_REMOTE_DIR='~/pyrite-510-benchmarks' pixi run pyrite remote sync
 ```
 
 The current sync file list omits `PYPI.md`, needed by the editable package
 build. Copy that file to the isolated checkout as a separate setup step. On the
-lab box, install the locked environment with `uv sync --extra nvidia --locked`.
+lab box, install the locked environment with `pixi install --locked -e nvidia`.
 Then, from the isolated checkout, submit `sbatch checks/equal_precision/run.sbatch
 pilot`. This site-specific script uses the existing Geant4 11.4.2 installation
 under `~/.local/opt/pyrite-issue-182/`, copied into an isolated build. To reproduce
@@ -74,7 +74,7 @@ Each job saves hardware, allocation and remote code-sync evidence.
 Use the project environment to summarize a single snapshot after pulling it:
 
 ```bash
-uv run python checks/equal_precision/analyze.py PATH/TO/evidence/pilot/SNAPSHOT \
+pixi run python checks/equal_precision/analyze.py PATH/TO/evidence/pilot/SNAPSHOT \
   --output /tmp/equal-precision-summary
 ```
 
@@ -114,7 +114,7 @@ per-segment estimator arm.
 cProfile on 1000 W histories; profiler timings never enter the comparisons.
 Raw trace and host profile are retained, while the derived SQLite cache is
 omitted from the evidence archive. Sample deadlines stop the launcher's
-process group, including `uv` children. Failed-attempt markers override any
+process group, including wrapper children. Failed-attempt markers override any
 late result file; a retry gets a unique attempt filename. Budget deferrals
 remain in job logs and incomplete replicate counts remain explicit.
 
@@ -171,7 +171,7 @@ records are retained in [the kernel diagnostic archive](https://github.com/Quant
 To regenerate the summary after extracting the archive:
 
 ```bash
-uv run python checks/equal_precision/analyze_kernel_diagnostic.py \
+pixi run python checks/equal_precision/analyze_kernel_diagnostic.py \
   evidence/kernel-diagnostic/1312 evidence/kernel-diagnostic/1313 \
   --output /tmp/kernel-diagnostic-summary.json
 ```
@@ -252,7 +252,7 @@ budget deferrals remain in the evidence. Keep raw evidence outside the source
 checkout when linting. After pulling completed job directories, CPU analysis is:
 
 ```bash
-uv run python checks/equal_precision/analyze_precision.py \
+pixi run python checks/equal_precision/analyze_precision.py \
   /path/to/1343 /path/to/1344 /path/to/1345 \
   --output /tmp/precision-summary.json
 ```
@@ -280,7 +280,7 @@ an explicitly unqualified diagnostic control.
 Analyze completed evidence separately from the earlier protocol:
 
 ```bash
-uv run python checks/equal_precision/analyze_precision.py \
+pixi run python checks/equal_precision/analyze_precision.py \
   /path/to/preflight /path/to/si /path/to/w \
   --protocol /path/to/preflight/source/precision-endpoint.json \
   --output /tmp/endpoint-summary.json
@@ -291,7 +291,7 @@ protocol file for historical results; its byte hash includes line endings. For C
 arithmetic diagnosis using the retained job-1343 reference probes:
 
 ```bash
-uv run python checks/equal_precision/probe_precision_cpu.py rad-boundary64-24 \
+pixi run python checks/equal_precision/probe_precision_cpu.py rad-boundary64-24 \
   /path/to/1343 /tmp/endpoint-cpu.json
 ```
 
@@ -372,11 +372,11 @@ combinations write `pyrite.equal-precision.comparison.v1` records:
 
 ```bash
 # Transport only: terminal fractions and transmitted energy, no radiation work.
-uv run python checks/equal_precision/pyrite_adapter.py silicon-800kev-tr0.03-0deg \
+pixi run python checks/equal_precision/pyrite_adapter.py silicon-800kev-tr0.03-0deg \
   --arm transport --histories 200 --seed 7 --core per-electron --audit-cxr \
   --output /tmp/ep/transport.json
 # Uncollided cone detector with the production per-segment estimator.
-uv run python checks/equal_precision/pyrite_adapter.py tungsten-800kev-tr0.03-0deg-det0-15 \
+pixi run python checks/equal_precision/pyrite_adapter.py tungsten-800kev-tr0.03-0deg-det0-15 \
   --arm detector --histories 10 --seed 7 --core per-electron --audit-cxr \
   --max-steps 200000 --output /tmp/ep/detector.json
 ```
@@ -407,7 +407,7 @@ the pinned source with the custom per-history tally first:
 ```bash
 git clone https://github.com/PenRed/PenRed.git penred && cd penred
 git checkout 145a8a357f08affa551f592300fa6dfcab98a762
-uv run python /path/to/pyrite/checks/equal_precision/prepare_penred.py .
+pixi run python /path/to/pyrite/checks/equal_precision/prepare_penred.py .
 cd src && mkdir build && cd build
 cmake -DWITH_DICOM=OFF -DWITH_MPI=OFF -DWITH_LB=OFF -DBUILD_UTILITIES=OFF \
   -DCMAKE_BUILD_TYPE=Release ..
@@ -421,7 +421,7 @@ physics source changes. PenRed's default `WITH_NATIVE=ON` compiles for the
 build host, so build on the host that times it.
 
 ```bash
-uv run python checks/equal_precision/penred_adapter.py silicon-300kev-100um-0deg-anchor \
+pixi run python checks/equal_precision/penred_adapter.py silicon-300kev-100um-0deg-anchor \
   --histories 20000 --seed 11 --executable PATH/pen_main --output /tmp/ep/penred.json
 ```
 

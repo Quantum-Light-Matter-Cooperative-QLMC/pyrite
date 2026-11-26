@@ -26,10 +26,14 @@ from pyrite.remote import scripts
 #: Modules whose job is to build shell for the box.
 _REMOTE_SOURCES = sorted((Path(scripts.__file__).parent).glob("*.py"))
 
-#: `uv run --no-sync pyrite VERB ...` as it appears in an f-string template.
+#: `{config.shell_remote_run()} pyrite VERB ...` (or ``host_run_command``) as it
+#: appears in an f-string template.
 #: A `{`-prefixed verb is interpolated at build time and is covered by
 #: `_generated_invocations` instead.
-_INVOCATION = re.compile(r"--no-sync pyrite ((?:[a-z][a-z0-9-]*(?: |$))+)")
+_INVOCATION = re.compile(
+    r"(?:\{config\.shell_remote_run\(\)\}|\{config\.host_run_command\(\)\}|--as-is -e [a-z0-9-]+) "
+    r"pyrite ((?:[a-z][a-z0-9-]*(?: |$))+)"
+)
 
 
 def _verb_path(tail: str) -> tuple[str, ...]:
@@ -57,11 +61,11 @@ def _generated_invocations() -> set[tuple[str, ...]]:
     """Invocations whose verb is interpolated, so only the built script shows it.
 
     Runs at collection, before the autouse remote pins: pin an absolute remote
-    checkout and uv here so building never resolves a host or ssh-expands ``~``.
+    checkout and pixi here so building never resolves a host or ssh-expands ``~``.
     """
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(remote_config, "REMOTE_DIR", "/path/to/pyrite")
-        patch.setattr(remote_config, "REMOTE_UV", "uv")
+        patch.setattr(remote_config, "REMOTE_PIXI", "pixi")
         built = (
             scripts._prune_checkpoint_stems_command("j", ["hopg"], catalog_profile="standard"),
             scripts._prune_checkpoint_stems_command("j", ["hopg"], all_profiles=True, yes=True),

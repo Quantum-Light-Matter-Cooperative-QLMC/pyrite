@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -28,7 +29,6 @@ def main():
     output = root / "evidence" / "single-scattering" / digest
     output.mkdir(parents=True, exist_ok=True)
     deadline = time.monotonic() + 540
-    uv = str(Path.home() / ".local/bin/uv")
     # Small preflights retain startup/table costs, like the previous Geant4 arm.
     requests = [(1000, 53000, scene) for scene in config["scenes"]]
     requests += [
@@ -43,10 +43,7 @@ def main():
             print("BOUNDED_STOP", flush=True)
             return
         cmd = [
-            uv,
-            "run",
-            "--no-sync",
-            "python",
+            sys.executable,
             str(here / "geant4_adapter.py"),
             scene,
             "--histories",

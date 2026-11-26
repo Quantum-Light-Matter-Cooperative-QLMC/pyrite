@@ -15,8 +15,8 @@ out="evidence/elsepa895/$SLURM_JOB_ID"
 mkdir -p "$out"
 cp .pyrite-sync "$out/sync.txt"
 pyrite_gpu_info > "$out/gpu.txt" 2>&1
-uv run --no-sync python checks/equal_precision/prepare_stopping.py
-uv run --no-sync python checks/elsepa_statistical/parity.py > "$out/parity.log" 2>&1
+pixi run --as-is -e amd python checks/equal_precision/prepare_stopping.py
+pixi run --as-is -e amd python checks/elsepa_statistical/parity.py > "$out/parity.log" 2>&1
 mv parity895.json "$out/parity.json"
 for precision in mixed fp64; do
     for seed in 89501 89502 89503; do
@@ -24,7 +24,7 @@ for precision in mixed fp64; do
         if (( seed % 2 )); then laws=(mixture quantile); fi
         for law in "${laws[@]}"; do
             stem="$out/$precision-$law-w-1MeV-100um-$seed"
-            uv run --no-sync python checks/elsepa_statistical/run.py --law "$law" \
+            pixi run --as-is -e amd python checks/elsepa_statistical/run.py --law "$law" \
                 w-1MeV-100um --histories 4000 --seed "$seed" --rows-per-round 1024 \
                 --device-staging --transport-precision "$precision" --no-audit \
                 --estimator continuous --cone-mode point --output "$stem.json" \

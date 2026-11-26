@@ -4,8 +4,8 @@ py-spy launches the scan as its own child, so it needs no ptrace permission on
 an already-running process (lab hosts set ``kernel.yama.ptrace_scope=1`` and
 grant no sudo). It samples the production run -- the real grid, backend and
 worker tree -- unlike the bounded ``--quick`` cProfile pass. It is resolved
-through ``uv tool run`` when no ``py-spy`` executable is on PATH, so it is not a
-project dependency.
+through ``pixi exec`` (conda-forge ``py-spy``) when no ``py-spy`` executable is
+on PATH, so it is not a project dependency.
 """
 
 import shutil
@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-#: Requirement ``uv tool run`` resolves when py-spy is not installed.
+#: conda match spec ``pixi exec --spec`` resolves when py-spy is not installed.
 PY_SPY_REQUIREMENT = "py-spy>=0.4"
 #: Samples per second. ``--nonblocking`` keeps the target running while it is
 #: read; on the lab host 25 Hz already fell seconds behind a multi-GiB scan.
@@ -57,12 +57,12 @@ def py_spy_record_args(output: str) -> list[str]:
 
 
 def py_spy_launcher() -> list[str] | None:
-    """Local py-spy executable argv, or ``None`` when neither it nor uv is on PATH."""
+    """Local py-spy executable argv, or ``None`` when neither it nor pixi is on PATH."""
     if shutil.which("py-spy") is not None:
         return ["py-spy"]
-    uv = shutil.which("uv")
-    if uv is not None:
-        return [uv, "tool", "run", "--from", PY_SPY_REQUIREMENT, "py-spy"]
+    pixi = shutil.which("pixi")
+    if pixi is not None:
+        return [pixi, "exec", "--spec", PY_SPY_REQUIREMENT, "py-spy"]
     return None
 
 

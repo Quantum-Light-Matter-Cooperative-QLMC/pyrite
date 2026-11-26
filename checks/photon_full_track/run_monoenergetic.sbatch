@@ -1,5 +1,5 @@
 #!/bin/bash
-# Submit from an isolated git-archive checkout after `uv sync --locked` there.
+# Submit from an isolated git-archive checkout after `pixi install --locked` there.
 # Tasks 1..9: 12/20/30 keV x three Geant4 cascade settings; 10..12: PyRITE.
 # Existing patched TestEm5 and pinned data remain read-only.
 #SBATCH --job-name=issue341-mono
@@ -10,7 +10,7 @@
 #SBATCH --array=1-12
 #SBATCH --output=results/%x_%A_%a.log
 set -euo pipefail
-export PATH=$HOME/.local/bin:$PATH
+export PATH=$HOME/.pixi/bin:$PATH
 ROOT=${SLURM_SUBMIT_DIR}
 export PYRITE_HOME=${PHOTON_DATA_ROOT:?set PHOTON_DATA_ROOT to the pinned issue-341 home}
 export PYRITE_CATALOG="$ROOT/src/pyrite/data/catalog"
@@ -33,10 +33,10 @@ if ((i < 9)); then
     "$MICROMAMBA" run -p "$ENV_ROOT" "$G4_ROOT/build/TestEm5" "$ROOT/macros/$NAME.mac" \
         > "$NAME.log" 2>&1
     gzip "$NAME.log"
-    uv run --project "$ROOT" --locked python "$CHECK" reduce-geant4 "$ROOT/results/$NAME.json" \
+    pixi run --locked --manifest-path "$ROOT" python "$CHECK" reduce-geant4 "$ROOT/results/$NAME.json" \
         --energy-keV "$ENERGY" --events "$EVENTS" --log "$NAME.log.gz"
 else
     ENERGY=${ENERGIES[$((i - 9))]}
-    uv run --project "$ROOT" --locked python "$CHECK" pyrite "$ROOT/results/w_${ENERGY}kev_pyrite.json" \
+    pixi run --locked --manifest-path "$ROOT" python "$CHECK" pyrite "$ROOT/results/w_${ENERGY}kev_pyrite.json" \
         --energy-keV "$ENERGY" --events "$EVENTS"
 fi

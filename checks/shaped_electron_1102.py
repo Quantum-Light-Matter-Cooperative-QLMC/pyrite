@@ -29,7 +29,7 @@ Parts:
 4. impact-position (registration) averaging;
 5. two-beam electron Pendelloesung distance for the coupling vector.
 
-Run:  uv run python checks/shaped_electron_1102.py
+Run:  pixi run python checks/shaped_electron_1102.py
 
 Validation: quantum-shaped-cxr-interference
 """

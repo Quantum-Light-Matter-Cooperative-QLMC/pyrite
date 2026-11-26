@@ -1,4 +1,4 @@
-# `uv run pre-commit install` installs both stages below. Commit-stage hooks
+# `pixi run pre-commit install` installs both stages below. Commit-stage hooks
 # fix staged files; pre-push hooks run the cheap CI contracts that `lint`
 # alone misses (import-linter layers, the skill mirror, the repo map).
 default_install_hook_types: [pre-commit, pre-push]
@@ -38,19 +38,19 @@ repos:
     hooks:
       - id: import-linter
         name: import-linter layer contracts
-        entry: uv run --quiet lint-imports
+        entry: pixi run --quiet lint-imports
         language: system
         pass_filenames: false
         stages: [pre-push]
       - id: check-skills
         name: skill mirror is synchronized
-        entry: uv run --quiet pyrite-dev check-skills
+        entry: pixi run --quiet pyrite-dev check-skills
         language: system
         pass_filenames: false
         stages: [pre-push]
       - id: repo-map
         name: generated repository map is current
-        entry: uv run --quiet pyrite-dev repo-map --check
+        entry: pixi run --quiet pyrite-dev repo-map --check
         language: system
         pass_filenames: false
         stages: [pre-push]

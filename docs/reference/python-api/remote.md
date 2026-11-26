@@ -24,7 +24,7 @@ configuration and defaults; name selection defaults to `PYRITE_REMOTE_TARGET`,
 then the configured default. Unknown/invalid selections raise `ValueError` or
 `TypeError`. Remote paths use POSIX syntax; `~/` expands through a cached SSH
 remote-home lookup when a path is used. For an offline dry run, provide absolute
-`remote_dir` and `uv` paths (or an executable name such as `uv`).
+`remote_dir` and `pixi` paths (or an executable name such as `pixi`).
 
 Submission may sync the checkout and selected catalog, reserve checkpoints, and
 submit an allocation. `no_sync=True` uses the existing remote code. Dry runs only

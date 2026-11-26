@@ -1,17 +1,15 @@
 #!/usr/bin/env bash
 # Agent-agnostic SessionStart hook (Claude Code: .claude/settings.json; Codex:
-# .codex/hooks.json). Top up the session's project venv with every dependency
-# group plus this host's declared GPU backend extra. The environment wins;
-# otherwise read backend.default from the platform config store that
-# `pyrite config setup` writes. Unset/cpu/auto -> no vendor extra.
+# .codex/hooks.json). Install the checkout's `default` pixi environment (every
+# dependency group) plus this host's declared GPU backend environment. The
+# process environment wins; otherwise read backend.default from the platform
+# config store that `pyrite config setup` writes. Unset/cpu/auto -> no vendor
+# environment.
 #
 # Fail open and bounded: SessionStart must never hang or block a session.
-# --inexact never uninstalls (so it cannot fight a concurrent `uv run` or drop
-# another backend's packages), --locked never rewrites uv.lock, a short lock
-# timeout gives up when another session is already syncing this venv, and the
-# whole sync is capped by `timeout`. `tool.uv.default-groups = "all"` already
-# makes every `uv run` install all groups; --all-groups also covers branches
-# that predate that setting.
+# Each pixi environment is its own prefix under .pixi/envs, so installing one
+# never removes another backend's packages; --locked never rewrites pixi.lock,
+# and the whole install is capped by `timeout`.
 set -uo pipefail
 root="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || true)}"
 [ -n "$root" ] || root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
@@ -45,20 +43,19 @@ fi
 backend=$(printf '%s' "$backend" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
 
 case "$backend" in
-    cuda) extra_args=(--extra nvidia) ;;
-    rocm) extra_args=(--extra amd) ;;
-    sycl) extra_args=(--extra intel) ;;
+    cuda) extra_args=(-e nvidia) ;;
+    rocm) extra_args=(-e amd) ;;
+    sycl) extra_args=(-e intel) ;;
     *) extra_args=() ;;
 esac
 
 log=$(mktemp "${TMPDIR:-/tmp}/pyrite-session-sync.XXXXXX") || exit 0
-if UV_CACHE_DIR=/tmp/pyrite-uv-cache UV_LOCK_TIMEOUT=30 timeout 240 \
-    uv sync --all-groups --inexact --locked --quiet "${extra_args[@]}" \
+if timeout 240 pixi install --locked -e default "${extra_args[@]}" \
     </dev/null >"$log" 2>&1; then
     rm -f "$log"
 else
     rc=$?
     echo "pyrite: session dependency sync skipped (exit $rc); see $log." \
-        "Run \`uv sync --all-groups ${extra_args[*]}\` manually if imports fail."
+        "Run \`pixi install -e default ${extra_args[*]}\` manually if imports fail."
 fi
 exit 0

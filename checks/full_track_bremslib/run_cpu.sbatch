@@ -13,8 +13,6 @@ set -euo pipefail
 ROOT="${PYRITE_BENCH_ROOT:-$PWD}"
 cd "$ROOT/pyrite"
 export PYRITE_MC_BACKEND=cpu
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache
-export UV_LINK_MODE=copy
 export PYRITE_BENCH_CORE=per-electron
 
 for benchmark_case in w_300kev si_300kev; do
@@ -27,7 +25,7 @@ for benchmark_case in w_300kev si_300kev; do
       export PYRITE_BENCH_NE=3000
     fi
     export PYRITE_BENCH_OUTPUT="$ROOT/${benchmark_case}_${cutoff_ev}ev.json"
-    "${PYRITE_REMOTE_UV:-$HOME/.local/bin/uv}" run --no-sync pyrite-dev test \
+    "${PYRITE_REMOTE_PIXI:-$HOME/.pixi/bin/pixi}" run --as-is pyrite-dev test \
       "$ROOT/test_benchmark.py" -s -q
   done
 done

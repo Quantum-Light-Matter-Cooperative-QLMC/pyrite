@@ -89,7 +89,7 @@ class OptunaOptimizer:
             import optuna
         except ImportError as exc:
             raise ImportError(
-                "Optuna optimizer requires the optional dependency: uv sync --extra optimization"
+                "Optuna optimizer requires the optional dependency: pip install pyrite-mc[optimization]"
             ) from exc
         if not objectives:
             raise ValueError("optimizer requires at least one objective")

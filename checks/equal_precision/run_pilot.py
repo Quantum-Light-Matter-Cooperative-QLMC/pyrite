@@ -6,12 +6,13 @@ import json
 import os
 import signal
 import subprocess
+import sys
 import time
 from pathlib import Path
 
 
 def run_command(cmd, env, log, timeout):
-    """Enforce a sample deadline on its complete process tree, including uv."""
+    """Enforce a sample deadline on its complete process tree, including any wrapper."""
     with subprocess.Popen(
         cmd, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True
     ) as process:
@@ -51,7 +52,6 @@ def main():
         ).hexdigest()[:12]
     output = root / "evidence" / args.stage / adapter_digest
     output.mkdir(parents=True, exist_ok=True)
-    uv = str(Path.home() / ".local/bin/uv")
     started = time.monotonic()
     # Leave time to flush evidence before the scheduler's ten-minute limit.
     deadline = started + (540 if args.stage != "smoke" else 240)
@@ -105,10 +105,7 @@ def main():
                             continue
                     adapter = "geant4_adapter.py" if arm == "geant4" else "pyrite_adapter.py"
                     cmd = [
-                        uv,
-                        "run",
-                        "--no-sync",
-                        "python",
+                        sys.executable,
                         str(Path(__file__).with_name(adapter)),
                         scene["id"],
                         "--histories",

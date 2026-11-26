@@ -2,7 +2,7 @@
 
 For a worked component plot, use [Working with results](../guides/working-with-results.md).
 Apps require `pyrite-mc[apps]`; Python plotting requires `pyrite-mc[plots]`.
-A checkout's `uv sync` includes both.
+A checkout's `pixi install` includes both.
 
 ## Checkpoint layout and identity
 

@@ -12,6 +12,17 @@ import pytest
 
 from pyrite import _jit_cache
 
+#: Numba >= 0.62 stamps cached kernels by a SHA-256 of their source; 0.61 (the
+#: pixi ``svml`` environment's SVML build, #1462) stamps ``(mtime, size)``.
+CONTENT_STAMPS = hasattr(pytest.importorskip("numba.core.caching"), "_hash_source_file")
+
+
+def _expected_stamp(source: Path):
+    if CONTENT_STAMPS:
+        return hashlib.sha256(source.read_bytes()).digest()
+    stat = source.stat()
+    return (stat.st_mtime, stat.st_size)
+
 
 @pytest.fixture
 def managed(monkeypatch, tmp_path):
@@ -23,9 +34,19 @@ def managed(monkeypatch, tmp_path):
 def test_apply_sets_only_unset_variables(managed):
     env = {"CUPY_CACHE_DIR": "/user/cupy", "NUMBA_CACHE_DIR": ""}
     applied = _jit_cache.apply_managed_cache_env(env)
-    assert applied == {"NUMBA_CACHE_DIR": str(managed / "numba")}
-    assert env == {"CUPY_CACHE_DIR": "/user/cupy", "NUMBA_CACHE_DIR": str(managed / "numba")}
+    numba = str(managed / "numba" / _jit_cache._environment_key())
+    assert applied == {"NUMBA_CACHE_DIR": numba}
+    assert env == {"CUPY_CACHE_DIR": "/user/cupy", "NUMBA_CACHE_DIR": numba}
     assert _jit_cache.apply_managed_cache_env(env) == {}
+
+
+def test_numba_cache_is_keyed_by_environment(managed, monkeypatch):
+    first = _jit_cache.managed_dir("numba")
+    monkeypatch.setattr(sys, "prefix", str(managed / "other-env"))
+    second = _jit_cache.managed_dir("numba")
+    assert first.parent == second.parent == managed / "numba"
+    assert first != second
+    assert _jit_cache.managed_dir("cupy") == managed / "cupy"
 
 
 def test_locations_classify_sources(managed, tmp_path):
@@ -102,8 +123,8 @@ def _probe(module_dir: Path, cache: Path) -> dict:
 def test_native_numba_cache_hits_and_invalidates_across_processes(tmp_path):
     """Same source + cache dir hits; source edit or another directory misses.
 
-    Numba stamps sources by content, so an mtime-only change (a remote sync)
-    still hits.
+    Numba >= 0.62 stamps sources by content, so an mtime-only change (a remote
+    sync) still hits; Numba 0.61 stamps ``(mtime, size)`` and misses.
 
     Closure kernels are keyed by their cell contents, so a closure created
     with the same values hits in a fresh process.
@@ -135,18 +156,18 @@ def test_native_numba_cache_hits_and_invalidates_across_processes(tmp_path):
 
     index = next(cache.rglob("kernels.scale-*.nbi"))
     stamp, overloads = _jit_cache.numba_index_entries(index)
-    assert stamp == hashlib.sha256(source.read_bytes()).digest() and overloads == 1
+    assert stamp == _expected_stamp(source) and overloads == 1
     stat = source.stat()
 
     assert _probe(module_dir, tmp_path / "other-cache") == miss
     source.write_text(body.format(factor=3.0))
     os.utime(source, (stat.st_atime, stat.st_mtime + 10))
     assert _probe(module_dir, cache) == miss
-    assert _jit_cache.numba_index_entries(index)[0] == hashlib.sha256(source.read_bytes()).digest()
+    assert _jit_cache.numba_index_entries(index)[0] == _expected_stamp(source)
 
-    # Touching the source without changing its bytes keeps the content stamp.
+    # Touching the source without changing its bytes keeps a content stamp.
     os.utime(source, (stat.st_atime, stat.st_mtime + 20))
-    assert _probe(module_dir, cache) == hit
+    assert _probe(module_dir, cache) == (hit if CONTENT_STAMPS else miss)
 
 
 def test_cli_entry_respects_overrides_after_import_defaults(tmp_path):
@@ -176,14 +197,14 @@ def test_cli_entry_respects_overrides_after_import_defaults(tmp_path):
         [sys.executable, "-c", script], env=env, capture_output=True, text=True, check=True
     )
     report = json.loads(done.stderr.strip().splitlines()[-1])
-    managed_numba = str(tmp_path / "xdg" / "pyrite" / "numba")
+    managed_numba = str(tmp_path / "xdg" / "pyrite" / "numba" / _jit_cache._environment_key())
     assert report["before"] == {
         "NUMBA_CACHE_DIR": managed_numba,
         "CUPY_CACHE_DIR": str(tmp_path / "mine"),
     }
     assert report["loaded"] == {"numba": False, "cupy": False}
     assert report["after"]["CUPY_CACHE_DIR"] == str(tmp_path / "mine")
-    assert Path(report["after"]["NUMBA_CACHE_DIR"]).parts[-2:] == ("pyrite", "numba")
+    assert Path(report["after"]["NUMBA_CACHE_DIR"]).parts[-3:-1] == ("pyrite", "numba")
     assert not report["cupy"]
     status = json.loads(done.stdout)
     assert status["schema"] == "pyrite.cache.status.v1"
@@ -302,7 +323,7 @@ def _import_probe(mode: str, cache_root: Path, **overrides: str) -> dict:
 @pytest.mark.parametrize("mode", ["plain", "numba-first"])
 def test_import_pyrite_sets_managed_defaults(tmp_path, mode):
     out = _import_probe(mode, tmp_path)
-    assert out["numba"] == str(tmp_path / "pyrite" / "numba")
+    assert out["numba"] == str(tmp_path / "pyrite" / "numba" / _jit_cache._environment_key())
     assert out["cupy"] == str(tmp_path / "pyrite" / "cupy")
     assert out["config"] in (None, out["numba"])
     assert not out["cupy_imported"]

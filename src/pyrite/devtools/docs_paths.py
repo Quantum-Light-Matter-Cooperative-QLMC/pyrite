@@ -11,6 +11,7 @@ _SKIP_PARTS = frozenset(
         ".git",
         ".remember",
         ".serena",
+        ".pixi",
         ".venv",
         ".worktrees",
         "_autosummary",

@@ -13,15 +13,14 @@
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 BR="$PWD"
-export PATH="$HOME/.local/bin:/usr/local/cuda/bin:$PATH" PYRITE_MC_BACKEND=cuda
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache
+export PATH="$HOME/.pixi/bin:/usr/local/cuda/bin:$PATH" PYRITE_MC_BACKEND=cuda
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
 export PYRITE_HOME="$BR" PYRITE_CATALOG="$BR/src/pyrite/data/catalog" PYRITE_USER_CATALOG="$BR/user-catalog"
 out="$BR/evidence/continuation/profile/$SLURM_JOB_ID"; mkdir -p "$out"
 cp .pyrite-sync "$out/sync.txt"; scontrol show job "$SLURM_JOB_ID" > "$out/job.txt"
 nvidia-smi -q > "$out/gpu.txt"; nsys --version > "$out/nsys-version.txt"; ncu --version > "$out/ncu-version.txt" || true
-uv run --no-sync python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
-bench=(uv run --no-sync python checks/equal_precision/benchmark_continuation.py)
+pixi run --as-is -e nvidia python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
+bench=(pixi run --as-is -e nvidia python checks/equal_precision/benchmark_continuation.py)
 reports=cuda_gpu_mem_size_sum,cuda_gpu_mem_time_sum,cuda_api_sum,cuda_gpu_kern_sum,nvtx_sum
 profile() {  # stem scene histories policy
   local stem=$1 scene=$2 n=$3 policy=$4

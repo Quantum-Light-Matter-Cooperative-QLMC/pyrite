@@ -32,7 +32,7 @@ def destination(monkeypatch, tmp_path):
         {
             "host": "box",
             "remote_dir": "/srv/pyrite",
-            "uv": "uv",
+            "pixi": "pixi",
             "gpu_vendor": "amd",
             "partition": "gpu-amd",
         },

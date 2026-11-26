@@ -22,7 +22,7 @@ HOST: str | None = None
 # ``_expand_remote_home``): every downstream script and scp path sees an absolute
 # path, and the defaults work on any box without configuration.
 REMOTE_DIR = env_value("PYRITE_REMOTE_DIR", "~/pyrite")
-REMOTE_UV = env_value("PYRITE_REMOTE_UV", "~/.local/bin/uv")
+REMOTE_PIXI = env_value("PYRITE_REMOTE_PIXI", "~/.pixi/bin/pixi")
 # SLURM target profile overrides, same compatibility role as ``HOST``: ``None``
 # resolves ``remote.gpu_vendor`` / ``remote.partition`` / ``remote.nodelist`` /
 # ``remote.gres`` / ``remote.account`` / ``remote.constraint`` /
@@ -89,11 +89,12 @@ SYNC_PATHS = [
     "src",
     "checks",
     "pyproject.toml",
-    "uv.lock",
+    "pixi.lock",
     "README.md",
     "PYPI.md",
     "LICENSE.txt",
     "THIRD-PARTY-NOTICES.md",
+    "LICENSE-SVML.md",
     # Generator sources (ADR-0014): lets the box run `pyrite tables generate`.
     "vendor",
 ]
@@ -280,7 +281,7 @@ def _remote_home(host: str) -> str:
     if result.returncode != 0 or not PurePosixPath(home).is_absolute():
         raise SystemExit(
             f"cannot resolve '~' on remote host {host!r} (ssh exit {result.returncode}); "
-            "set PYRITE_REMOTE_DIR / PYRITE_REMOTE_UV to absolute paths"
+            "set PYRITE_REMOTE_DIR / PYRITE_REMOTE_PIXI to absolute paths"
         )
     _reject_controls("remote $HOME", home)
     return home
@@ -308,20 +309,20 @@ def remote_dir() -> str:
     return value
 
 
-def remote_uv() -> str:
-    """Return validated executable name or absolute POSIX path (``~/`` expanded remotely)."""
-    value = _target_field("uv", REMOTE_UV)
+def remote_pixi() -> str:
+    """Return validated pixi executable name or absolute POSIX path (``~/`` expanded remotely)."""
+    value = _target_field("pixi", REMOTE_PIXI)
     if not isinstance(value, str):
         raise SystemExit(
-            f"invalid PYRITE_REMOTE_UV={value!r}: expected executable name or absolute POSIX path"
+            f"invalid PYRITE_REMOTE_PIXI={value!r}: expected executable name or absolute POSIX path"
         )
-    _reject_controls("PYRITE_REMOTE_UV", value)
+    _reject_controls("PYRITE_REMOTE_PIXI", value)
     value = _expand_remote_home(value)
     if not value or (
         _ABS_EXECUTABLE_RE.fullmatch(value) is None and _EXECUTABLE_RE.fullmatch(value) is None
     ):
         raise SystemExit(
-            f"invalid PYRITE_REMOTE_UV={value!r}: expected executable name such as 'uv' "
+            f"invalid PYRITE_REMOTE_PIXI={value!r}: expected executable name such as 'pixi' "
             "or absolute POSIX path, not shell program text"
         )
     return value
@@ -568,18 +569,18 @@ def host_exec() -> str | None:
     return _slurm_setting("remote.host_exec", HOST_EXEC) or None
 
 
-def host_uv_command(extra_env: str = "") -> str:
-    """Return ``<runtime env> <uv>`` for PyRITE Python run on the host outside a job.
+def host_run_command(extra_env: str = "") -> str:
+    """Return ``<runtime env> <pixi> run --as-is -e <env>`` for host-side PyRITE outside a job.
 
     With ``host_exec`` (e.g. ``srun --time=00:30:00``) the command runs inside
     that allocation instead of on the login node; ``/usr/bin/env`` carries the
     runtime variables into the launched task regardless of the scheduler's
     export policy. It is absolute because launchers resolve a bare ``env``
-    through the user's PATH, where uv's installer leaves a non-executable
-    ``~/.local/bin/env`` shell snippet that shadows the real one.
+    through the user's PATH, where some installers leave a
+    non-executable ``~/.local/bin/env`` shell snippet that shadows the real one.
     """
     assignments = f"{remote_runtime_env()} {extra_env}".rstrip()
-    command = f"{assignments} {shell_remote_uv()}"
+    command = f"{assignments} {shell_remote_run()}"
     prefix = host_exec()
     return f"{prefix} /usr/bin/env {command}" if prefix else command
 
@@ -683,8 +684,13 @@ def shell_remote_dir() -> str:
     return shell_word(remote_dir())
 
 
-def shell_remote_uv() -> str:
-    return shell_word(remote_uv())
+def shell_remote_pixi() -> str:
+    return shell_word(remote_pixi())
+
+
+def shell_remote_run() -> str:
+    """``<pixi> run --as-is -e <env>``: run in the installed job environment, never re-solve."""
+    return f"{shell_remote_pixi()} run --as-is -e {remote_environment()}"
 
 
 def shell_remote_path(*parts: str) -> str:
@@ -746,27 +752,35 @@ def remote_host() -> str:
     return selected.host if selected is not None else _legacy_remote_host()
 
 
-_EXTRA_RE = re.compile(r"[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?")
-_VENDOR_EXTRAS = frozenset({"nvidia", "amd", "intel"})
+_ENVIRONMENT_RE = re.compile(r"[a-z0-9][a-z0-9-]*")
 
 
-def parse_extras(value: str) -> tuple[str, ...]:
-    """Validate a comma-separated uv extra list; each name is safe unquoted in a shell line.
+def parse_environment(value: str) -> str:
+    """Validate a pixi environment name (``[tool.pixi.environments]``); empty means the vendor's.
 
-    Vendor extras are refused: ``gpu_vendor`` selects exactly one of them.
+    The name is safe unquoted in a shell line.
     """
-    names = tuple(dict.fromkeys(part.strip() for part in value.split(",") if part.strip()))
-    for name in names:
-        if _EXTRA_RE.fullmatch(name) is None:
-            raise ValueError(f"invalid target extras: {name!r} is not a uv extra name")
-        if name in _VENDOR_EXTRAS:
-            raise ValueError(f"invalid target extras: {name!r} is selected by gpu_vendor")
-    return names
+    value = value.strip()
+    if value and _ENVIRONMENT_RE.fullmatch(value) is None:
+        raise ValueError(
+            f"invalid target environment: {value!r} is not a pixi environment name "
+            "(lowercase letters, digits and -)"
+        )
+    return value
 
 
-def remote_extras() -> tuple[str, ...]:
-    """uv extras each job keeps beside the vendor extra (the target's ``extras``)."""
-    return parse_extras(_target_field("extras", ""))
+def remote_environment() -> str:
+    """pixi environment jobs install and run: the target's ``environment``, else its GPU vendor's."""
+    return parse_environment(_target_field("environment", "")) or remote_gpu_vendor()
+
+
+def shell_remote_env_python() -> str:
+    """The job environment's interpreter, for launchers (nsys, py-spy) that must exec it directly."""
+    return shell_remote_path(".pixi", "envs", remote_environment(), "bin", "python")
+
+
+#: Stored-target keys from the uv era (#1462), mapped to the field that replaced them.
+LEGACY_TARGET_FIELDS = {"uv": "pixi", "extras": "environment"}
 
 
 def transfer_host() -> str:
@@ -825,7 +839,7 @@ class RemoteTarget:
 
     host: str
     remote_dir: str = "~/pyrite"
-    uv: str = "~/.local/bin/uv"
+    pixi: str = "~/.pixi/bin/pixi"
     gpu_vendor: str = "nvidia"
     partition: str = "gpu"
     nodelist: str = "any"
@@ -846,9 +860,9 @@ class RemoteTarget:
     qos: str = ""
     # Additional ``#SBATCH`` long options; options PyRITE owns are rejected.
     sbatch_extra: str = ""
-    # Comma-separated uv extras each job's ``uv sync`` keeps beside the GPU
-    # vendor's, e.g. ``dask``; empty syncs the vendor extra alone.
-    extras: str = ""
+    # pixi environment each job installs and runs in; empty uses the GPU
+    # vendor's environment (``nvidia``/``amd``/``intel``).
+    environment: str = ""
 
     def __post_init__(self):
         from .targets import validate_name
@@ -856,7 +870,7 @@ class RemoteTarget:
         for field in (
             "host",
             "remote_dir",
-            "uv",
+            "pixi",
             "gpu_vendor",
             "partition",
             "nodelist",
@@ -872,7 +886,7 @@ class RemoteTarget:
             "mail_user",
             "qos",
             "sbatch_extra",
-            "extras",
+            "environment",
         ):
             value = getattr(self, field)
             if not isinstance(value, str) or any(ord(c) < 32 or ord(c) == 127 for c in value):
@@ -880,14 +894,14 @@ class RemoteTarget:
         validate_remote_target(self.host)
         if self.transfer_host:
             validate_remote_target(self.transfer_host)
-        object.__setattr__(self, "extras", ",".join(parse_extras(self.extras)))
+        object.__setattr__(self, "environment", parse_environment(self.environment))
         if self.name is not None:
             validate_name(self.name)
         if not (PurePosixPath(self.remote_dir).is_absolute() or self.remote_dir.startswith("~/")):
             raise ValueError("remote_dir must be an absolute POSIX path or ~/path")
-        uv = self.uv[1:] if self.uv.startswith("~/") else self.uv
-        if not (_EXECUTABLE_RE.fullmatch(uv) or _ABS_EXECUTABLE_RE.fullmatch(uv)):
-            raise ValueError("uv must be an executable name, absolute POSIX path or ~/path")
+        pixi = self.pixi[1:] if self.pixi.startswith("~/") else self.pixi
+        if not (_EXECUTABLE_RE.fullmatch(pixi) or _ABS_EXECUTABLE_RE.fullmatch(pixi)):
+            raise ValueError("pixi must be an executable name, absolute POSIX path or ~/path")
         for field in (
             "gpu_vendor",
             "partition",

@@ -204,7 +204,7 @@ def submit(
     ``chunk_minutes=0`` selects a monolithic allocation; only that mode accepts
     ``parallel_materials``. ``workers`` is a nonnegative CPU worker count.
     Dry runs generate a batch script without submission or sync. Absolute
-    ``remote_dir`` and ``uv`` avoid the remote-home lookup needed for ``~/``.
+    ``remote_dir`` and ``pixi`` avoid the remote-home lookup needed for ``~/``.
     """
     if isinstance(materials, (str, bytes)):
         raise TypeError("materials must be a sequence of names, not a string")

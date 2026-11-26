@@ -26,14 +26,18 @@ jobs:
           # Notes span the previous v* tag, so tags and history are needed.
           fetch-depth: 0
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
         with:
-          python-version: "3.14"
+          pixi-version: v0.85.0
+          environments: docs
+          locked: true
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
 
       - name: Render release notes
-        # Runtime dependencies only: pyrite-dev needs the lint toolchain.
+        # The light docs environment: runtime plus Sphinx, no lint toolchain.
         run: >
-          uv run --locked --no-default-groups
+          pixi run --locked -e docs
           python -m pyrite.devtools.release "$GITHUB_REF_NAME" --notes-file release-notes.md
 
       # Zenodo's GitHub integration archives every published release of this
@@ -58,16 +62,20 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - name: Set up pixi
+        uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
         with:
-          python-version: "3.14"
+          pixi-version: v0.85.0
+          environments: default
+          locked: true
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
 
       - name: Build package
-        run: uv build
+        run: pixi run --locked python -m build --outdir dist .
 
       - name: Check distributions
-        run: uvx twine check dist/*
+        run: pixi exec --spec twine twine check dist/*
 
       - name: Upload distributions
         uses: actions/upload-artifact@v4

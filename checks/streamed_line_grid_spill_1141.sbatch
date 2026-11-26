@@ -11,7 +11,7 @@
 # usage (from an isolated rsync of the worktree, with CODE_SHA): sbatch -J grid1141-<sha> checks/streamed_line_grid_spill_1141.sbatch [OUT]
 set -uo pipefail
 ROOT=${1:-grid1141_out}
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 cd "$SLURM_SUBMIT_DIR"
 export PYRITE_HOME="$HOME/pyrite"  # shared tables; code runs from this isolated copy
 export XDG_CONFIG_HOME="$(mktemp -d)"
@@ -22,8 +22,8 @@ export OPENBLAS_NUM_THREADS=1
 export STREAM_GRID=measured
 echo "code $(cat CODE_SHA)"
 nvidia-smi --query-gpu=name,memory.total --format=csv
-uv sync -q --locked --no-default-groups --extra nvidia || exit 1
-B=(uv run --no-sync python checks/streamed_scoring_memory.py)
+pixi install --locked -e nvidia || exit 1
+B=(pixi run --as-is -e nvidia python checks/streamed_scoring_memory.py)
 OUT=$ROOT/hbn; mkdir -p "$OUT/spill"
 ARGS=(hbn 5000 cuda 1e7 0 10 100)
 arm() {  # NE NAME [ENV...]

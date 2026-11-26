@@ -43,8 +43,8 @@ Numbers from this script back
 
 Validation: substep-radiation-invariance
 
-Run:  uv run python checks/substep_invariance.py
-      uv run python checks/substep_invariance.py --quick
+Run:  pixi run python checks/substep_invariance.py
+      pixi run python checks/substep_invariance.py --quick
 """
 
 import argparse

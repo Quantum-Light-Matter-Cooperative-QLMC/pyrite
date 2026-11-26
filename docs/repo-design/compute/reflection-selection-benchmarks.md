@@ -65,7 +65,7 @@ ledger row.
 The profiler is `checks/cxr_selection_profile_1200.py`:
 
 ```bash
-uv run python checks/cxr_selection_profile_1200.py silicon si.pkl out/si-band-node \
+pixi run python checks/cxr_selection_profile_1200.py silicon si.pkl out/si-band-node \
     --axis band --quadrature node --max-reflections 512 auto --repeats 2
 ```
 

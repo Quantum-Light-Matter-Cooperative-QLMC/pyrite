@@ -16,7 +16,7 @@ seconds per primary; items above ``--max-run-s`` are kept as ``over-budget``
 and never run, so they stay explicit unmet targets. The predicted counts are
 an input to held-out timed runs (``precision.sbatch``), never a reported time.
 
-    uv run python checks/geant4_performance/precision_plan.py evidence/run/2835 \\
+    pixi run python checks/geant4_performance/precision_plan.py evidence/run/2835 \\
         evidence/pilot3/2864 --output precision-plan.json
 """
 

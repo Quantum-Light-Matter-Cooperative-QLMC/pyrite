@@ -1,7 +1,7 @@
 # Slow-test audit
 
 Linux-only instrumentation for #646. Run heavy work in a bounded SLURM allocation,
-from a clean, synced checkout, with `uv sync --all-groups --locked`. The probes
+from a clean, synced checkout, with `pixi install --locked`. The probes
 use `psutil` and `threadpoolctl` from that environment. Do not run the full audit
 on the laptop.
 
@@ -24,8 +24,8 @@ export PATH="$HOME/.local/bin:$PATH"
 export XDG_CONFIG_HOME="$PWD/.audit-config"
 mkdir -p "$XDG_CONFIG_HOME"
 PYRITE_HOME="$HOME/.local/share/pyrite" \
-  PYRITE_CATALOG="$PWD/src/pyrite/data/catalog" uv run pyrite tables fetch
-env -u PYRITE_HOME -u PYRITE_CATALOG uv run pyrite tables verify
+  PYRITE_CATALOG="$PWD/src/pyrite/data/catalog" pixi run pyrite tables fetch
+env -u PYRITE_HOME -u PYRITE_CATALOG pixi run pyrite tables verify
 ```
 
 Save the sync stamp, environment (Python, NumPy, `threadpool_info()`, CPU
@@ -36,12 +36,12 @@ For an unmodified full baseline:
 export OPENBLAS_NUM_THREADS=1
 export RSSPROBE_DIR="$PWD/audit-output/rss"
 mkdir -p "$RSSPROBE_DIR"
-/usr/bin/time -v uv run pyrite-dev test --slow \
+/usr/bin/time -v pixi run pyrite-dev test --slow \
   -p checks.slow_test_audit.rssprobe --durations=0 --durations-min=0 \
   --junitxml=audit-output/junit.xml -o junit_duration_report=total \
   > audit-output/pytest.log 2> audit-output/time.err &
 test_pid=$!
-uv run python checks/slow_test_audit/treemon.py "$test_pid" audit-output/tree.csv &
+pixi run python checks/slow_test_audit/treemon.py "$test_pid" audit-output/tree.csv &
 monitor_pid=$!
 wait "$test_pid"
 rc=$?
@@ -61,10 +61,10 @@ caches are not flushed.
 Decompose one catalog in a fresh process (axis, energy in MeV, optional order):
 
 ```bash
-OPENBLAS_NUM_THREADS=1 uv run python checks/slow_test_audit/axial_probe.py 110 2.78 16
-OPENBLAS_NUM_THREADS=1 uv run python -m cProfile -o axial.prof \
+OPENBLAS_NUM_THREADS=1 pixi run python checks/slow_test_audit/axial_probe.py 110 2.78 16
+OPENBLAS_NUM_THREADS=1 pixi run python -m cProfile -o axial.prof \
   checks/slow_test_audit/axial_probe.py 110 2.78 16
-uv run python -m pstats axial.prof
+pixi run python -m pstats axial.prof
 ```
 
 `axial_probe.py` times a profile, extrema, one axial-state solve, an independent

@@ -91,8 +91,8 @@ def inventory(root, stem=None, cases=(), energies=(), *, hashes=False, for_scori
 def _host_command(action, request):
     return (
         f"cd {config.shell_remote_dir()} && "
-        f"{config.host_uv_command(f'PYRITE_REMOTE_DIR={config.shell_word(config.remote_dir())}')} "
-        "run --no-sync python -m pyrite.remote.trajectories "
+        f"{config.host_run_command(f'PYRITE_REMOTE_DIR={config.shell_word(config.remote_dir())}')} "
+        "python -m pyrite.remote.trajectories "
         f"{shlex.quote(action)} {shlex.quote(json.dumps(request))}"
     )
 

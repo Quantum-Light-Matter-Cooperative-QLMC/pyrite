@@ -144,7 +144,7 @@ def test_claude_project_memory_imports_shared_instructions() -> None:
 
 def test_agent_session_start_syncs_optional_dependencies() -> None:
     root = Path(__file__).parents[2]
-    expected = "uv sync --all-groups"
+    expected = "pixi install"
     claude = json.loads((root / ".claude" / "settings.json").read_text())
     codex = json.loads((root / ".codex" / "hooks.json").read_text())
 
@@ -155,5 +155,4 @@ def test_agent_session_start_syncs_optional_dependencies() -> None:
     assert "sync_local_backend.sh" in claude_command
     assert "sync_local_backend.sh" in codex_command
     assert expected in claude_hook_script
-    assert "--inexact" in claude_hook_script
-    assert "UV_CACHE_DIR=/tmp/pyrite-uv-cache" in claude_hook_script
+    assert "--locked -e default" in claude_hook_script

@@ -207,7 +207,7 @@ To publish a table set version (maintainer):
 1. Build or fetch every pinned input: refresh tables with the per-code
    builders below (`--pin` without `--url`), then `pyrite tables fetch`.
 2. Stage the upload set:
-   `uv run python scripts/release_table_bundles.py build --version <n> --archives build/xsgen-release`.
+   `pixi run python scripts/release_table_bundles.py build --version <n> --archives build/xsgen-release`.
    It reuses local archives whose digest matches the index and downloads the
    rest, then writes `build/zenodo-tables/`.
 3. In Zenodo, open the table record, choose **New version**, upload every
@@ -215,7 +215,7 @@ To publish a table set version (maintainer):
    the metadata from `zenodo-metadata.json` (creators are the PyRITE authors
    who prepared the set; upstream deposits are `isDerivedFrom` relations and
    their credits stay in the notices), and publish.
-4. Pin it: `uv run python scripts/release_table_bundles.py pin --record <id>`
+4. Pin it: `pixi run python scripts/release_table_bundles.py pin --record <id>`
    downloads every bundle back, checks its SHA-256, writes
    `table-bundles.json` and re-pins the table indexes (an existing URL is
    kept as a fallback only when it serves the same bytes). Commit the
@@ -226,7 +226,7 @@ To publish a table set version (maintainer):
 To build or refresh one code's tables (maintainer):
 
 1. Build the archive and index from the stored tables, for example
-   `uv run python scripts/release_elsepa_tables.py --out build/xsgen-release`
+   `pixi run python scripts/release_elsepa_tables.py --out build/xsgen-release`
    (likewise `release_bremslib_tables.py`, `release_sbethe_tables.py`;
    `release_epdl_table.py` writes the EPDL npz; `release_brem_lattice_share_table.py`
    builds the share kernel in `part`/`merge` steps on the remote box)
@@ -317,7 +317,7 @@ blobs that are not in the `main` tree.
   - 4.33
   - 1.40
   - 0
-* - `uv.lock`
+* - `pixi.lock`
   - 60
   - 33.63
   - 1.14
@@ -423,7 +423,7 @@ are stored as roughly 130-byte pointers, and the content lives in LFS storage
 under a per-plan quota. The GitHub Free personal allowance is 10 GiB of
 storage and 10 GiB of bandwidth; the organization's plan was not checked; see
 [Git LFS billing](https://docs.github.com/en/billing/concepts/product-billing/git-lfs).
-Costs: every clone, CI job, remote box, and `uv` git install needs `git-lfs`,
+Costs: every clone, CI job, remote box, and `pip` git install needs `git-lfs`,
 and bandwidth is metered. It is also redundant with ADR-0014's rule that large
 upstream-derived data is a fetched dataset, not a tracked file. `git-lfs` is
 not installed on the development machine.

@@ -377,10 +377,10 @@ def test_regenerate_command_declares_tutorial_extras(tmp_path):
         '# /// script\n# dependencies = ["pyrite-mc[optimization]==0.23.0"]\n# ///\n'
     )
     assert module.regenerate_command([plain]) == (
-        "uv run --group docs python docs/_notebooks.py --regenerate 01-plain"
+        "pixi run python docs/_notebooks.py --regenerate 01-plain"
     )
     assert module.regenerate_command([plain, optimized]) == (
-        "uv run --group docs --extra optimization python docs/_notebooks.py --regenerate-all"
+        "pixi run python docs/_notebooks.py --regenerate-all"
     )
 
 
@@ -396,7 +396,7 @@ def test_cuda_tutorials_declare_backend_and_nvidia_extra(tmp_path):
     assert module.capture_backend(plain) == "cpu"
     assert module.capture_backend(cuda) == "cuda"
     assert module.regenerate_command([cuda]) == (
-        "uv run --group docs --extra nvidia python docs/_notebooks.py --regenerate 15-cuda"
+        "pixi run -e nvidia python docs/_notebooks.py --regenerate 15-cuda"
     )
     rocm = tmp_path / "16-rocm.py"
     rocm.write_text('# /// script\n# [tool.pyrite]\n# backend = "rocm"\n# ///\n')
@@ -442,7 +442,7 @@ def test_stale_capture_fails_unless_it_needs_a_gpu(tmp_path, monkeypatch, capsys
             module.check_notebooks()
     elif backend == "cuda":
         module.check_notebooks()
-        assert "--extra nvidia" in capsys.readouterr().err
+        assert "-e nvidia" in capsys.readouterr().err
     else:
         module.check_notebooks()
         assert "stale" not in capsys.readouterr().err

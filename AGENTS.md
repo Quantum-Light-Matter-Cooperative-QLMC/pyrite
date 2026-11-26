@@ -38,51 +38,43 @@ prose keep required format.
 Use project runner; never bare `pytest`, `.venv/bin/python`, or path-hack imports.
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test path/to/test.py -k test_name
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite transport
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite transport-collisions
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite transport-cascades
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite transport-runner
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite spectrum
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite spectrum-coherent
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite spectrum-brem
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite quantum
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite channeling
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite energy-grid
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite materials
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite xsgen
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite core
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite cli
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite apps
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite packaging
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --slow path/to/test.py
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev lint
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev format
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev typecheck
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev check-lines
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev complexity --check
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev nbstrip
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev precommit
+pixi run pyrite-dev test path/to/test.py -k test_name
+pixi run pyrite-dev test-suite transport
+pixi run pyrite-dev test-suite transport-collisions
+pixi run pyrite-dev test-suite transport-cascades
+pixi run pyrite-dev test-suite transport-runner
+pixi run pyrite-dev test-suite spectrum
+pixi run pyrite-dev test-suite spectrum-coherent
+pixi run pyrite-dev test-suite spectrum-brem
+pixi run pyrite-dev test-suite quantum
+pixi run pyrite-dev test-suite channeling
+pixi run pyrite-dev test-suite energy-grid
+pixi run pyrite-dev test-suite materials
+pixi run pyrite-dev test-suite xsgen
+pixi run pyrite-dev test-suite core
+pixi run pyrite-dev test-suite cli
+pixi run pyrite-dev test-suite apps
+pixi run pyrite-dev test-suite packaging
+pixi run pyrite-dev test --slow path/to/test.py
+pixi run pyrite-dev lint
+pixi run pyrite-dev format
+pixi run pyrite-dev typecheck
+pixi run pyrite-dev check-lines
+pixi run pyrite-dev complexity --check
+pixi run pyrite-dev nbstrip
+pixi run pyrite-dev docs
+pixi run pyrite-dev verify
+pixi run pyrite-dev precommit
 ```
 
-If `uv run` cannot write project environment, add
-`UV_PROJECT_ENVIRONMENT=/tmp/pyrite-venv`; do not switch interpreters.
-
-Before the first sandboxed docs build, set writable uv tool directories:
-
-```bash
-export UV_TOOL_DIR=/tmp/pyrite-uv-tools
-export UV_TOOL_BIN_DIR=/tmp/pyrite-uv-tool-bin
-```
-
-Apply these to `pyrite-dev docs`, `verify`, `precommit`, and direct Sphinx
-invocations. The marimo HTML-WASM demo export invokes Ruff through uv's tool
-runner. `UV_CACHE_DIR` alone does not redirect its default
-`~/.local/share/uv/tools` writes; a read-only home causes
-`LocalWheelError: Failed to analyze local imports with Ruff` / `Could not create
-temporary file`. Set the tool directories up front and keep demo export enabled.
+`pixi run` uses the `default` environment (Python 3.13, every dependency
+group). Others: `-e py314`, `-e docs`, GPU `-e nvidia|amd|intel`, `-e svml`
+(Intel SVML Numba; restrictive terms in `LICENSE-SVML.md`), `-e viz`. Layout
+and channel policy: `docs/repo-design/development-workspace.md`. Never use
+`uv`, `pip install` into `.pixi/`, or another interpreter. If the package cache
+is not writable, set `PIXI_CACHE_DIR=/tmp/pyrite-pixi-cache`. The docs
+feature keeps marimo's internal uv tool/cache dirs under `.pixi/`, so sandboxed
+docs builds need no extra setup.
 
 ## Choose tests by impact
 
@@ -124,7 +116,7 @@ Do not add separate tutorial provenance manifests or HTML/session exports.
 - Make smallest owning change. Preserve unrelated dirty-tree work.
 - Prefer reusable logic in `src/pyrite/`; keep marimo apps thin. Keep notebook
   sources output-free; tutorial snapshot regeneration follows `tutorial-authoring`.
-  Run `uv run marimo check <app.py>` after marimo edits.
+  Run `pixi run marimo check <app.py>` after marimo edits.
 - Invoke matching repo skill for CLI, notebooks, Monte Carlo, performance,
   physics, docs, runtime, remote GPU, regression, catalog-golden, or backlog
   work.
@@ -180,7 +172,7 @@ Do not add separate tutorial provenance manifests or HTML/session exports.
   `systemd-run --user --scope -p MemoryMax=8G -p MemorySwapMax=0 ...`.
   After a squash/rebase with no content change, rerun only focused tests;
   leave domain suites to CI.
-- Format only changed paths (`uv run ruff format <paths>`); CI formats PRs.
+- Format only changed paths (`pixi run ruff format <paths>`); CI formats PRs.
   Repo-wide `pyrite-dev format` only when asked.
 - Kill processes by PID (`pgrep -a`, then `kill <pid>`); never `pkill`/`killall`
   patterns, which can match the agent's own shell. Never `git add .`/`-A`.
@@ -191,7 +183,7 @@ Do not add separate tutorial provenance manifests or HTML/session exports.
   state; record progress in the issue. In Claude Code, `/ship` does this
   publishing (see Task dispatch).
 - Remote runs start with the `remote-gpu-jobs` pre-flight (synced SHA, node
-  state, `uv` on PATH, explicit catalog env). Record job IDs in the issue's
+  state, `pixi` on PATH, explicit catalog env). Record job IDs in the issue's
   `## Progress` section instead of blocking on them.
 - Zotero: an empty search or children listing is not proof of absence. Retry,
   search attachments by parent title/DOI, then ask the user before concluding a

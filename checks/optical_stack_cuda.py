@@ -1,7 +1,7 @@
 """Real CUDA parity and throughput of the O(N) many-layer stack solve (#962).
 
 Run on a clean committed tree with a CUDA device:
-``uv run --extra nvidia pyrite-dev validation-records -- checks/optical_stack_cuda.py``.
+``pixi run -e nvidia pyrite-dev validation-records -- checks/optical_stack_cuda.py``.
 Missing CUDA fails; there is no skip or CPU fallback. Prints JSON evidence.
 
 Parity compares the complex top-wave amplitude and interface response of the

@@ -75,8 +75,8 @@ timing samples; it does not justify a kernel or estimator change.
 Run the same harness file in each checkout through its project environment:
 
 ```bash
-PYRITE_MC_BACKEND=cpu UV_CACHE_DIR=/tmp/pyrite-uv-cache \
-  uv run --offline python /path/to/physics_adapter_overhead.py \
+PYRITE_MC_BACKEND=cpu \
+  pixi run --offline python /path/to/physics_adapter_overhead.py \
   --repeats 40 --electrons 32 > sample.json
 ```
 

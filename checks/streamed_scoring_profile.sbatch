@@ -10,15 +10,15 @@
 # nsys 2025.6 rejects -q and needs a writable TMPDIR (/tmp/nvidia is not writable on the lab box).
 set -uo pipefail
 MAT=$1
-export PATH=$HOME/.local/bin:$PATH
+export PATH=$HOME/.pixi/bin:$PATH
 cd "$SLURM_SUBMIT_DIR"
 export TMPDIR="$HOME/tmp-nsys"; mkdir -p "$TMPDIR"
 export PYRITE_HOME=/home/aamador/pyrite PYRITE_CATALOG=$PWD/src/pyrite/data/catalog PYRITE_USER_CATALOG=$(mktemp -d)/catalog
 export PYRITE_MC_BACKEND=cuda
 echo "code $(cat CODE_SHA) mat $MAT"
-uv sync -q --locked --package pyrite-mc --no-default-groups --extra nvidia
+pixi install --locked -e nvidia
 OUT=prof611_out/$MAT; mkdir -p $OUT
-B=(uv run --no-sync python checks/streamed_scoring_memory.py run)
+B=(pixi run --as-is -e nvidia python checks/streamed_scoring_memory.py run)
 "${B[@]}" streamed 1000 1000 $OUT/warmup.json $MAT 300 cuda 1e5 1
 for A in "joined 0" "joined-device 0" "streamed 4000"; do
   set -- $A

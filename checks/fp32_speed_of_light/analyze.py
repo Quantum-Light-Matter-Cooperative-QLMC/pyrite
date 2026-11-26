@@ -10,7 +10,7 @@ the fraction of primaries whose value is bitwise equal (trajectory
 divergence); ``rel`` the relative difference of the means; ``z`` the paired
 mean difference over its standard error, pooled over seeds.
 
-    uv run python checks/fp32_speed_of_light/analyze.py evidence/fp32sol831/<job> [...]
+    pixi run python checks/fp32_speed_of_light/analyze.py evidence/fp32sol831/<job> [...]
 """
 
 import json

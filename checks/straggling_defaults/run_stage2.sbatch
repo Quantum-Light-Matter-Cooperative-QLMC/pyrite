@@ -11,11 +11,11 @@
 # Usage: sbatch run_stage2.sbatch MATERIAL ENERGY_KEV [ARM_TIMEOUT_S]
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 PYRITE_USER_CATALOG="$(mktemp -d)/catalog"
 export PYRITE_USER_CATALOG
-export PYRITE_MC_BACKEND=cuda UV_CACHE_DIR=/tmp/pyrite-uv-cache
+export PYRITE_MC_BACKEND=cuda
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
 material="${1:?material}"
 energy="${2:?energy keV}"
@@ -29,12 +29,12 @@ lscpu > "$out/cpu.txt"
 cp SOURCE_SHA "$out/source_sha.txt"
 cp checks/straggling_defaults/{study.py,analyze.py,protocol-stage2.json,run_stage2.sbatch} "$out/source/"
 sha256sum src/pyrite/data/conduction_band.toml > "$out/conduction-band.txt"
-fractions=$(uv run --no-sync python -c "import json,sys; print(' '.join(map(str, json.load(open(sys.argv[1]))['range_fractions'])))" "$protocol")
+fractions=$(pixi run --as-is -e nvidia python -c "import json,sys; print(' '.join(map(str, json.load(open(sys.argv[1]))['range_fractions'])))" "$protocol")
 for fraction in $fractions; do
   for switch in off on; do
     name="$fraction-$switch"
     rc=0
-    timeout "$arm_timeout" uv run --no-sync python checks/straggling_defaults/study.py \
+    timeout "$arm_timeout" pixi run --as-is -e nvidia python checks/straggling_defaults/study.py \
       "$material" "$fraction" "$switch" "$out/$name" --protocol "$protocol" --energy "$energy" \
       > "$out/$name.log" 2>&1 || rc=$?
     if [ "$rc" -ne 0 ]; then

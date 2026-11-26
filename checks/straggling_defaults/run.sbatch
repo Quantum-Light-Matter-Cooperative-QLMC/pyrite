@@ -10,7 +10,7 @@
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
-export PYRITE_MC_BACKEND=cuda UV_CACHE_DIR=/tmp/pyrite-uv-cache
+export PYRITE_MC_BACKEND=cuda
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
 material="${1:?material or anchors or refinement}"
 out="evidence/straggling/$SLURM_JOB_ID-$material"
@@ -24,7 +24,7 @@ sha256sum src/pyrite/data/conduction_band.toml > "$out/conduction-band.txt"
 run() {
   local name="$1"; shift
   local rc=0
-  timeout 120 "$HOME/.local/bin/uv" run --no-sync python checks/straggling_defaults/study.py \
+  timeout 120 "${PYRITE_REMOTE_PIXI:-$HOME/.pixi/bin/pixi}" run --as-is -e nvidia python checks/straggling_defaults/study.py \
     "$@" "$out/$name" > "$out/$name.log" 2>&1 || rc=$?
   if [ "$rc" -ne 0 ]; then
     echo "$name exit $rc (124 = timeout)" | tee -a "$out/failures.txt"
@@ -39,7 +39,7 @@ if [ "$material" = anchors ]; then
   if [ ! -e "$XDG_DATA_HOME/pyrite" ]; then
     ln -s "$PWD" "$XDG_DATA_HOME/pyrite"
   fi
-  timeout 500 "$HOME/.local/bin/uv" run --no-sync pyrite-dev test \
+  timeout 500 "${PYRITE_REMOTE_PIXI:-$HOME/.pixi/bin/pixi}" run --as-is -e nvidia pyrite-dev test \
     tests/montecarlo/test_straggling_cuda.py \
     tests/montecarlo/test_shell_soft_hard_cuda.py --durations=0 > "$out/tests.log" 2>&1
 elif [ "$material" = cpu ]; then

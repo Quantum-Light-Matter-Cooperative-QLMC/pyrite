@@ -25,6 +25,8 @@ import tokenize
 import tomllib
 from pathlib import Path
 
+from pyrite._util.extras import checkout_environment
+
 DOCS = Path(__file__).resolve().parent
 NOTEBOOKS = DOCS / "notebooks"
 MOLAB = (
@@ -242,9 +244,12 @@ def regenerate_command(sources):
     )
     if any(capture_backend(source) == "cuda" for source in sources):
         extras = sorted({*extras, "nvidia"})
-    flags = "".join(f" --extra {extra}" for extra in extras)
+    # The default pixi environment carries the docs group and every non-GPU
+    # extra; a GPU extra selects that vendor's environment instead.
+    environments = sorted({checkout_environment(extra) for extra in extras} - {"default"})
+    flags = "".join(f" -e {name}" for name in environments)
     target = f"--regenerate {sources[0].stem}" if len(sources) == 1 else "--regenerate-all"
-    return f"uv run --group docs{flags} python docs/_notebooks.py {target}"
+    return f"pixi run{flags} python docs/_notebooks.py {target}"
 
 
 def page_location(source):
@@ -409,7 +414,7 @@ def check_notebooks(app=None):
         ):
             raise ValueError(
                 f"{source.stem}: legacy capture fingerprint; run "
-                "uv run --group docs python docs/_notebooks.py --migrate-hashes"
+                "pixi run python docs/_notebooks.py --migrate-hashes"
             )
         # `pyrite_version` is provenance only: releases do not re-execute tutorials.
         if checks_freshness(source) and (

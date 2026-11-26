@@ -14,7 +14,7 @@ mc_cxr_spectrum_solid_angle; docs/physics/detectors/detector-solid-angle.md, TOD
      current flat-Omega + Gaussian remains excellent for the easy case.
 
 Run (CPU-force on a box with the cupy wheel but no CUDA device):
-  uv run python -c "import sys;sys.modules['cupy']=None;sys.path.insert(0,'checks');import runpy;runpy.run_path('checks/detector_solid_angle_check.py',run_name='__main__')"
+  pixi run python -c "import sys;sys.modules['cupy']=None;sys.path.insert(0,'checks');import runpy;runpy.run_path('checks/detector_solid_angle_check.py',run_name='__main__')"
 """
 
 import os

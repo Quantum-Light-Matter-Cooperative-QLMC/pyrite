@@ -26,7 +26,7 @@
   },
   "epdl_table_sha256": "fcc2f00c5bb969e99bc84cac16762f13e939f071d585c433a5c0f420913fcfc9",
   "hardware_tests": {
-    "command": "uv run --extra nvidia pyrite-dev test tests/montecarlo/test_photon_cuda.py --durations=0 -rA --junitxml=first-flight.xml",
+    "command": "pixi run -e nvidia pyrite-dev test tests/montecarlo/test_photon_cuda.py --durations=0 -rA --junitxml=first-flight.xml",
     "errors": "0",
     "failures": "0",
     "skipped": "0",
@@ -37,7 +37,7 @@
   "input_arrays_sha256": "8fd5055d27fc701d0a9c69fda8e23bc2486feefafc636cbfca4dcb7658b4e76b",
   "interactions": 6870,
   "max_distance_abs_difference_ang": 0.0,
-  "measurement_command": "uv run --extra nvidia python checks/photon_first_flight_cuda.py",
+  "measurement_command": "pixi run -e nvidia python checks/photon_first_flight_cuda.py",
   "memory_scope": "combined process peak RSS and retained CuPy pool; not per-arm peaks",
   "numpy": "2.5.4",
   "peak_process_rss_kib": 804300,

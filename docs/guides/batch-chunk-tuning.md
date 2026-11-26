@@ -183,11 +183,11 @@ def make_scene() -> Scene:
 
 Run on an allocated GPU worker through the
 [cluster workflow](running-on-a-cluster.md), from the repository root (where
-`batch_chunk_scene.py` is saved) after `uv sync --extra nvidia --extra optimization`:
+`batch_chunk_scene.py` is saved) after `pixi install -e nvidia`:
 
 <!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
-PYRITE_FP64=1 uv run --no-sync python -m pyrite.perf.batch_chunk_tuner \
+PYRITE_FP64=1 pixi run --as-is python -m pyrite.perf.batch_chunk_tuner \
   --scene batch_chunk_scene.py \
   --batches 512,1024,2048,4096,8192 \
   --chunks 256,512,1024,2048,4096 \
@@ -225,7 +225,7 @@ Afterward apply the suggested values to a **new** PyRITE process:
 ```bash
 export PYRITE_MC_ELECTRON_BATCH_MAX=4096  # replace with Optuna winner
 export PYRITE_MC_CXR_CHUNK=1024          # replace with Optuna winner
-PYRITE_MC_BACKEND=cuda PYRITE_FP64=1 uv run python your_simulation.py
+PYRITE_MC_BACKEND=cuda PYRITE_FP64=1 pixi run python your_simulation.py
 ```
 
 Execution batch caps may be overridden by the CUDA scratch memory budget, and

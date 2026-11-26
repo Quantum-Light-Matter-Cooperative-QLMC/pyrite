@@ -46,7 +46,7 @@ def _(mo):
     beam, not the tilted surface normal.
 
     Open this source locally with
-    `uv run marimo edit docs/notebooks/16-classical-mev-radiation.py`, or use
+    `pixi run marimo edit docs/notebooks/16-classical-mev-radiation.py`, or use
     Molab's inline environment. The first cell installs missing pinned reference
     tables, including BremsLib; later runs reuse them. Six small CPU simulations
     use seed **775** and **256 histories per component population**. Compilation

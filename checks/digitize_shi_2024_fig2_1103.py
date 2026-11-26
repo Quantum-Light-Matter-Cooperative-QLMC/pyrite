@@ -12,7 +12,7 @@ stored curves keep every 8th column (0.2 pt).
 Writes ``tests/data/recoil/shi-2024-fig2.json``. Not part of any test run:
 it needs the publisher PDF (not redistributed) and two extra packages:
 
-  uv run --with pymupdf --with scikit-image python checks/digitize_shi_2024_fig2_1103.py PDF
+  pixi run -e viz python checks/digitize_shi_2024_fig2_1103.py PDF
 
 Validation: shi-2024-fig2-intensity-attribution
 """

@@ -1,7 +1,7 @@
 """Headless CXR scan entry point -- thin ``python -m`` shim over the run command.
 
 The remote box invokes ``python -m pyrite._entry.scan <material>`` inside its
-uv-synced checkout. The scan itself -- and the rationale for the __main__ guard
+pixi-installed checkout. The scan itself -- and the rationale for the __main__ guard
 (spawn/forkserver re-import the entry module per worker) -- lives in
 ``pyrite.runs.scan``; the Click surface lives in ``pyrite.cli.commands.scan``.
 Entry shims are drivers, so binding the two together here is what keeps

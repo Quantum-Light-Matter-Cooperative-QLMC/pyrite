@@ -16,7 +16,7 @@ Prints the numbers quoted in
    Doppler line ``cr-doppler-line-energy``. Levels keep the solver's
    ``U_0 = 0`` reference; a vacuum reference moves each shift by <= 0.5 %.
 
-    PYRITE_MC_BACKEND=cpu uv run python checks/longitudinal_coherence_regimes.py
+    PYRITE_MC_BACKEND=cpu pixi run python checks/longitudinal_coherence_regimes.py
 
 Exit 0 when the internal limits hold (forward fixed-level root equals the
 Baier--Katkov form to 1e-5; quantum bunching never exceeds the classical

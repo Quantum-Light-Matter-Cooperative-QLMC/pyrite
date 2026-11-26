@@ -223,15 +223,15 @@ exported local copies are under the issue worktree's ignored
 evidence. Reproduce **on a lab GPU allocation**, with the project runner:
 
 ```bash
-uv run --extra nvidia python checks/cxr_reduction_benchmark.py \
+pixi run -e nvidia python checks/cxr_reduction_benchmark.py \
   replay results/hopg-batch.npz --output results/hopg-replay.json \
   --revision 86db77f5 --repeats 9
 
-uv run --extra nvidia python checks/cxr_reduction_benchmark.py \
+pixi run -e nvidia python checks/cxr_reduction_benchmark.py \
   derive results/hopg-batch.npz --output results/stress-batch.npz \
   --revision 86db77f5 --line-repeats 32 --grid-nodes 100003
 
-uv run --extra nvidia python checks/cxr_reduction_benchmark.py \
+pixi run -e nvidia python checks/cxr_reduction_benchmark.py \
   replay results/stress-batch.npz --output results/stress-replay.json \
   --revision 86db77f5 --skip-bin-mean
 ```

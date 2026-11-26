@@ -1,8 +1,9 @@
 """Remote ladder/precision job payloads (issue #109).
 
-Regression: the first submissions ran ``uv run --no-sync`` on a box whose venv
-predated the lockfile and died on ``import endf_parserpy``. Every payload must
-run the standard remote dependency sync before its first work command.
+Regression: the first submissions ran the job without installing on a box whose
+environment predated the lockfile and died on ``import endf_parserpy``. Every
+payload must run the standard remote environment install before its first work
+command.
 """
 
 import shlex
@@ -13,7 +14,8 @@ import pytest
 from pyrite.energy_grid import convergence_job as job
 
 REMOTE = SimpleNamespace(shell_word=shlex.quote, shell_remote_dir=lambda: "/box/pyrite")
-SYNC = "uv sync --package pyrite-mc --no-default-groups --extra nvidia  # SYNC-MARKER"
+RUN = "pixi run --as-is -e nvidia"
+SYNC = "pixi install --locked -e nvidia  # SYNC-MARKER"
 
 
 def _args(**overrides):
@@ -32,7 +34,7 @@ def test_ladder_slice_syncs_dependencies_before_running():
 
 
 def test_precision_job_syncs_dependencies_before_every_step():
-    commands = job.remote_precision_commands(_args(), "uv")
+    commands = job.remote_precision_commands(_args(), RUN)
     payload = job._precision_payload("/box/jobs/j2", commands, REMOTE, SYNC)
 
     first_step = min(payload.index(command) for command in commands)
@@ -40,7 +42,7 @@ def test_precision_job_syncs_dependencies_before_every_step():
 
 
 def test_precision_steps_pin_their_precision_and_share_one_payload():
-    transport, fp64, fp32, compare = job.remote_precision_commands(_args(), "uv")
+    transport, fp64, fp32, compare = job.remote_precision_commands(_args(), RUN)
 
     assert transport.startswith("PYRITE_FP64=1 PYRITE_MC_BACKEND=cuda")
     assert "--expect-dtype float64" in fp64 and fp64.startswith("PYRITE_FP64=1")
@@ -62,7 +64,7 @@ def test_bandwidth_job_forwards_local_resolution_to_remote_steps():
             "bandwidth.json",
         ]
     )
-    reference, candidate = job.remote_bandwidth_commands(args, "uv")
+    reference, candidate = job.remote_bandwidth_commands(args, RUN)
     assert "--resolution local" in reference
     assert "--compare-resolution uniform" in reference
     assert "--payload bandwidth.segments.pkl" in reference
@@ -91,7 +93,7 @@ def test_bandwidth_attribution_runs_fp32_then_fp64_reports():
     args = job.build_parser().parse_args(
         ["start-bandwidth", "--attribute", "--top", "50", "--json-out", "attr.json"]
     )
-    fp32, fp64 = job.remote_bandwidth_commands(args, "uv")
+    fp32, fp64 = job.remote_bandwidth_commands(args, RUN)
     assert fp32.startswith("env -u PYRITE_FP64") and " attribute " in fp32
     assert fp64.startswith("PYRITE_FP64=1") and " attribute " in fp64
     assert "--top 50" in fp32 and "--json-out attr.json" in fp32

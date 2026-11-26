@@ -131,8 +131,8 @@ def test_prune_checkpoint_command_reserves_runs_and_releases():
 
     assert "for stem in hopg hopg--survey-deadbeef0000" in command
     assert "trap release_prune EXIT" in command
-    assert "run --no-sync pyrite checkpoint gc --profile standard --yes" in command
-    assert command.index("for stem in hopg") < command.index("run --no-sync pyrite checkpoint gc")
+    assert "run --as-is -e nvidia pyrite checkpoint gc --profile standard --yes" in command
+    assert command.index("for stem in hopg") < command.index("-e nvidia pyrite checkpoint gc")
 
 
 def test_prune_remote_dispatches_exact_reserved_stems(monkeypatch, capsys):

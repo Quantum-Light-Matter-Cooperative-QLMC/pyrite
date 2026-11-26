@@ -26,8 +26,8 @@ compound on free-atom tables (mos2), thin and bulk-like slabs, at 30 and
 Validation: elsepa-elastic-sampling
 
 Run (GPU; use the remote box, with the ELSEPA tables installed):
-  uv run python checks/elsepa_line_sensitivity.py --quick
-  uv run python checks/elsepa_line_sensitivity.py --output REPORT.json
+  pixi run python checks/elsepa_line_sensitivity.py --quick
+  pixi run python checks/elsepa_line_sensitivity.py --output REPORT.json
 """
 
 import argparse

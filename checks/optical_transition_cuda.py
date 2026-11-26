@@ -2,7 +2,7 @@
 
 Stage a clean committed tree with ``pyrite remote sync`` and run in a bounded
 SLURM GPU allocation on that host:
-``uv run --extra nvidia pyrite-dev validation-records -- checks/optical_transition_cuda.py``.
+``pixi run -e nvidia pyrite-dev validation-records -- checks/optical_transition_cuda.py``.
 Missing CUDA fails; there is no skip or CPU fallback. Prints JSON evidence.
 
 Compares, on a multilayer gold/vacuum stack with Johnson–Christy and Rakić

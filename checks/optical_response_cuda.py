@@ -1,7 +1,7 @@
 """Real CUDA parity of the explicit optical response and bounded TR seam.
 
 Stage with ``pyrite remote sync`` and run in a bounded SLURM GPU allocation
-on that host: ``uv run --extra nvidia python checks/optical_response_cuda.py``.
+on that host: ``pixi run -e nvidia python checks/optical_response_cuda.py``.
 Missing CUDA fails; no skip or CPU backend fallback. Prints JSON evidence.
 Validation: optical-material-response (measurement only).
 """

@@ -10,8 +10,6 @@ set -euo pipefail
 ROOT="${PYRITE_BENCH_ROOT:-$PWD}"
 cd "$ROOT/pyrite"
 export PYRITE_MC_BACKEND=cpu
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache
-export UV_LINK_MODE=copy
 export PYRITE_BENCH_CORE=per-electron
 export PYRITE_BENCH_CUTOFF_EV=1000
 export PYRITE_BENCH_NE=10000
@@ -23,6 +21,6 @@ for entry in w_800kev:mott w_800kev:sr si_800kev:mott; do
   else
     export PYRITE_BENCH_OUTPUT="$ROOT/${PYRITE_BENCH_CASE}_1000ev.json"
   fi
-  "${PYRITE_REMOTE_UV:-$HOME/.local/bin/uv}" run --no-sync pyrite-dev test \
+  "${PYRITE_REMOTE_PIXI:-$HOME/.pixi/bin/pixi}" run --as-is pyrite-dev test \
     "$ROOT/test_benchmark.py" -s -q
 done

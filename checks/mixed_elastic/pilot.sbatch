@@ -12,15 +12,15 @@
 set -uo pipefail
 cd "$SLURM_SUBMIT_DIR"
 sha=$1
-export PATH="$HOME/.local/bin:$PATH" PYRITE_HOME="$HOME/pyrite" PYRITE_MC_BACKEND=cuda
+export PATH="$HOME/.pixi/bin:$PATH" PYRITE_HOME="$HOME/pyrite" PYRITE_MC_BACKEND=cuda
 export PYRITE_CATALOG="$PWD/src/pyrite/data/catalog" PYRITE_USER_CATALOG="$(mktemp -d)/catalog"
 export XDG_CONFIG_HOME="$(mktemp -d)" OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
-uv sync --locked --package pyrite-mc --no-default-groups --extra nvidia -q || exit 1
+pixi install --locked -e nvidia || exit 1
 out="evidence/pilot/$SLURM_JOB_ID"; mkdir -p "$out"
 echo "$sha" > "$out/sha.txt"
 run() {  # tag scene histories [bench options...]
     local tag=$1 scene=$2 n=$3; shift 3
-    .venv/bin/python checks/geant4_performance/pyrite_bench.py "$scene" --histories "$n" \
+    .pixi/envs/nvidia/bin/python checks/geant4_performance/pyrite_bench.py "$scene" --histories "$n" \
         --warmup-histories -1 --seed 91001 --rows-per-round 1024 --device-staging \
         --no-audit --output "$out/$tag-$scene.json" "$@" > "$out/$tag-$scene.log" 2>&1
     echo "DONE $tag $scene rc=$?"

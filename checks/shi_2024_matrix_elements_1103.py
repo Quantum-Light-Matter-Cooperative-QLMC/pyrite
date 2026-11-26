@@ -27,7 +27,7 @@ Checks (fail -> exit 1):
    PXR+CB one; Shi's QM/CL area ratio matches the model's
    (PXR+CB, exact roots) / (PXR-only, classical) ratio within 1.5x.
 
-Run:  uv run python checks/shi_2024_matrix_elements_1103.py
+Run:  pixi run python checks/shi_2024_matrix_elements_1103.py
 
 Validation: shi-2024-fig2-intensity-attribution
 """

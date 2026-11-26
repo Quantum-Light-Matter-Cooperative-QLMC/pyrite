@@ -1,7 +1,7 @@
 #!/bin/bash
 # Weekly lab-host entry point. Run from cron against a dedicated synced checkout.
 set -euo pipefail
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 mkdir -p evidence/validation-344
 # Serialize cron/manual invocations, then refuse to accumulate pending jobs.

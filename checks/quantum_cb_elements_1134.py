@@ -27,7 +27,7 @@ Checks (fail -> exit 1):
    are reported; some fall below that floor. The HOPG/hBN (002)/(004) lines at the Huang 2023
    geometries are reported (about -2 %, comparable to that floor).
 
-Run:  uv run python checks/quantum_cb_elements_1134.py
+Run:  pixi run python checks/quantum_cb_elements_1134.py
 
 Validation: cbs-amplitude
 """

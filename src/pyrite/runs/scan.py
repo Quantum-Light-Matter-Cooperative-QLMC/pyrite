@@ -353,7 +353,7 @@ def _reexec_under_py_spy(**kwargs):
 
     launcher = py_spy_launcher()
     if launcher is None:
-        raise click.UsageError("--py-spy requested but neither py-spy nor uv is on PATH")
+        raise click.UsageError("--py-spy requested but neither py-spy nor pixi is on PATH")
     argv, output, status = _py_spy_reexec_command(launcher, **kwargs)
     output.parent.mkdir(parents=True, exist_ok=True)
     status.unlink(missing_ok=True)

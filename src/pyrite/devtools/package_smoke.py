@@ -1,7 +1,10 @@
-"""Build and install pyrite-mc from wheel and editable source in clean uv venvs."""
+"""Build and install pyrite-mc from wheel and editable source in clean pip venvs.
+
+The venvs use only the standard library ``venv`` and ``pip``: the same path a
+user takes with ``pip install pyrite-mc``, independent of the pixi workspace.
+"""
 
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -12,8 +15,9 @@ from pathlib import Path
 from pyrite.devtools import repo_root
 
 ROOT = repo_root()
-EXPECTED_EXTRAS = {"amd", "apps", "external-db", "intel", "nvidia", "plots"}
 PROJECT_DOCUMENT = tomllib.loads((ROOT / "pyproject.toml").read_text())
+#: The wheel must publish exactly the extras ``pyproject.toml`` declares.
+EXPECTED_EXTRAS = set(PROJECT_DOCUMENT["project"]["optional-dependencies"])
 PROJECT_VERSION = PROJECT_DOCUMENT["project"]["version"]
 
 
@@ -80,10 +84,14 @@ def _inspect_wheel(wheel: Path) -> None:
     assert all(name.startswith(("pyrite/", "pyrite_mc-")) for name in names)
 
 
-def _probe_install(uv: str, source: Path, root: Path, label: str) -> None:
+def _pip(venv: Path, *args: str, cwd: Path) -> None:
+    _run(str(_python(venv)), "-m", "pip", "--disable-pip-version-check", *args, cwd=cwd)
+
+
+def _probe_install(source: Path, root: Path, label: str) -> None:
     venv = root / label
-    _run(uv, "venv", "--python", sys.executable, str(venv), cwd=root)
-    _run(uv, "pip", "install", "--python", str(_python(venv)), str(source), cwd=root)
+    _run(sys.executable, "-m", "venv", str(venv), cwd=root)
+    _pip(venv, "install", str(source), cwd=root)
     _run(
         str(_python(venv)),
         "-c",
@@ -128,15 +136,7 @@ def _probe_install(uv: str, source: Path, root: Path, label: str) -> None:
     _run_fails_with_hint(
         str(_python(venv)), "-c", "import pyrite.plots.mpl", cwd=root, hint="pyrite-mc[plots]"
     )
-    _run(
-        uv,
-        "pip",
-        "install",
-        "--python",
-        str(_python(venv)),
-        f"pyrite-mc[apps] @ {source.as_uri()}",
-        cwd=root,
-    )
+    _pip(venv, "install", f"pyrite-mc[apps] @ {source.as_uri()}", cwd=root)
     _run(pyrite, "app", "analysis", "launch", "--smoke", cwd=root)
     _run(pyrite, "app", "pixels", "launch", "--smoke", cwd=root)
     _run(pyrite, "app", "compare", "launch", "--smoke", cwd=root)
@@ -155,17 +155,14 @@ def _probe_install(uv: str, source: Path, root: Path, label: str) -> None:
 
 
 def main() -> None:
-    uv = shutil.which("uv")
-    if uv is None:
-        raise SystemExit("uv executable not found")
     with tempfile.TemporaryDirectory(prefix="pyrite-mc-package-") as tmp:
         work = Path(tmp)
         dist = work / "dist"
-        _run(uv, "build", "--wheel", "--out-dir", str(dist), cwd=ROOT)
+        _run(sys.executable, "-m", "build", "--wheel", "--outdir", str(dist), str(ROOT), cwd=ROOT)
         wheel = next(dist.glob("pyrite_mc-*.whl"))
         _inspect_wheel(wheel)
-        _probe_install(uv, wheel, work, "wheel-venv")
-        _probe_install(uv, ROOT, work, "editable-venv")
+        _probe_install(wheel, work, "wheel-venv")
+        _probe_install(ROOT, work, "editable-venv")
     print("pyrite-mc wheel and editable installs expose only canonical PyRITE identities")
 
 

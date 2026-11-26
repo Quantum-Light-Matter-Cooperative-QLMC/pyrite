@@ -1,7 +1,7 @@
 """Remote-GPU batching benchmark of energy-resolved axial MCWF (#627).
 
 Run only in a bounded remote GPU allocation from a synced checkout:
-``uv run --extra nvidia python checks/axial_energy_mcwf_cuda.py``.
+``pixi run -e nvidia python checks/axial_energy_mcwf_cuda.py``.
 Same crystal, grid, depths, seed and incident-energy quadrature on both
 backends (complex128). The CPU reference runs one electron per solver call
 and may be capped by ``--cpu-max-electrons``; throughput is compared per

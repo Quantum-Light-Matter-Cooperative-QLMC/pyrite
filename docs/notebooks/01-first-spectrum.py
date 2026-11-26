@@ -43,7 +43,7 @@ def _(mo):
     ## Environment and reference tables
 
     Locally, install the project environment and open this file with
-    `uv run marimo edit docs/notebooks/01-first-spectrum.py`.
+    `pixi run marimo edit docs/notebooks/01-first-spectrum.py`.
     In Molab, the inline dependencies provide the environment. Use its
     **built-in package manager** to add packages; if table loading reports a
     missing MF=26/MT=527 photon yield, enter `endf-parserpy==0.17.0` and restart.

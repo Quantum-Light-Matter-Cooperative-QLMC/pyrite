@@ -17,7 +17,7 @@ sbatch checks/equal_precision/moment-cpu-788.sbatch
 For a short standalone check (use the same inputs for all three variants):
 
 ```bash
-uv run python checks/equal_precision/benchmark_moment_transport_cpu.py \
+pixi run python checks/equal_precision/benchmark_moment_transport_cpu.py \
   exact /tmp/788-exact-audit.json --replay si-300-100um-0deg \
   --core per-electron --histories 256 --seed 78811 \
   --batch-histories 256 --probe-electrons 0 --output /tmp/788-exact.json

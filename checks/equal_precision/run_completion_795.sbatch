@@ -9,14 +9,13 @@
 #SBATCH --output=completion-795-%j.log
 set -euo pipefail
 cd "${SLURM_SUBMIT_DIR:-$PWD}"
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$PWD/user-catalog"
 export PYRITE_MC_BACKEND=cuda PYRITE_FP64=1
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
-export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/pyrite-uv-cache}"
-UV="${UV:-$HOME/.local/bin/uv}"
-if ! command -v "$UV" >/dev/null; then UV=uv; fi
+PIXI="${PYRITE_REMOTE_PIXI:-$HOME/.pixi/bin/pixi}"
+if ! command -v "$PIXI" >/dev/null; then PIXI=pixi; fi
 BASE_REF="${PYRITE_795_BASE_REF:-42931cbb2b5fe71a2a8afd3fd00a69033a92c9ad}"
 BASE_FILE='src/pyrite/montecarlo/transport/hard_radiative.py'
 if ! git cat-file -e "${BASE_REF}^{commit}" 2>/dev/null; then
@@ -41,21 +40,21 @@ fi
     git status --short
     sha256sum "$BASE_FILE" "$OUT/baseline-hard_radiative.py" \
         checks/equal_precision/{benchmark_completion_795.py,pyrite_adapter.py,manifest.json}
-    "$UV" --version
-    "$UV" run --no-sync python --version
+    "$PIXI" --version
+    "$PIXI" run --as-is -e nvidia python --version
 } > "$OUT/provenance.txt"
 if command -v scontrol >/dev/null && [ -n "${SLURM_JOB_ID:-}" ]; then
     scontrol show job "$SLURM_JOB_ID" > "$OUT/job.txt"
 fi
 if command -v nvidia-smi >/dev/null; then nvidia-smi -q > "$OUT/gpu.txt"; fi
 # Validation gates before timing; each backend is selected in a fresh process.
-PYRITE_MC_BACKEND=cpu "$UV" run --no-sync pyrite-dev test \
+PYRITE_MC_BACKEND=cpu "$PIXI" run --as-is -e nvidia pyrite-dev test \
     tests/montecarlo/cascades/test_hard_radiative_completion_795.py \
     tests/montecarlo/cascades/test_hard_radiative.py > "$OUT/tests-cpu.log" 2>&1
-PYRITE_MC_BACKEND=cuda "$UV" run --no-sync pyrite-dev test \
+PYRITE_MC_BACKEND=cuda "$PIXI" run --as-is -e nvidia pyrite-dev test \
     tests/montecarlo/cascades/test_hard_radiative_completion_795.py \
     tests/montecarlo/cascades/test_hard_radiative_cuda.py > "$OUT/tests-cuda.log" 2>&1
-"$UV" run --no-sync pyrite-dev complexity --check > "$OUT/complexity.log" 2>&1
+"$PIXI" run --as-is -e nvidia pyrite-dev complexity --check > "$OUT/complexity.log" 2>&1
 SCRIPT=checks/equal_precision/benchmark_completion_795.py
 # Interleave variants and reverse order for alternating seeds to reduce time drift.
 # Each variant is a fresh Python process, with one equal-workload warmup.
@@ -67,7 +66,7 @@ for seed in 79501 79502 79503; do
             for variant in "${variants[@]}"; do
                 stem="$OUT/${scene}-${histories}-${seed}-${variant}"
                 echo "$(date -Is) $stem"
-                timeout --signal=TERM --kill-after=5s 600s "$UV" run --no-sync python "$SCRIPT" run \
+                timeout --signal=TERM --kill-after=5s 600s "$PIXI" run --as-is -e nvidia python "$SCRIPT" run \
                     --variant "$variant" --baseline-source "$OUT/baseline-hard_radiative.py" \
                     "$scene" --histories "$histories" --seed "$seed" --core cuda \
                     --batch-histories "$batch_histories" --scratch-mib 4096 --probe-electrons 0 \
@@ -78,12 +77,12 @@ for seed in 79501 79502 79503; do
             done
             base="$OUT/${scene}-${histories}-${seed}-baseline.json"
             candidate="$OUT/${scene}-${histories}-${seed}-candidate.json"
-            "$UV" run --no-sync python "$SCRIPT" compare "$base" "$candidate" \
+            "$PIXI" run --as-is -e nvidia python "$SCRIPT" compare "$base" "$candidate" \
                 > "$OUT/${scene}-${histories}-${seed}-parity.json" || {
                 echo "STOP: parity failure for $scene / $histories / $seed" >&2; exit 1;
             }
         done
     done
 done
-"$UV" run --no-sync python "$SCRIPT" summarize "$OUT" > "$OUT/summary.json"
+"$PIXI" run --as-is -e nvidia python "$SCRIPT" summarize "$OUT" > "$OUT/summary.json"
 echo "Completed #795 benchmark: $OUT/summary.json"

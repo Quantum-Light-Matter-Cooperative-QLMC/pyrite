@@ -4,7 +4,7 @@ Reads ``bench-<precision>-<scene>-<seed>.json`` from one or more evidence
 directories and prints a Markdown table of median warm-transport time per
 history and launched rows per second, per directory, scene and precision.
 
-    uv run python checks/rocm/bench_table.py evidence/gpu-eval888/amd/<job> \\
+    pixi run python checks/rocm/bench_table.py evidence/gpu-eval888/amd/<job> \\
         [evidence/gpu-eval888/nvidia/<job>]
 """
 

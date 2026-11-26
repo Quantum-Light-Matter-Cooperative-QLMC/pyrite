@@ -27,8 +27,8 @@ C K difference per ``k``, the spurious -15.7 % of the #89 revalidation.
 Validation: segment-escape-average
 
 Run (GPU; use the remote box):
-  uv run python checks/segment_escape_split_ladder.py --quick
-  uv run python checks/segment_escape_split_ladder.py --output REPORT.json
+  pixi run python checks/segment_escape_split_ladder.py --quick
+  pixi run python checks/segment_escape_split_ladder.py --output REPORT.json
 """
 
 import argparse

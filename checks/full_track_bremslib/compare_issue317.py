@@ -7,7 +7,7 @@ prints transmitted/backscattered primary fractions with
 ``z = (p_PyRITE - p_G4) / sqrt(p1 q1 / N1 + p2 q2 / N2)``.
 
 Usage:
-  uv run python checks/full_track_bremslib/compare_issue317.py [RECORDS] [--output JSON]
+  pixi run python checks/full_track_bremslib/compare_issue317.py [RECORDS] [--output JSON]
 
 Validation: inelastic-angular-deflection
 """

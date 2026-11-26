@@ -2,7 +2,7 @@
 
 Run each arm/trial in a fresh process, with the same captured HDF5 input::
 
-    uv run --with pyvista --with kaleido python checks/trajectory_viewer_benchmark.py \
+    pixi run -e viz python checks/trajectory_viewer_benchmark.py \
         /tmp/capture.h5 --backend pyvista --output /tmp/pv.json
 
 ``--replicate`` repeats complete captured showers with distinct track/history

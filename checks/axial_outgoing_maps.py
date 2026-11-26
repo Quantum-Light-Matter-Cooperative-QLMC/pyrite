@@ -2,7 +2,7 @@
 
 Run the bounded CPU example with::
 
-    uv run python checks/axial_outgoing_maps.py
+    pixi run python checks/axial_outgoing_maps.py
 
 For one supercell-periodic string and a Bloch eigenbasis on a rectangular
 window of plane-wave orders (the represented space R), split each TDS Kraus

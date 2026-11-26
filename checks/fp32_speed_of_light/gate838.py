@@ -29,7 +29,7 @@ MeV, the #894 exit cosine and energy bins, work counts) is printed as an
 ungated diagnostic with its relative change and z, so rare large-angle
 outcomes are reported even where they cannot be gated (#1013).
 
-    uv run python checks/fp32_speed_of_light/gate838.py evidence/gate838/<job> \\
+    pixi run python checks/fp32_speed_of_light/gate838.py evidence/gate838/<job> \\
         [--output summary.json]
 """
 

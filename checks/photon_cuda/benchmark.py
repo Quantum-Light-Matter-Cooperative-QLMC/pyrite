@@ -1,7 +1,7 @@
 """Fixed-physics CUDA scaling, profiling and Optuna chunk experiments (#341).
 
 Remote GPU allocation only. Run as a module so the original maintained
-workload is reused: ``uv run --extra nvidia --extra optimization python -m
+workload is reused: ``pixi run -e nvidia python -m
 checks.photon_cuda.benchmark scaling|trace|tune``. Timings include host rates
 and both transfer directions. No physical parameters or numerical defaults
 are optimized. GPU-event elapsed time includes idle gaps between dispatches;

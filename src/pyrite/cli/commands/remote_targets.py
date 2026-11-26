@@ -5,9 +5,10 @@ from dataclasses import asdict
 
 import click
 
-from ...console.output import confirm_destructive, emit_diagnostic, emit_result, output_option
+from ...console.output import confirm_destructive, emit_result, output_option
 from ...console.tables import emit_object, emit_table, flatten
 from ...remote import targets
+from .._deprecations import removed_option
 
 
 @click.group("target", no_args_is_help=True)
@@ -52,7 +53,7 @@ def show_command(name, json_output):
 _HELP = {
     "host": "SSH alias of the SLURM login node.",
     "remote_dir": "Checkout directory on the host (absolute or ~/path).",
-    "uv": "uv executable on the host.",
+    "pixi": "pixi executable on the host (default ~/.pixi/bin/pixi).",
     "gpu_vendor": "nvidia or amd.",
     "partition": "SLURM partition.",
     "nodelist": "SLURM node list, or 'any'.",
@@ -67,7 +68,7 @@ _HELP = {
     "host_exec": "Prefix for helper Python on the host (pull, gc, trajectories), e.g. 'srun --time=00:30:00 --mem=8G'; empty runs it on the login node.",
     "nice": "SLURM --nice for chunked and background jobs (default 10000); 0 omits it, e.g. on age-priority queues.",
     "transfer_host": "SSH alias of a data-transfer node that shares remote_dir (e.g. a site DTN); sync uploads and pull/trajectory/performance downloads go there. Empty uses --host.",
-    "extras": "Comma-separated uv extras every job's uv sync keeps beside the GPU vendor's, e.g. dask; empty syncs only the vendor extra.",
+    "environment": "pixi environment every job installs (pixi install --locked) and runs in, e.g. svml; empty uses the GPU vendor's (nvidia, amd or intel).",
     "description": "Free-text note shown by list.",
 }
 
@@ -77,22 +78,16 @@ def _fields(function):
         function = click.option(f"--{field.replace('_', '-')}", default=None, help=_HELP[field])(
             function
         )
+    # #1462: environments moved from uv to pixi; neither old field has an alias.
+    function = removed_option("--uv", "--pixi PATH")(function)
+    function = removed_option("--extras", "--environment ENV")(function)
     return function
 
 
 def _save(name, values, edit):
-    target = targets.save_target(
-        name, {k: v for k, v in values.items() if v is not None}, edit=edit
-    )
-    for other in targets.named_targets().values():
-        if (
-            other.name != name
-            and (other.host, other.remote_dir) == (target.host, target.remote_dir)
-            and other.gpu_vendor != target.gpu_vendor
-        ):
-            emit_diagnostic(
-                f"warning: {name} and {other.name} share host and remote_dir with different GPU vendors; use separate remote directories"
-            )
+    # Targets of different GPU vendors may share a checkout: each installs its
+    # own pixi environment (.pixi/envs/<env>), so neither rebuilds the other's.
+    targets.save_target(name, {k: v for k, v in values.items() if v is not None}, edit=edit)
     emit_result(f"saved remote target {name}")
 
 

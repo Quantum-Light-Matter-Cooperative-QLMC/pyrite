@@ -10,17 +10,17 @@
 #SBATCH --output=line286-%j.log
 set -uo pipefail
 cd "$SLURM_SUBMIT_DIR"
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$PWD/user-catalog" XDG_CONFIG_HOME="$PWD/.xdg-config"
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache PYRITE_MC_BACKEND=cuda
+export PYRITE_MC_BACKEND=cuda
 mkdir -p "$XDG_CONFIG_HOME" "$PYRITE_USER_CATALOG"
 out="evidence/line286/$SLURM_JOB_ID"; mkdir -p "$out"
 cp .pyrite-sync "$out/sync.json"
-uv sync --extra nvidia --locked -q
-uv run --no-sync pytest -q -p no:cacheprovider tests/montecarlo/spectrum/test_sinc_bin_integration_cuda.py tests/montecarlo/spectrum/test_sinc_bin_near_far.py > "$out/tests.log" 2>&1
+pixi install --locked -e nvidia
+pixi run --as-is -e nvidia pytest -q -p no:cacheprovider tests/montecarlo/spectrum/test_sinc_bin_integration_cuda.py tests/montecarlo/spectrum/test_sinc_bin_near_far.py > "$out/tests.log" 2>&1
 echo "pytest rc=$?"
-py=(uv run --no-sync python -W ignore checks/line_cost_286.py --quadrature bin-mean)
+py=(pixi run --as-is -e nvidia python -W ignore checks/line_cost_286.py --quadrature bin-mean)
 "${py[@]}" --energy-kev 300 --counts 100 400 --repeat 2 --output "$out/hopg-300.json"
 echo "rc=$?"
 "${py[@]}" --energy-kev 29999 --counts 100 400 --repeat 1 --output "$out/hopg-29999.json"

@@ -28,8 +28,8 @@ mean-stopping uncertainty has closed.
 Validation: energy-loss-straggling
 
 Run:
-  uv run python checks/energy_loss_straggling_observables.py --quick
-  uv run python checks/energy_loss_straggling_observables.py --output REPORT.json
+  pixi run python checks/energy_loss_straggling_observables.py --quick
+  pixi run python checks/energy_loss_straggling_observables.py --output REPORT.json
 """
 
 import argparse

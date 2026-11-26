@@ -33,7 +33,7 @@ requires-python = ">=3.13"
 dependencies = [
     "backports.zstd>=1.7; python_version < '3.14'",
     "click>=8.4.1",
-    "numpy>=2.4.6",
+    "numpy>=2.2",
     "pandas>=3.0.3",
     "polars>=1.44.2",
     "platformdirs>=4.9",
@@ -44,7 +44,7 @@ dependencies = [
     "xraydb>=4.5.8",
     "psutil>=7.2.2",
     "threadpoolctl>=3.5",
-    "numba>=0.66.0",
+    "numba>=0.61",
     "tqdm>=4.68.2",
     "h5py>=3.16.0",
     "endf-parserpy>=0.17.0",
@@ -69,10 +69,12 @@ nvidia = [
     "nvidia-cufft-cu12>=11.4.1.4,<12",
     "nvidia-nvjitlink-cu12>=12.9.86,<13",
 ]
-# AMD's current ``amd-cupy`` wheels are CPython 3.10-only. PyRITE requires
-# Python 3.13+, so this extra builds upstream CuPy against ROCm instead. It must
-# not be installed beside the CUDA CuPy distribution in one environment.
-amd = ["cupy-rocm-7-0>=14.2.0"]
+# Builds upstream CuPy from source against the host's ROCm
+# (``CUPY_INSTALL_USE_HIP=1``) for the node's own GPU architecture: the
+# prebuilt ``cupy-rocm-*`` wheels do not target every GPU (they segfault on
+# gfx1151), and AMD's ``amd-cupy`` wheels are CPython 3.10-only. It must not be
+# installed beside the CUDA CuPy distribution in one environment.
+amd = ["cupy>=14.2.0"]
 intel = ["dpctl>=0.22.1", "dpnp>=0.20.0"]
 # Runtime of ``pyrite.plots`` (and lazy matplotlib figures in ``perf``/``validation``).
 plots = [
@@ -118,6 +120,8 @@ test = [
     "pytest-xdist>=3.8.0",
     "pytest-timeout>=2.4.0",
     "pytest-cov>=7.1.0",
+    # Builds the wheel `pyrite-dev package-smoke` installs with plain pip.
+    "build>=1.2",
     # Real dask-jobqueue job scripts for the SLURM Dask provisioning tests.
     "dask-jobqueue>=0.9",
 ]
@@ -142,7 +146,7 @@ docs = [
     "pydata-sphinx-theme>=0.20.0",
     "sphinxcontrib-bibtex>=2.6",
     # Exports the browser-only results demo (docs/demo/) during the HTML build.
-    "marimo>=0.25.1",
+    "marimo>=0.26.0",
     "sphinx-design>=0.6.1",
 ]
 
@@ -160,19 +164,16 @@ oracle = [
 # Firefox (geckodriver) and Chrome/Chromium; never imported by ``src/``.
 browser = ["selenium>=4.53.0"]
 
-dev = [{ include-group = "test" }, { include-group = "lint" }]
 # Contributor checkout: the shipped app/plot extras plus notebook conversion
 # tools nothing in ``src/`` imports.
 notebooks = [
     "pyrite-mc[apps]",
     "nbconvert>=7.17.1",
-    "pandoc>=2.4",
-    "marimo[recommended]>=0.26.0",
 ]
 
 [tool.pytest.ini_options]
 # Put src/ on the path so `import pyrite` resolves without requiring an install
-# (an editable install via `uv sync` also works). Tests stay CPU-only/fast -- the
+# (the pixi environments install it editable). Tests stay CPU-only/fast -- the
 # heavy MC physics validation lives in checks/, not here; heavy tests that do
 # live here carry the opt-in `slow` marker (tests/helpers/slow_marker.py).
 testpaths = ["tests"]
@@ -216,7 +217,7 @@ exclude_also = ["if TYPE_CHECKING:", "if __name__ == .__main__.:"]
 #     `_jit_*kernel.py`, `_jit_annihilation.py`, and
 #     `montecarlo/spectrum/*_jit_kernel.py`) import `cupy` at module scope, so
 #     a CPU-only environment reports them 0% (never imported) and the total drops
-#     ~7 points. With the `nvidia` extra installed their host-side code is
+#     ~7 points. In the `nvidia` pixi environment their host-side code is
 #     measured; `cupyx.jit` device bodies stay untraceable regardless.
 #   - `transport/_jit_radiative.py` is CPU Numba code, not a CUDA module;
 #     retain it and host dispatch/fallback paths in CPU coverage reports.
@@ -233,9 +234,6 @@ watcher_on_save = "autorun"
 # Analysis-app spectra above the Standard plot resolution exceed marimo's 8 MB
 # default; keep in sync with pyrite.cli.commands.app_analysis.OUTPUT_MAX_BYTES.
 output_max_bytes = 512_000_000
-
-[tool.jupytext]
-formats = "ipynb,md:myst"
 
 [tool.ty.src]
 include = ["src"]
@@ -559,6 +557,7 @@ line-length = 100
 
 # keep this tight; avoid duplicate exclusion logic
 exclude = [
+    ".pixi",
     ".venv",
     "__pycache__",
     ".ruff_cache",
@@ -596,11 +595,139 @@ ignore = [
 quote-style = "double"
 indent-style = "space"
 
-[tool.uv]
-cache-dir = "/tmp/pyrite-uv-cache"
-# Every `uv run`/`uv sync` (including a fresh worktree's first `uv run`) gets
-# all contributor groups; the `notebooks` group pulls `pyrite-mc[apps]`, which
-# tests need (plotly, marimo). Runtime-only installs pass `--no-default-groups`.
-default-groups = "all"
-constraint-dependencies = ["boto3>=1.35.0"]
-conflicts = [[{ extra = "nvidia" }, { extra = "amd" }, { extra = "intel" }]]
+[tool.pixi.workspace]
+# Contributor, CI and lab environments (#1462). Users still install the PyPI
+# package (`pip install pyrite-mc`); pixi only manages development checkouts.
+# Layout, channel policy and the conda/PyPI split:
+# docs/repo-design/development-workspace.md.
+channels = ["conda-forge"]
+platforms = [
+    "linux-64",
+    "osx-arm64",
+    "win-64",
+    { name = "linux-64-cuda", subdir = "linux-64", cuda = "13" },
+]
+requires-pixi = ">=0.85"
+
+# The project installs editable from PyPI metadata. conda-forge supplies the
+# interpreter and the compiled scientific stack (one shared BLAS, HDF5 and
+# LLVM), so pixi skips the PyPI wheels of the same projects; pure-Python
+# dependencies stay on PyPI. Floors match [project.dependencies].
+[tool.pixi.dependencies]
+python = ">=3.13,<3.15"
+numpy = ">=2.2"
+scipy = ">=1.17.1"
+numba = ">=0.61"
+h5py = ">=3.16.0"
+pandas = ">=3.0.3"
+polars = ">=1.44.2"
+psutil = ">=7.2.2"
+gemmi = ">=0.7.5,<0.8"
+
+# nbconvert's Markdown/LaTeX exporters shell out to the pandoc binary.
+[tool.pixi.feature.notebooks.dependencies]
+matplotlib-base = ">=3.11.0"
+pandoc = "*"
+
+# Selenium drives Firefox through geckodriver (checks/plotly_*_622.py).
+[tool.pixi.feature.browser.dependencies]
+geckodriver = "*"
+
+[tool.pixi.pypi-dependencies]
+pyrite-mc = { path = ".", editable = true }
+
+# CPU-only environments: every contributor platform, never the CUDA row.
+[tool.pixi.feature.cpu]
+platforms = ["linux-64", "osx-arm64", "win-64"]
+
+[tool.pixi.feature.py313.dependencies]
+python = "3.13.*"
+
+[tool.pixi.feature.py314.dependencies]
+python = "3.14.*"
+
+# marimo's HTML-WASM export (the docs results demo) shells out to the `uv`
+# binary to run Ruff's import graph. It is a tool marimo calls, not how this
+# workspace manages environments; its tool/cache dirs stay inside `.pixi/` so
+# read-only homes and sandboxes need no extra setup.
+[tool.pixi.feature.docs.dependencies]
+matplotlib-base = ">=3.11.0"
+uv = "*"
+
+[tool.pixi.feature.docs.activation.env]
+UV_TOOL_DIR = "$PIXI_PROJECT_ROOT/.pixi/uv-tools"
+UV_TOOL_BIN_DIR = "$PIXI_PROJECT_ROOT/.pixi/uv-tools/bin"
+UV_CACHE_DIR = "$PIXI_PROJECT_ROOT/.pixi/uv-cache"
+
+# One-off research scripts (trajectory scene viewers, PDF figure digitizing)
+# that need packages nothing else uses: `pixi run -e viz python checks/...`.
+[tool.pixi.feature.viz]
+platforms = ["linux-64"]
+
+[tool.pixi.feature.viz.dependencies]
+vtk-base = "*"
+pyvista = "*"
+scikit-image = "*"
+pymupdf = "*"
+
+[tool.pixi.feature.viz.pypi-dependencies]
+trame = "*"
+trame-vtk = "*"
+trame-vuetify = "*"
+
+# CUDA 13 from conda-forge: CuPy and cuFINUFFT link one toolkit pinned by
+# `cuda-version`, replacing the CUDA 13 CuPy wheel plus CUDA 12 runtime wheels
+# of the PyPI `nvidia` extra. Never combine with that extra (CuPy twice).
+[tool.pixi.feature.cuda]
+platforms = ["linux-64-cuda"]
+
+[tool.pixi.feature.cuda.dependencies]
+cuda-version = "13.*"
+cupy = ">=14.1.1"
+cufinufft = ">=2.5.1,<2.6"
+
+# GPU environments solve alone (no solve-group with `default`, whose platforms
+# differ), so pin the scientific stack to the versions `default` locks; GPU
+# and CPU runs then compare like for like. SciPy is left free: conda-forge
+# CuPy 14.2 constrains scipy<1.18, so `nvidia` locks 1.17.x.
+[tool.pixi.feature.gpu-stack.dependencies]
+numpy = "2.5.*"
+numba = "0.68.*"
+
+[tool.pixi.feature.amd]
+platforms = ["linux-64"]
+
+[tool.pixi.feature.intel]
+platforms = ["linux-64"]
+
+# Opt-in Intel SVML Numba (#1459): only Anaconda pkgs/main ships the
+# SVML-patched llvmlite. Separate, more restrictive terms: LICENSE-SVML.md.
+[tool.pixi.feature.svml]
+platforms = ["linux-64"]
+channels = [{ channel = "https://repo.anaconda.com/pkgs/main", priority = 10 }]
+
+[tool.pixi.feature.svml.dependencies]
+numpy = "2.2.*"
+numba = "0.61.*"
+llvmlite = "0.44.*"
+intel-cmplr-lib-rt = "*"
+
+# pkgs/main has no published conda-to-PyPI map; without this pixi would also
+# install PyPI wheels over every pkgs/main Python package (numpy/numba/
+# llvmlite SVML builds, scipy, h5py, ...). tests/dev/test_pixi_lock.py fails
+# when a new pkgs/main package needs an entry.
+[tool.pixi.workspace.conda-pypi-map]
+"https://repo.anaconda.com/pkgs/main" = { mapping = { numpy = "numpy", numpy-base = false, numba = "numba", llvmlite = "llvmlite", python = false, scipy = "scipy", h5py = "h5py", pandas = "pandas", polars = "polars", polars-runtime-32 = "polars-runtime-32", psutil = "psutil", mpi4py = "mpi4py", python-dateutil = "python-dateutil", python-tzdata = "tzdata", six = "six", packaging = "packaging" } }
+
+[tool.pixi.environments]
+# Contributor default: every dependency group plus the pure-Python extras.
+default = { features = ["cpu", "py313", "test", "lint", "docs", "notebooks", "oracle", "browser", "dask", "optimization"], solve-group = "py313" }
+py314 = { features = ["cpu", "py314", "test", "lint", "docs", "notebooks", "oracle", "browser", "dask", "optimization"], solve-group = "py314" }
+docs = { features = ["cpu", "py313", "docs"], solve-group = "py313" }
+# Lab/GPU environments carry the test group and the cluster extras jobs use;
+# nvidia also carries docs, to regenerate the CUDA tutorial captures.
+nvidia = { features = ["py313", "gpu-stack", "cuda", "test", "docs", "notebooks", "dask", "optimization"] }
+amd = { features = ["py313", "gpu-stack", "amd", "test", "notebooks", "dask", "optimization"] }
+intel = { features = ["py313", "gpu-stack", "intel", "test", "notebooks", "dask", "optimization"] }
+svml = { features = ["py313", "svml", "test"] }
+viz = { features = ["py313", "test", "notebooks", "viz"], solve-group = "py313" }

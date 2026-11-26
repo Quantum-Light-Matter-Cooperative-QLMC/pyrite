@@ -8,12 +8,11 @@
 #SBATCH --output=transport-cost-%j.log
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$PWD/user-catalog"
 export PYRITE_MC_BACKEND=cuda
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache
 out="evidence/transport-cost/$SLURM_JOB_ID"
 mkdir -p "$out"
 cp .pyrite-sync "$out/sync.json"
@@ -22,7 +21,7 @@ nvidia-smi -q > "$out/gpu.txt"
 sha256sum checks/equal_precision/{diagnose_kernel.py,pyrite_adapter.py,manifest.json,transport-cost.sbatch} \
     src/pyrite/montecarlo/transport/{_jit_kernel.py,_jit_radiative_device.py,_jit_launch.py,batching.py} \
     > "$out/code.txt"
-uv run --no-sync python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
+pixi run --as-is -e nvidia python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
 deadline=$((SECONDS + 540))
 for seed in 78601 78602 78603; do
     variants=(baseline threads32 capacity capacity32 learned32)
@@ -37,7 +36,7 @@ for seed in 78601 78602 78603; do
             fi
             stem="$out/$scene-$seed-$variant"
             printf 'RUN %s\n' "$stem"
-            if timeout --signal=TERM --kill-after=5s 60s uv run --no-sync python \
+            if timeout --signal=TERM --kill-after=5s 60s pixi run --as-is -e nvidia python \
                 checks/equal_precision/diagnose_kernel.py "$variant" "$stem-audit.json" \
                 "$scene" --histories 5000 --seed "$seed" --core cuda \
                 --batch-histories 5000 --scratch-mib 4096 --probe-electrons 0 \

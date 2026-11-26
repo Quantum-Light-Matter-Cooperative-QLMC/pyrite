@@ -17,7 +17,7 @@ mkdir -p "$DEST"
 git clone --quiet https://github.com/PenRed/PenRed.git "$DEST/source"
 git -C "$DEST/source" checkout --quiet "$PIN"
 test "$(git -C "$DEST/source" rev-parse HEAD)" = "$PIN"
-"$HOME/.local/bin/uv" run --no-sync python checks/equal_precision/prepare_penred.py "$DEST/source"
+"${PYRITE_REMOTE_PIXI:-$HOME/.pixi/bin/pixi}" run --as-is python checks/equal_precision/prepare_penred.py "$DEST/source"
 mkdir "$DEST/source/src/build"
 cd "$DEST/source/src/build"
 cmake -DWITH_DICOM=OFF -DWITH_MPI=OFF -DWITH_LB=OFF -DBUILD_UTILITIES=OFF \

@@ -18,14 +18,13 @@ set -euo pipefail
 name=${1:?usage: sbatch checks/tutorial_capture_cuda.sbatch <tutorial-name>}
 root=${SLURM_SUBMIT_DIR:-$PWD}
 cd "$root"
-export PATH=$HOME/.local/bin:$PATH  # SLURM batch environments lack uv
+export PATH=$HOME/.pixi/bin:$PATH  # SLURM batch environments lack pixi
 export PYRITE_HOME=$root PYRITE_CATALOG=$root/src/pyrite/data/catalog
 PYRITE_USER_CATALOG=$(mktemp -d)/catalog
 XDG_CONFIG_HOME=$(mktemp -d)  # ignore the box's stale catalog pin
 export PYRITE_USER_CATALOG XDG_CONFIG_HOME
-export UV_CACHE_DIR=${UV_CACHE_DIR:-/tmp/pyrite-uv-cache}
 echo "revision=$(git rev-parse HEAD 2>/dev/null || echo archive) tutorial=$name"
 nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv
-uv sync -q --locked --group docs --extra nvidia --extra optimization
-uv run --no-sync pyrite tables fetch
-uv run --no-sync python docs/_notebooks.py --regenerate "$name"
+pixi install --locked -e nvidia
+pixi run --as-is -e nvidia pyrite tables fetch
+pixi run --as-is -e nvidia python docs/_notebooks.py --regenerate "$name"

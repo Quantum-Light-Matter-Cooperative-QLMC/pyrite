@@ -2,7 +2,7 @@
 
 Heavy: run on the lab box, not locally (see the remote-gpu-jobs skill)::
 
-    OMP_NUM_THREADS=1 uv run python checks/axial_mcwf_return_flux.py --out axial_return_flux.json
+    OMP_NUM_THREADS=1 pixi run python checks/axial_mcwf_return_flux.py --out axial_return_flux.json
 
 ``--smoke`` runs a seconds-long TDS-only check of the plumbing.
 

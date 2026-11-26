@@ -40,7 +40,7 @@ def captures(tmp_path):
 @pytest.fixture(autouse=True)
 def remote_config(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path / "remote"))
-    monkeypatch.setattr(config, "REMOTE_UV", "/bin/uv")
+    monkeypatch.setattr(config, "REMOTE_PIXI", "/bin/pixi")
     monkeypatch.setattr(config, "HOST", "test-box")
     monkeypatch.setenv("PYRITE_SSH_MUX", "0")
 

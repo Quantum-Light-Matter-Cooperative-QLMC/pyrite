@@ -34,10 +34,10 @@ def test_profile_edit_between_slices_fails_before_scan_and_preserves_job_identit
     jobdir.mkdir(parents=True)
     metadata = f"slurm_job_id: 100\nstems: {stem}\n"
     (jobdir / "meta").write_text(metadata)
-    fake_uv = tmp_path / "uv"
-    fake_uv.write_text(
+    fake_pixi = tmp_path / "pixi"
+    fake_pixi.write_text(
         "#!/bin/sh\n"
-        'if [ "$1" = sync ]; then exit 0; fi\n'
+        'if [ "$1" = install ]; then exit 0; fi\n'
         'case "$*" in *"tables verify"*) exit 0 ;; esac\n'
         'case "$*" in *"pyrite.remote.physics_identity"*) shift 5; '
         f'exec {shlex.quote(sys.executable)} -c {shlex.quote(verifier)} "$@" ;; esac\n'
@@ -45,13 +45,13 @@ def test_profile_edit_between_slices_fails_before_scan_and_preserves_job_identit
         f'echo \'{{"cached_cases":0,"completed_new_cases":1}}\' > "{jobdir}/progress/hopg.json"\n'
         "exit 75\n"
     )
-    fake_uv.chmod(0o755)
+    fake_pixi.chmod(0o755)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     (bin_dir / "sbatch").write_text("#!/bin/sh\necho 4242\n")
     (bin_dir / "sbatch").chmod(0o755)
     monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
-    monkeypatch.setattr(config, "REMOTE_UV", str(fake_uv))
+    monkeypatch.setattr(config, "REMOTE_PIXI", str(fake_pixi))
     script = scripts._chunked_queue_script(
         "j",
         ["hopg"],

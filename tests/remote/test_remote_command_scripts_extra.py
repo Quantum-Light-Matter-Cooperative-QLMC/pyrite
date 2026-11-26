@@ -70,7 +70,7 @@ def test_amd_slurm_batch_script_selects_rocm_target_without_nvidia_modules(monke
     assert "#SBATCH --gres=gpu:radeon8060s:1" in script
     assert "module" not in script
     assert "export PYRITE_MC_BACKEND=rocm" in script
-    assert 'export UV_PROJECT_ENVIRONMENT="/path/to/pyrite/.venv-amd"' in script
+    assert "UV_PROJECT_ENVIRONMENT" not in script  # pixi environments are separate dirs
     assert (
         '. "/path/to/pyrite/src/pyrite/remote/rocm_build_env.sh" && _pyrite_rocm_env "/path/to/pyrite"'
         in script
@@ -81,38 +81,36 @@ def test_amd_slurm_batch_script_selects_rocm_target_without_nvidia_modules(monke
     subprocess.run(["bash", "-n"], input=script, text=True, check=True)
 
 
-def test_amd_uv_sync_builds_cupy_against_hip(monkeypatch):
+def test_amd_pixi_install_builds_cupy_against_hip(monkeypatch):
     _use_amd_target(monkeypatch)
 
-    block = scripts._uv_sync_block()
+    block = scripts._pixi_install_block()
 
-    assert (
-        'CUPY_INSTALL_USE_HIP=1 "uv" sync --package pyrite-mc --no-default-groups --extra amd'
-        in block
-    )
+    assert 'CUPY_INSTALL_USE_HIP=1 "pixi" install --locked -e amd >>' in block
 
 
-def test_nvidia_uv_sync_does_not_request_hip():
-    block = scripts._uv_sync_block()
+def test_nvidia_pixi_install_does_not_request_hip():
+    block = scripts._pixi_install_block()
 
     assert "CUPY_INSTALL_USE_HIP" not in block
-    assert "--extra nvidia" in block
+    assert '"pixi" install --locked -e nvidia >>' in block
 
 
-def test_target_extras_survive_the_exact_job_sync():
+def test_target_environment_replaces_the_vendor_environment():
     target = config.RemoteTarget(
-        host="cluster", remote_dir="/srv/pyrite", uv="uv", extras="dask, optimization,dask"
+        host="cluster", remote_dir="/srv/pyrite", pixi="pixi", environment=" svml "
     )
-    assert target.extras == "dask,optimization"
+    assert target.environment == "svml"
     with config.use_target(target):
-        block = scripts._uv_sync_block(once=True)
-    assert "--no-default-groups --extra nvidia --extra dask --extra optimization >>" in block
+        block = scripts._pixi_install_block(once=True)
+        assert config.shell_remote_run() == '"pixi" run --as-is -e svml'
+    assert '"pixi" install --locked -e svml >>' in block
 
 
-@pytest.mark.parametrize(("extras", "error"), [("dask;rm", "uv extra"), ("amd", "gpu_vendor")])
-def test_target_extras_refuse_unsafe_or_vendor_names(extras, error):
-    with pytest.raises(ValueError, match=error):
-        config.RemoteTarget(host="cluster", extras=extras)
+@pytest.mark.parametrize("environment", ["svml;rm", "SVML", "-x"])
+def test_target_environment_refuses_unsafe_names(environment):
+    with pytest.raises(ValueError, match="pixi environment name"):
+        config.RemoteTarget(host="cluster", environment=environment)
 
 
 @pytest.mark.parametrize(
@@ -243,17 +241,17 @@ def test_parallel_queue_script_preserves_partial_failure_results(monkeypatch, tm
     bash = _bash_or_skip(tmp_path)
     jobdir = tmp_path / "jobs" / "j"
     jobdir.mkdir(parents=True)
-    fake_uv = tmp_path / "uv"
-    fake_uv.write_text(
+    fake_pixi = tmp_path / "pixi"
+    fake_pixi.write_text(
         "#!/bin/sh\n"
-        'if [ "$1" = sync ]; then exit 0; fi\n'
+        'if [ "$1" = install ]; then exit 0; fi\n'
         'case "$*" in *"tables verify"*) exit 0 ;; esac\n'
         'case "$*" in *hbn*) exit 7 ;; esac\n'
         "exit 0\n"
     )
-    fake_uv.chmod(0o755)
+    fake_pixi.chmod(0o755)
     monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
-    monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
+    monkeypatch.setattr(config, "REMOTE_PIXI", fake_pixi.as_posix())
     script = remote._queue_script(
         "j", ["hopg", "hbn", "hfse2"], quick=False, workers=4, parallel_materials=2
     )
@@ -275,18 +273,18 @@ def test_parallel_queue_script_enforces_process_limit(monkeypatch, tmp_path, par
     jobdir = tmp_path / "jobs" / "j"
     jobdir.mkdir(parents=True)
     trace = tmp_path / "trace"
-    fake_uv = tmp_path / "uv"
-    fake_uv.write_text(
+    fake_pixi = tmp_path / "pixi"
+    fake_pixi.write_text(
         "#!/bin/sh\n"
-        'if [ "$1" = sync ]; then exit 0; fi\n'
+        'if [ "$1" = install ]; then exit 0; fi\n'
         'case "$*" in *"tables verify"*) exit 0 ;; esac\n'
         f'echo "start $$" >> "{trace.as_posix()}"\n'
         "sleep 0.3\n"
         f'echo "end $$" >> "{trace.as_posix()}"\n'
     )
-    fake_uv.chmod(0o755)
+    fake_pixi.chmod(0o755)
     monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
-    monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
+    monkeypatch.setattr(config, "REMOTE_PIXI", fake_pixi.as_posix())
     materials = ["hopg", "hbn", "hfse2", "v2o5"]
     script = remote._queue_script(
         "j",

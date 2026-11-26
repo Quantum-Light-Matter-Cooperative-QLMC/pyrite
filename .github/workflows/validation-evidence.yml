@@ -17,10 +17,13 @@ jobs:
       PYRITE_TEST_WORKERS: '1'
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
         with:
-          python-version: '3.14'
-      - run: uv sync --all-groups --locked
+          pixi-version: v0.85.0
+          environments: py314
+          locked: true
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
       - name: Cache pinned physics tables
         uses: actions/cache@v4
         with:
@@ -29,9 +32,9 @@ jobs:
             ~/.local/share/pyrite/xsgen/tables
             ~/.local/share/pyrite/xsgen/reference-data
           key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
-      - run: uv run pyrite tables fetch
+      - run: pixi run -e py314 pyrite tables fetch
       - name: Collect dated CPU validation evidence (no publication)
-        run: uv run python checks/refresh_validation_evidence.py --output-dir evidence/validation-344/${{ github.run_id }}
+        run: pixi run -e py314 python checks/refresh_validation_evidence.py --output-dir evidence/validation-344/${{ github.run_id }}
       - name: Upload logs, records and ledger preview even on failure
         if: always()
         uses: actions/upload-artifact@v4

@@ -213,7 +213,7 @@ def test_app_launch_without_apps_extra_names_the_install_hint(monkeypatch):
     assert result.exit_code == 1
     assert "pyrite app pixels launch requires the optional 'apps' extra" in result.output
     assert 'pip install "pyrite-mc[apps]"' in result.output
-    assert "uv sync --extra apps" in result.output
+    assert "pixi install -e default" in result.output
     assert launched == []
 
 
@@ -302,7 +302,7 @@ def test_channeling_missing_extra_and_failed_subprocess(monkeypatch, name):
         result = runner.invoke(cli.command, ["app", name, action])
         assert result.exit_code == 1
         assert 'pip install "pyrite-mc[apps]"' in result.output
-        assert "uv sync --extra apps" in result.output
+        assert "pixi install -e default" in result.output
 
 
 def test_channeling_help_does_not_load_notebook_or_backend():

@@ -18,7 +18,7 @@ design doc's validation plan, on real HOPG transport:
      convolution, unlike the analytic term); the ratio is reported.
 
 Run CPU-forced (the viz laptop has the cupy wheel but no CUDA toolkit):
-    uv run python -c "import sys;sys.modules['cupy']=None;sys.path.insert(0,'checks');import runpy;runpy.run_path('checks/mosaic_mc_check.py',run_name='__main__')"
+    pixi run python -c "import sys;sys.modules['cupy']=None;sys.path.insert(0,'checks');import runpy;runpy.run_path('checks/mosaic_mc_check.py',run_name='__main__')"
 """
 
 import os

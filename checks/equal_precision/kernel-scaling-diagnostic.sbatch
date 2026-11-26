@@ -12,7 +12,6 @@ cd "$SLURM_SUBMIT_DIR"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_MC_BACKEND=cuda
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache
 OUT="evidence/kernel-diagnostic/$SLURM_JOB_ID"
 SCRIPT="${1:-checks/equal_precision/diagnose_kernel.py}"
 mkdir -p "$OUT"
@@ -26,7 +25,7 @@ for seed in 55001 55002; do
     for scene in si-300-100um-0deg w-300-10um-0deg; do
         for variant in baseline threads32 capacity both-capacity32 radiation-off; do
             stem="$OUT/$scene-$seed-$variant"
-            timeout --signal=TERM --kill-after=5s 40s "$HOME/.local/bin/uv" run --no-sync python \
+            timeout --signal=TERM --kill-after=5s 40s "${PYRITE_REMOTE_PIXI:-$HOME/.pixi/bin/pixi}" run --as-is -e nvidia python \
                 "$SCRIPT" "$variant" "$stem-audit.json" \
                 "$scene" --histories 5000 --seed "$seed" --core cuda \
                 --batch-histories 5000 --scratch-mib 4096 --probe-electrons 0 \

@@ -16,14 +16,14 @@
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 source checks/geant4_performance/env.sh
-uv sync --extra nvidia --locked -q
+pixi install --locked -e nvidia
 out="evidence/gridsens/$SLURM_JOB_ID"; mkdir -p "$out"
 cp .pyrite-sync "$out/sync.json"
-uv run --no-sync python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
+pixi run --as-is -e nvidia python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
 s=w-1MeV-100um
 for h in 2000 10000; do
     stem="$out/pyc-$s-$h"
-    PYRITE_MC_BACKEND=cuda uv run --no-sync python checks/geant4_performance/pyrite_bench.py \
+    PYRITE_MC_BACKEND=cuda pixi run --as-is -e nvidia python checks/geant4_performance/pyrite_bench.py \
         "$s" --histories "$h" --seed 1 --rows-per-round 1024 --device-staging \
         --estimator continuous --cone-mode point --chunk 1000000 --warmup-histories 1000 \
         --spectrum-step-ev 25 --spectrum-step-ev 100 --spectrum-step-ev 400 \

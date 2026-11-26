@@ -10,7 +10,7 @@ set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 # Branch checkout = submit dir; MAIN = a synced checkout of the comparison revision.
 BR="$PWD"; MAIN="${MAIN:?set MAIN to the comparison checkout}"
-export PATH="$HOME/.local/bin:$PATH" PYRITE_MC_BACKEND=cuda UV_CACHE_DIR=/tmp/pyrite-uv-cache
+export PATH="$HOME/.pixi/bin:$PATH" PYRITE_MC_BACKEND=cuda
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
 out="$BR/evidence/continuation/staging/$SLURM_JOB_ID"; mkdir -p "$out"
 cp "$BR/.pyrite-sync" "$out/sync-branch.txt"; cp "$MAIN/.pyrite-sync" "$out/sync-main.txt"
@@ -21,12 +21,12 @@ sha256sum "$BR"/checks/equal_precision/{benchmark_continuation.py,pyrite_adapter
 run_in() {  # dir stem args...
   local dir=$1 stem=$2; shift 2
   ( cd "$dir" && export PYRITE_HOME="$dir" PYRITE_CATALOG="$dir/src/pyrite/data/catalog" PYRITE_USER_CATALOG="$dir/user-catalog" &&
-    timeout --signal=TERM --kill-after=5s 600s uv run --no-sync python "$BR/checks/equal_precision/benchmark_continuation.py" "$@" --output "$out/$stem.json" ) > "$out/$stem.log" 2>&1 \
+    timeout --signal=TERM --kill-after=5s 600s pixi run --as-is -e nvidia python "$BR/checks/equal_precision/benchmark_continuation.py" "$@" --output "$out/$stem.json" ) > "$out/$stem.log" 2>&1 \
     && echo "DONE $stem" || { echo "{\"status\":\"failed\",\"exit_code\":$?}" > "$out/$stem.failed.json"; echo "FAILED $stem"; }
 }
-for dir in "$BR" "$MAIN"; do ( cd "$dir" && PYRITE_HOME="$dir" PYRITE_CATALOG="$dir/src/pyrite/data/catalog" PYRITE_USER_CATALOG="$dir/user-catalog" uv run --no-sync python "$BR/checks/equal_precision/prepare_stopping.py" > "$out/tables-$(basename $dir).json" ); done
+for dir in "$BR" "$MAIN"; do ( cd "$dir" && PYRITE_HOME="$dir" PYRITE_CATALOG="$dir/src/pyrite/data/catalog" PYRITE_USER_CATALOG="$dir/user-catalog" pixi run --as-is -e nvidia python "$BR/checks/equal_precision/prepare_stopping.py" > "$out/tables-$(basename $dir).json" ); done
 ( export PYRITE_HOME="$BR" PYRITE_CATALOG="$BR/src/pyrite/data/catalog" PYRITE_USER_CATALOG="$BR/user-catalog" &&
-  uv run --no-sync pyrite-dev test tests/montecarlo/transport/test_transport_continuation_cuda.py \
+  pixi run --as-is -e nvidia pyrite-dev test tests/montecarlo/transport/test_transport_continuation_cuda.py \
   tests/montecarlo/transport/test_transport_continuation.py ) > "$out/tests.log" 2>&1 && echo "DONE tests" || echo "FAILED tests"
 # Host vs device staging of retained rows, matched and sustained populations.
 P20=learned32-B5000,cont-Q256-A5000-T32,cont-Q256-A5000-T32-D,cont-Q256-Aall-T32-D

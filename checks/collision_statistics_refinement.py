@@ -42,8 +42,8 @@ Numbers from this script back
 
 Validation: energy-controlled-propagation
 
-Run:  uv run python checks/collision_statistics_refinement.py
-      uv run python checks/collision_statistics_refinement.py --quick
+Run:  pixi run python checks/collision_statistics_refinement.py
+      pixi run python checks/collision_statistics_refinement.py --quick
 """
 
 import argparse

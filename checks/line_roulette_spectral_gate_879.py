@@ -11,7 +11,7 @@ capture cost is reported separately and charged to a one-use cost comparison.
 Artifacts, arrays, timing logs and reports must live in ignored scratch paths.
 No production estimator, RNG, physics or policy implementation is changed.
 Example (lab allocation, after a pushed checkpoint):
-    uv run python checks/line_roulette_spectral_gate_879.py --out scratch/roulette879/gate
+    pixi run python checks/line_roulette_spectral_gate_879.py --out scratch/roulette879/gate
 """
 
 import argparse

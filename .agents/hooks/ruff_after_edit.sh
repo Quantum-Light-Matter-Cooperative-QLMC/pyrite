@@ -25,7 +25,7 @@ case "$file" in
 esac
 cd "$root" || exit 0
 
-ruff=(timeout 30 uv run --quiet --no-sync ruff)
+ruff=(timeout 30 pixi run --quiet --as-is ruff)
 "${ruff[@]}" format --quiet --force-exclude -- "$file" >/dev/null 2>&1 || exit 0
 findings=$("${ruff[@]}" check --fix --unfixable F401,F841 --force-exclude \
     --output-format concise --quiet -- "$file" 2>/dev/null)

@@ -524,7 +524,7 @@ def _(mo):
     patterns), launch the channeling app from the PyRITE checkout:
 
     ```bash
-    uv run pyrite app channeling launch
+    pixi run pyrite app channeling launch
     ```
 
     Select **Axial (experimental)**. These displays need additional

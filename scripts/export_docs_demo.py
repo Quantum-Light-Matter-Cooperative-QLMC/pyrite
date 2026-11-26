@@ -1,4 +1,4 @@
-"""Export the documentation results demo data; run with ``uv run python scripts/export_docs_demo.py``.
+"""Export the documentation results demo data; run with ``pixi run python scripts/export_docs_demo.py``.
 
 Writes ``docs/demo/public/results_demo.json``, the only input of the browser-only
 marimo demo ``docs/demo/results_app.py``, plus the README preview image

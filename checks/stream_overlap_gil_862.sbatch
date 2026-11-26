@@ -11,14 +11,14 @@
 # GIL holder and its functions are known per thread while the other thread waits.
 # usage (from an isolated synced checkout root): sbatch -J og862-<sha> checks/stream_overlap_gil_862.sbatch [OUTDIR]
 set -uo pipefail
-export PATH=$HOME/.local/bin:$PATH
+export PATH=$HOME/.pixi/bin:$PATH
 cd "$SLURM_SUBMIT_DIR"
 export TMPDIR="$HOME/tmp-nsys"; mkdir -p "$TMPDIR"
 export PYRITE_HOME=$HOME/pyrite PYRITE_CATALOG=$PWD/src/pyrite/data/catalog PYRITE_USER_CATALOG=$(mktemp -d)/catalog
 export PYRITE_MC_BACKEND=cuda
 echo "code $(cat CODE_SHA)"
-uv sync -q --locked --package pyrite-mc --no-default-groups --extra nvidia
-B=(uv run --no-sync python checks/streamed_scoring_memory.py)
+pixi install --locked -e nvidia
+B=(pixi run --as-is -e nvidia python checks/streamed_scoring_memory.py)
 OUT=${1:-og862_out}; mkdir -p "$OUT"
 "${B[@]}" run streamed 1000 1000 "$OUT/warmup.json" silicon 300 cuda 1e5 1 > /dev/null
 for ARM in serial overlap; do

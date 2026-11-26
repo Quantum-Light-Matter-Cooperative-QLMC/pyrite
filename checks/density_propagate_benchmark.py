@@ -10,7 +10,7 @@ solve.
 
 Run locally for small bands, on ``pyrite remote`` for ``H >= 56``::
 
-    PYRITE_MC_BACKEND=cpu uv run python checks/density_propagate_benchmark.py \
+    PYRITE_MC_BACKEND=cpu pixi run python checks/density_propagate_benchmark.py \
         --orders 24 32 40 --thickness-um 2 --dz 250 --repeats 3 --out bench.json
 
 ``--backend cpu cuda`` times the same solve on each ``propagate`` backend and
@@ -18,7 +18,7 @@ reports the CUDA result's maximum deviation from the CPU one. Device phase
 times are launch times (the step is asynchronous); compare walls. CUDA runs
 need a CUDA host (``pyrite remote``)::
 
-    uv run python checks/density_propagate_benchmark.py --orders 24 40 56 \
+    pixi run python checks/density_propagate_benchmark.py --orders 24 40 56 \
         --backend cpu cuda --out gpu.json
 
 Performance evidence only; no physics-validation claim.

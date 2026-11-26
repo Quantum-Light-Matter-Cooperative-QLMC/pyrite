@@ -27,11 +27,11 @@ SSH host and submits jobs through that host's SLURM setup. **Do not combine
 
 On the coordinator and every worker, use compatible Python/PyRITE versions,
 physics tables and material data. From a source checkout, install the locked
-environment with `uv sync`; add Dask only when using its backend:
+environment with `pixi install`; add Dask only when using its backend:
 
 ```bash
-uv sync --extra dask       # includes distributed and dask-jobqueue
-uv run pyrite tables verify
+pixi install       # includes distributed and dask-jobqueue
+pixi run pyrite tables verify
 ```
 
 For an installed tool rather than a checkout, the Dask extra is
@@ -173,7 +173,7 @@ jobqueue:
   slurm:
     account: MY_ACCOUNT
     walltime: "04:00:00"
-    python: /shared/pyrite/.venv/bin/python    # same path on every node
+    python: /shared/pyrite/.pixi/envs/default/bin/python    # same path on every node
     interface: null           # e.g. ib0 if the default route is not the cluster network
     local-directory: /tmp     # node-local disk for worker spill files
     log-directory: /shared/pyrite-output/dask-logs
@@ -241,7 +241,7 @@ script again: `pyrite run` resumes, and published case artifacts are reused.
 set -euo pipefail
 cd /shared/pyrite                       # same absolute path on every node
 export PYRITE_MC_BACKEND=cpu
-uv run --no-sync pyrite run standard -m hopg \
+pixi run --as-is pyrite run standard -m hopg \
   --execution site-dask --execution-config execution.toml
 ```
 
@@ -346,7 +346,7 @@ cores plus a 2-core coordinator fit:
 jobqueue:
   slurm:
     account: MY_ACCOUNT
-    python: /u/home/USER/pyrite/.venv/bin/python
+    python: /u/home/USER/pyrite/.pixi/envs/nvidia/bin/python
     local-directory: /tmp
     job-script-prologue:
       - ". /u/local/Modules/default/init/modules.sh"
@@ -369,11 +369,11 @@ workers = 30
 
 Submit the coordinator script above with `--partition=campus` and
 `--time=24:00:00`. Hoffman2 login nodes are for editing and submission only:
-build the environment (`uv sync --extra dask`) inside a compute-node job, and
+build the environment (`pixi install`) inside a compute-node job, and
 copy data through the `hoffman2-dtn` transfer node. A `pyrite remote` target
 for the same checkout needs `--extras dask` (see
 [remote targets](../guides/running-on-a-cluster.md#set-up-a-new-remote-host)), or each
-remote job's exact `uv sync` removes Dask from the shared environment.
+remote job's exact `pixi install` removes Dask from the shared environment.
 
 ## Checkpoints, retries and outputs
 
@@ -509,7 +509,7 @@ Before scaling up, run a small Dask connectivity and correctness smoke test:
 
 <!-- verify: skip (standalone developer smoke script, not a pyrite CLI invocation) -->
 ```bash
-uv run python checks/dask_execution_smoke.py --mode local \
+pixi run python checks/dask_execution_smoke.py --mode local \
   --output "$PWD/pyrite-output/dask-smoke-local"
 ```
 

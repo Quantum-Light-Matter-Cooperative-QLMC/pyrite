@@ -31,8 +31,8 @@ elastic mean free path, ``sqrt(2 lambda_el/lambda_in,1^(s))``.
 Validation: shell-soft-hard-transport
 
 Run:
-  uv run python checks/soft_inelastic_deflection.py
-  uv run python checks/soft_inelastic_deflection.py --output REPORT.json
+  pixi run python checks/soft_inelastic_deflection.py
+  pixi run python checks/soft_inelastic_deflection.py --output REPORT.json
 """
 
 import argparse

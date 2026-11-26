@@ -34,7 +34,7 @@ for tilt in "${tilt_list[@]}"; do
         rm -rf "$PYRITE_CACHE_DIR/line-grids"
         stem="$OUT/$MATERIAL-$E0-$tilt-$arm"
         echo "== $(date -Is) $stem"
-        timeout "$ARM_TIMEOUT" uv run --no-sync python -u checks/characteristic_device_memory_1455.py \
+        timeout "$ARM_TIMEOUT" pixi run --as-is -e amd python -u checks/characteristic_device_memory_1455.py \
             "$MATERIAL" "$E0" "$tilt" "$arm" "$stem.json" > "$stem.log" 2>&1
         rc=$?
         [ "$rc" -ne 0 ] && STATUS=1

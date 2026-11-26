@@ -9,10 +9,10 @@ Policy: `docs/repo-design/releasing.md`. Versions bump only in a release PR
 titled `chore(release): bump version to X.Y.Z`; never mix with feature work.
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev release X.Y.Z --check
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev release X.Y.Z --notes-file <scratch>/notes.md
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --slow
+pixi run pyrite-dev release X.Y.Z --check
+pixi run pyrite-dev release X.Y.Z --notes-file <scratch>/notes.md
+pixi run pyrite-dev verify
+pixi run pyrite-dev test --slow
 ```
 
 `verify` is static-only. Release validation explicitly runs the full slow-inclusive
@@ -22,7 +22,7 @@ CPU suite; ordinary feature work follows `AGENTS.md` "Choose tests by impact".
    (shim, call sites, tests, docs) in earlier commits; no release while due.
 2. Run without `--check`: bumps `pyproject.toml`, `src/pyrite/__init__.py`,
    tutorial `pyrite-mc[...]==X.Y.Z` pins in `docs/notebooks/*.py`, and
-   `uv.lock`, regenerates CLI reference/deprecations, prints notes since
+   `pixi.lock`, regenerates CLI reference/deprecations, prints notes since
    last `v*` tag (else last release commit; `--base REV` overrides).
    Tutorial captures need no regeneration: `pyrite_version` is provenance
    only and fingerprints ignore the PyRITE pin version.

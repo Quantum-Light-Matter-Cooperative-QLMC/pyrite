@@ -14,7 +14,7 @@ def _tables_preflight_block(allow_physics_fallback=False) -> str:
     required = "elsepa,sbethe-tables,eedl,eadl,epdl,sbethe"
     # BremsLib is required by model-aware scan preflight, not this global
     # inventory: explicit EEDL/uncoupled jobs do not consume those tables.
-    verify = f"{config.remote_runtime_env()} {config.shell_remote_uv()} run --no-sync pyrite tables verify --require {required}"
+    verify = f"{config.remote_runtime_env()} {config.shell_remote_run()} pyrite tables verify --require {required}"
     return f"""if [ ! -f "$JOBDIR/.tables_ok" ]; then
   if {verify} >> "$JOBDIR/log" 2>&1; then
     : > "$JOBDIR/.tables_ok"

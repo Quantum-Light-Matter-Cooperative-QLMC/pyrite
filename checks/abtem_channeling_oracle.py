@@ -30,9 +30,9 @@ differ by 6% and 2% at ``s = 0.05 / angstrom`` (1% above ``s = 0.2``).
 
 Run configurations on ``pyrite remote`` (SLURM, CPU) in batches, then merge::
 
-    uv run --group oracle python checks/abtem_channeling_oracle.py run \
+    pixi run python checks/abtem_channeling_oracle.py run \
         --configs 0 4 --out cfg0.npz
-    uv run --group oracle python checks/abtem_channeling_oracle.py compare \
+    pixi run python checks/abtem_channeling_oracle.py compare \
         cfg*.npz --out report.json
 
 Repeat ``run`` with ``--slice 0.5`` to show slice convergence. Thickness

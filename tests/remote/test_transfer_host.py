@@ -26,7 +26,7 @@ LOGIN, DTN = "h2", "h2-dtn"
 
 
 def _target(remote_dir, **extra):
-    return RemoteTarget(host=LOGIN, remote_dir=str(remote_dir), uv="uv", **extra)
+    return RemoteTarget(host=LOGIN, remote_dir=str(remote_dir), pixi="pixi", **extra)
 
 
 def test_transfer_host_routes_only_data_paths(monkeypatch):
@@ -109,6 +109,8 @@ def _fake_hosts(monkeypatch):
         calls.append(("capture", host or config.remote_host(), command))
         if "squeue" in command:
             return ""
+        # The box's pixi is configured, not necessarily on this machine's PATH.
+        command = command.replace('command -v "pixi"', "true")
         return subprocess.check_output(["sh", "-c", command], text=True)
 
     def run(argv, **_kwargs):
@@ -157,10 +159,10 @@ def test_sync_moves_data_through_the_transfer_host(tmp_path, monkeypatch, mode):
         transport.sync_code()
     assert (box / "src/pyrite/keep.py").read_text() == "KEEP = 1\n"
     assert (box / config.SYNC_STAMP_NAME).is_file()
-    # Scheduler state and the uv probe stay on the login host ...
+    # Scheduler state and the pixi probe stay on the login host ...
     assert _host_of(calls, "squeue") == {LOGIN}
-    if mode == "rsync":  # the uv probe rides the inventory round trip only when one runs
-        assert _host_of(calls, transport._UV_MISSING_MARK) == {LOGIN}
+    if mode == "rsync":  # the pixi probe rides the inventory round trip only when one runs
+        assert _host_of(calls, transport._PIXI_MISSING_MARK) == {LOGIN}
         assert _host_of(calls, "command -v rsync") == {DTN}
     # ... while every upload, inventory and extraction goes to the DTN.
     data = [(kind, host) for kind, host, _ in calls if kind in ("rsync", "scp")]
@@ -202,9 +204,9 @@ def _tmp_scp(check_call, tmp):
 # --- staged pull --------------------------------------------------------------
 
 
-def _fake_uv(tmp_path, *, fail=False):
-    """A ``host_uv_command`` stand-in whose ``checkpoint slim ... -o OUT`` copies the checkpoint."""
-    script = tmp_path / "fake_uv.sh"
+def _fake_pixi(tmp_path, *, fail=False):
+    """A ``host_run_command`` stand-in whose ``checkpoint slim ... -o OUT`` copies the checkpoint."""
+    script = tmp_path / "fake_pixi.sh"
     count = tmp_path / "slims"
     body = 'while [ $# -gt 0 ]; do case "$1" in -o) out=$2; shift;; slim) ckpt=$2;; esac; shift; done\n'
     body += f'echo x >> "{count}"\n'
@@ -218,8 +220,8 @@ def _staged_box(tmp_path, monkeypatch, *, fail=False):
     ckpt = box / "pyrite-output" / "checkpoints" / "hopg"
     ckpt.mkdir(parents=True)
     (ckpt / "part.bin").write_bytes(b"checkpoint-bytes" * 64)
-    uv, count = _fake_uv(tmp_path, fail=fail)
-    monkeypatch.setattr(config, "host_uv_command", lambda extra_env="": uv)
+    pixi, count = _fake_pixi(tmp_path, fail=fail)
+    monkeypatch.setattr(config, "host_run_command", lambda extra_env="": pixi)
     monkeypatch.setenv("PYRITE_SSH_MUX", "0")
     return box, str(ckpt), count
 

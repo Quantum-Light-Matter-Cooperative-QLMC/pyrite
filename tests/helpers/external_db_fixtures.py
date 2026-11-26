@@ -93,7 +93,7 @@ def _mp_rester(api_key: str) -> object:
     except ImportError as exc:
         raise MPQueryError(
             "Materials Project lookup requires the external-db extra; "
-            "run `uv sync --extra external-db` before retrying."
+            "run from the default pixi environment (`pixi run`), which includes it."
         ) from exc
     return MPRester(api_key)
 

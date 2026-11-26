@@ -24,7 +24,7 @@ This check separates the detector contributions under those approximations. It i
 finite and the zone/native split adds up to the full-row score (incoherent
 sums are additive over rows), 1 otherwise.
 
-    PYRITE_MC_BACKEND=cpu uv run python checks/channeling_detector_components.py \
+    PYRITE_MC_BACKEND=cpu pixi run python checks/channeling_detector_components.py \
         --electrons 50 --json scratch/channeling_detector_components.json
 
 Band integrals are photons/sr per incident electron over the case line grid.

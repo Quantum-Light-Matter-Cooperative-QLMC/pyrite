@@ -7,7 +7,7 @@ coherent line sums. No GPU simulator or CPU fallback can pass for CUDA.
 
 Run on the lab box after ``pyrite remote sync`` with its pinned tables fetched::
 
-    uv run --extra nvidia python checks/scheduled_cuda_parity.py --output-dir evidence/parity-344
+    pixi run -e nvidia python checks/scheduled_cuda_parity.py --output-dir evidence/parity-344
 
 The numerical bounds are initial regression guards, NOT an uncertainty model
 or statistical validation of real transport. They require hardware calibration

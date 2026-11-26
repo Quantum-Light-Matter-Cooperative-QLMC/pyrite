@@ -44,8 +44,8 @@ Numbers from this script back
 
 Validation: transverse-bunch-form-factor
 
-Run:  uv run python checks/coherent_transverse_coherence.py
-      uv run python checks/coherent_transverse_coherence.py --quick
+Run:  pixi run python checks/coherent_transverse_coherence.py
+      pixi run python checks/coherent_transverse_coherence.py --quick
 """
 
 import argparse

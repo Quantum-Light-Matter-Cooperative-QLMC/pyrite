@@ -10,7 +10,6 @@
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
 export MPLBACKEND=Agg PYRITE_MC_BACKEND=cuda
 out="scratch/quotient/$SLURM_JOB_ID"
@@ -25,11 +24,11 @@ cp checks/equal_precision/{precision_source.py,precision_checks.py,benchmark_pre
 cp src/pyrite/montecarlo/transport/{_jit_kernel.py,_jit_launch.py,_jit_radiative_device.py,_jit_device.py,api.py,kinematics.py,_jit_radiative.py,hard_radiative.py,batching.py} "$out/source/"
 cp -r tests/performance "$out/source/performance-tests"
 if [ "$1" = preflight ]; then
-    PYRITE_TEST_BACKEND=cuda "$HOME/.local/bin/uv" run --no-sync pyrite-dev test tests/montecarlo/cascades/test_hard_radiative_cuda.py --durations=0 > "$out/reference-tests.log" 2>&1
-    "$HOME/.local/bin/uv" run --no-sync pyrite-dev test tests/performance --durations=0 > "$out/harness-tests.log" 2>&1
+    PYRITE_TEST_BACKEND=cuda "${PYRITE_REMOTE_PIXI:-$HOME/.pixi/bin/pixi}" run --as-is -e nvidia pyrite-dev test tests/montecarlo/cascades/test_hard_radiative_cuda.py --durations=0 > "$out/reference-tests.log" 2>&1
+    "${PYRITE_REMOTE_PIXI:-$HOME/.pixi/bin/pixi}" run --as-is -e nvidia pyrite-dev test tests/performance --durations=0 > "$out/harness-tests.log" 2>&1
 fi
 extra=()
 if [ "$1" != preflight ]; then extra=(--preflight "$2"); fi
-"$HOME/.local/bin/uv" run --no-sync python checks/equal_precision/run_precision.py "$1" "$out" "${extra[@]}" --protocol checks/equal_precision/precision-quotient.json --replica-start "${3:-0}" --replica-stop "${4:-10}"
+"${PYRITE_REMOTE_PIXI:-$HOME/.pixi/bin/pixi}" run --as-is -e nvidia python checks/equal_precision/run_precision.py "$1" "$out" "${extra[@]}" --protocol checks/equal_precision/precision-quotient.json --replica-start "${3:-0}" --replica-stop "${4:-10}"
 nvidia-smi -q > "$out/gpu-after.txt"
 find "$out" -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > "$out/SHA256SUMS"

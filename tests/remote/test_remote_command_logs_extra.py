@@ -61,7 +61,7 @@ def test_stack_dump_signals_only_handler_registered_scans():
     command = viewer._stack_dump_command("j", 2)
     assert 'srun --jobid="$SID" --overlap --ntasks=1' in command
     assert "SigCgt" in command and ">> 9" in command
-    assert "-m pyrite\\\\._entry\\\\.scan" in command  # not the uv wrapper or workers
+    assert "-m pyrite\\\\._entry\\\\.scan" in command  # not the pixi wrapper or workers
     assert 'tail -c +"$((start + 1))" "$D/log"' in command
 
 

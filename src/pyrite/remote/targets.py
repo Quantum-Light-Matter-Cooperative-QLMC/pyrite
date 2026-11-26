@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, replace
 
 from ..console import config as store
+from ..console.output import emit_diagnostic
 from . import config
 from .config import RemoteTarget
 
@@ -16,7 +17,7 @@ _NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{0,63}\Z")
 _FIELDS = (
     "host",
     "remote_dir",
-    "uv",
+    "pixi",
     "gpu_vendor",
     "partition",
     "nodelist",
@@ -31,7 +32,7 @@ _FIELDS = (
     "host_exec",
     "nice",
     "transfer_host",
-    "extras",
+    "environment",
     "description",
 )
 
@@ -58,8 +59,43 @@ def _target_table():
     return table
 
 
+_WARNED: set[str] = set()
+
+
+def _warn_once(key: str, message: str) -> None:
+    if key not in _WARNED:
+        _WARNED.add(key)
+        emit_diagnostic(f"warning: {message}")
+
+
+def _drop_legacy(values, where: str | None):
+    """Drop uv-era keys (``uv``, ``extras``) from stored target values (#1462).
+
+    ``where`` names a user-configured target to warn about; ``None`` drops
+    silently (local job provenance records written before the migration).
+    """
+    if not isinstance(values, dict):
+        return values
+    legacy = [key for key in config.LEGACY_TARGET_FIELDS if key in values]
+    if legacy and where is not None:
+        replaced = ", ".join(f"{key} -> {config.LEGACY_TARGET_FIELDS[key]}" for key in legacy)
+        _warn_once(
+            f"target:{where}",
+            f"remote target {where!r} has uv-era fields ignored since the pixi migration "
+            f"({replaced}); set the replacements with: pyrite remote target edit {where} "
+            "--pixi PATH --environment ENV",
+        )
+    return {key: value for key, value in values.items() if key not in legacy}
+
+
+def stored_target(record: dict) -> RemoteTarget:
+    """Rebuild a target from a local job provenance record, ignoring uv-era fields."""
+    return RemoteTarget(**_drop_legacy(record, None))
+
+
 def _load_target(name, values):
     validate_name(name)
+    values = _drop_legacy(values, name)
     if not isinstance(values, dict) or set(values) - set(_FIELDS):
         raise store.ConfigError(f"invalid remote.targets.{name}: unknown fields or non-table")
     try:
@@ -108,9 +144,14 @@ def resolve_target(target: str | RemoteTarget | None = None) -> RemoteTarget:
 
 
 def _fallback_values(exclude=()):
+    if "PYRITE_REMOTE_UV" in os.environ:
+        _warn_once(
+            "env:PYRITE_REMOTE_UV",
+            "PYRITE_REMOTE_UV is ignored since the pixi migration; set PYRITE_REMOTE_PIXI",
+        )
     return {
         "remote_dir": os.environ.get("PYRITE_REMOTE_DIR", config.REMOTE_DIR),
-        "uv": os.environ.get("PYRITE_REMOTE_UV", config.REMOTE_UV),
+        "pixi": os.environ.get("PYRITE_REMOTE_PIXI", config.REMOTE_PIXI),
         **{
             field: store.resolve(f"remote.{field}", getattr(config, override)).value
             for field, override in (
@@ -152,7 +193,8 @@ def save_target(name: str, values: dict, *, edit: bool = False) -> RemoteTarget:
     )
     document = store._load_document()
     table = document.setdefault("remote", {}).setdefault("targets", {})
-    table[name] = (dict(table[name]) | values) if edit else values
+    # An edit also retires uv-era keys from the stored table.
+    table[name] = (_drop_legacy(dict(table[name]), None) | values) if edit else values
     store._write_document(document)
     return target
 
@@ -196,7 +238,7 @@ def job_target(jobid: str) -> RemoteTarget | None:
         raise store.ConfigError(f"remote_jobs.{jobid} must be a table")
     if len(records) > 1:
         raise ValueError(f"job {jobid!r} exists on multiple targets; specify --target")
-    return RemoteTarget(**next(iter(records.values()))) if records else None
+    return stored_target(next(iter(records.values()))) if records else None
 
 
 def profile_job_target(profile: str) -> RemoteTarget | None:
@@ -213,7 +255,7 @@ def profile_job_target(profile: str) -> RemoteTarget | None:
     for jobid, records in table.items():
         if pattern.match(jobid) and isinstance(records, dict):
             for record in records.values():
-                target = RemoteTarget(**record)
+                target = stored_target(record)
                 found[(target.host, target.remote_dir)] = target
     if len(found) > 1:
         names = ", ".join(sorted(t.name or t.host for t in found.values()))

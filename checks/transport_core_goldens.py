@@ -10,8 +10,8 @@ Goldens must be captured from the pre-collapse code; ``--dir`` data is a local
 working artifact and is not committed.
 
 Usage:
-    uv run python checks/transport_core_goldens.py capture --dir DIR
-    uv run python checks/transport_core_goldens.py check --dir DIR
+    pixi run python checks/transport_core_goldens.py capture --dir DIR
+    pixi run python checks/transport_core_goldens.py check --dir DIR
 """
 
 import argparse

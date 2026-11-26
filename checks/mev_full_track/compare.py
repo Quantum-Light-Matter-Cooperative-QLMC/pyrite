@@ -32,9 +32,9 @@ Kolmogorov distances of the binned loss, angle and photon spectra.
 Validation: mev-full-track-transport
 
 Run:
-  uv run python checks/mev_full_track/compare.py reduce-geant4 RAW_DIR
-  uv run python checks/mev_full_track/compare.py reduce-pyrite RAW_DIR
-  uv run python checks/mev_full_track/compare.py [--output REPORT.json]
+  pixi run python checks/mev_full_track/compare.py reduce-geant4 RAW_DIR
+  pixi run python checks/mev_full_track/compare.py reduce-pyrite RAW_DIR
+  pixi run python checks/mev_full_track/compare.py [--output REPORT.json]
 """
 
 import argparse

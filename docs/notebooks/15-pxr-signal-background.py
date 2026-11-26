@@ -41,7 +41,7 @@ def _(mo):
     from source density to transmitted flux to expected measured counts.
     A visible source peak does not guarantee a visible measured peak.
 
-    Run locally with `uv run marimo edit docs/notebooks/15-pxr-signal-background.py`,
+    Run locally with `pixi run marimo edit docs/notebooks/15-pxr-signal-background.py`,
     or use Molab's inline environment. The first cell installs missing reference
     tables once (about 100 MB); later runs reuse them. This bounded CPU example
     uses **2048 CXR / 512 bremsstrahlung histories**, transport seed **23**,

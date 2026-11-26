@@ -16,13 +16,13 @@ route, or precision and never Monte Carlo:
 
 ``REAL`` is fixed at import, so each backend is its own process::
 
-    uv run python checks/sinc_bin_integration.py transport --out p.pkl
-    PYRITE_MC_BACKEND=cpu uv run python checks/sinc_bin_integration.py \\
+    pixi run python checks/sinc_bin_integration.py transport --out p.pkl
+    PYRITE_MC_BACKEND=cpu pixi run python checks/sinc_bin_integration.py \\
         evaluate --payload p.pkl --out cpu64.npz --expect-dtype float64
-    PYRITE_MC_BACKEND=cuda uv run python checks/sinc_bin_integration.py \\
+    PYRITE_MC_BACKEND=cuda pixi run python checks/sinc_bin_integration.py \\
         evaluate --payload p.pkl --out gpu32.npz --expect-dtype float32
-    uv run python checks/sinc_bin_integration.py yield --evaluation gpu32.npz --rtol 1e-3
-    uv run python checks/sinc_bin_integration.py agree \\
+    pixi run python checks/sinc_bin_integration.py yield --evaluation gpu32.npz --rtol 1e-3
+    pixi run python checks/sinc_bin_integration.py agree \\
         --reference cpu64.npz --candidate gpu32.npz --rtol 1e-5
 
 Heavy at 300 keV: run through ``pyrite remote`` (lab box), never locally.

@@ -488,7 +488,7 @@ def tune_kernels(
     try:
         import optuna
     except ImportError as exc:
-        raise ImportError("install pyrite-mc[optimization] / uv sync --extra optimization") from exc
+        raise ImportError("install pyrite-mc[optimization] (a pixi checkout has it)") from exc
 
     phases: tuple[Phase, ...] = (
         ("total",)

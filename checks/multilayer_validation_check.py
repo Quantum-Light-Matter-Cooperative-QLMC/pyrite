@@ -29,7 +29,7 @@ plan"): two self-contained, quantitative checks that need NO measured data.
      profile shape (hence the centroid fraction) is Z-dependent.]
 
 Run with the project environment and CPU backend:
-    PYRITE_MC_BACKEND=cpu uv run python checks/multilayer_validation_check.py
+    PYRITE_MC_BACKEND=cpu pixi run python checks/multilayer_validation_check.py
 """
 
 import sys

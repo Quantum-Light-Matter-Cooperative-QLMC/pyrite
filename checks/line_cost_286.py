@@ -9,7 +9,7 @@ outside the reducer (amplitudes, kinematics, queueing) is the remainder.
 
 Measurement only: production code is wrapped, never changed.
 
-    uv run python checks/line_cost_286.py --energy-kev 300 --counts 100 400 1600 \
+    pixi run python checks/line_cost_286.py --energy-kev 300 --counts 100 400 1600 \
         --output out.json
 """
 

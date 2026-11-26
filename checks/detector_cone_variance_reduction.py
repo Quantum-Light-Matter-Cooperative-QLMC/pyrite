@@ -259,7 +259,7 @@ def submit(args):
 
     from pyrite import remote
     from pyrite.energy_grid.convergence_job import _precision_payload
-    from pyrite.remote._queue_scripts import _uv_sync_block
+    from pyrite.remote._queue_scripts import _pixi_install_block
 
     rest = list(args.rest)
     if rest and rest[0] == "--":
@@ -270,13 +270,13 @@ def submit(args):
     # The job runs its own copy of this script, embedded below, so a later
     # code sync from another checkout cannot remove or change it mid-queue.
     command = (
-        f'{env}PYRITE_MC_BACKEND=cuda {remote.shell_remote_uv()} run --no-sync python "$JOBDIR/check.py" '
+        f'{env}PYRITE_MC_BACKEND=cuda {remote.shell_remote_run()} python "$JOBDIR/check.py" '
         + " ".join(shlex.quote(token) for token in rest)
     )
     source = Path(__file__).read_text()
     if "\nPYRITE_CHECK_EOF\n" in source:
         raise SystemExit("script contains the heredoc terminator")
-    payload = _precision_payload(jobdir, [command], remote, _uv_sync_block(), label=JOB_KIND)
+    payload = _precision_payload(jobdir, [command], remote, _pixi_install_block(), label=JOB_KIND)
     embed = f"cat > \"$JOBDIR/check.py\" <<'PYRITE_CHECK_EOF'\n{source}PYRITE_CHECK_EOF\n"
     marker = '\n[ -f "$JOBDIR/STOP" ]'
     payload = payload.replace(marker, "\n" + embed.rstrip("\n") + marker, 1)

@@ -28,7 +28,7 @@ for seed in "${seeds[@]}"; do
     for s in "${scenes[@]}"; do
         for arm in ss wvi gs; do
             stem="$PWD/$out/$arm-$s-$seed"
-            .venv/bin/python checks/geant4_performance/geant4_bench.py "$s" \
+            .pixi/envs/default/bin/python checks/geant4_performance/geant4_bench.py "$s" \
                 --histories "$histories" --warmup $((histories / 100)) --seed "$seed" \
                 --threads 32 --executable "$G4BENCH" --elastic "$arm" \
                 --output "$stem.json" > "$stem.log" 2>&1

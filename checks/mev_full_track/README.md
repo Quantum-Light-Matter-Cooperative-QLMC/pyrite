@@ -67,11 +67,11 @@ shards per case. `run_control.sbatch` runs the point-nucleus control below.
 ## Comparison
 
 ```bash
-uv run python checks/mev_full_track/compare.py reduce-geant4 RAW_DIR
-uv run python checks/mev_full_track/compare.py reduce-pyrite RAW_DIR
-uv run python checks/mev_full_track/compare.py --output report.json
-uv run python checks/mev_full_track/compare.py reduce-pyrite RAW_DIR --variant point
-uv run python checks/mev_full_track/compare.py --variant point
+pixi run python checks/mev_full_track/compare.py reduce-geant4 RAW_DIR
+pixi run python checks/mev_full_track/compare.py reduce-pyrite RAW_DIR
+pixi run python checks/mev_full_track/compare.py --output report.json
+pixi run python checks/mev_full_track/compare.py reduce-pyrite RAW_DIR --variant point
+pixi run python checks/mev_full_track/compare.py --variant point
 ```
 
 The gates were fixed before any PyRITE result was inspected. An observable

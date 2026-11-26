@@ -7,7 +7,7 @@
 #SBATCH --mem=16G
 #SBATCH --time=24:00:00
 #SBATCH --output=/home/aamador/pyrite-1055/runs/%x-%A-%a.log
-export PATH=$HOME/.local/bin:$PATH
+export PATH=$HOME/.pixi/bin:$PATH
 export PYRITE_HOME=$HOME/pyrite PYRITE_CATALOG=$HOME/pyrite-1055/src/pyrite/data/catalog
 export PYRITE_USER_CATALOG=$(mktemp -d)/catalog XDG_CONFIG_HOME=$(mktemp -d)
 export PYRITE_MC_BACKEND=cpu NUMBA_NUM_THREADS=$SLURM_CPUS_PER_TASK
@@ -25,7 +25,7 @@ CASES=(
 )
 read -r CRYSTAL PSI EMAX <<< "${CASES[$SLURM_ARRAY_TASK_ID]}"
 echo "sha $(cat SHA) case $CRYSTAL psi=$PSI mrad"
-uv run --frozen python checks/planar_zone_row_cbs.py --crystal "$CRYSTAL" --psi-mrad "$PSI" \
+pixi run --frozen python checks/planar_zone_row_cbs.py --crystal "$CRYSTAL" --psi-mrad "$PSI" \
   --energy-MeV 17 --thickness-um 20 --electrons 2000 --chunks 20 \
   --e-min-keV 5 --e-max-keV "$EMAX" --n-energy $(( (EMAX - 5) * 10 + 1 )) \
   --band cr:10:25 --band cbs:25:40 \

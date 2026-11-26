@@ -229,7 +229,7 @@ _STACK_SIGNAL_BIT = 9
 _STACK_MARKER = "CXR_STACK_SIGNALLED"
 
 # Runs on the job's node inside its allocation: signal only this user's scan
-# interpreters (not the uv wrapper, not multiprocessing workers) that catch
+# interpreters (not the pixi wrapper, not multiprocessing workers) that catch
 # SIGUSR1.
 _STACK_SIGNAL_SCRIPT = (
     "n=0; skipped=0; "

@@ -64,7 +64,7 @@ within statistics, or the script exits 1. The two independent models are
 reported, not gated.
 
 ```bash
-PYRITE_MC_BACKEND=cpu uv run python checks/pair_production_geant4/compare.py
+PYRITE_MC_BACKEND=cpu pixi run python checks/pair_production_geant4/compare.py
 ```
 
 ## Results (2026-10-01, PyRITE `8ca14d0c`, SLURM jobs 332/344)

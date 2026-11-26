@@ -67,15 +67,19 @@ jobs:
           # Format the source commit, not GitHub's synthetic merge commit.
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
         with:
-          python-version: "3.14"
+          pixi-version: v0.85.0
+          environments: py314
+          locked: true
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
 
       - name: Format code
-        run: uv run --locked pyrite-dev format
+        run: pixi run --locked -e py314 pyrite-dev format
 
       - name: Regenerate CLI reference
-        run: uv run --locked pyrite-dev cli-reference --write
+        run: pixi run --locked pyrite-dev cli-reference --write
 
       - name: Commit formatting and generated-reference fixes
         id: commit
@@ -126,19 +130,19 @@ jobs:
           - cli
           - apps
           - packaging
-        python: ["3.13", "3.14"]
-    env:
-      UV_PYTHON: ${{ matrix.python }}
+        # Python 3.13 is the `default` pixi environment, 3.14 is `py314`.
+        environment: [default, py314]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
         with:
-          python-version: ${{ matrix.python }}
-
-      - name: Install dependencies
-        run: uv sync --all-groups --locked
+          pixi-version: v0.85.0
+          environments: ${{ matrix.environment }}
+          locked: true
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
 
       # Every hash-pinned fetched dataset and table release (ADR-0014): EEDL,
       # EADL, EPDL, SBETHE sdbase/ and catalogue tables, ELSEPA, BremsLib, and
@@ -157,13 +161,13 @@ jobs:
           key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
 
       - name: Fetch pinned data
-        run: uv run pyrite tables fetch
+        run: pixi run -e ${{ matrix.environment }} pyrite tables fetch
 
       - name: Test ${{ matrix.suite }} suite
         # Every PR runs the opt-in slow tier too (#381).
         env:
           PYRITE_SLOW_TESTS: "1"
-        run: uv run pyrite-dev test-suite "${{ matrix.suite }}" --durations=30 --durations-min=0.5
+        run: pixi run -e ${{ matrix.environment }} pyrite-dev test-suite "${{ matrix.suite }}" --durations=30 --durations-min=0.5
 
   quantum:
     needs: changes
@@ -173,19 +177,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.13", "3.14"]
-    env:
-      UV_PYTHON: ${{ matrix.python }}
+        # Python 3.13 is the `default` pixi environment, 3.14 is `py314`.
+        environment: [default, py314]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
         with:
-          python-version: ${{ matrix.python }}
-
-      - name: Install dependencies
-        run: uv sync --all-groups --locked
+          pixi-version: v0.85.0
+          environments: ${{ matrix.environment }}
+          locked: true
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
 
       - name: Cache pinned data
         uses: actions/cache@v4
@@ -197,29 +201,32 @@ jobs:
           key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
 
       - name: Fetch pinned data
-        run: uv run pyrite tables fetch
+        run: pixi run -e ${{ matrix.environment }} pyrite tables fetch
 
       - name: Test quantum suite
         env:
           PYRITE_SLOW_TESTS: "1"
-        run: uv run pyrite-dev test-suite quantum --durations=30 --durations-min=0.5
+        run: pixi run -e ${{ matrix.environment }} pyrite-dev test-suite quantum --durations=30 --durations-min=0.5
 
   full:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
         with:
-          python-version: "3.14"
-      - run: uv sync --all-groups --locked
+          pixi-version: v0.85.0
+          environments: py314
+          locked: true
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
 
       # Includes a non-mutating format check for fork PRs too.
       - name: Verify non-test gates
-        run: uv run pyrite-dev verify
+        run: pixi run -e py314 pyrite-dev verify
       - name: Check agent skills
-        run: uv run pyrite-dev check-skills
+        run: pixi run -e py314 pyrite-dev check-skills
       - name: Check generated repository map
-        run: uv run pyrite-dev repo-map --check
+        run: pixi run -e py314 pyrite-dev repo-map --check
 
   # Keep the existing JIT-compiled suite above. Here --numba intentionally
   # disables JIT to exercise Python-level Numba bodies; it does NOT test
@@ -263,10 +270,13 @@ jobs:
       SLOW: ${{ (github.event_name == 'schedule' || inputs.slow) && '--slow' || '' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
         with:
-          python-version: '3.14'
-      - run: uv sync --all-groups --locked
+          pixi-version: v0.85.0
+          environments: py314
+          locked: true
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
       - name: Cache pinned physics tables
         uses: actions/cache@v4
         with:
@@ -275,7 +285,7 @@ jobs:
             ~/.local/share/pyrite/xsgen/tables
             ~/.local/share/pyrite/xsgen/reference-data
           key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
-      - run: uv run pyrite tables fetch
+      - run: pixi run -e py314 pyrite tables fetch
       - name: Suites with JIT disabled and online checks enabled
         shell: bash
         run: |
@@ -284,7 +294,7 @@ jobs:
           for suite in "${suites[@]}"; do
             echo "::group::$suite"
             export PYRITE_TEST_DIAGNOSTICS="numba-diagnostics/$suite"
-            uv run pyrite-dev test-suite "$suite" $SLOW --durations=10 \
+            pixi run -e py314 pyrite-dev test-suite "$suite" $SLOW --durations=10 \
               --junitxml="numba-junit-$suite.xml" || rc=1
             echo "::endgroup::"
           done
@@ -299,3 +309,39 @@ jobs:
             numba-diagnostics/
           if-no-files-found: ignore
           retention-days: 30
+
+  # Opt-in Intel SVML Numba environment (#1459, #1462). Anaconda pkgs/main
+  # terms apply (LICENSE-SVML.md): this job only checks that the SVML
+  # kernels still work and publishes no artifact built from the environment.
+  svml:
+    runs-on: ubuntu-latest
+    env:
+      PYRITE_MC_BACKEND: cpu
+    steps:
+      - uses: actions/checkout@v7
+      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
+        with:
+          pixi-version: v0.85.0
+          environments: svml
+          locked: true
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+      - name: Cache pinned physics tables
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/pyrite/datasets
+            ~/.local/share/pyrite/xsgen/tables
+            ~/.local/share/pyrite/xsgen/reference-data
+          key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
+      - run: pixi run -e svml pyrite tables fetch
+      - name: Require operational SVML
+        run: |
+          pixi run -e svml numba -s | tee numba-sysinfo.txt
+          grep -E 'SVML Operational +: True' numba-sysinfo.txt
+      - name: Node-window and vector-sine kernels under SVML
+        run: >
+          pixi run -e svml pyrite-dev test
+          tests/montecarlo/spectrum/test_node_support_window.py
+          tests/montecarlo/spectrum/test_vector_sin.py
+          tests/test_jit_cache.py

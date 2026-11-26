@@ -1,8 +1,8 @@
 """Generate or check the Click command reference.
 
 Usage:
-    uv run pyrite-dev cli-reference --write
-    uv run pyrite-dev cli-reference --check
+    pixi run pyrite-dev cli-reference --write
+    pixi run pyrite-dev cli-reference --check
 """
 
 import argparse

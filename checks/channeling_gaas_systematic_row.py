@@ -22,7 +22,7 @@ Gaussian tilt spreads (rms in ``k_x/g400``, mirrored about the symmetric
 ``k_x = 0``) applied as an incoherent sum over incidence; ``sigma = 0`` is the
 parameter-free plane-wave prediction.
 
-    UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run python \
+    pixi run python \
         checks/channeling_gaas_systematic_row.py --ladder \
         --json docs/validation/check-records/planar-zone/gaas400-ratios-1178.json
 

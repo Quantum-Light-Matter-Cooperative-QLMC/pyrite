@@ -25,9 +25,9 @@ From a source checkout, run the maintained example or open its reactive notebook
 
 <!-- verify: skip (downloadable Python example and marimo editor; checked by notebook export) -->
 ```bash
-uv sync --extra apps
-uv run python docs/examples/experimental_axial_channeling.py
-uv run marimo edit docs/examples/axial_channeling_notebook.py
+pixi install
+pixi run python docs/examples/experimental_axial_channeling.py
+pixi run marimo edit docs/examples/axial_channeling_notebook.py
 ```
 
 The reactive example uses its shared script for computation and plots. Change

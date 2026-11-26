@@ -71,17 +71,17 @@ def test_missing_section_marker_fails_closed(monkeypatch):
         transport._remote_inventories(artifacts=False, tables=True)
 
 
-def test_missing_remote_uv_fails_before_transfer(monkeypatch):
+def test_missing_remote_pixi_fails_before_transfer(monkeypatch):
     commands = []
 
     def capture(command):
         commands.append(command)
-        return transport._UV_MISSING_MARK + "\n"
+        return transport._PIXI_MISSING_MARK + "\n"
 
     monkeypatch.setattr(transport, "_ssh_capture", capture)
-    with pytest.raises(SystemExit, match="uv not found on remote-host at uv"):
+    with pytest.raises(SystemExit, match="pixi not found on remote-host at pixi"):
         transport._remote_inventories(artifacts=False, tables=True)
-    assert len(commands) == 1 and commands[0].startswith('command -v "uv" ')
+    assert len(commands) == 1 and commands[0].startswith('command -v "pixi" ')
 
 
 def test_ships_only_missing_or_differing_pairs_payload_first(tmp_path):
@@ -297,16 +297,16 @@ def test_generated_script_stops_in_preflight_before_any_transport(monkeypatch, t
     jobdir = tmp_path / "jobs" / "j"
     jobdir.mkdir(parents=True)
     ran = tmp_path / "ran"
-    fake_uv = tmp_path / "uv"
-    fake_uv.write_text(
+    fake_pixi = tmp_path / "pixi"
+    fake_pixi.write_text(
         "#!/bin/sh\n"
-        'if [ "$1" = sync ]; then exit 0; fi\n'
+        'if [ "$1" = install ]; then exit 0; fi\n'
         'case "$*" in *"tables verify"*) echo "missing: elsepa Z=6"; exit 1 ;; esac\n'
         f'echo transport >> "{ran.as_posix()}"\n'
     )
-    fake_uv.chmod(0o755)
+    fake_pixi.chmod(0o755)
     monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
-    monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
+    monkeypatch.setattr(config, "REMOTE_PIXI", fake_pixi.as_posix())
     from pyrite import remote
 
     script = (

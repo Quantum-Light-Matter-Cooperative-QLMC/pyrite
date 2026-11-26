@@ -1,4 +1,4 @@
-"""Thin ``python -m`` entry-point shims the remote box invokes on a uv-synced
+"""Thin ``python -m`` entry-point shims the remote box invokes on a pixi-installed
 checkout (``python -m pyrite._entry.scan``, ``python -m pyrite._entry.reproduce_zhai``).
 
 Each module is a minimal ``__main__`` wrapper -- the heavy logic lives elsewhere

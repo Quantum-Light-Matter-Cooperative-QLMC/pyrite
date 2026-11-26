@@ -56,7 +56,7 @@ lines inside the window are reported as a 4 pi yield fraction
 Runs: each case is a few minutes at the default grid; the full set and the
 grid/bin convergence arms belong on ``pyrite remote``::
 
-    PYRITE_MC_BACKEND=cpu uv run python checks/planar_line_anchors.py \
+    PYRITE_MC_BACKEND=cpu pixi run python checks/planar_line_anchors.py \
         --datasets genz kephart azadegan klein --out planar_anchors.json
 
 Validation: cr-line-shape, cr-yield-assembly

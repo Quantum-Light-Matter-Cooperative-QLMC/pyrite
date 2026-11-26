@@ -12,12 +12,12 @@ Python API, follow [Transition and coherent transition radiation](../notebooks/s
 From a source checkout:
 
 ```bash
-uv sync --extra apps
-uv run pyrite app transition-radiation launch
+pixi install
+pixi run pyrite app transition-radiation launch
 ```
 
 For an installed distribution, install `pyrite-mc[apps]`, then use the same
-commands without `uv run`. The initial analytic calculation needs no checkpoints,
+commands without `pixi run`. The initial analytic calculation needs no checkpoints,
 transport tables or GPU.
 
 The default source is a **30 keV beam** crossing a free-standing **20 nm silicon
@@ -66,9 +66,9 @@ the time/position offsets rather than multiplying by an analytic form factor.
 To keep the same default cases as campaign checkpoints:
 
 ```bash
-uv run pyrite run tr_demo
-uv run pyrite run ctr_demo
-uv run pyrite app analysis launch silicon
+pixi run pyrite run tr_demo
+pixi run pyrite run ctr_demo
+pixi run pyrite app analysis launch silicon
 ```
 
 Select the corresponding identity-qualified checkpoint in the analysis app.
@@ -92,7 +92,7 @@ PXR/CBS; coherent TR–line interference and diffracted TR are outside it.
 ## Export a static page
 
 ```bash
-uv run pyrite app transition-radiation export --stem tr_ctr_demo
+pixi run pyrite app transition-radiation export --stem tr_ctr_demo
 ```
 
 Open `pyrite-output/results/tr_ctr_demo.html` for the initial analytic plots;

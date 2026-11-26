@@ -52,7 +52,7 @@ The command:
    removals first, with call sites, tests, and docs.
 3. Bumps `pyproject.toml`, `src/pyrite/__init__.py` and the tutorial
    `pyrite-mc[...]==X.Y.Z` script pins in `docs/notebooks/*.py`, then refreshes
-   `uv.lock` (CI syncs with `--locked`).
+   `pixi.lock` (CI syncs with `--locked`).
 4. Regenerates `docs/repo-design/cli/cli-reference.md` and
    `docs/repo-design/cli/cli-deprecations.md`.
 5. Prints release notes from conventional commits since the last `v*` tag

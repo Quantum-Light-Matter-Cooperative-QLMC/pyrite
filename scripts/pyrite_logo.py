@@ -3,7 +3,7 @@
 
 Run from a PyRITE checkout with the reference tables installed:
 
-    PYRITE_MC_BACKEND=cpu uv run python scripts/pyrite_logo.py --ri-gap 0.10
+    PYRITE_MC_BACKEND=cpu pixi run python scripts/pyrite_logo.py --ri-gap 0.10
 
 Adjust --ri-gap to add space before the spectral I (logo units; 0 restores
 the original spacing). Cached simulations are reused when only spacing changes.

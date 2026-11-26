@@ -16,17 +16,17 @@
 #SBATCH --output=ncu825-%j.log
 set -uo pipefail
 cd "$SLURM_SUBMIT_DIR"
-export PATH="$HOME/.local/bin:/usr/local/cuda/bin:$PATH"
+export PATH="$HOME/.pixi/bin:/usr/local/cuda/bin:$PATH"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$PWD/user-catalog" XDG_CONFIG_HOME="$PWD/.xdg-config"
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache PYRITE_MC_BACKEND=cuda
+export PYRITE_MC_BACKEND=cuda
 mkdir -p "$XDG_CONFIG_HOME" "$PYRITE_USER_CATALOG"
 out="evidence/ncu825/$SLURM_JOB_ID"; mkdir -p "$out"
 cp .pyrite-sync "$out/sync.json"; nvidia-smi > "$out/gpu.txt"; ncu --version > "$out/ncu-version.txt"
-uv sync --extra nvidia --locked -q
-uv run --no-sync python checks/equal_precision/prepare_stopping.py > /dev/null
-py=(uv run --no-sync python)
+pixi install --locked -e nvidia
+pixi run --as-is -e nvidia python checks/equal_precision/prepare_stopping.py > /dev/null
+py=(pixi run --as-is -e nvidia python)
 pv=("${py[@]}" checks/fp32_speed_of_light/precision_variants.py
     --bench checks/geant4_performance/pyrite_bench.py)
 flags=(--seed 1 --rows-per-round 1024 --device-staging --warmup-histories 500)

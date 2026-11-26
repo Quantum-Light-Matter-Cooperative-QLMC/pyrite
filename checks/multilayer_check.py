@@ -11,7 +11,7 @@ Checks, on real MoSe2 transport segments:
      away from the substrate.
 
 Run CPU-forced (the viz laptop has no CUDA toolkit):
-    uv run python -c "import sys;sys.modules['cupy']=None;sys.path.insert(0,'checks');import runpy;runpy.run_path('checks/multilayer_check.py',run_name='__main__')"
+    pixi run python -c "import sys;sys.modules['cupy']=None;sys.path.insert(0,'checks');import runpy;runpy.run_path('checks/multilayer_check.py',run_name='__main__')"
 """
 
 import os

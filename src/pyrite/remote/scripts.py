@@ -16,7 +16,7 @@ _stems = _queue_scripts._stems
 _material_stems = _queue_scripts._material_stems
 _list_checkpoint_dirs_command = _queue_scripts._list_checkpoint_dirs_command
 _validate_parallel_materials = _queue_scripts._validate_parallel_materials
-_uv_sync_block = _queue_scripts._uv_sync_block
+_pixi_install_block = _queue_scripts._pixi_install_block
 _cpu_profile_block = _queue_scripts._cpu_profile_block
 _queue_script = _queue_scripts._queue_script
 _sbatch_retry_block = _queue_scripts._sbatch_retry_block
@@ -128,24 +128,18 @@ def _nvidia_prelude() -> str:
 
 
 def _amd_prelude() -> str:
-    """ROCm job environment: no modules, own venv, backend pinned to ``rocm``.
+    """ROCm job environment: no modules, backend pinned to ``rocm``.
 
-    AMD nodes share ``REMOTE_DIR`` with NVIDIA nodes, and the two ``uv sync``
-    extras install different CuPy builds, so AMD jobs keep a separate project
-    environment instead of rebuilding the shared ``.venv`` on every switch.
-    Pinning the backend makes a missing HIP stack fail instead of running on CPU.
+    AMD nodes may share ``REMOTE_DIR`` with NVIDIA nodes; their CuPy builds
+    live in separate pixi environments (``.pixi/envs/amd`` and ``nvidia``), so
+    neither rebuilds the other's packages on a switch. Pinning the backend makes a missing HIP stack fail instead of running on CPU.
     ``rocm_build_env.sh`` (synced with ``src``) fills the CuPy HIP build gaps
     a distribution ROCm leaves -- ROCm root, compiler, header layout, and
     roctracer -- and leaves a complete ROCm install untouched (#888).
     """
-    venv = config.shell_word(config.remote_path(".venv-amd"))
     checkout = config.shell_word(config.remote_dir())
     env_script = config.shell_word(config.remote_path("src/pyrite/remote/rocm_build_env.sh"))
-    return (
-        f"export UV_PROJECT_ENVIRONMENT={venv}\n"
-        f". {env_script} && _pyrite_rocm_env {checkout}\n"
-        "export PYRITE_MC_BACKEND=rocm"
-    )
+    return f". {env_script} && _pyrite_rocm_env {checkout}\nexport PYRITE_MC_BACKEND=rocm"
 
 
 _VENDOR_PRELUDES = {"nvidia": _nvidia_prelude, "amd": _amd_prelude}
@@ -549,7 +543,7 @@ def _prune_checkpoint_stems_command(
         f"{reserve}; "
         f"release_prune() {{ {release}; }}; trap release_prune EXIT; "
         f"cd {config.shell_remote_dir()} || exit $?; "
-        f"{config.host_uv_command()} run --no-sync pyrite {command}"
+        f"{config.host_run_command()} pyrite {command}"
     )
     if not obsolete_stems:
         return base

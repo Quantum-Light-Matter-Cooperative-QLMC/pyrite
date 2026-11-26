@@ -15,12 +15,12 @@
 set -uo pipefail
 cd "$SLURM_SUBMIT_DIR"
 source checks/geant4_performance/env.sh
-uv sync --extra nvidia --locked -q
+pixi install --locked -e nvidia
 out="evidence/calib/$SLURM_JOB_ID"; mkdir -p "$out"
 cp .pyrite-sync "$out/sync.json"; nvidia-smi > "$out/gpu.txt"
 run() {  # stem, then pyrite_bench args
     local stem=$1; shift
-    PYRITE_MC_BACKEND=cuda uv run --no-sync python checks/geant4_performance/pyrite_bench.py \
+    PYRITE_MC_BACKEND=cuda pixi run --as-is -e nvidia python checks/geant4_performance/pyrite_bench.py \
         "$@" --seed 1 --warmup-histories -1 --device-staging --no-audit \
         --output "$out/$stem.json" > "$out/$stem.log" 2>&1 || echo "FAIL $stem"
     echo "DONE $stem"
@@ -49,6 +49,6 @@ for s in w-1MeV-100um si-300keV-100um; do
         done
     done
 done
-PYRITE_TEST_BACKEND=cuda PYRITE_MC_BACKEND=cuda uv run --no-sync pyrite-dev test --slow \
+PYRITE_TEST_BACKEND=cuda PYRITE_MC_BACKEND=cuda pixi run --as-is -e nvidia pyrite-dev test --slow \
     tests/montecarlo/transport/test_transport_continuation_cuda.py > "$out/cuda-tests.log" 2>&1
 echo "cuda tests rc=$?"

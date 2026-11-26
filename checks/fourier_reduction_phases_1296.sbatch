@@ -14,7 +14,7 @@
 set -uo pipefail
 cd "$SLURM_SUBMIT_DIR"
 . checks/rocm/env.sh
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 export XDG_CONFIG_HOME="$PWD/.xdg-config" PYRITE_USER_CATALOG="$PWD/.xdg-config/pyrite"
 export PYRITE_HOME="${PROBE_WORKSPACE:-$HOME/.pyrite/workspace}"
 export PROBE_SHA=$(cat CODE_SHA)
@@ -25,9 +25,9 @@ pyrite_gpu_sync -q || exit 1
 pyrite_gpu_info > "$OUT/gpu-info.txt" 2>&1
 H=checks/fourier_reduction_phases_1296.py
 if ! ls "$OUT"/flush-*.npz > /dev/null 2>&1; then
-    uv run --no-sync python -u $H capture "$MATERIAL" "$E0" "$TILT" "$HISTORIES" "$OUT"
+    pixi run --as-is -e amd python -u $H capture "$MATERIAL" "$E0" "$TILT" "$HISTORIES" "$OUT"
     echo "capture rc=$?"
 fi
-uv run --no-sync python -u $H "${ARMSET:-bench}" "$OUT" "$REPEATS"
+pixi run --as-is -e amd python -u $H "${ARMSET:-bench}" "$OUT" "$REPEATS"
 echo "bench rc=$?"
 sha256sum "$OUT"/*.json > "$OUT/SHA256SUMS" 2>/dev/null

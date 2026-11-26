@@ -1,7 +1,7 @@
 """Research-only axial source profile and bound-population comparator (#1154).
 
 Run in an isolated, synced checkout through ``pyrite remote``. CPU jobs pin
-to qlmc-queen. Example: ``uv run python checks/axial_source_performance.py
+to qlmc-queen. Example: ``pixi run python checks/axial_source_performance.py
 --case B --count 16 --repeats 3 --profile --out runs/B.json``.
 No production hooks, RNG changes, admission changes or validation verdicts.
 Scaling overrides are research probes outside the admitted numerical settings.

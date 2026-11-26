@@ -13,12 +13,11 @@ set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 exec 9>.pyrite-sync.lock
 flock -s -w 30 9
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$PWD/user-catalog"
 export PYRITE_MC_BACKEND=cuda PYRITE_TEST_BACKEND=cuda
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache
 policy=checks/equal_precision/moment-cpu-cuda-788.json
 cpu="${CPU:?CPU held-out evidence directory}"
 # OUT resumes an earlier directory; complete records there are not rerun.
@@ -28,9 +27,9 @@ cp .pyrite-sync "$out/sync-$SLURM_JOB_ID.txt"
 cp "$policy" "$out/policy-$SLURM_JOB_ID.json"
 scontrol show job "$SLURM_JOB_ID" > "$out/job-$SLURM_JOB_ID.txt"
 nvidia-smi -q > "$out/gpu-$SLURM_JOB_ID.txt"
-uv run --no-sync python checks/equal_precision/prepare_stopping.py > "$out/tables-$SLURM_JOB_ID.json"
+pixi run --as-is -e nvidia python checks/equal_precision/prepare_stopping.py > "$out/tables-$SLURM_JOB_ID.json"
 deadline=$((SECONDS + 7800))
-field() { uv run --no-sync python -c "import json; v=json.load(open('$policy'))$1; print('\n'.join(map(str, v)) if isinstance(v, list) else v)"; }
+field() { pixi run --as-is -e nvidia python -c "import json; v=json.load(open('$policy'))$1; print('\n'.join(map(str, v)) if isinstance(v, list) else v)"; }
 run() {
     local case=$1 variant=$2 seed=$3 histories=$4 stem=$5
     local scene=${case%%:*} cutoff=()
@@ -40,7 +39,7 @@ run() {
         printf 'BOUNDED_STOP %s %s %s\n' "$case" "$seed" "$variant"
         exit 0
     fi
-    timeout --signal=TERM --kill-after=5s 900s uv run --no-sync python \
+    timeout --signal=TERM --kill-after=5s 900s pixi run --as-is -e nvidia python \
         checks/equal_precision/benchmark_moment_production.py "$variant" "$stem-audit.json" \
         "$scene" "${cutoff[@]}" --histories "$histories" --seed "$seed" --core cuda \
         --batch-histories "$histories" --scratch-mib 4096 --probe-electrons 0 \
@@ -61,11 +60,11 @@ done
 mapfile -t work_cases < <(field '["work_audit"]["cases"]')
 seed=$(field '["work_audit"]["seed"]')
 for case in "${work_cases[@]}"; do
-    count=$(uv run --no-sync python -c "import json; s=json.load(open('$policy'))['work_audit']; print(s['histories_override'].get('$case', s['histories']))")
+    count=$(pixi run --as-is -e nvidia python -c "import json; s=json.load(open('$policy'))['work_audit']; print(s['histories_override'].get('$case', s['histories']))")
     for variant in exact table; do
         run "$case" "$variant" "$seed" "$count" "$out/work/${case/:/-cut}-$seed-$variant"
     done
 done
-uv run --no-sync python checks/equal_precision/analyze_moment_cpu_cuda.py \
+pixi run --as-is -e nvidia python checks/equal_precision/analyze_moment_cpu_cuda.py \
     "$cpu" "$out/pairs" "$out/analysis.json"
 echo COMPLETE

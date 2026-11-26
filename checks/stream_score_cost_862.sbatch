@@ -12,13 +12,13 @@
 # `gpu-busy` (per-estimator wall, GPU busy and top kernels); W runs 8192 / 4096 there.
 # usage (from an isolated synced checkout root): sbatch -J sc862-<sha> checks/stream_score_cost_862.sbatch [OUTDIR] [cprofile|nsys]
 set -uo pipefail
-export PATH=$HOME/.local/bin:$PATH
+export PATH=$HOME/.pixi/bin:$PATH
 cd "$SLURM_SUBMIT_DIR"
 export PYRITE_HOME=$HOME/pyrite PYRITE_CATALOG=$PWD/src/pyrite/data/catalog PYRITE_USER_CATALOG=$(mktemp -d)/catalog
 export PYRITE_MC_BACKEND=cuda
 echo "code $(cat CODE_SHA)"
-uv sync -q --locked --package pyrite-mc --no-default-groups --extra nvidia
-B=(uv run --no-sync python checks/streamed_scoring_memory.py)
+pixi install --locked -e nvidia
+B=(pixi run --as-is -e nvidia python checks/streamed_scoring_memory.py)
 OUT=${1:-sc862_out}; MODE=${2:-cprofile}; mkdir -p "$OUT"
 [ "$MODE" = nsys ] && export TMPDIR="$HOME/tmp-nsys" && mkdir -p "$TMPDIR"
 "${B[@]}" run streamed 1000 1000 "$OUT/warmup.json" silicon 300 cuda 1e5 1 > /dev/null
@@ -38,7 +38,7 @@ for ARM in "${ARMS[@]}"; do
   fi
   echo "== $ARM cProfile"
   STREAM_PHASES=0 STREAM_CPROFILE="$STEM.pstats" "${B[@]}" run streamed "$NE" "$BLOCK" "$STEM.json" "$MAT" 300 cuda 1e5 1 > /dev/null
-  uv run --no-sync python -c '
+  pixi run --as-is -e nvidia python -c '
 import pstats, sys
 for key in ("cumulative", "tottime"):
     print(f"-- by {key}")

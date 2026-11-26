@@ -265,7 +265,7 @@ def tune(
     try:
         import optuna
     except ImportError as exc:
-        raise ImportError("install pyrite-mc[optimization] / uv sync --extra optimization") from exc
+        raise ImportError("install pyrite-mc[optimization] (a pixi checkout has it)") from exc
 
     scene = Path(scene_path).expanduser().resolve(strict=True)
     # Validate workload once BEFORE allocating a GPU context in the worker.

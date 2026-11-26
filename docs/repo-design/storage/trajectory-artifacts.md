@@ -157,9 +157,9 @@ and do not establish an optimal chunk size or pinned-transfer strategy.
 Reproduce inside a GPU scheduler allocation after the remote pre-flight:
 
 ```bash
-uv run python checks/pyrite_issue610_overlap_benchmark.py --local \
+pixi run python checks/pyrite_issue610_overlap_benchmark.py --local \
   --ne 30000 --seed 42 --repeats 5 --residency both
-uv run python checks/pyrite_issue610_overlap_benchmark.py --local \
+pixi run python checks/pyrite_issue610_overlap_benchmark.py --local \
   --ne 30000 --seed 42 --repeats 3 --overlap-only
 ```
 

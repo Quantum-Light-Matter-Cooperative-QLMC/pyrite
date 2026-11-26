@@ -8,7 +8,7 @@ identities for candidate output. Each invocation uses a fresh process.
 histories with seeds 89501–89503 in both precisions. Reduce the complete run:
 
 ```bash
-uv run python checks/elsepa_statistical/analyze.py evidence/elsepa895/JOB_ID \
+pixi run python checks/elsepa_statistical/analyze.py evidence/elsepa895/JOB_ID \
   --output evidence/elsepa895/JOB_ID/summary.json
 ```
 
@@ -41,7 +41,7 @@ No profiler replay timings enter this comparison.
 Remote GPU only, from a clean synced checkout:
 
 ```bash
-uv run python checks/elsepa_statistical/run.py --law mixture w-1MeV-100um \
+pixi run python checks/elsepa_statistical/run.py --law mixture w-1MeV-100um \
   --histories 4000 --seed 89501 --rows-per-round 1024 --device-staging \
   --transport-precision mixed --no-audit \
   --estimator continuous --cone-mode point --output evidence/mixture.json

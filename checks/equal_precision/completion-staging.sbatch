@@ -8,12 +8,11 @@
 #SBATCH --output=completion-staging-%j.log
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.pixi/bin:$PATH"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$PWD/user-catalog"
 export PYRITE_MC_BACKEND=cuda PYRITE_TEST_BACKEND=cuda
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache
 baseline_source="${1:?pass the retained pre-change hard_radiative.py path}"
 out="evidence/completion-staging/$SLURM_JOB_ID"
 mkdir -p "$out/source"
@@ -23,11 +22,11 @@ cp src/pyrite/montecarlo/transport/hard_radiative.py "$out/source/candidate.py"
 sha256sum "$out/source/"*.py > "$out/source-sha256.txt"
 scontrol show job "$SLURM_JOB_ID" > "$out/job.txt"
 nvidia-smi -q > "$out/gpu.txt"
-uv run --no-sync python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
-uv run --no-sync pyrite-dev test \
+pixi run --as-is -e nvidia python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
+pixi run --as-is -e nvidia pyrite-dev test \
     tests/montecarlo/cascades/test_hard_radiative.py -k completion_stages \
     --durations=5 > "$out/cache-tests.log" 2>&1
-uv run --no-sync pyrite-dev test \
+pixi run --as-is -e nvidia pyrite-dev test \
     tests/montecarlo/cascades/test_hard_radiative_cuda.py --durations=5 > "$out/cuda-tests.log" 2>&1
 deadline=$((SECONDS + 420))
 for seed in 78611 78612 78613; do
@@ -41,7 +40,7 @@ for seed in 78611 78612 78613; do
             fi
             stem="$out/$scene-$seed-$variant"
             printf 'RUN %s\n' "$stem"
-            if timeout --signal=TERM --kill-after=5s 60s uv run --no-sync python \
+            if timeout --signal=TERM --kill-after=5s 60s pixi run --as-is -e nvidia python \
                 checks/equal_precision/benchmark_completion.py "$variant" "$stem-audit.json" \
                 --baseline-source "$out/source/baseline.py" \
                 "$scene" --histories 5000 --seed "$seed" --core cuda \

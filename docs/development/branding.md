@@ -11,7 +11,7 @@ From a checkout with reference tables installed and plotting dependencies:
 
 ```bash
 PYRITE_MC_BACKEND=cpu MPLCONFIGDIR=/tmp/pyrite-matplotlib \
-  uv run python scripts/pyrite_logo.py
+  pixi run python scripts/pyrite_logo.py
 ```
 
 The default sample uses 4,096 electron histories for the Y and 256 for the
