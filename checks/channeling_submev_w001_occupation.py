@@ -2,7 +2,7 @@
 
 Run on the remote box (CPU) with::
 
-    PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=1 uv run python checks/channeling_submev_w001_occupation.py \
+    PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=1 pixi run python checks/channeling_submev_w001_occupation.py \
         --energy-kev 30 --fraction 0.1 --arm tds+electronic --step-ang 0.5
 
 Each invocation runs one case and prints JSON; a SLURM array covers the grid.

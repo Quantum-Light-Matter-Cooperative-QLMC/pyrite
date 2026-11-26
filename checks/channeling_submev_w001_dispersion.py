@@ -2,7 +2,7 @@
 
 Run from the repository root with::
 
-    PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=4 uv run python checks/channeling_submev_w001_dispersion.py
+    PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=4 pixi run python checks/channeling_submev_w001_dispersion.py
 
 ``axial_line_catalog`` uses ``k = 0`` levels and admits a level only when its
 band spreads by less than 0.1 eV over the zone. Below 300 keV the W <001> 2p

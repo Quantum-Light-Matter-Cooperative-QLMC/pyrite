@@ -434,7 +434,7 @@ $k\neq0$. The dielectric response is covered separately in
 broad axial screen. Its pair sets were keyed by band rank and changed under k
 refinement. It also could not tell an on-string transition from a
 tunnelling splitting of string ground orbitals. Run it with
-`PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=4 uv run python checks/channeling_submev_multistring.py`
+`PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=4 pixi run python checks/channeling_submev_multistring.py`
 (optionally `--cases silicon:110 ...` and `--energies-kev ...`).
 
 *Classifier.* For two Bloch states at the same $k$, the integrand of the
@@ -632,7 +632,7 @@ by up to 2.8 eV.
   and its doublet-summed dipole strength.
 
 Run with
-`PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=4 uv run python checks/channeling_submev_w001_dispersion.py`.
+`PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=4 pixi run python checks/channeling_submev_w001_dispersion.py`.
 It took 14 min on 4 CPU threads, with a peak of 0.66 GiB, under an 8 GiB
 cap.
 

@@ -2,7 +2,7 @@
 
 Run with::
 
-    uv run python checks/channeling_submev_w001_linewidth.py --energies-kev 30 100 300
+    pixi run python checks/channeling_submev_w001_linewidth.py --energies-kev 30 100 300
 
 The radiating coherence ``sigma = <1s|rho|2p>`` obeys the secular equation of
 ``cr-line-shape``. In the flat-band limit, with ``|w_n|^2`` the on-column

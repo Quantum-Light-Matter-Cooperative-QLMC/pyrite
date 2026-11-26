@@ -2,7 +2,7 @@
 
 Run with::
 
-    uv run python checks/channeling_submev_w001_tds_phase.py --energies-kev 30 100 300
+    pixi run python checks/channeling_submev_w001_tds_phase.py --energies-kev 30 100 300
 
 The TDS jumps of :func:`axial_dissipator` expand one displaced atom's
 transmission ``exp(i dphi_u)`` to second order in the phase fluctuation

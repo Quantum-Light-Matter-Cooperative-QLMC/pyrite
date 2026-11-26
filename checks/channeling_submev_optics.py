@@ -1,6 +1,6 @@
 """Static optics bound for sub-MeV channeling-radiation candidate lines (#585).
 
-Run with ``uv run python checks/channeling_submev_optics.py``. Prints JSON.
+Run with ``pixi run python checks/channeling_submev_optics.py``. Prints JSON.
 
 For each candidate bound->bound line recorded by the sub-MeV screens (planar
 ``channeling_submev_screen.py``, axial ``channeling_submev_axial_screen.py``

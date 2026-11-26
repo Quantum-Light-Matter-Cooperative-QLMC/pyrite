@@ -1,7 +1,7 @@
 """On-string versus inter-string classification of sub-MeV axial pairs (#585).
 
 Run with
-``PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=4 uv run python checks/channeling_submev_multistring.py``
+``PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=4 pixi run python checks/channeling_submev_multistring.py``
 (optionally ``--cases silicon:110 ...`` and ``--energies-kev ...``). Prints JSON.
 
 The broad axial screen (``channeling_submev_axial_screen.py``) left two gaps on
