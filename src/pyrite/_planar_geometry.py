@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Self
 import numpy as np
 
 from ._units import _length_vector, _quantity_spelling, _scalar_quantity, normalize_unit
+from ._util.arrays import readonly_array
 from ._util.spec_defaults import UNSET, _Unset
 
 if TYPE_CHECKING:
@@ -385,12 +386,6 @@ class PixelGrid:
         return cls(shape=(515, 2048), pitch_mm=(0.0135, 0.0135))
 
 
-def _readonly_float_array(value: object) -> np.ndarray:
-    array = np.asarray(value, dtype=float)
-    array.setflags(write=False)
-    return array
-
-
 def solid_angle_sr(width_mm: float, height_mm: float, distance_mm: float) -> float:
     """Return the exact on-axis solid angle [sr] of a rectangular face.
 
@@ -447,10 +442,10 @@ class PixelRays:
     solid_angle_sr: np.ndarray
 
     def __post_init__(self) -> None:
-        centers = _readonly_float_array(self.centers_mm)
-        directions = _readonly_float_array(self.directions_lab)
-        distance = _readonly_float_array(self.distance_mm)
-        solid_angle = _readonly_float_array(self.solid_angle_sr)
+        centers = readonly_array(self.centers_mm, dtype=float)
+        directions = readonly_array(self.directions_lab, dtype=float)
+        distance = readonly_array(self.distance_mm, dtype=float)
+        solid_angle = readonly_array(self.solid_angle_sr, dtype=float)
         if centers.ndim != 3 or centers.shape[-1] != 3:
             raise ValueError("PixelRays.centers_mm must have shape (ny, nx, 3)")
         if directions.shape != centers.shape:

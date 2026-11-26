@@ -101,7 +101,7 @@ def handoff_uniforms(seed: int, electrons, n_draws: int = 4) -> np.ndarray:
     Validation: cr-zone-handoff-accounting
     """
     from ..transport.kinematics import _SM64_GOLDEN, _SM64_ONE
-    from ..transport.secondaries import _mix
+    from ..transport.kinematics import _splitmix64_array as _mix
 
     with np.errstate(over="ignore"):
         x = np.uint64(seed) ^ _HANDOFF_STREAM_SALT

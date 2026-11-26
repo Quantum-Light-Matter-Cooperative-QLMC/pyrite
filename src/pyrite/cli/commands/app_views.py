@@ -25,37 +25,18 @@ reaches the marimo subprocess through ``-- --material <X>`` and the
     pyrite app compare export --stem cmp   # write pyrite-output/results/cmp.html
 """
 
-import os
-import subprocess
-import sys
-import tempfile
-from dataclasses import dataclass
-from pathlib import Path
-
 import click
 
-from ..._acp import running_acp
 from ..._app_defaults import get_analysis_default
-from ...console.outputs import output_dir
-from ...paths import app_dir
-from .. import _completion as _cli_completion
-from .._extras import require_cli_extra
-
-
-@dataclass(frozen=True)
-class MarimoApp:
-    """One launchable marimo app: its command name, notebook, and tunnel port."""
-
-    name: str
-    notebook_name: str
-    tunnel_port: int
-    title: str
-    material_picker: bool = True
-
-    @property
-    def notebook(self) -> str:
-        return str(app_dir() / self.notebook_name)
-
+from ._app_launcher import (
+    BACKEND_CHOICES,
+    MATERIAL_ARGUMENT,
+    MarimoApp,
+    export,
+    launch,
+    marimo_command,
+    smoke_command,
+)
 
 PIXELS = MarimoApp("pixels", "pixel_app.py", 2720, "pixel-detector observation")
 CONFIGURATION = MarimoApp("configuration", "configuration_app.py", 2726, "configuration", False)
@@ -69,8 +50,9 @@ TRANSITION_RADIATION = MarimoApp(
 )
 
 
-#: ``PYRITE_MC_BACKEND`` values (mirrors ``pyrite._backend``, which probes devices on import).
-BACKEND_CHOICES = ("auto", "cpu", "cuda", "rocm", "sycl")
+_command = marimo_command
+_smoke_command = smoke_command
+_launch = launch
 
 
 def resolve_material(material: str | None) -> str:
@@ -78,106 +60,13 @@ def resolve_material(material: str | None) -> str:
     return material or get_analysis_default() or "hopg"
 
 
-def _command(app, material=None, *, edit=False, watch=False, tunnel=False, no_token=False):
-    """The marimo argv for one launch. Marimo's flags precede the notebook; app args follow ``--``."""
-    return [
-        sys.executable,
-        "-m",
-        "marimo",
-        "edit" if edit else "run",
-        *(["--watch"] if watch else []),
-        *(["--port", str(app.tunnel_port)] if tunnel else []),
-        *(["--no-token"] if no_token else []),
-        app.notebook,
-        *(["--", "--material", material] if material is not None else []),
-    ]
-
-
-def _smoke_command(app, material, output):
-    """The one-shot, headless ``marimo export html`` argv for one app."""
-    return [
-        sys.executable,
-        "-m",
-        "marimo",
-        "export",
-        "html",
-        app.notebook,
-        "--output",
-        str(output),
-        "--force",
-        *(["--", "--material", material] if material is not None else []),
-    ]
-
-
-def _launch(
-    app,
-    material=None,
-    *,
-    edit=False,
-    watch=False,
-    smoke=False,
-    acp=False,
-    tunnel=False,
-    no_token=False,
-    backend=None,
-):
-    require_cli_extra("apps", feature=f"pyrite app {app.name} launch")
-    cmd = _command(app, material, edit=edit, watch=watch, tunnel=tunnel, no_token=no_token)
-    label = f" with material={material}" if material is not None else ""
-    click.echo(f"launching {app.notebook} ({'edit' if edit else 'run'}){label}")
-    if tunnel:
-        click.echo(f"ssh -L {app.tunnel_port}:127.0.0.1:{app.tunnel_port} <your-pi-ssh-host>")
-        click.echo(f"http://127.0.0.1:{app.tunnel_port}")
-    env = {**os.environ, **({"PYRITE_ANALYZE_INITIAL": material} if material is not None else {})}
-    if backend is not None:
-        # The array backend is chosen once at import; the app process inherits it.
-        env["PYRITE_MC_BACKEND"] = backend
-        click.echo(f"array backend: {backend}")
-    if smoke:
-        with tempfile.TemporaryDirectory(prefix=f"pyrite-{app.name}-") as tmpdir:
-            output = Path(tmpdir) / f"{app.name}.html"
-            _run(_smoke_command(app, material, output), env)
-        return
-    if acp:
-        with running_acp():
-            _run(cmd, env)
-    else:
-        _run(cmd, env)
-
-
-def _run(command: list[str], env: dict[str, str]) -> None:
-    """Keep child failures nonzero and report them through Click diagnostics."""
-    try:
-        subprocess.run(command, check=True, env=env)
-    except subprocess.CalledProcessError as exc:
-        raise click.ClickException(f"marimo exited with status {exc.returncode}") from exc
-    except OSError as exc:
-        raise click.ClickException(f"could not start marimo: {exc}") from exc
-
-
 def _export(app, stem: str | None, material: str | None) -> None:
     """Export the app's HTML without starting a marimo server or browser."""
-    require_cli_extra("apps", feature=f"pyrite app {app.name} export")
-    resolved = resolve_material(material) if app.material_picker else None
-    suffix = f"_{resolved}" if resolved is not None else ""
-    stem = stem or f"pyrite_{app.name}{suffix}"
-    output = output_dir("results") / f"{stem}.html"
-    output.parent.mkdir(parents=True, exist_ok=True)
-    click.echo(f"exporting {app.notebook} -> {output}")
-    env = {**os.environ, **({"PYRITE_ANALYZE_INITIAL": resolved} if resolved is not None else {})}
-    _run(_smoke_command(app, resolved, output), env)
-
-
-_MATERIAL_ARGUMENT = click.argument(
-    "material",
-    required=False,
-    type=_cli_completion.MATERIAL,
-    shell_complete=_cli_completion.complete_material,
-)
+    export(app, stem, resolve_material(material) if app.material_picker else None)
 
 
 def _launch_command(app: MarimoApp) -> click.Command:
-    material_argument = _MATERIAL_ARGUMENT if app.material_picker else lambda command: command
+    material_argument = MATERIAL_ARGUMENT if app.material_picker else lambda command: command
 
     @click.command(
         app.name,
@@ -225,7 +114,7 @@ def _launch_command(app: MarimoApp) -> click.Command:
 
 
 def _export_command(app: MarimoApp) -> click.Command:
-    material_argument = _MATERIAL_ARGUMENT if app.material_picker else lambda command: command
+    material_argument = MATERIAL_ARGUMENT if app.material_picker else lambda command: command
 
     @click.command(
         "export",

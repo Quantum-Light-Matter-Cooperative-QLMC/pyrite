@@ -12,6 +12,7 @@ from endf_parserpy import EndfFile
 
 from ..._backend import BACKEND, CUPY_BACKENDS, REAL, _to_cpu, xp
 from ..._physics_fallback import PhysicsFallbackWarning
+from ..._util.arrays import readonly_array
 from ...materials.atomic import Z_TABLE
 from ...materials.attenuation import (
     _finite_mu_or_raise,
@@ -122,12 +123,6 @@ class _ResolvedEEDLContext:
     prepared: _PreparedEEDLGrid
     state: _EEDLSegmentState
     all_available: bool
-
-
-def _readonly(array: object) -> np.ndarray:
-    out = np.asarray(array, dtype=float)
-    out.setflags(write=False)
-    return out
 
 
 def _section_vector(section: Mapping[str, object], field: str, label: str) -> np.ndarray:
@@ -290,16 +285,16 @@ def _extract_bremsstrahlung_table(
         cumulative = np.concatenate(
             ([0.0], np.cumsum(0.5 * (density[:-1] + density[1:]) * np.diff(energy)))
         )
-        photon_grids.append(_readonly(energy))
-        photon_densities.append(_readonly(density))
-        photon_cumulative.append(_readonly(cumulative))
+        photon_grids.append(readonly_array(energy, dtype=float))
+        photon_densities.append(readonly_array(density, dtype=float))
+        photon_cumulative.append(readonly_array(cumulative, dtype=float))
 
     return BremsstrahlungCrossSectionTable(
         element=element,
         atomic_number=atomic_number,
-        incident_energy_eV=_readonly(incident),
-        total_cross_section_cm2=_readonly(total_barn * 1.0e-24),
-        distribution_incident_energy_eV=_readonly(panel_incident),
+        incident_energy_eV=readonly_array(incident, dtype=float),
+        total_cross_section_cm2=readonly_array(total_barn * 1.0e-24, dtype=float),
+        distribution_incident_energy_eV=readonly_array(panel_incident, dtype=float),
         photon_energy_eV_by_incident=tuple(photon_grids),
         photon_probability_density_per_eV_by_incident=tuple(photon_densities),
         photon_cumulative_probability_by_incident=tuple(photon_cumulative),

@@ -210,6 +210,12 @@ def _splitmix64(x):
     return x ^ (x >> _SM64_S31)
 
 
+# Vectorised host twin: the same body run by numpy on uint64 scalars or arrays,
+# so host-side stream keying cannot drift from the compiled finalizer.
+# ``NUMBA_DISABLE_JIT=1`` makes ``njit`` return the plain function.
+_splitmix64_array = getattr(_splitmix64, "py_func", _splitmix64)
+
+
 @njit(uint64(int64, int64), cache=True)
 def _stream_key_scalar(seed, elec_id):
     """Per-electron stream key. Independent of batch size and launch geometry."""
@@ -237,10 +243,7 @@ def stream_keys(seed, Ne, *, start=0):
     if start < 0 or Ne < 0:
         raise ValueError("stream_keys needs a non-negative start and count")
     e = np.arange(start, start + Ne, dtype=np.uint64)
-    x = np.uint64(seed) + _SM64_GOLDEN * (e + _SM64_ONE)
-    x = (x ^ (x >> _SM64_S30)) * _SM64_MIX1
-    x = (x ^ (x >> _SM64_S27)) * _SM64_MIX2
-    return x ^ (x >> _SM64_S31)
+    return _splitmix64_array(np.uint64(seed) + _SM64_GOLDEN * (e + _SM64_ONE))
 
 
 # 2**-52: counter uniforms keep 52 bits so ``(m + 0.5) * 2**-52`` is exact and

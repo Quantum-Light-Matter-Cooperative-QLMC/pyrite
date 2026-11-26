@@ -26,119 +26,43 @@ subprocess, as a belt-and-suspenders fallback.
     pyrite app viewer --no-token         # pass marimo's --no-token (disable auth token)
 """
 
-import os
-import subprocess
-import sys
-import tempfile
-from pathlib import Path
+from functools import partial
 
 import click
 
-from ..._acp import running_acp
 from ..._app_defaults import get_viewer_default, set_viewer_default
 from ...console import output as _cli_core
-from ...console.outputs import output_dir
-from ...paths import app_dir
-from .. import _completion as _cli_completion
-from .._deprecations import canonical_option
-from .._extras import require_cli_extra
+from ._app_launcher import (
+    MATERIAL_ARGUMENT,
+    MarimoApp,
+    export,
+    launch,
+    marimo_command,
+    persisted_launch,
+    persisted_launch_command,
+    smoke_command,
+)
 
-NOTEBOOK = str(app_dir() / "trace_app.py")
 TUNNEL_PORT = 2719
-
-
-def _command(material, *, edit=False, watch=False, tunnel=False, no_token=False):
-    """The marimo argv for one launch (module-run through the current
-    interpreter so the venv's marimo is the one that runs). Marimo's own flags
-    go before the notebook path; app args go after ``--``."""
-    return [
-        sys.executable,
-        "-m",
-        "marimo",
-        "edit" if edit else "run",
-        *(["--watch"] if watch else []),
-        *(["--port", str(TUNNEL_PORT)] if tunnel else []),
-        *(["--no-token"] if no_token else []),
-        NOTEBOOK,
-        "--",
-        "--material",
-        material,
-    ]
-
-
-def _smoke_command(material, output):
-    """The one-shot, headless command used to execute the viewer app in CI-like checks."""
-    return [
-        sys.executable,
-        "-m",
-        "marimo",
-        "export",
-        "html",
-        NOTEBOOK,
-        "--output",
-        str(output),
-        "--force",
-        "--",
-        "--material",
-        material,
-    ]
+APP = MarimoApp(
+    "viewer", "trace_app.py", TUNNEL_PORT, "3D viewer", initial_env="PYRITE_VIEWER_INITIAL"
+)
+NOTEBOOK = APP.notebook
+_command = partial(marimo_command, APP)
+_smoke_command = partial(smoke_command, APP)
+_launch = partial(launch, APP)
 
 
 def _export(stem: str | None, material: str | None) -> None:
     """Export viewer HTML without starting a marimo server or browser."""
-    require_cli_extra("apps", feature="pyrite app viewer export")
-    resolved = material or get_viewer_default() or "hopg"
-    stem = stem or f"pyrite_viewer_{resolved}"
-    output = output_dir("results") / f"{stem}.html"
-    output.parent.mkdir(parents=True, exist_ok=True)
-    click.echo(f"exporting {NOTEBOOK} -> {output}")
-    subprocess.run(_smoke_command(resolved, output), check=True)
-
-
-def _launch(
-    material, *, edit=False, watch=False, smoke=False, acp=False, tunnel=False, no_token=False
-):
-    require_cli_extra("apps", feature="pyrite app viewer launch")
-    cmd = _command(material, edit=edit, watch=watch, tunnel=tunnel, no_token=no_token)
-    print(f"launching {NOTEBOOK} ({'edit' if edit else 'run'}) with material={material}")
-    if tunnel:
-        print(f"ssh -L {TUNNEL_PORT}:127.0.0.1:{TUNNEL_PORT} <your-pi-ssh-host>")
-        print(f"http://127.0.0.1:{TUNNEL_PORT}")
-    env = {**os.environ, "PYRITE_VIEWER_INITIAL": material}
-    if smoke:
-        with tempfile.TemporaryDirectory(prefix="pyrite-viewer-") as tmpdir:
-            subprocess.run(
-                _smoke_command(material, Path(tmpdir) / "viewer.html"), check=True, env=env
-            )
-        return
-    if acp:
-        with running_acp():
-            subprocess.run(cmd, check=True, env=env)
-    else:
-        subprocess.run(cmd, check=True, env=env)
+    export(APP, stem, material or get_viewer_default() or "hopg")
 
 
 def _cli(args):
-    if args.default and args.material is None:
-        raise SystemExit("pyrite app viewer -d/--save-default: no material given to persist")
-
-    if args.default:
-        set_viewer_default(args.material)
-
-    material = args.material or get_viewer_default() or "hopg"
-    launch_args = {"edit": args.edit, "watch": args.watch}
-    if args.smoke:
-        launch_args["smoke"] = True
-    if args.acp:
-        launch_args["acp"] = True
-    if args.tunnel:
-        launch_args["tunnel"] = True
-    if args.no_token:
-        launch_args["no_token"] = True
-    _launch(material, **launch_args)
+    persisted_launch(args, APP, get_viewer_default, set_viewer_default, _launch)
 
 
-@click.command(
+command = persisted_launch_command(
     "viewer",
     help=(
         "Launch the interactive 3D viewer with marimo run or edit.\n\n"
@@ -146,49 +70,12 @@ def _cli(args):
         "MATERIAL overrides the persisted default for this run. --save-default "
         "stores it for later no-argument launches."
     ),
+    cli=lambda args: _cli(args),  # late-bound: tests patch the module _cli/_launch
 )
-@click.argument(
-    "material",
-    required=False,
-    type=_cli_completion.MATERIAL,
-    shell_complete=_cli_completion.complete_material,
-)
-@canonical_option(
-    "-d",
-    "--save-default",
-    "persist_default",
-    is_flag=True,
-    help="Persist MATERIAL as default for future no-argument runs.",
-)
-@click.option("--watch", is_flag=True, help="Reload app when source files change.")
-@click.option("--smoke", is_flag=True, help="Execute app once headlessly and exit.")
-@click.option("--edit", is_flag=True, help="Use `marimo edit` instead of `marimo run`.")
-@click.option("--acp", is_flag=True, help="Start local Claude and Codex ACP bridges.")
-@click.option("--tunnel", is_flag=True, help="Bind fixed port for SSH tunneling.")
-@click.option("--no-token", is_flag=True, help="Disable marimo auth token.")
-def command(material, persist_default, watch, smoke, edit, acp, tunnel, no_token):
-    if persist_default and material is None:
-        raise click.UsageError("--save-default requires MATERIAL")
-    return _cli_core.invoke_legacy(
-        _cli,
-        material=material,
-        default=persist_default,
-        watch=watch,
-        smoke=smoke,
-        edit=edit,
-        acp=acp,
-        tunnel=tunnel,
-        no_token=no_token,
-    )
 
 
 @click.command("export", help="Render the viewer as static HTML without starting marimo.")
-@click.argument(
-    "material",
-    required=False,
-    type=_cli_completion.MATERIAL,
-    shell_complete=_cli_completion.complete_material,
-)
+@MATERIAL_ARGUMENT
 @click.option("--stem", help="Output stem under pyrite-output/results/ (without .html).")
 def export_command(material, stem):
     _export(stem, material)

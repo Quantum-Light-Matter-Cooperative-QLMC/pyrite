@@ -23,6 +23,21 @@ from typing import Any
 import numpy as np
 
 
+def _conditional_density(result: Any, conditional: bool) -> np.ndarray:
+    """``result.density_per_ang2`` [Å⁻²], optionally divided by ``result.surviving``.
+
+    The conditional density is zero at depths where nothing survives.
+    """
+    if not conditional:
+        return result.density_per_ang2
+    return np.divide(
+        result.density_per_ang2,
+        result.surviving[:, None, None],
+        out=np.zeros_like(result.density_per_ang2),
+        where=result.surviving[:, None, None] > 0,
+    )
+
+
 @dataclass(frozen=True)
 class EnergyQuadrature:
     """Incident-normalized nodes and provenance of the energy distribution.
@@ -518,14 +533,7 @@ class AxialEnergyDiagnostic:
     per_node: tuple[Any, ...] | None
 
     def density(self, *, conditional: bool = False) -> np.ndarray:
-        if not conditional:
-            return self.density_per_ang2
-        return np.divide(
-            self.density_per_ang2,
-            self.surviving[:, None, None],
-            out=np.zeros_like(self.density_per_ang2),
-            where=self.surviving[:, None, None] > 0,
-        )
+        return _conditional_density(self, conditional)
 
 
 def axial_energy_diagnostic(

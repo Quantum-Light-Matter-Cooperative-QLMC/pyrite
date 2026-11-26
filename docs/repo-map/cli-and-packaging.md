@@ -34,7 +34,7 @@ Terminal presentation primitives shared by the CLI and the domain packages, and 
 `-R/--remote`: the one shared option whose callback validates through `remote.config`, which `console/` sits below and cannot import.
 
 ## `_util/`
-Domain-free internal helpers (#1029); no public API, and the `util-imports-no-pyrite` import-linter contract keeps every module free of `pyrite.*` imports. `io`: the one atomic text/JSON writer (`atomic_write_text`, `atomic_write_json`; hidden mkstemp sibling + `os.replace`, re-exported as `paths.atomic_write_text`). `hashing`: the one streamed `file_sha256` (re-exported by `datasets`, `checkpoints.trajectory_scoring`, `xsgen.bremslib.release`) and `canonical_json_digest` (compact sorted-key JSON; observation payload, photon-identity, managed-CIF and axial-settings digests). `env` (`env_value`, `GENERATED_INVOCATION_ENV`), `extras` (`require_extra`, `MissingExtraError`), `deprecations` (module, public-export and Python API removal schedules), `spec_defaults` (`UNSET` omission sentinel), `formatting` (`fmt_thickness`). Writers with different durability contracts stay with their owners: fsync'd shared-FS JSON (`execution/slurm`), binary lockfiles (`checkpoints/campaign_lock`), pid-named temporaries that keep umask file permissions rather than mkstemp 0600 (`_progress`, `perf/`, `observations/store`, checkpoint manifests). Tests: `tests/test_util_helpers.py`.
+Domain-free internal helpers (#1029); no public API, and the `util-imports-no-pyrite` import-linter contract keeps every module free of `pyrite.*` imports. `io`: the one atomic text/JSON writer (`atomic_write_text`, `atomic_write_json`; hidden mkstemp sibling + `os.replace`, re-exported as `paths.atomic_write_text`). `hashing`: the one streamed `file_sha256` (re-exported by `datasets`, `checkpoints.trajectory_scoring`, `xsgen.bremslib.release`) and `canonical_json_digest` (compact sorted-key JSON; observation payload, photon-identity, managed-CIF and axial-settings digests). `env` (`env_value`, `GENERATED_INVOCATION_ENV`), `extras` (`require_extra`, `MissingExtraError`), `deprecations` (module, public-export and Python API removal schedules), `spec_defaults` (`UNSET` omission sentinel), `formatting` (`fmt_thickness`), `arrays` (`host_array`: CuPy/NumPy → host NumPy via `.get()` when present; `readonly_array`: non-writeable NumPy view, #1467). Writers with different durability contracts stay with their owners: fsync'd shared-FS JSON (`execution/slurm`), binary lockfiles (`checkpoints/campaign_lock`), pid-named temporaries that keep umask file permissions rather than mkstemp 0600 (`_progress`, `perf/`, `observations/store`, checkpoint manifests). Tests: `tests/test_util_helpers.py`.
 
 ## `_catalog_keys.py`
 Offline `[materials|profiles|beams|detectors].*` key reads by listing the selected catalog directory's object files, without importing the scientific material modules. Shell completion, `runs.scan`'s material validation and checkpoint identity resolution all need catalog keys where a `materials` import would be far too expensive.
@@ -227,11 +227,14 @@ records it at the existing recorded depths in the instantaneous basis.
 
 ## `cli/commands/app_views.py`
 `pyrite app pixels launch|export`, `pyrite app compare launch|export` and
-`pyrite app channeling launch|export` share the `MarimoApp` launcher (headless
+`pyrite app channeling launch|export` share the `_app_launcher.MarimoApp` launcher (headless
 smoke, edit/watch, ACP bridges and static HTML export). Fixed tunnel ports are
 2720/2721/2722. Pixels/compare resolve MATERIAL > the analysis app's persisted
 default > `hopg`, passed as `--material` and `PYRITE_ANALYZE_INITIAL`. Channeling
 targets `channeling_app.py` with no material argument. Imports no `apps` module.
+
+## `cli/commands/_app_launcher.py`
+The one marimo launcher behind every `pyrite app <name> launch|export` (#1467): `MarimoApp` (command name, notebook, tunnel port, title, `material_picker`, `initial_env`, `base_env`), argv for run/edit and headless `marimo export html`, child environment (app `base_env` < caller env < material and `--backend`), ACP bridges, and `run_marimo`, which reports child failures as Click errors with exit 1. `persisted_launch_command`/`persisted_launch` add the `-d/--save-default` material precedence (MATERIAL > persisted default > `hopg`) that `app_analysis` and `app_viewer` use; `app_views` builds the picker and standalone apps. App modules keep `_command`/`_smoke_command`/`_launch` aliases, and tests patch `_app_launcher.subprocess`.
 
 ## `cli/commands/app_viewer.py`
 `pyrite app viewer launch|export` owner for `src/pyrite/apps/trace_app.py`: material-argument handling, smoke execution, static-HTML export, ACP bridges, fixed-port tunnel launch.

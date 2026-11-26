@@ -26,7 +26,7 @@ from typing import Any, Literal, NamedTuple
 import numpy as np
 from scipy.special import ndtr, ndtri
 
-from .energy_ensemble import IncidentEnergyEnsemble
+from .energy_ensemble import IncidentEnergyEnsemble, _conditional_density
 from .mcwf import mcwf_stream_key
 
 # Stable, disjoint namespaces for entrance-energy and transverse/trajectory RNG.
@@ -293,14 +293,7 @@ class AxialEnergyMCWFResult:
     provenance: dict[str, Any]
 
     def density(self, *, conditional_on_survival: bool = False) -> np.ndarray:
-        if not conditional_on_survival:
-            return self.density_per_ang2
-        return np.divide(
-            self.density_per_ang2,
-            self.surviving[:, None, None],
-            out=np.zeros_like(self.density_per_ang2),
-            where=self.surviving[:, None, None] > 0,
-        )
+        return _conditional_density(self, conditional_on_survival)
 
 
 def _radiation_bins(

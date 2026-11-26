@@ -16,6 +16,7 @@ from pyrite.quantum.state import TransverseStateSpec
 
 from .axial_dissipator import axial_dissipator
 from .axial_mcwf import AxialMCWF
+from .energy_ensemble import _conditional_density
 from .metrics import RECORDING_BUDGET_BYTES, AxialMetricsObservable, EnsembleMetrics
 from .realspace import RealSpaceGrid, SplitStepPropagator
 from .states import EntryState, MixedState, axial_entry, gaussian, momentum_inv_ang
@@ -208,14 +209,7 @@ class AxialPropagationResult:
 
     def density(self, *, conditional: bool = False) -> np.ndarray:
         """Return density [Å⁻²], optionally conditioned on survival (zero if empty)."""
-        if not conditional:
-            return self.density_per_ang2
-        return np.divide(
-            self.density_per_ang2,
-            self.surviving[:, None, None],
-            out=np.zeros_like(self.density_per_ang2),
-            where=self.surviving[:, None, None] > 0,
-        )
+        return _conditional_density(self, conditional)
 
 
 def _unitary(config, grid, potential, components, norms, observe):

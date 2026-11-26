@@ -22,6 +22,7 @@ import numpy as np
 import xraydb
 
 from ..._backend import REAL, _to_cpu, xp
+from ..._util.arrays import readonly_array
 from ...materials.atomic import Z_TABLE
 from ...materials.attenuation import (
     _finite_mu_or_raise,
@@ -46,7 +47,6 @@ from ..eedl_ionization import EEDL_SHA256 as CHARACTERISTIC_EEDL_SHA256
 from ..eedl_ionization import (
     EEDL_SUBSHELL_LABELS,
     _load_eedl_subshell_tables,
-    _readonly,
     _require_finite,
     eedl_path,
 )
@@ -447,7 +447,7 @@ def _parse_characteristic_file(
             shell, None if scaled_yields is None else scaled_yields.get(shell.shell_designator)
         )
         fluorescence.append(radiative_scale * shell.fluorescence_yield)
-    line_energy = _readonly([record[4] for record in line_records])
+    line_energy = readonly_array([record[4] for record in line_records], dtype=float)
     relaxation_index = _readonly_int(ionization_rows)
     transfer, line_yields = _cascade_yields(
         relaxation,
@@ -463,26 +463,28 @@ def _parse_characteristic_file(
         atomic_number=atomic_number,
         recommended_cutoff_eV=_MIN_RELAXATION_CUTOFF_EV,
         fluorescence_yields=fluorescence_yields,
-        projectile_energy_eV_by_shell=tuple(_readonly(grid) for grid in projectile_grids),
+        projectile_energy_eV_by_shell=tuple(
+            readonly_array(grid, dtype=float) for grid in projectile_grids
+        ),
         ionization_shell_labels=tuple(ionization_shell_labels),
-        shell_binding_energy_eV=_readonly(binding_energies),
-        shell_fluorescence_yield=_readonly(fluorescence),
+        shell_binding_energy_eV=readonly_array(binding_energies, dtype=float),
+        shell_fluorescence_yield=readonly_array(fluorescence, dtype=float),
         ionization_cross_sections_cm2_by_shell=tuple(
-            _readonly(values) for values in cross_section_tables
+            readonly_array(values, dtype=float) for values in cross_section_tables
         ),
         relaxation=relaxation,
         relaxation_shell_labels=relaxation.shell_labels,
         ionization_relaxation_index=relaxation_index,
         relaxation_fluorescence_yields=scaled_yields,
-        radiative_yield_per_decay=_readonly(emission),
+        radiative_yield_per_decay=readonly_array(emission, dtype=float),
         line_labels=tuple(record[0] for record in line_records),
         line_initial_shell=tuple(record[1] for record in line_records),
         line_final_shell=tuple(record[2] for record in line_records),
         line_source=tuple(record[3] for record in line_records),
         line_energy_eV=line_energy,
-        cxr_fwhm_eV=_readonly([record[5] for record in line_records]),
-        vacancy_transfer=_readonly(transfer),
-        line_yield_per_vacancy=_readonly(line_yields),
+        cxr_fwhm_eV=readonly_array([record[5] for record in line_records], dtype=float),
+        vacancy_transfer=readonly_array(transfer, dtype=float),
+        line_yield_per_vacancy=readonly_array(line_yields, dtype=float),
         ionization_shell_model=("eedl",) * len(ionization_shell_labels),
     )
 
@@ -513,8 +515,8 @@ def _with_bote_salvat_ionization(
             continue
         edge = float(element.edge_eV[element.shells.index(shell)])
         grid = bote_salvat_energy_grid(edge, float(grids[row][-1]))
-        grids[row] = _readonly(grid)
-        values[row] = _readonly(element.cross_sections_cm2(shell, grid))
+        grids[row] = readonly_array(grid, dtype=float)
+        values[row] = readonly_array(element.cross_sections_cm2(shell, grid), dtype=float)
         models[row] = "bote-salvat"
     return replace(
         table,

@@ -10,9 +10,10 @@ from typing import Any
 import numpy as np
 from endf_parserpy import EndfFile
 
+from .._util.arrays import readonly_array
 from ..datasets import EADL, DatasetMismatchError, file_sha256, require_dataset
 from ..materials.atomic import Z_TABLE
-from .eedl_ionization import EEDL_SUBSHELL_LABELS, _readonly, _require_finite
+from .eedl_ionization import EEDL_SUBSHELL_LABELS, _require_finite
 
 EADL_FILENAME = EADL.filename
 EADL_SHA256 = EADL.sha256
@@ -73,7 +74,7 @@ class EADLRelaxation:
 
     @property
     def binding_energy_eV(self) -> np.ndarray:
-        return _readonly([shell.binding_energy_eV for shell in self.subshells])
+        return readonly_array([shell.binding_energy_eV for shell in self.subshells], dtype=float)
 
 
 def _subshell_capacity(designator: int) -> int:
@@ -205,12 +206,12 @@ def _extract_eadl_relaxation(
                 binding_energy_eV=binding,
                 electrons=electrons,
                 radiative_final=np.asarray([j for j, _e, _f in radiative], dtype=int),
-                radiative_energy_eV=_readonly([e for _j, e, _f in radiative]),
-                radiative_probability=_readonly([f for _j, _e, f in radiative]),
+                radiative_energy_eV=readonly_array([e for _j, e, _f in radiative], dtype=float),
+                radiative_probability=readonly_array([f for _j, _e, f in radiative], dtype=float),
                 auger_first=np.asarray([j for j, _k, _e, _f in auger], dtype=int),
                 auger_second=np.asarray([k for _j, k, _e, _f in auger], dtype=int),
-                auger_energy_eV=_readonly([e for _j, _k, e, _f in auger]),
-                auger_probability=_readonly([f for _j, _k, _e, f in auger]),
+                auger_energy_eV=readonly_array([e for _j, _k, e, _f in auger], dtype=float),
+                auger_probability=readonly_array([f for _j, _k, _e, f in auger], dtype=float),
             )
         )
     for shell in subshells:
@@ -396,7 +397,7 @@ def vacancy_cascade(
     for parent in range(n_shell):
         # Column `parent` of every row is final once all earlier shells are done.
         visits[:, parent + 1 :] += np.outer(visits[:, parent], daughters[parent, parent + 1 :])
-    return _readonly(daughters), _readonly(visits)
+    return readonly_array(daughters, dtype=float), readonly_array(visits, dtype=float)
 
 
 @dataclass(frozen=True, slots=True)

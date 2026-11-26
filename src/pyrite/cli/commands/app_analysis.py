@@ -26,155 +26,51 @@ subprocess, as a belt-and-suspenders fallback.
     pyrite app analysis --no-token         # pass marimo's --no-token (disable auth token)
 """
 
-import os
-import subprocess
-import sys
-import tempfile
-from pathlib import Path
+from functools import partial
 
-import click
-
-from ..._acp import running_acp
 from ..._app_defaults import get_analysis_default, set_analysis_default
 from ...console import output as _cli_core
-from ...paths import app_dir
-from .. import _completion as _cli_completion
-from .._deprecations import canonical_option
-from .._extras import require_cli_extra
+from ._app_launcher import (
+    MarimoApp,
+    launch,
+    marimo_command,
+    persisted_launch,
+    persisted_launch_command,
+    smoke_command,
+)
 
-NOTEBOOK = str(app_dir() / "analysis_app.py")
 TUNNEL_PORT = 2718
 # Spectra at the High/Publication/Full plot resolutions exceed marimo's 8 MB
 # default cell-output cap (17 tilts at Full: ~115 MB). A caller's own
 # MARIMO_RUNTIME_OUTPUT_MAX_BYTES wins.
 OUTPUT_MAX_BYTES = 512_000_000
-
-
-def _command(material, *, edit=False, watch=False, tunnel=False, no_token=False):
-    """The marimo argv for one launch (module-run through the current
-    interpreter so the venv's marimo is the one that runs). Marimo's own flags
-    go before the notebook path; app args go after ``--``."""
-    return [
-        sys.executable,
-        "-m",
-        "marimo",
-        "edit" if edit else "run",
-        *(["--watch"] if watch else []),
-        *(["--port", str(TUNNEL_PORT)] if tunnel else []),
-        *(["--no-token"] if no_token else []),
-        NOTEBOOK,
-        "--",
-        "--material",
-        material,
-    ]
-
-
-def _smoke_command(material, output):
-    """The one-shot, headless command used to execute the analysis app in CI-like checks."""
-    return [
-        sys.executable,
-        "-m",
-        "marimo",
-        "export",
-        "html",
-        NOTEBOOK,
-        "--output",
-        str(output),
-        "--force",
-        "--",
-        "--material",
-        material,
-    ]
-
-
-def _launch(
-    material, *, edit=False, watch=False, smoke=False, acp=False, tunnel=False, no_token=False
-):
-    require_cli_extra("apps", feature="pyrite app analysis launch")
-    cmd = _command(material, edit=edit, watch=watch, tunnel=tunnel, no_token=no_token)
-    print(f"launching {NOTEBOOK} ({'edit' if edit else 'run'}) with material={material}")
-    if tunnel:
-        print(f"ssh -L {TUNNEL_PORT}:127.0.0.1:{TUNNEL_PORT} <your-pi-ssh-host>")
-        print(f"http://127.0.0.1:{TUNNEL_PORT}")
-    env = {
-        "MARIMO_RUNTIME_OUTPUT_MAX_BYTES": str(OUTPUT_MAX_BYTES),
-        **os.environ,
-        "PYRITE_ANALYZE_INITIAL": material,
-    }
-    if smoke:
-        with tempfile.TemporaryDirectory(prefix="pyrite-analysis-") as tmpdir:
-            subprocess.run(
-                _smoke_command(material, Path(tmpdir) / "analysis.html"), check=True, env=env
-            )
-        return
-    if acp:
-        with running_acp():
-            subprocess.run(cmd, check=True, env=env)
-    else:
-        subprocess.run(cmd, check=True, env=env)
+APP = MarimoApp(
+    "analysis",
+    "analysis_app.py",
+    TUNNEL_PORT,
+    "analysis",
+    initial_env="PYRITE_ANALYZE_INITIAL",
+    base_env={"MARIMO_RUNTIME_OUTPUT_MAX_BYTES": str(OUTPUT_MAX_BYTES)},
+)
+NOTEBOOK = APP.notebook
+_command = partial(marimo_command, APP)
+_smoke_command = partial(smoke_command, APP)
+_launch = partial(launch, APP)
 
 
 def _cli(args):
-    if args.default and args.material is None:
-        raise SystemExit("pyrite app analysis -d/--save-default: no material given to persist")
-
-    if args.default:
-        set_analysis_default(args.material)
-
-    material = args.material or get_analysis_default() or "hopg"
-    launch_args = {"edit": args.edit, "watch": args.watch}
-    if args.smoke:
-        launch_args["smoke"] = True
-    if args.acp:
-        launch_args["acp"] = True
-    if args.tunnel:
-        launch_args["tunnel"] = True
-    if args.no_token:
-        launch_args["no_token"] = True
-    _launch(material, **launch_args)
+    persisted_launch(args, APP, get_analysis_default, set_analysis_default, _launch)
 
 
-@click.command(
+command = persisted_launch_command(
     "analyze",
     help=(
         "Launch the interactive analysis application with marimo run or edit.\n\n"
         "MATERIAL overrides the persisted default for this run. --save-default "
         "stores it for later no-argument launches."
     ),
+    cli=lambda args: _cli(args),  # late-bound: tests patch the module _cli/_launch
 )
-@click.argument(
-    "material",
-    required=False,
-    type=_cli_completion.MATERIAL,
-    shell_complete=_cli_completion.complete_material,
-)
-@canonical_option(
-    "-d",
-    "--save-default",
-    "persist_default",
-    is_flag=True,
-    help="Persist MATERIAL as default for future no-argument runs.",
-)
-@click.option("--watch", is_flag=True, help="Reload app when source files change.")
-@click.option("--smoke", is_flag=True, help="Execute app once headlessly and exit.")
-@click.option("--edit", is_flag=True, help="Use `marimo edit` instead of `marimo run`.")
-@click.option("--acp", is_flag=True, help="Start local Claude and Codex ACP bridges.")
-@click.option("--tunnel", is_flag=True, help="Bind fixed port for SSH tunneling.")
-@click.option("--no-token", is_flag=True, help="Disable marimo auth token.")
-def command(material, persist_default, watch, smoke, edit, acp, tunnel, no_token):
-    if persist_default and material is None:
-        raise click.UsageError("--save-default requires MATERIAL")
-    return _cli_core.invoke_legacy(
-        _cli,
-        material=material,
-        default=persist_default,
-        watch=watch,
-        smoke=smoke,
-        edit=edit,
-        acp=acp,
-        tunnel=tunnel,
-        no_token=no_token,
-    )
 
 
 def main(argv=None):

@@ -42,6 +42,7 @@ import numpy as np
 
 from .._cxr_grid_policy import DEFAULT_RTOL
 from .._grid_semantics import resolution_num
+from .._util.arrays import host_array as _host
 from ..detectors.spec import EagleXO, Timepix3
 from ..results.metrics import cxr_metrics
 
@@ -254,11 +255,6 @@ def nested_uniform_ladder(
         np.linspace(float(start_eV), float(stop_eV), intervals * 2**rung + 1)
         for rung in range(int(n_rungs))
     ]
-
-
-def _host(array: object) -> np.ndarray:
-    get = getattr(array, "get", None)
-    return np.asarray(get() if get is not None else array)
 
 
 def segment_fingerprint(segments: Mapping[str, Any]) -> dict[str, Any]:

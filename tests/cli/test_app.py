@@ -6,6 +6,7 @@ import pytest
 from click.testing import CliRunner
 
 from pyrite import cli
+from pyrite.cli.commands import _app_launcher as launcher
 from pyrite.cli.commands import app_analysis as analyze
 from pyrite.cli.commands import app_validation as check
 from pyrite.cli.commands import app_viewer as viewer
@@ -64,7 +65,7 @@ def test_analysis_leaf_launches_and_export_dispatches(monkeypatch):
 def test_viewer_export_never_launches(monkeypatch, tmp_path):
     launched = []
     monkeypatch.setattr(
-        viewer.subprocess, "run", lambda *args, **kwargs: launched.append((args, kwargs))
+        launcher.subprocess, "run", lambda *args, **kwargs: launched.append((args, kwargs))
     )
 
     result = CliRunner().invoke(
@@ -80,7 +81,7 @@ def test_viewer_export_never_launches(monkeypatch, tmp_path):
 def test_viewer_export_defaults_to_pyrite_stem(monkeypatch, tmp_path):
     launched = []
     monkeypatch.setattr(
-        viewer.subprocess, "run", lambda *args, **kwargs: launched.append((args, kwargs))
+        launcher.subprocess, "run", lambda *args, **kwargs: launched.append((args, kwargs))
     )
 
     viewer._export(None, "mose2")
@@ -177,7 +178,7 @@ def test_split_app_commands_target_their_notebooks_and_ports():
 def test_split_app_export_never_launches(monkeypatch, tmp_path):
     calls = []
     monkeypatch.setattr(
-        views.subprocess, "run", lambda *args, **kwargs: calls.append((args, kwargs))
+        launcher.subprocess, "run", lambda *args, **kwargs: calls.append((args, kwargs))
     )
     monkeypatch.setattr(views, "get_analysis_default", lambda: None)
 
@@ -206,7 +207,7 @@ def _hide_modules(monkeypatch, *names):
 def test_app_launch_without_apps_extra_names_the_install_hint(monkeypatch):
     launched = []
     _hide_modules(monkeypatch, "marimo")
-    monkeypatch.setattr(views.subprocess, "run", lambda *a, **k: launched.append(a))
+    monkeypatch.setattr(launcher.subprocess, "run", lambda *a, **k: launched.append(a))
 
     result = CliRunner().invoke(cli.command, ["app", "pixels", "launch", "--smoke", "hopg"])
 
@@ -222,7 +223,7 @@ def test_app_launch_without_apps_extra_names_the_install_hint(monkeypatch):
 )
 def test_channeling_launch_and_export_have_no_material_argument(monkeypatch, tmp_path, name):
     calls = []
-    monkeypatch.setattr(views.subprocess, "run", lambda *a, **k: calls.append((a, k)))
+    monkeypatch.setattr(launcher.subprocess, "run", lambda *a, **k: calls.append((a, k)))
     runner = CliRunner()
     launched = runner.invoke(
         cli.command, ["app", name, "launch", "--edit", "--watch", "--tunnel", "--no-token"]
@@ -270,7 +271,7 @@ def test_launch_backend_sets_app_process_environment(monkeypatch, name):
 
     assert views.BACKEND_CHOICES == _VALID_BACKENDS
     calls = []
-    monkeypatch.setattr(views.subprocess, "run", lambda *a, **k: calls.append(k["env"]))
+    monkeypatch.setattr(launcher.subprocess, "run", lambda *a, **k: calls.append(k["env"]))
     monkeypatch.setenv("PYRITE_MC_BACKEND", "cpu")
     runner = CliRunner()
     result = runner.invoke(cli.command, ["app", name, "launch", "--backend", "cuda"])
@@ -291,7 +292,7 @@ def test_channeling_missing_extra_and_failed_subprocess(monkeypatch, name):
     def fail(*args, **kwargs):
         raise subprocess.CalledProcessError(7, args[0])
 
-    monkeypatch.setattr(views.subprocess, "run", fail)
+    monkeypatch.setattr(launcher.subprocess, "run", fail)
     runner = CliRunner()
     for action in ("launch", "export"):
         result = runner.invoke(cli.command, ["app", name, action])

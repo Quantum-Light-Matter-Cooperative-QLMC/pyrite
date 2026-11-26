@@ -46,13 +46,9 @@ from .batching import resolve_transport_core
 from .events import EVENT_CUTOFF, EVENT_EXIT_BOTTOM, EVENT_EXIT_SIDE, EVENT_EXIT_TOP
 from .kinematics import (
     _SM64_GOLDEN,
-    _SM64_MIX1,
-    _SM64_MIX2,
     _SM64_ONE,
-    _SM64_S27,
-    _SM64_S30,
-    _SM64_S31,
 )
+from .kinematics import _splitmix64_array as _mix
 from .lineage import (
     CASCADE_RNG_MODEL,
     PROCESS_PAIR_ELECTRON,
@@ -160,12 +156,6 @@ class SecondaryPass:
     photon_seed: int
     projectile: str = "electron"
     lineage: bool = False
-
-
-def _mix(x):
-    x = (x ^ (x >> _SM64_S30)) * _SM64_MIX1
-    x = (x ^ (x >> _SM64_S27)) * _SM64_MIX2
-    return x ^ (x >> _SM64_S31)
 
 
 def secondary_stream_keys(seed, parent_track, parent_ordinal, *, salt=_SECONDARY_STREAM_SALT):

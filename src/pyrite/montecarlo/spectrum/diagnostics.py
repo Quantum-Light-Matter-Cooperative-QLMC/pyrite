@@ -35,6 +35,7 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
 from ..._backend import _to_cpu
+from ..._util.arrays import host_array as _host
 from ...materials.attenuation import _normalize_composition
 from ...materials.crystal import HBARC_EV_ANG
 from ..transport import (
@@ -43,7 +44,12 @@ from ..transport import (
     beta_from_keV,
     spliced_stopping_keV_per_ang,
 )
-from ._device_sizing import device_sinc_samples, device_sinc_spacing, sizing_module
+from ._device_sizing import (
+    _strictly_ordered,
+    device_sinc_samples,
+    device_sinc_spacing,
+    sizing_module,
+)
 from .brem import BremsstrahlungModel, _bremsstrahlung_dsigma_dk
 from .cxr import _SEG_ARRAYS, _observation_direction
 
@@ -146,17 +152,6 @@ def sinc_feature_samples(segments, n_hat, *, electron_limit=None):
         & (denominator > 0.0)
     )
     return width[valid], weight[valid]
-
-
-def _strictly_ordered(owner, flight):
-    """Whether rows run in strictly increasing ``(owner, flight)`` order.
-
-    Then every flight is one row, in every row subset too, so
-    :func:`_flight_sums` would return None (#1270).
-    """
-    later = owner[1:] > owner[:-1]
-    later |= (owner[1:] == owner[:-1]) & (flight[1:] > flight[:-1])
-    return bool(later.all())
 
 
 def _flight_sums(owner, flight, phase, t_L):
@@ -473,11 +468,6 @@ def coherent_fringe_spacing(
     if span <= 0.0:
         return float("inf"), 0.0, int(d.size)
     return float(np.pi * HBARC_EV_ANG / span), span, int(d.size)
-
-
-def _host(array):
-    get = getattr(array, "get", None)
-    return np.asarray(get() if get is not None else array)
 
 
 def _stopping_keV_per_ang(E_keV, composition):

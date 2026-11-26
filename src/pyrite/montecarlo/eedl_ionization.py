@@ -13,6 +13,7 @@ from typing import Any
 import numpy as np
 from endf_parserpy import EndfFile
 
+from .._util.arrays import readonly_array
 from ..datasets import EEDL, DatasetMismatchError, file_sha256, require_dataset
 from ..materials.atomic import Z_TABLE
 
@@ -71,12 +72,6 @@ class EEDLSubshellTable:
     binding_energy_eV: float
     projectile_energy_eV: np.ndarray
     cross_section_cm2: np.ndarray
-
-
-def _readonly(array: object) -> np.ndarray:
-    out = np.asarray(array, dtype=float)
-    out.setflags(write=False)
-    return out
 
 
 def _require_finite(value: object, name: str, *, positive: bool = False) -> float:
@@ -161,8 +156,8 @@ def _extract_eedl_subshell(
     return EEDLSubshellTable(
         shell_designator=mt - 533,
         binding_energy_eV=binding,
-        projectile_energy_eV=_readonly(projectile),
-        cross_section_cm2=_readonly(cross_section_barn * 1.0e-24),
+        projectile_energy_eV=readonly_array(projectile, dtype=float),
+        cross_section_cm2=readonly_array(cross_section_barn * 1.0e-24, dtype=float),
     )
 
 
