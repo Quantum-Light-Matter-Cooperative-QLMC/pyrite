@@ -102,7 +102,10 @@ def test_pull_attached_progress_uses_remote_reserved_stems_not_local_catalog(mon
 
     # Only the progress-reporting material (hbn) is pulled; unwritten hopg is skipped.
     assert pulls == [
-        (["hbn@high_energy-1ca2a03dbfd5", "hbn@other-ffffffffffff"], {"no_sync": True})
+        (
+            ["hbn@high_energy-1ca2a03dbfd5", "hbn@other-ffffffffffff"],
+            {"no_sync": True, "_expand_surveys": False},
+        )
     ]
 
 

@@ -537,6 +537,16 @@ and `parameter_sha256` hashes in `resolved.json` and `channeling.json`. These
 fixtures are CPU/NumPy fp64, whose line sums were already binary64, so every
 recorded output keeps its expectation.
 
+## Vectorized windowed sinc² sine (#1459)
+
+The CPU support-windowed sinc² reduction evaluates `sin` with the
+vectorizable `vector_sin` (fdlibm kernels, ≤ 0.79 ulp, identical bits on every
+host) instead of libm, about 4e-16 relative on the reduced spectrum, so
+`CXR_ESCAPE_MODEL` advances to `/fp64-spectrum-sum-v2`. Re-pinned: the
+generation-dependent `case_content_key` and `parameter_sha256` hashes in
+`resolved.json` and `channeling.json`. Every recorded output keeps its
+expectation within its tolerance.
+
 ## Device line-axis sizing (#1275)
 
 `LINE_BANDWIDTH_DEFAULT_MODEL=resonance-population-default-v2` and
