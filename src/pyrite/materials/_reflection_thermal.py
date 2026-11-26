@@ -18,6 +18,8 @@ def common_uniaxial_b(crystal: str, hkl, temperature_K: float) -> float:
     requested temperature; otherwise a scalar B cannot represent the sites.
     For the supported hexagonal crystals the reciprocal (001) is parallel to
     the direct c axis. Missing data and unsupported temperatures are errors.
+
+    Validation: cxr-fiber-intensity-average
     """
     from .channeling.thermal import ChannelingDataError, UniaxialThermalSite, thermal_site
     from .crystal import CRYSTALS, reciprocal_g_vector

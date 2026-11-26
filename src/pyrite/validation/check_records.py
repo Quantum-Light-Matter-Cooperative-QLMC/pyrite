@@ -62,6 +62,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/coherent_transverse_coherence.py": ("transverse-bunch-form-factor",),
     "checks/collision_statistics_refinement.py": ("energy-controlled-propagation",),
     "checks/cross_reflection_coherence.py": ("cross-reflection-coherence",),
+    "checks/fiber_paired_1480.py": (),  # #1480 research diagnostic, no ledger claim
+    "checks/fiber_thermal_1480.py": (),  # #1480 research diagnostic, no ledger claim
     "checks/fiber_nonbasal_cxr_1480.py": (
         "cxr-fiber-azimuthal-kinematics",
         "graphite-nonbasal-structure-factor",

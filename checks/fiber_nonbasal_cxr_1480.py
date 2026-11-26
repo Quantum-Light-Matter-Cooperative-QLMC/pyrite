@@ -153,6 +153,32 @@ def cmd_structure(args):
     if args.json:
         with open(args.json, "w") as fh:
             json.dump(rows, fh, indent=1)
+    if args.crystal == "hopg":
+        _assert_graphite_classes(rows)
+
+
+def _assert_graphite_classes(rows):
+    """``graphite-nonbasal-structure-factor``: |S|^2 classes, orbits and g_perp.
+
+    Six-member families hold below the {21} row (g_perp = 7.80 1/A); from it on, the mirror
+    orbits {hk} and {kh} share l, g_perp and |S| and group as twelve.
+    """
+    bad = []
+    a_star = 4 * math.pi / (math.sqrt(3) * CRYSTALS["hopg"]["lattice"]["a"])
+    rows_allowed = {round(a_star * x, 3) for x in (0.0, 1.0, math.sqrt(3), 2.0)}
+    for r in rows:
+        for h, k, ell in r["members"]:
+            m0 = (h - k) % 3 == 0
+            want = (16.0 if m0 else 1.0) if ell % 2 == 0 else (0.0 if m0 else 3.0)
+            if abs(geometric_s2("hopg", (h, k, ell)) - want) > 1e-9:
+                bad.append(((h, k, ell), "class"))
+        if r["g_perp"] > 0 and r["g_perp"] < 7.79 and r["multiplicity"] != 6:
+            bad.append((r["rep"], f"multiplicity {r['multiplicity']}"))
+        if r["g_perp"] < 7.79 and round(r["g_perp"], 3) not in rows_allowed:
+            bad.append((r["rep"], f"g_perp {r['g_perp']}"))
+    if bad:
+        raise SystemExit(f"graphite structure-factor checks failed: {bad[:8]}")
+    print(f"PASS graphite |S|^2 classes, six-member orbits and g_perp over {len(rows)} families")
 
 
 # ---- kinematics -------------------------------------------------------------
@@ -229,10 +255,10 @@ def cmd_kinematics(args):
     # 1. axial classical degeneracy: every member, every phi, same l
     print("1. axial classical degeneracy (alpha = 0)")
     for T in (30e3, 1e6):
+        worst = 0.0  # over every polar/azimuthal observation angle below
         for theta in np.deg2rad([20.0, 90.0, 119.0, 160.0]):
             for psi in (0.0, 0.7):
                 ref = classical_eV(T, _unit(0), g002, _unit(theta, psi))
-                worst = 0.0
                 for hkl in ((1, 0, 2), (1, 1, 2), (2, 0, 2), (-1, 2, 2)):
                     _, cl, _ = azimuth_scan(crystal, hkl, T, 0.0, theta, psi, 181)
                     worst = max(worst, float(np.max(np.abs(cl / ref - 1))))
@@ -269,6 +295,17 @@ def cmd_kinematics(args):
             half1 = HBARC_EV_ANG * math.hypot(g[0], g[1]) * math.sin(math.radians(119)) / (E * D)
             mean = 0.5 * (ex.max() + ex.min()) / cl[0] - 1
             half = 0.5 * (ex.max() - ex.min()) / cl[0]
+            # claimed term: fractional shift relative to the (00l) exact line
+            rel = 0.5 * (ex.max() + ex.min()) / e0 - 1
+            rel1 = -HBARC_EV_ANG * (g[0] ** 2 + g[1] ** 2) / (2 * E * beta * g[2])
+            check(
+                abs(rel - rel1) < 0.05 * abs(rel1) + 2e-4,
+                f"   {hkl} {T / 1e3:g} keV shift vs (00l) {rel:+.5f} (claimed {rel1:+.5f})",
+            )
+            check(
+                abs(mean - mean1) < 0.05 * abs(mean1) + 2e-4,
+                f"   {hkl} {T / 1e3:g} keV total recoil shift vs classical, first order",
+            )
             out.append((hkl, e0, ex.min(), ex.max(), mean, mean1, half, half1))
         for hkl, e0, lo, hi, mean, mean1, half, half1 in out:
             print(

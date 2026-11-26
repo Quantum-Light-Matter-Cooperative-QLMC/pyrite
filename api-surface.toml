@@ -389,6 +389,8 @@ propagate_axial = { target = "pyrite.montecarlo.channeling.axial_propagation:pro
 AdaptiveSampling = { target = "pyrite._sampling:AdaptiveSampling", status = "advanced-stable" }
 # #1173: omitted family count uses tolerance selection; explicit counts retain fixed sets.
 CxrReflections = { target = "pyrite._numerics:CxrReflections", status = "advanced-stable" }
+# #1480: full-fiber roll/cutoff numerics on CxrReflections.fiber; campaign scoring is #1483.
+FiberAverage = { target = "pyrite._fiber_average:FiberAverage", status = "experimental" }
 FixedSampling = { target = "pyrite._sampling:FixedSampling", status = "advanced-stable" }
 LineRoulette = { target = "pyrite._line_roulette:LineRoulette", status = "experimental" }
 # #379: transport estimator; copies reach every linear tally at power-of-two weights.

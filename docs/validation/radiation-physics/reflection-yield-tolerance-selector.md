@@ -507,6 +507,32 @@ texture record and reconstructed set.
 retired pins as the first two shells, a non-orthogonal axis, and an unchanged
 single-crystal enumeration.
 
+### Fiber-domain applicability (#1480)
+
+The v7 stop certifies convergence **within the basal set** only. It is not an
+omitted-yield bound against the full fiber sum. #1480 scored the full allowed
+domain ($\lvert g\rvert\le6$ Å⁻¹, every non-extinct family, uniform roll
+average over 32 sector nodes, uniaxial thermal tensor) on the same frozen
+transports as the basal arm. Production per-reflection model, 300 electrons
+per scene:
+
+| Scene | Basal / full fiber yield |
+|---|---:|
+| HOPG 30 keV, 500 nm, axial, 45° | 0.18 |
+| HOPG 30 keV, 500 nm, tilt 15°, 45° | 0.32 |
+| HOPG 300 keV, 500 nm, tilt 15°, 45° | 0.037 |
+| HOPG 1 MeV, 500 nm, tilt 15°, 45° | 0.020 |
+| HOPG 1 MeV, 500 nm, axial, 135° | 0.75 |
+| h-BN 30 keV, 500 nm, tilt 15°, 45° (B33 isotropic) | 0.38 |
+
+These are at $\lvert g\rvert\le6$ Å⁻¹. In the 30 keV, tilt 15° scene, raising the full-domain cutoff to 8 and 10 Å⁻¹ adds 22 % and 43 %, so they are upper bounds on the basal share. The v7 selection evidence above is therefore valid as stated: these are basal
+shell rows under a deliberate restriction. A selected set from this selector
+is not a converged fiber spectrum outside narrow $(00l)$ windows at backward,
+near-axial, high-energy geometry. The full table, the applicability envelope
+and the opt-in full-fiber model (`cxr-fiber-intensity-average`) are in the
+[#1480 research note](../../research/physics/fiber-nonbasal-cxr-1480.md#applicability-envelope).
+Selector extension to the fiber domain: #1484.
+
 ### Fiber-texture re-verification (v7, #1301, 2026-11-18)
 
 This is a fresh-context review. The verifier derived the result below from the

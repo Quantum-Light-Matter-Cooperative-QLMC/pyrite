@@ -19,7 +19,7 @@ def test_common_axis_and_observables():
     grid, edges = photon_axis(10, 15, 2)
     np.testing.assert_allclose(edges[[0, -1]], [10, 15])
     widths = np.diff(edges)
-    cxr = np.array([0., 3., 0.])
+    cxr = np.array([0.0, 3.0, 0.0])
     brem = np.ones_like(cxr)
     result = observables(grid, widths, cxr, brem)
     assert result["cxr_yield"] == pytest.approx(5)
@@ -30,25 +30,27 @@ def test_common_axis_and_observables():
     assert zero["cxr_fwhm_eV"] is None
     metrics = dict(A=result, B=result, C=result, D=zero)
     delta = paired_differences(metrics)
-    assert delta["B-A"]["cxr_yield"] == dict(absolute=0., relative=0.)
-    assert delta["A-D"]["cxr_yield"]["absolute"] == pytest.approx(5.)
+    assert delta["B-A"]["cxr_yield"] == dict(absolute=0.0, relative=0.0)
+    assert delta["A-D"]["cxr_yield"]["absolute"] == pytest.approx(5.0)
     assert delta["A-D"]["cxr_yield"]["relative"] is None
     assert delta["A-D"]["cxr_centroid_eV"]["absolute"] is None
 
 
 def test_merge_shells_before_clamp():
-    g, weights = merge_shell_weights([
-        (np.array([1., 3.]), {"C": np.array([2., 4.])}),
-        (np.array([2., 3.]), {"C": np.array([5., 7.])}),
-    ])
+    g, weights = merge_shell_weights(
+        [
+            (np.array([1.0, 3.0]), {"C": np.array([2.0, 4.0])}),
+            (np.array([2.0, 3.0]), {"C": np.array([5.0, 7.0])}),
+        ]
+    )
     np.testing.assert_array_equal(g, [1, 2, 3])
     np.testing.assert_array_equal(weights["C"], [2, 5, 11])
 
 
 def test_azimuth_average_sums_intensities_and_preserves_nodes():
-    grid = np.array([10., 11.])
-    angles = np.array([0., np.pi])
-    groups = {1.: [(1, 0, 0)], 2.: [(0, 1, 0)]}
+    grid = np.array([10.0, 11.0])
+    angles = np.array([0.0, np.pi])
+    groups = {1.0: [(1, 0, 0)], 2.0: [(0, 1, 0)]}
     calls = []
 
     def score(b, hkls, phi):
@@ -72,16 +74,37 @@ def test_production_domain_and_tensor_projection():
     from pyrite.materials.channeling.thermal import thermal_site
     from pyrite.materials.crystal import CRYSTALS
 
-    basal, full = reflection_domain("hopg", 8.)
+    basal, full = reflection_domain("hopg", 8.0)
     assert set(basal) < set(full)
     assert (0, 0, 2) in basal
     assert (1, 0, 2) in full
     assert all(tuple(-i for i in h) in full for h in full)
     assert CRYSTALS["hopg"]["texture"] == "fiber"
     site = thermal_site("hopg", "C")
-    groups = tensor_groups("hopg", full, site, 300.)
-    b33 = site.b_factor_along(1., 300.)
+    groups = tensor_groups("hopg", full, site, 300.0)
+    b33 = site.b_factor_along(1.0, 300.0)
     assert set(groups[b33]) == set(basal)
-    assert min(groups) == pytest.approx(site.b_factor_along(0., 300.))
+    assert min(groups) == pytest.approx(site.b_factor_along(0.0, 300.0))
     assert {h for hkls in groups.values() for h in hkls} == set(full)
     assert sum(map(len, groups.values())) == len(full)
+
+
+def test_ladder_bands_disjoint_and_cumulative():
+    from checks.fiber_paired_1480 import ladder_bands
+    from pyrite.config import FiberAverage
+    from pyrite.montecarlo.spectrum.cxr.fiber import FiberCXRModel
+
+    domains = [
+        FiberCXRModel(FiberAverage(cutoff_invang=cut), 300.0).prepare() for cut in (4.0, 6.0)
+    ]
+    bands = ladder_bands(domains)
+    seen = set()
+    for domain, band in zip(domains, bands, strict=True):
+        rows = band["basal"] + band["nonbasal"]
+        assert all(h[:2] == (0, 0) for h, _ in band["basal"])
+        assert not any(h[:2] == (0, 0) for h, _ in band["nonbasal"])
+        assert seen.isdisjoint(h for h, _ in rows)
+        seen |= {h for h, _ in rows}
+        assert seen == set(domain.hkls)
+    with pytest.raises(ValueError, match="nested"):
+        ladder_bands(domains[::-1])

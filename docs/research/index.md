@@ -29,6 +29,8 @@ physics/transverse-recoil-527
 physics/shi-2024-intensity-1103
 physics/shaped-electron-cxr-1102
 physics/fiber-nonbasal-cxr-1480
+physics/fiber-paired-1480
+physics/fiber-production-1480
 physics/strain-acoustic-modulation-1058
 physics/phase-retention
 physics/channeling-radiation-physics
