@@ -160,7 +160,7 @@ docs = [
     "pydata-sphinx-theme>=0.20.0",
     "sphinxcontrib-bibtex>=2.6",
     # Exports the browser-only results demo (docs/demo/) during the HTML build.
-    "marimo>=0.25.1",
+    "marimo>=0.26.0",
     "sphinx-design>=0.6.1",
 ]
 
@@ -180,17 +180,12 @@ browser = [
     "selenium>=4.53.0",
 ]
 
-dev = [
-    { include-group = "test" },
-    { include-group = "lint" },
-]
 # Contributor checkout: the shipped app/plot extras plus notebook conversion
 # tools nothing in ``src/`` imports.
 notebooks = [
     "pyrite-mc[apps]",
     "nbconvert>=7.17.1",
     "pandoc>=2.4",
-    "marimo[recommended]>=0.26.0",
 ]
 
 [tool.pytest.ini_options]
@@ -245,7 +240,7 @@ exclude_also = [
 #     `_jit_*kernel.py`, `_jit_annihilation.py`, and
 #     `montecarlo/spectrum/*_jit_kernel.py`) import `cupy` at module scope, so
 #     a CPU-only environment reports them 0% (never imported) and the total drops
-#     ~7 points. With the `nvidia` extra installed their host-side code is
+#     ~7 points. In the `nvidia` pixi environment their host-side code is
 #     measured; `cupyx.jit` device bodies stay untraceable regardless.
 #   - `transport/_jit_radiative.py` is CPU Numba code, not a CUDA module;
 #     retain it and host dispatch/fallback paths in CPU coverage reports.
@@ -262,9 +257,6 @@ watcher_on_save = "autorun"
 # Analysis-app spectra above the Standard plot resolution exceed marimo's 8 MB
 # default; keep in sync with pyrite.cli.commands.app_analysis.OUTPUT_MAX_BYTES.
 output_max_bytes = 512_000_000
-
-[tool.jupytext]
-formats = "ipynb,md:myst"
 
 [tool.ty.src]
 include = ["src"]
@@ -673,9 +665,6 @@ python = "3.13.*"
 [tool.pixi.feature.py314.dependencies]
 python = "3.14.*"
 
-# CUDA 13 from conda-forge: CuPy and cuFINUFFT link one toolkit pinned by
-# `cuda-version`, replacing the CUDA 13 CuPy wheel plus CUDA 12 runtime wheels
-# of the PyPI `nvidia` extra. Never combine with that extra (CuPy twice).
 # marimo's HTML-WASM export (the docs results demo) shells out to the `uv`
 # binary to run Ruff's import graph. It is a tool marimo calls, not how this
 # workspace manages environments; its tool/cache dirs stay inside `.pixi/` so
@@ -701,6 +690,9 @@ trame-vuetify = "*"
 pymupdf = "*"
 scikit-image = "*"
 
+# CUDA 13 from conda-forge: CuPy and cuFINUFFT link one toolkit pinned by
+# `cuda-version`, replacing the CUDA 13 CuPy wheel plus CUDA 12 runtime wheels
+# of the PyPI `nvidia` extra. Never combine with that extra (CuPy twice).
 [tool.pixi.feature.cuda]
 platforms = ["linux-64-cuda"]
 
