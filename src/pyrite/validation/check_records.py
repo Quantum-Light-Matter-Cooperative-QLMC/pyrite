@@ -64,6 +64,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/cross_reflection_coherence.py": ("cross-reflection-coherence",),
     "checks/fiber_paired_1480.py": (),  # #1480 research diagnostic, no ledger claim
     "checks/fiber_thermal_1480.py": (),  # #1480 research diagnostic, no ledger claim
+    "checks/fiber_domain_structure_1485.py": (),  # #1485 research prototype, no ledger claim
     "checks/fiber_nonbasal_cxr_1480.py": (
         "cxr-fiber-azimuthal-kinematics",
         "graphite-nonbasal-structure-factor",

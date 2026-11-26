@@ -216,6 +216,8 @@ Energy-weighted share of the scored set ($\lvert g\rvert\le6$ Å⁻¹; script ar
 
 ## Domain coherence (open)
 
+Phase II measurements of all four points below, with a proposed per-crystal domain model: [Crystallite structure of fiber CXR](fiber-domain-structure-1485.md) (#1485).
+
 - **Crystallite size and formation length.** CXR formation lengths are nanometres for keV photons. HOPG crystallites are micrometres in plane and of order 0.1 µm along $c$. One roll per coherent region is therefore well justified for HOPG, and the incoherent mean does not depend on whether one track crosses several crystallites: the mean is linear in the orientation distribution. Only line shapes and inter-segment phase in the coherent mode depend on domain size.
 - **Several domains along one track.** In incoherent mode the result equals the per-segment orientation average. In the coherent mode (`coherent-emission`), phases across a domain boundary are not modelled; the opt-in model refuses coherent emission.
 - **Basal coherence between domains.** Basal $g$ is common to all rolls, but stacking-registry shifts between crystallites randomize the basal phase too. This matters only for the coherent mode.
