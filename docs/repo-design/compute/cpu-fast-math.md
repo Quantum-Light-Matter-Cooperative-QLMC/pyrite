@@ -188,8 +188,30 @@ What the rows show:
   kernels other than the reducer. That is why the adopted variant applies
   flags to the reducer alone.
 
-Reducer variants alone (`--reducer`, everything else reproducible), on the
-AVX2 laptop (i7-13620H, photon-case, 1 thread, 2 warm samples):
+Reducer variants alone (`--reducer`, everything else reproducible) on
+qlmc-queen (jobs 16045 at 1 thread and 16046 at 4 threads; spread under
+0.5 %). "Change" is over the peak, as above:
+
+| Case | Threads | Arm | Warm wall (s) | Speedup | Reducer (s) | Change |
+|---|---:|---|---:|---:|---:|---:|
+| photon-case | 1 | reproducible | 7.64 | 1.00x | 2.66 | 0 |
+| photon-case | 1 | `u35` strict | 6.73 | 1.14x | 1.75 | 1.7e-16 |
+| photon-case | 1 | `sinc2` strict | 6.33 | 1.21x | 1.34 | 1.7e-16 |
+| photon-case | 1 | `sinc2` + `contract` (adopted) | 5.89 | 1.30x | 0.92 | 1.7e-16 |
+| photon-case | 1 | `sinc2` + `arcp,contract` | 6.01 | 1.27x | 0.92 | 1.7e-16 |
+| photon-case | 4 | reproducible | 5.53 | 1.00x | 0.69 | 0 |
+| photon-case | 4 | `sinc2` + `arcp,contract` | 5.08 | 1.09x | 0.24 | 1.7e-16 |
+| layered | 1 | reproducible | 31.10 | 1.00x | 8.83 | 0 |
+| layered | 1 | `u35` strict | 27.98 | 1.11x | 5.84 | 2.1e-16 |
+| layered | 1 | `sinc2` strict | 26.61 | 1.17x | 4.44 | 2.1e-16 |
+| layered | 1 | `sinc2` + `contract` (adopted) | 25.43 | 1.22x | 3.04 | 1.1e-16 |
+| layered | 4 | reproducible | 24.42 | 1.00x | 2.27 | 0 |
+| layered | 4 | `sinc2` + `arcp,contract` | 22.84 | 1.07x | 0.80 | 1.1e-16 |
+
+At 4 threads the reducer already runs in parallel and the serial NumPy
+remainder dominates, so the complete-case gain falls to 7–9 %.
+
+The same variants on the AVX2 laptop (i7-13620H, photon-case, 1 thread, 2 warm samples):
 
 | Arm | Warm wall (s) | Speedup | Reducer (s) | Change |
 |---|---:|---:|---:|---:|
@@ -203,7 +225,7 @@ The adopted kernel against `reproducible` on complete cases (#1468's
 validation, moved here). Each mode ran in its own process with its own Numba
 cache. "Change" is the largest absolute change of any output array as a
 fraction of its peak; "sum change" is the largest relative change of an
-array's sum. CPU rows are qlmc-queen at 1 thread (jobs 16050/16051, 16054/16055;
+array's sum. CPU rows are qlmc-queen at 1 thread unless marked (jobs 16050–16053, 16054/16055;
 mean of 2 warm samples). The GPU row is qlmc-ace, Radeon 8060S with FP64,
 ROCm (job 16056).
 
@@ -213,6 +235,8 @@ ROCm (job 16056).
 | layered | CPU | 31.06 | 25.27 | 1.23x | 1.1e-16 | 0 |
 | channeling-demo (admitted planar case) | CPU | 13.36 | 13.03 | – | 0 (same bits) | 0 |
 | layered | GPU (ROCm) | 5.71 | 5.70 | – | 0 (same bits) | 0 |
+| photon-case, 4 threads | CPU | 5.54 | 5.09 | 1.09x | 1.7e-16 | 0 |
+| layered, 4 threads | CPU | 24.38 | 22.83 | 1.07x | 1.1e-16 | 0 |
 
 - Both modes are far inside Monte Carlo error. These cases' relative MC error
   is about 1e-2 or larger per bin (the channeling case's budget is 6 %), and
