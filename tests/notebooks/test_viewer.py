@@ -11,6 +11,7 @@ from click.testing import CliRunner
 
 from pyrite import _app_defaults
 from pyrite.apps import viewer
+from pyrite.cli.commands import _app_launcher
 from pyrite.cli.commands import app_viewer as viewer_cli
 
 
@@ -188,7 +189,7 @@ def test_command_tunnel_uses_fixed_marimo_port():
 def test_tunnel_launch_prints_forwarding_instructions_without_running_marimo(monkeypatch, capsys):
     launched = []
     monkeypatch.setattr(
-        viewer_cli.subprocess, "run", lambda *args, **kwargs: launched.append((args, kwargs))
+        _app_launcher.subprocess, "run", lambda *args, **kwargs: launched.append((args, kwargs))
     )
 
     viewer_cli._launch("hopg", tunnel=True)
