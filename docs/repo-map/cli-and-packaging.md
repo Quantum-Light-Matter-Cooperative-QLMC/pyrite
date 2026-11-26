@@ -227,14 +227,14 @@ records it at the existing recorded depths in the instantaneous basis.
 
 ## `cli/commands/app_views.py`
 `pyrite app pixels launch|export`, `pyrite app compare launch|export` and
-`pyrite app channeling launch|export` share the `MarimoApp` launcher (headless
+`pyrite app channeling launch|export` share the `_app_launcher.MarimoApp` launcher (headless
 smoke, edit/watch, ACP bridges and static HTML export). Fixed tunnel ports are
 2720/2721/2722. Pixels/compare resolve MATERIAL > the analysis app's persisted
 default > `hopg`, passed as `--material` and `PYRITE_ANALYZE_INITIAL`. Channeling
 targets `channeling_app.py` with no material argument. Imports no `apps` module.
 
 ## `cli/commands/_app_launcher.py`
-Shared marimo launcher for `app_analysis` and `app_viewer` (#1467): `MarimoApp` config dataclass and `app_command()` own argv building, headless smoke runs, launch, environment precedence, `--save-default` and the shared Click options. Each command module declares only its notebook, tunnel port and help; the Click callback looks up the module's `_cli` at call time so tests can monkeypatch it. Tests patch `_app_launcher.subprocess`. Separate from the `MarimoApp` in `app_views.py` (no persisted default, optional material); the two overlap in argv/smoke/run logic.
+The one marimo launcher behind every `pyrite app <name> launch|export` (#1467): `MarimoApp` (command name, notebook, tunnel port, title, `material_picker`, `initial_env`, `base_env`), argv for run/edit and headless `marimo export html`, child environment (app `base_env` < caller env < material and `--backend`), ACP bridges, and `run_marimo`, which reports child failures as Click errors with exit 1. `persisted_launch_command`/`persisted_launch` add the `-d/--save-default` material precedence (MATERIAL > persisted default > `hopg`) that `app_analysis` and `app_viewer` use; `app_views` builds the picker and standalone apps. App modules keep `_command`/`_smoke_command`/`_launch` aliases, and tests patch `_app_launcher.subprocess`.
 
 ## `cli/commands/app_viewer.py`
 `pyrite app viewer launch|export` owner for `src/pyrite/apps/trace_app.py`: material-argument handling, smoke execution, static-HTML export, ACP bridges, fixed-port tunnel launch.

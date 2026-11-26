@@ -26,10 +26,18 @@ subprocess, as a belt-and-suspenders fallback.
     pyrite app analysis --no-token         # pass marimo's --no-token (disable auth token)
 """
 
+from functools import partial
+
 from ..._app_defaults import get_analysis_default, set_analysis_default
 from ...console import output as _cli_core
-from ...paths import app_dir
-from ._app_launcher import MarimoApp, app_command
+from ._app_launcher import (
+    MarimoApp,
+    launch,
+    marimo_command,
+    persisted_launch,
+    persisted_launch_command,
+    smoke_command,
+)
 
 TUNNEL_PORT = 2718
 # Spectra at the High/Publication/Full plot resolutions exceed marimo's 8 MB
@@ -37,32 +45,31 @@ TUNNEL_PORT = 2718
 # MARIMO_RUNTIME_OUTPUT_MAX_BYTES wins.
 OUTPUT_MAX_BYTES = 512_000_000
 APP = MarimoApp(
-    name="analysis",
-    notebook=str(app_dir() / "analysis_app.py"),
-    tunnel_port=TUNNEL_PORT,
+    "analysis",
+    "analysis_app.py",
+    TUNNEL_PORT,
+    "analysis",
     initial_env="PYRITE_ANALYZE_INITIAL",
-    get_default=get_analysis_default,
-    set_default=set_analysis_default,
     base_env={"MARIMO_RUNTIME_OUTPUT_MAX_BYTES": str(OUTPUT_MAX_BYTES)},
 )
 NOTEBOOK = APP.notebook
-_command = APP.command
-_smoke_command = APP.smoke_command
-_launch = APP.launch
+_command = partial(marimo_command, APP)
+_smoke_command = partial(smoke_command, APP)
+_launch = partial(launch, APP)
 
 
 def _cli(args):
-    APP.run_cli(args, _launch)
+    persisted_launch(args, APP, get_analysis_default, set_analysis_default, _launch)
 
 
-command = app_command(
+command = persisted_launch_command(
     "analyze",
     help=(
         "Launch the interactive analysis application with marimo run or edit.\n\n"
         "MATERIAL overrides the persisted default for this run. --save-default "
         "stores it for later no-argument launches."
     ),
-    cli=lambda args: _cli(args),  # late-bound: tests patch the module _cli
+    cli=lambda args: _cli(args),  # late-bound: tests patch the module _cli/_launch
 )
 
 
