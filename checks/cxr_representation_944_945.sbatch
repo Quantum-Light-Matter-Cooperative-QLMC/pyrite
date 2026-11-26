@@ -10,29 +10,22 @@
 # Submit from a synced checkout root with -p gpu or -p gpu-amd; arguments are
 # the mode (`capture` or `replay`) and its flags for checks/cxr_representation_944_945.py.
 set -euo pipefail
-export PATH="$HOME/.pixi/bin:/usr/local/cuda/bin:/opt/rocm/bin:$PATH"
+export PATH="/usr/local/cuda/bin:/opt/rocm/bin:$PATH"
 cd "$SLURM_SUBMIT_DIR"
-export PYRITE_HOME="$PWD"
-export PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
+. checks/rocm/env.sh
 export PYRITE_USER_CATALOG="$PWD/scratch/repr944/empty-user-catalog"
 export XDG_CONFIG_HOME="$PWD/scratch/repr944/xdg"
 export PYRITE_FP64=0 OPENBLAS_NUM_THREADS=1
 mkdir -p "$PYRITE_USER_CATALOG" "$XDG_CONFIG_HOME"
 echo "code $(cat CODE_SHA 2>/dev/null || git rev-parse HEAD)"
-if command -v nvidia-smi >/dev/null; then
-  export PYRITE_MC_BACKEND=cuda
+if [ "$PYRITE_GPU_VENDOR" = nvidia ]; then
   nvidia-smi --query-gpu=name,driver_version --format=csv
-  pixi install --locked -e amd
-else
-  source src/pyrite/remote/rocm_build_env.sh
-  _pyrite_rocm_env "$PWD"
-  export PYRITE_MC_BACKEND=rocm
-  pixi install --locked -e amd
 fi
+pyrite_gpu_sync
 if [ -n "${CHECK_SCRIPT:-}" ]; then
   # e.g. CHECK_SCRIPT=checks/cxr_bin_mean_profile_1003.py for its `wall` mode
-  pixi run --as-is -e amd python "$CHECK_SCRIPT" "$@"
+  pixi run --as-is -e "$PYRITE_PIXI_ENV" python "$CHECK_SCRIPT" "$@"
 else
-  pixi run --as-is -e amd python -m checks.cxr_representation_944_945 "$@"
+  pixi run --as-is -e "$PYRITE_PIXI_ENV" python -m checks.cxr_representation_944_945 "$@"
 fi
 echo DONE

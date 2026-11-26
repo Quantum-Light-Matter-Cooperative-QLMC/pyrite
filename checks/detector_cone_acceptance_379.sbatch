@@ -20,14 +20,14 @@ if [ "${GPU:-0}" = 1 ]; then
     . /u/local/Modules/default/init/modules.sh
     module load cuda
   fi
-  sync_extra=(--extra nvidia)
+  pixi_env=nvidia
 else
-  sync_extra=()
+  pixi_env=default
 fi
 export OPENBLAS_NUM_THREADS=1
 export NUMBA_NUM_THREADS="${SLURM_CPUS_PER_TASK:-16}"
 echo "code $(cat CODE_SHA 2>/dev/null || echo unknown)"
-pixi install --locked -e nvidia "${sync_extra[@]}"
+pixi install --locked -e "$pixi_env"
 nvidia-smi -L 2>/dev/null || true
 read -r -a argv <<<"${ARGS:?set ARGS}"
-pixi run --as-is -e nvidia python checks/detector_cone_acceptance_379.py "${argv[@]}"
+pixi run --as-is -e "$pixi_env" python checks/detector_cone_acceptance_379.py "${argv[@]}"

@@ -31,10 +31,10 @@ for spec in "${case_list[@]}"; do
     for seed in "${seed_list[@]}"; do
         stem="$OUT/$material-$e0-$tilt-n$HISTORIES-s$seed"
         echo "== $(date -Is) $stem"
-        timeout "$ARM_TIMEOUT" pixi run --as-is -e amd python -u $H run "$material" "$e0" "$tilt" \
+        timeout "$ARM_TIMEOUT" pixi run --as-is -e "$PYRITE_PIXI_ENV" python -u $H run "$material" "$e0" "$tilt" \
             "$HISTORIES" "$seed" "$BUDGETS" "$stem.json" > "$stem.log" 2>&1
         echo "rc=$? $(tail -c 600 "$stem.log" | tr '\n' ' ' | cut -c1-600)"
     done
 done
-pixi run --as-is -e amd python $H table "$OUT" | tee "$OUT/table.txt"
+pixi run --as-is -e "$PYRITE_PIXI_ENV" python $H table "$OUT" | tee "$OUT/table.txt"
 sha256sum "$OUT"/* > "$OUT/SHA256SUMS" 2>/dev/null

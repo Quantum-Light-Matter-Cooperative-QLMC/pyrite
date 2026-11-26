@@ -25,9 +25,9 @@ pyrite_gpu_sync -q || exit 1
 pyrite_gpu_info > "$OUT/gpu-info.txt" 2>&1
 H=checks/fourier_reduction_phases_1296.py
 if ! ls "$OUT"/flush-*.npz > /dev/null 2>&1; then
-    pixi run --as-is -e amd python -u $H capture "$MATERIAL" "$E0" "$TILT" "$HISTORIES" "$OUT"
+    pixi run --as-is -e "$PYRITE_PIXI_ENV" python -u $H capture "$MATERIAL" "$E0" "$TILT" "$HISTORIES" "$OUT"
     echo "capture rc=$?"
 fi
-pixi run --as-is -e amd python -u $H "${ARMSET:-bench}" "$OUT" "$REPEATS"
+pixi run --as-is -e "$PYRITE_PIXI_ENV" python -u $H "${ARMSET:-bench}" "$OUT" "$REPEATS"
 echo "bench rc=$?"
 sha256sum "$OUT"/*.json > "$OUT/SHA256SUMS" 2>/dev/null

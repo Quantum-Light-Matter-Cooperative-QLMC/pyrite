@@ -23,10 +23,10 @@ echo "code $PROBE_SHA host $(hostname) backend ${PYRITE_MC_BACKEND:-}"
 pyrite_gpu_sync -q || exit 1
 pyrite_gpu_info > "$OUT/gpu-info.txt" 2>&1
 H=checks/fourier_mode_cap_1320.py
-pixi run --as-is -e amd python -u $H capture "$MATERIAL" "$E0" "$TILT" "$HISTORIES" "$OUT" > "$OUT/capture.log" 2>&1
+pixi run --as-is -e "$PYRITE_PIXI_ENV" python -u $H capture "$MATERIAL" "$E0" "$TILT" "$HISTORIES" "$OUT" > "$OUT/capture.log" 2>&1
 echo "capture rc=$?"
 if ls "$OUT"/flush-*.npz > /dev/null 2>&1; then
-    pixi run --as-is -e amd python -u $H replay "$OUT" > "$OUT/replay.log" 2>&1
+    pixi run --as-is -e "$PYRITE_PIXI_ENV" python -u $H replay "$OUT" > "$OUT/replay.log" 2>&1
     echo "replay rc=$?"
 fi
 sha256sum "$OUT"/*.json > "$OUT/SHA256SUMS" 2>/dev/null

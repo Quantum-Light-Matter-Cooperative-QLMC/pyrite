@@ -19,13 +19,13 @@ export PYRITE_HOME="${PROBE_WORKSPACE:-$HOME/.pyrite/workspace}" PROBE_SHA=$(cat
 FLUSHES=$1; OUT=$2
 mkdir -p "$OUT"
 echo "code $PROBE_SHA host $(hostname) backend ${PYRITE_MC_BACKEND:-}"
-pyrite_gpu_sync --group dev -q || exit 1
+pyrite_gpu_sync -q || exit 1
 H=checks/fourier_reduction_phases_1296.py
-PYRITE_TEST_BACKEND=$PYRITE_MC_BACKEND pixi run --as-is -e amd pyrite-dev test \
+PYRITE_TEST_BACKEND=$PYRITE_MC_BACKEND pixi run --as-is -e "$PYRITE_PIXI_ENV" pyrite-dev test \
     tests/montecarlo/spectrum/test_fourier_cuda.py; echo "tests rc=$?"
-pixi run --as-is -e amd python -u $H spread "$FLUSHES" 5; echo "spread rc=$?"
+pixi run --as-is -e "$PYRITE_PIXI_ENV" python -u $H spread "$FLUSHES" 5; echo "spread rc=$?"
 cp "$FLUSHES/spread_bench.json" "$OUT/" 2>/dev/null
-MARGIN_REF=v6 pixi run --as-is -e amd python -u $H margins "$OUT/margins.json" all 64 642501 0.375,3
+MARGIN_REF=v6 pixi run --as-is -e "$PYRITE_PIXI_ENV" python -u $H margins "$OUT/margins.json" all 64 642501 0.375,3
 echo "margins rc=$?"
-CAPTURE=0 pixi run --as-is -e amd python -u $H capture mos2 30 15 1024 "$OUT"; echo "capture rc=$?"
+CAPTURE=0 pixi run --as-is -e "$PYRITE_PIXI_ENV" python -u $H capture mos2 30 15 1024 "$OUT"; echo "capture rc=$?"
 sha256sum "$OUT"/*.json > "$OUT/SHA256SUMS" 2>/dev/null

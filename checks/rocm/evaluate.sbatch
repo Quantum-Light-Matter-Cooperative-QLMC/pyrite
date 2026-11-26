@@ -26,22 +26,31 @@ status=0
 
 if has build; then
     step build
-    # --no-cache: rebuild CuPy from source rather than reuse a cached wheel, so
-    # the stage proves the build path itself.
     start=$SECONDS
-    pyrite_gpu_sync -v --no-cache --reinstall-package cupy > "$out/build.log" 2>&1; rc=$?
+    if [ "$PYRITE_GPU_VENDOR" = amd ]; then
+        # AMD CuPy is the PyPI sdist built against ROCm. Reinstall it through a
+        # job-private pixi cache so no cached wheel is reused and the stage
+        # proves the source build itself; the shared cache stays untouched.
+        pyrite_gpu_sync -q > "$out/build.log" 2>&1 \
+            && PIXI_CACHE_DIR="$PWD/$out/pixi-cache" pixi reinstall --locked -e "$PYRITE_PIXI_ENV" -vv cupy \
+                >> "$out/build.log" 2>&1; rc=$?
+        rm -rf "$PWD/$out/pixi-cache"
+    else
+        # NVIDIA CuPy is a conda-forge binary: there is nothing to build.
+        pyrite_gpu_sync -v > "$out/build.log" 2>&1; rc=$?
+    fi
     echo "build wall $((SECONDS - start)) s"
     echo "build rc=$rc"
     (( rc == 0 )) || { grep -iE "error|fatal|not found" "$out/build.log" | head -40; exit 1; }
 fi
 pyrite_gpu_sync -q || { echo "STOP: environment not built"; exit 1; }
-pixi run --as-is -e amd python -c "import pyrite._backend as b; print(b.BACKEND.name, b.BACKEND.vendor, b.BACKEND.device.name)" \
+pixi run --as-is -e "$PYRITE_PIXI_ENV" python -c "import pyrite._backend as b; print(b.BACKEND.name, b.BACKEND.vendor, b.BACKEND.device.name)" \
     | tee "$out/backend.txt"
-pixi run --as-is -e amd python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
+pixi run --as-is -e "$PYRITE_PIXI_ENV" python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
 
 if has smoke; then
     step smoke
-    pixi run --as-is -e amd python checks/rocm/cupy_smoke.py > "$out/cupy-smoke.txt" 2>&1 || status=1
+    pixi run --as-is -e "$PYRITE_PIXI_ENV" python checks/rocm/cupy_smoke.py > "$out/cupy-smoke.txt" 2>&1 || status=1
     cat "$out/cupy-smoke.txt"
 fi
 
@@ -51,12 +60,12 @@ if has suite; then
     step "suite A: hardware modules"
     mapfile -t modules < <(find tests -name 'test_*cuda*.py' -o -name 'test_gpu_oom_retry.py' | sort)
     modules+=(tests/montecarlo/transport/test_multilayer.py)
-    pixi run --as-is -e amd pyrite-dev test --slow "${modules[@]}" -p no:randomly -rfEs \
+    pixi run --as-is -e "$PYRITE_PIXI_ENV" pyrite-dev test --slow "${modules[@]}" -p no:randomly -rfEs \
         --junitxml="$out/suite-a.xml" --durations=30 > "$out/suite-a.log" 2>&1 || status=1
     tail -40 "$out/suite-a.log"
     # Pass B: modules whose bodies need the session itself on the device.
     step "suite B: device session"
-    PYRITE_TEST_BACKEND=$PYRITE_MC_BACKEND pixi run --as-is -e amd pyrite-dev test --slow \
+    PYRITE_TEST_BACKEND=$PYRITE_MC_BACKEND pixi run --as-is -e "$PYRITE_PIXI_ENV" pyrite-dev test --slow \
         tests/montecarlo/transport/test_photon_production_cuda.py \
         tests/montecarlo/transport/test_photon_reentry_cuda.py \
         tests/montecarlo/transport/test_photon_reentry_pair_cuda.py \
@@ -78,7 +87,7 @@ if has bench; then
             s=${spec%%:*} h=${spec##*:}
             for p in fp64 mixed; do
                 stem="$out/bench-$p-$s-$seed"
-                if pixi run --as-is -e amd python checks/geant4_performance/pyrite_bench.py "$s" \
+                if pixi run --as-is -e "$PYRITE_PIXI_ENV" python checks/geant4_performance/pyrite_bench.py "$s" \
                     --histories "$h" --seed "$seed" --rows-per-round 1024 --device-staging \
                     --transport-precision "$p" --no-audit --output "$stem.json" > "$stem.log" 2>&1; then
                     echo "DONE $p $s $seed"
@@ -88,7 +97,7 @@ if has bench; then
             done
         done
     done
-    pixi run --as-is -e amd python checks/rocm/bench_table.py "$out" > "$out/bench.md" && cat "$out/bench.md"
+    pixi run --as-is -e "$PYRITE_PIXI_ENV" python checks/rocm/bench_table.py "$out" > "$out/bench.md" && cat "$out/bench.md"
 fi
 step "done status=$status"
 exit "$status"
