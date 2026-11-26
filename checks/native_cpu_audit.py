@@ -45,6 +45,7 @@ CASES = (
     "crystal300-coherent-hr",
     "crystal300-binmean",
     "transport-si300",
+    "channeling-demo",
 )
 
 
@@ -344,6 +345,65 @@ def transport_workload():
     }
 
 
+def _math_record(result):
+    try:
+        return dict(result.provenance["math"])
+    except (KeyError, TypeError):
+        return None
+
+
+def channeling_workload():
+    import pyrite as pr
+
+    # The admitted planar channeling_demo case of the experimental planar
+    # channeling guide (17 MeV, 2 um Si, plane (1-10), 200 histories) (#1469).
+    scene = dict(
+        beam=pr.Beam(
+            energy_keV=17_000, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()
+        ),
+        target=pr.geometry.Slab(
+            "silicon",
+            thickness_ang=20_000,
+            tilt_deg=3,
+            tilt_azim_deg=45,
+            footprint=pr.geometry.Footprint(5, 5),
+        ),
+        detector=pr.Detector(
+            0,
+            acceptance=pr.detectors.SensorAcceptance(distance_mm=1_000, width_mm=3, height_mm=3),
+        ),
+    )
+    options = dict(
+        physics=pr.Physics(radiative_model="uncoupled"),
+        channeling=pr.quantum.Channeling("planar", plane=(1, -1, 0)),
+        numerics=pr.Numerics(
+            sampling=pr.config.FixedSampling(cxr_histories=200, brem_histories=200),
+            energy_bins=pr.detectors.EnergyBins(
+                cxr=np.arange(1_000, 24_000, 50), brem=np.arange(1_000, 17_000_000, 500)
+            ),
+        ),
+    )
+
+    def run():
+        result = pr.simulate(scene["beam"], scene["target"], scene["detector"], **options)
+        densities = {
+            "cxr_incoherent": result.cxr.incoherent,
+            "cxr_coherent": result.cxr.coherent,
+            "brem": result.brem,
+            "characteristic": result.characteristic,
+            "channeling": result.channeling,
+        }
+        arrays = {k: digest(v.density) for k, v in densities.items() if v is not None}
+        return {
+            "arrays": arrays,
+            "phases": {},
+            "fallbacks": {},
+            "math": _math_record(result),
+        }
+
+    return run, {"kind": "complete-case-channeling", "guide": "experimental-planar-channeling"}
+
+
 def photon_workload(name):
     from pyrite.montecarlo.transport.photon_histories import (
         ledger_residual_eV,
@@ -627,6 +687,8 @@ def measure(args):
         run, parameters = photon_case_workload()
     elif args.case == "transport-si300":
         run, parameters = transport_workload()
+    elif args.case == "channeling-demo":
+        run, parameters = channeling_workload()
     elif args.case == "axial":
         run, parameters = axial_workload()
     elif args.case == "axial-prod":

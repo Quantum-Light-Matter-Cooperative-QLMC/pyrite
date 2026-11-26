@@ -40,6 +40,8 @@ reproducible protocol, the route inventory, the retained measurements
 | `fastmath_arms.py` | One complete case under one #1469 arm (`--fastmath`, `--reducer`, `--asm`, `--arrays`) |
 | `fast_variants.py` | #1469 prototypes: reduced-accuracy sines and node-window reducer variants rebuilt from the production source by named edits; not used by production |
 | `sin_micro.py`, `reducer_replay.py`, `capture_window_inputs.py` | #1469 sine speed/ulp micro, replay of captured reducer calls per `EDIT:FLAGSET` arm, and the input capture (from #1459) |
+| `math_gpu.sbatch` | #1469 math-mode validation on one GPU (gpu-amd by default): each case under `PYRITE_MATH=reproducible` and `fast` |
+| `compare_modes.py` | Compares one case's `--arrays` output under the two math modes (bitwise equality, change over peak, sum change) |
 | `inventory.json` | Code-referenced routes and explicit unknowns |
 | `report.md` | Findings, rank, coverage gaps, evidence index |
 | `results/job-<id>/` | Retained evidence per job: `summary.json`, `manifest.json` (SHA-256 of retained and dropped files), selected raw JSON |
@@ -75,6 +77,8 @@ ARMS="warm sampler" sbatch -J gpuhost1432-<sha> checks/native_cpu_audit/gpu.sbat
 - `transport-si300` (#1469): transport only, default physics (shell-soft-hard,
   ELSEPA single scattering), 2048 primaries, 300 keV, 200 um Si, 5 deg, seed
   1469, explicit 5 keV cutoff (engine call, no transport reuse; not scorable).
+  `channeling-demo` (#1469): the admitted planar `channeling_demo` case of the
+  experimental planar channeling guide through `pr.simulate`.
 
 ## Parallelism and free threading
 

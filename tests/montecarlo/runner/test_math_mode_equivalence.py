@@ -11,7 +11,8 @@ continuum) runs under both modes from the same seed. Tolerances are explicit:
 
 A kernel adoption that changes RNG consumption (transport accept/reject) must
 widen these to Monte Carlo error with validation evidence, not loosen them
-silently. While no kernel differs between modes both runs agree bitwise. The
+silently. The CPU node-window reducer differs between modes (#1469); its
+own bound is tested in ``test_node_support_window.py``. The
 ``math-fast`` CI job runs this module with ``PYRITE_TEST_MATH=fast``.
 """
 
