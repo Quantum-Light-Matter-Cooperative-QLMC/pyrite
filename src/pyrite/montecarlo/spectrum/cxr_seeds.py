@@ -23,6 +23,7 @@ from typing import Any
 import numpy as np
 
 from ..._cxr_windows import FeatureSeed
+from ..._util.arrays import host_array as _host
 from ...materials.crystal import CRYSTALS, HBARC_EV_ANG
 from ._device_sizing import DeviceTail, device_resident
 from ._population_tail import block_tail_sums
@@ -97,11 +98,6 @@ SEEDING_REVISION = 4
 
 #: Kinematic resonances below this are dropped by the line kernels too.
 _MIN_RESONANCE_EV = MIN_RESONANCE_EV
-
-
-def _host(array):
-    get = getattr(array, "get", None)
-    return np.asarray(get() if get is not None else array)
 
 
 def _weighted_quantiles(values, weights, probabilities):

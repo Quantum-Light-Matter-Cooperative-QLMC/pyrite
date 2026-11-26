@@ -64,6 +64,7 @@ from ..._cxr_grid_policy import (
     DEFAULT_COHERENT_LEAK_LIMIT,
 )
 from ..._cxr_windows import FeatureSeed
+from ..._util.arrays import host_array as _host
 from ...materials.crystal import HBARC_EV_ANG
 from ..transport.kinematics import C_ANG_PER_FS
 from .coherent_dispersion import CoherentDispersionLaw, DispersionBands
@@ -380,11 +381,6 @@ def _dispersion_residual_power_bound(
     escape_max = np.abs(field.escape_mid_ang) + 0.5 * np.abs(field.escape_change_ang)
     phase_error = np.minimum(2.0, residual * escape_max)
     return width * _electron_l1_power(_piece_l1_amplitudes(field) * phase_error, field.electron)
-
-
-def _host(array):
-    get = getattr(array, "get", None)
-    return np.asarray(get() if get is not None else array)
 
 
 class _RowJumps:

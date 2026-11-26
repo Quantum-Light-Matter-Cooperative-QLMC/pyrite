@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from scipy.constants import elementary_charge
 
+from .._util.arrays import readonly_array as _readonly
 from ..detectors import Detector, NativeSpectrum
 from .observation import REALIZATION_RNG, Acquisition, NativeAcquisition
 
@@ -70,12 +71,6 @@ def resolve_acquisition(
             ),
         },
     )
-
-
-def _readonly(value: object, *, dtype=None) -> np.ndarray:
-    array = np.asarray(value, dtype=dtype)
-    array.setflags(write=False)
-    return array
 
 
 def _canonical_digest(name: str, value: object) -> str:

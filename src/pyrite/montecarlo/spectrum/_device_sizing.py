@@ -169,6 +169,11 @@ def upload(cp, array):
 
 
 def _strictly_ordered(owner, flight) -> bool:
+    """Whether rows run in strictly increasing ``(owner, flight)`` order.
+
+    Then every flight is one row, in every row subset too, so
+    :func:`.diagnostics._flight_sums` would return None (#1270).
+    """
     later = owner[1:] > owner[:-1]
     later |= (owner[1:] == owner[:-1]) & (flight[1:] > flight[:-1])
     return bool(later.all())

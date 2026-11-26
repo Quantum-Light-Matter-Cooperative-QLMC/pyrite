@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from ..materials.radiation_length import radiation_length_ang
+from ..montecarlo.runner.transition_emission import case_layers
 
 #: Warn above this traversed thickness in radiation lengths. At 0.05 X0 a
 #: high-energy photon converts with probability 1 - exp(-7/9 * 0.05) ~ 4%, the
@@ -29,13 +30,6 @@ class ThickTargetWarning(UserWarning):
     """A case traverses enough radiation lengths to need photon transport."""
 
 
-def _case_layers(case: Mapping[str, Any]):
-    layers = case.get("abs_layers")
-    if layers is not None:
-        return list(layers)
-    return [(0.0, float(case["thickness_ang"]), case["composition"])]
-
-
 def traversed_radiation_lengths(case: Mapping[str, Any]) -> float:
     """Normal-incidence-corrected stack thickness ``sum_i t_i / X0_i / cos(tilt)``.
 
@@ -46,7 +40,7 @@ def traversed_radiation_lengths(case: Mapping[str, Any]) -> float:
     """
     total = sum(
         (float(bottom) - float(top)) / radiation_length_ang(composition)
-        for top, bottom, composition in _case_layers(case)
+        for top, bottom, composition in case_layers(case)
     )
     cos_tilt = math.cos(math.radians(float(case.get("tilt_deg") or 0.0)))
     return total / cos_tilt if cos_tilt > 0.0 else math.inf

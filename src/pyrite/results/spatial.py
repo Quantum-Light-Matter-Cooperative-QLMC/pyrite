@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Literal, cast
 
 import numpy as np
 
+from .._util.arrays import readonly_array as _readonly_array
 from ..instrument import PlanarDetector
 from .spectral_support import _checked_bin_edges
 
@@ -31,12 +32,6 @@ COMPONENTS = (
     "cxr_total",
     "coherent_total",
 )
-
-
-def _readonly_array(value: object, *, dtype=None) -> np.ndarray:
-    array = np.asarray(value, dtype=dtype)
-    array.setflags(write=False)
-    return array
 
 
 def _combined_sampling(parts: Sequence[SpectralFactors]) -> tuple[str | None, np.ndarray | None]:

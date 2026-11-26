@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import contextlib
 import fcntl
-import hashlib
 import json
 import os
 import re
@@ -55,6 +54,7 @@ from ..instrument import (
 )
 from ..instrument.acquisition import resolve_acquisition
 from ..instrument.observation import (
+    _array_identity,
     acquisition_payload,
     link_identity,
     payload_digest,
@@ -120,16 +120,6 @@ class ObservationStoreError(RuntimeError):
 def default_observation_root() -> Path:
     """Return ``<workspace>/pyrite-output/observations``, beside ``checkpoints``."""
     return output_dir("observations")
-
-
-def _array_identity(array: np.ndarray) -> dict[str, Any]:
-    # Same encoding as the identity payloads' attenuation/direction entries.
-    contiguous = np.ascontiguousarray(array)
-    return {
-        "shape": list(contiguous.shape),
-        "dtype": contiguous.dtype.str,
-        "sha256": hashlib.sha256(contiguous.tobytes()).hexdigest(),
-    }
 
 
 def _jsonable(value: Any) -> Any:

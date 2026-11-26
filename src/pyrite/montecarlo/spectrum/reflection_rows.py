@@ -12,6 +12,7 @@ from typing import Any
 
 import numpy as np
 
+from ..._util.arrays import host_array as _host
 from ...materials.crystal import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
 from ..geometry import _mosaic_quadrature, _orientation_R
 from ..transport import beta_from_keV
@@ -20,11 +21,6 @@ __all__ = ["MIN_RESONANCE_EV", "ReflectionRows", "reflection_rows"]
 
 #: Kinematic resonances below this are dropped by the line kernels too.
 MIN_RESONANCE_EV = 10.0
-
-
-def _host(array):
-    get = getattr(array, "get", None)
-    return np.asarray(get() if get is not None else array)
 
 
 @dataclass(frozen=True, slots=True)

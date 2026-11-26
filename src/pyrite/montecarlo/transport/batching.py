@@ -7,6 +7,7 @@ from functools import cache
 
 import numpy as np
 
+from ..._util.arrays import host_array
 from ..._util.env import env_value
 from .continuation import (
     TransportContinuationConfig,
@@ -131,14 +132,10 @@ def _flight_diagnostic_summary(
     retain only fixed-size percentile summaries.
     """
 
-    def _host(array):
-        get = getattr(array, "get", None)
-        return np.asarray(get() if get is not None else array)
-
-    E_start = _host(E_start_keV).astype(float, copy=False)
-    length = _host(L_ang).astype(float, copy=False)
-    electron = _host(elec_id).astype(np.int64, copy=False)
-    layer_index = _host(layer).astype(np.int64, copy=False)
+    E_start = host_array(E_start_keV).astype(float, copy=False)
+    length = host_array(L_ang).astype(float, copy=False)
+    electron = host_array(elec_id).astype(np.int64, copy=False)
+    layer_index = host_array(layer).astype(np.int64, copy=False)
     n_flights = E_start.size
 
     stopping = np.zeros(n_flights, dtype=float)

@@ -39,6 +39,7 @@ from .instrument import (
     PlanarDetector,
     ResolvedObservation,
 )
+from .instrument.observation import _array_identity
 from .materials import CATALOG, MediumSpec
 from .materials._composition import resolve_composition
 from .materials.photon_cross_sections import ATTENUATION_MODEL
@@ -88,15 +89,6 @@ def _canonical_value(value: Any) -> Any:
             if not key.startswith("_")
         }
     raise TypeError(f"cannot canonicalize observation value {type(value).__name__}")
-
-
-def _array_identity(array: np.ndarray) -> dict[str, Any]:
-    contiguous = np.ascontiguousarray(array)
-    return {
-        "shape": list(contiguous.shape),
-        "dtype": contiguous.dtype.str,
-        "sha256": hashlib.sha256(contiguous.tobytes()).hexdigest(),
-    }
 
 
 def _resolved_composition(material: str | MediumSpec) -> tuple[tuple[str, float], ...]:
