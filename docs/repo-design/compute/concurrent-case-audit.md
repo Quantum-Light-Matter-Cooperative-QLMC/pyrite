@@ -9,7 +9,8 @@ offer enough throughput or memory benefit to justify a production executor?
 **Recommendation: defer a production executor; threads are not a general
 replacement for the process pool.** On the HOPG slab case, four threads nearly
 match a four-process pool (2.4-2.6x against 2.5-2.9x serial) at well under half
-its PSS, on the workstation and on the remote box. On other case families they
+its PSS, on the workstation and on the remote box, and with adaptive history
+counts (2.2x against 2.4x at half the PSS). On other case families they
 do not. Planar channeling scales only 1.8x on threads against 3.75x on
 processes, because its time is Python-level work under the GIL. The layered
 MoS2-on-Si case reaches 1.5-1.7x on either arm. Pure transport does not
@@ -131,6 +132,8 @@ node's memory.
 | layered MoS2/Si | processes | 130.2 s | 85.4 s | 76.9 s (1.69x) | – | 7337 MiB |
 | planar channeling | threads | 98.8 s | 66.3 s | 55.6 s (1.78x) | 54.2 s (1.82x) | 870 MiB |
 | planar channeling | processes | 99.2 s | 50.2 s | 26.4 s (3.75x) | – | 1977 MiB |
+| HOPG adaptive, 1024-8192 | threads | 8.86 s | 5.60 s | 4.09 s (2.17x) | 4.02 s (2.20x) | 1681 MiB |
+| HOPG adaptive, 1024-8192 | processes | 8.77 s | 5.36 s | 3.59 s (2.44x) | – | 3363 MiB |
 
 USS tracks PSS within 3 % for threads and 5-10 % for processes. At 8 HOPG
 workers the process tree reached 5138 MiB against 2058 MiB for threads.
@@ -141,13 +144,22 @@ that its node-window reducer dominates. Its share after #1469 was not profiled
 here. Memory favours threads in every family, by 1.4x (layered) to 2.3x
 (channeling) at four workers.
 
+`PROBE_FAMILY=adaptive` (job 16116, `c6b554721`, best of 3) is the same HOPG
+slab with adaptive CXR and brem stopping at target RSE 0.02 between 1024 and
+8192 histories. The variance-of-variance guard is relaxed to 0.05, because at
+the default 0.01 CXR never stops before the cap. Realized counts differ by seed
+(1364-4719 locally), so the eight jobs are unequal and four workers already
+leave cores idle at the tail; that limits both arms. Threads give 2.2x at about
+half the processes' PSS, the same pattern as fixed-N HOPG. Digests, which
+include the realized counts and stop reasons, equalled serial in every arm.
+
 **Not measured, so not claimed.**
 
 - The #1432 audit measured four processes at 1.21x for four identical
   `crystal300` cases on four bound CPUs of a shared GPU node. Its allocation
   differs from this probe's, so the two topology results are not directly
   comparable.
-- Adaptive precision, cone split, photon, axial MCWF and GPU paths. Repeated
+- Cone split, photon, axial MCWF and GPU paths. Repeated
   samples for layered and channeling.
 - More than one Numba thread per job with concurrent launches (see row 10).
 - A free-threaded interpreter: none could be installed (#1421).
@@ -214,13 +226,13 @@ not evaluated; **n/a** = not reachable by the CPU case path.
 | 9 | `functools.cache`/`lru_cache` tables | `photon_cross_sections._table()` and ~35 others | CPython serializes the dict; two threads may both compute the first value | read-only after build | ok |
 | 10 | ContextVar state | tuning, spectrum launch, precision, progress, recovery engine, fallback audit, line-data coverage (`runner/transport_options.py:15-22`, `runner/__init__.py:79-82`, `runner/recovery.py:13`, `_physics_fallback.py:18`, `spectrum/cxr/_coverage.py:45`, `_bin_quadrature.py:801`, `transport/beam_prefetch.py:32`) | a new `ThreadPoolExecutor` thread starts with an empty context. The probe set none of them in the caller, so it does not exercise propagation; `stream_overlap.py` and `beam_prefetch.py` call `copy_context()` explicitly, pinned by `tests/montecarlo/runner/test_stream_overlap.py::test_scoring_thread_sees_the_callers_context` and `tests/montecarlo/transport/test_beam_prefetch.py::test_prefetch_worker_sees_the_callers_context` (both fail with the copy removed) | an executor must copy the caller context per submitted case and own a per-case fallback-audit and progress sink | **blocker** for a case executor; existing worker threads ok |
 | 11 | Numba `parallel=True` | 12 kernels | `numba.set_num_threads(1)` only in pool workers. Numba documents that `workqueue` is not thread-safe and aborts on nested parallelism; `default` promises nothing and `threadsafe` needs `omp` or `tbb` | pin `NUMBA_THREADING_LAYER=threadsafe` and test two concurrent launches; the probe ran with one Numba thread | **blocker** |
-| 12 | RNG and seed ownership | per-case `seed` consumed as `default_rng(p.seed)` or `SeedSequence(seed).spawn(...)`; no `np.random.seed` or global generator in `src/` | the 8 seeds produced digests equal to serial in every thread and process arm above, also with shuffled submission order | cone-split path; channeling and layered digests matched serial in the probe only | ok for the measured path and adaptive precision: `tests/scan/test_adaptive_api.py::test_adaptive_cases_on_threads_match_serial_and_own_their_arrays` runs three seeds on two threads in reverse order and gets serial outputs and realized counts bit for bit |
+| 12 | RNG and seed ownership | per-case `seed` consumed as `default_rng(p.seed)` or `SeedSequence(seed).spawn(...)`; no `np.random.seed` or global generator in `src/` | the 8 seeds produced digests equal to serial in every thread and process arm above, also with shuffled submission order | cone-split path; channeling, layered and adaptive digests matched serial in the probe only | ok for the measured path and adaptive precision: `tests/scan/test_adaptive_api.py::test_cases_on_threads_match_serial_and_own_their_arrays` runs three seeds on two threads in reverse order, adaptive and fixed-N, and gets serial outputs (and realized counts) bit for bit |
 | 13 | `_RESOURCE_POLICY` | `runner/oom.py` mutates `pool_peak_bytes`, `cases_since_free`, `pool_limit_*`; `chunking.py` rebinds `gpu` | single-driver design | CPU path reads only; GPU OOM counters are not thread-safe | **blocker** for any GPU use |
 | 14 | Host-memory admission | `runner/host_admission.py`, `transport/host_memory.py` read `MemAvailable`/cgroup headroom per call; the docstring says a projection is not a reservation | check-then-act | N threads admit against the same headroom and can over-commit together; needs a shared reservation ledger | **blocker** |
 | 15 | Worker-count and memory budget | `host_admission._cpu_pool_workers` (`worker_mem_mb`, about 5.5 GiB per full-case process measured earlier) | sized for processes | a thread budget needs its own measured per-case footprint (this probe: about 0.19 GiB marginal PSS per extra thread at 1024 histories, against about 0.7 GiB per extra process) | open |
 | 16 | Device contexts, streams, pools | `runner/stream_overlap.py` one scoring thread on a non-blocking stream | one owner by design; #1411 owns multi-GPU | none for a CPU slice | n/a |
 | 17 | Callbacks, stop and drain | `execution/protocol.py` requires `callback` in the coordinating process and draining of started tasks on `should_stop` | #928 contract; `LocalExecutor` delegates to `run_cases` | probe: exceptions reach the coordinator, completions are observed there, and threads cancel every unstarted job, while a process pool runs up to `max_workers + 1` queued jobs after a stop (above); a production executor still needs these as tests; the bounded process `cpu_pool` no longer overruns a stop (#1478, fixed) | ok for threads (probe only) |
-| 18 | Checkpoint and result isolation | callback owns persistence; results returned by value | a process boundary copies today | rule: a `run_case` output owns every array in it, sharing no memory with another case's output or with any case input, so the caller may mutate or keep it; the callback that receives it owns persistence. Checked for adaptive outputs by the test in row 12; fixed-N and channeling outputs are unchecked | ok for adaptive outputs |
+| 18 | Checkpoint and result isolation | callback owns persistence; results returned by value | a process boundary copies today | rule: a `run_case` output owns every array in it, sharing no memory with another case's output or with any case input, so the caller may mutate or keep it; the callback that receives it owns persistence. Checked for adaptive and fixed-N outputs by the test in row 12; channeling and layered outputs are unchecked | ok for adaptive and fixed-N |
 | 19 | Concurrent tests | `test_montecarlo.py` and `test_gpu_oom_retry.py` replace `ProcessPoolExecutor` with a synchronous fake | none ran two cases at once; this branch adds the two tests named in rows 2 and 5 | a concurrent test per locked cache (row 7); an executor-level stop/drain test (row 17). Thread digest parity (row 12) and ContextVar propagation at existing worker threads (row 10) are now covered | **blocker** until an executor exists |
 
 ## Free-threaded Python
@@ -233,15 +245,14 @@ must not be disabled around extensions that have not.
 
 - **Defer** adoption; do not reject. Threads match processes only where the
   case's time is GIL-releasing native work (HOPG slab). There they use about
-  half the memory, on two hosts. Channeling, which is Python-heavy, scales half
+  half the memory, on two hosts, with fixed or adaptive history counts. Channeling, which is Python-heavy, scales half
   as well on threads. An executor would therefore be an opt-in per workload,
   never a replacement default.
 - Fixed beside this audit: the bounded `cpu_pool` no longer starts queued
   cases after a stop (#1478).
 - Done here, valid without any executor: the core pin no longer touches
   `os.environ` (row 2) and the two `OrderedDict` memos are locked (row 5).
-- Before a plan can be written: resolve rows 3, 4, 10, 11 and 14; measure
-  adaptive precision; decide whether `nogil` on the per-electron
+- Before a plan can be written: resolve rows 3, 4, 10, 11 and 14; decide whether `nogil` on the per-electron
   entry points is worth its parity evidence (row 1), which matters for
   transport-only workloads and not for full cases (#1458). #1458 also
   covers thread-fed CPU transport for the GPU pipeline. A free-threaded arm,

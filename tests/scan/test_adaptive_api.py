@@ -523,15 +523,19 @@ def _arrays(value, path=""):
 
 
 @pytest.mark.filterwarnings("ignore::pyrite._cxr_grid_policy.CxrYieldStatisticsWarning")
-def test_adaptive_cases_on_threads_match_serial_and_own_their_arrays(scene, numerics):
-    """Adaptive seeds are schedule-independent and outputs alias nothing (#1423).
+@pytest.mark.parametrize("sampling", ["adaptive", "fixed"])
+def test_cases_on_threads_match_serial_and_own_their_arrays(scene, numerics, sampling):
+    """Seeds are schedule-independent and outputs alias nothing (#1423).
 
     Two threads run three seeds submitted in reverse order: each output equals
-    the serial one bit for bit, with the same realized history count, and no
-    output array shares memory with another case's output or with any case.
+    the serial one bit for bit (adaptive: with the same realized history
+    count), and no output array shares memory with another case's output or
+    with any case.
     """
     from concurrent.futures import ThreadPoolExecutor
 
+    if sampling == "fixed":
+        numerics = _bounded_numerics(FixedSampling(cxr_histories=60, brem_histories=60))
     base = api.build_case(scene, numerics)
     cases = {seed: replace(base, seed=seed) for seed in (1, 2, 3)}
 
@@ -544,10 +548,9 @@ def test_adaptive_cases_on_threads_match_serial_and_own_their_arrays(scene, nume
         threaded = {seed: future.result() for seed, future in futures.items()}
 
     for seed, output in threaded.items():
-        assert (
-            output["adaptive_sampling"]["realized_electrons"]
-            == (serial[seed]["adaptive_sampling"]["realized_electrons"])
-        )
+        if sampling == "adaptive":
+            realized = output["adaptive_sampling"]["realized_electrons"]
+            assert realized == serial[seed]["adaptive_sampling"]["realized_electrons"]
         expected = dict(_arrays(serial[seed]))
         got = dict(_arrays(output))
         assert got.keys() == expected.keys() and got
