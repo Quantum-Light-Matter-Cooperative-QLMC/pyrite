@@ -501,6 +501,55 @@ def ladder_bands(domains):
     return bands
 
 
+def component_score(segments, grid, case, hkls, lookup, phi, n_hat, count, groove):
+    """Single-radiator incoherent CXR with its PXR and CBS parts, shape (3, n).
+
+    Mirrors the single-slab branch of the runner's ``_cxr_for_segments_once``
+    (same case keys, mosaic and line options) with ``components=True``. Row
+    0 is the full row intensity including PXR-CBS interference, so it must
+    equal the runner route; the ladder integrity check enforces that on the
+    smallest cutoff.
+    """
+    from pyrite._backend import _to_cpu
+    from pyrite.montecarlo.runner.chunking import _RESOURCE_POLICY, _adaptive_chunk, _admit_chunk
+    from pyrite.montecarlo.spectrum import mc_cxr_spectrum
+
+    mosaic = dict(
+        mosaic_fwhm_rad=case.get("mosaic_mc_fwhm_rad"), mosaic_nodes=case.get("mosaic_mc_nodes", 1)
+    )
+    if case.get("mosaic_mc_sampling") == "history":
+        mosaic.update(mosaic_sampling="history", mosaic_seed=int(case["seed"]))
+    chunk = _admit_chunk(
+        case.get("spec_chunk") or _RESOURCE_POLICY.spec_chunk or _adaptive_chunk(grid.size),
+        grid.size,
+    )
+    parts = mc_cxr_spectrum(
+        segments,
+        grid,
+        crystal=case["crystal"],
+        hkl_list=hkls,
+        n_hat=n_hat,
+        B_ang2=lookup.__getitem__,
+        composition=case["composition"],
+        beam_uvw=case.get("beam_uvw"),
+        surface_hkl=case.get("surface_hkl"),
+        azimuth_rad=phi,
+        recip_miscut_rad=case.get("recip_miscut_rad"),
+        sinc_cutoff=case.get("sinc_cutoff"),
+        node_support_cutoff=case.get("node_support_cutoff", "auto"),
+        chunk=chunk,
+        layers=case.get("abs_layers"),
+        groove=groove,
+        coherent=False,
+        electron_limit=count,
+        E_cut_keV=case.get("E_cut_lines_keV", 5.0),
+        line_quadrature=case.get("line_quadrature", "bin-mean"),
+        components=True,
+        **mosaic,
+    )
+    return np.stack([np.asarray(_to_cpu(p), dtype=float) for p in parts])
+
+
 def run_ladder(args):
     """Reciprocal-cutoff ladder of the opt-in model with its matched continuum.
 
@@ -556,13 +605,20 @@ def run_ladder(args):
     n_hat, groove, count = tp["n_hat"], tp.get("groove"), int(tp["Ne_lines"])
     phi0 = float(pilot.get("azimuth_rad", 0.0))
 
+    parts = ("cxr", "pxr", "cbs") if args.components else ("cxr",)
+    zero = np.zeros((len(parts), grid.size))
+
     def score_rows(model, rows):
         if not rows:
-            return np.zeros_like(grid)
+            return zero.copy()
         band = FiberReflectionSet(model, tuple(h for h, _ in rows), tuple(b for _, b in rows))
         lookup = band._thermal_lookup()
 
         def score(hkls, phi):
+            if args.components:
+                return component_score(
+                    segments, grid, pilot, hkls, lookup, phi, n_hat, count, groove
+                )
             return _to_cpu(
                 runner._cxr_for_segments(
                     segments,
@@ -577,7 +633,8 @@ def run_ladder(args):
                 )
             )
 
-        return host_density(band._average(score, grid.shape, phi0), grid)
+        value = band._average(score, zero.shape if args.components else grid.shape, phi0)
+        return np.stack([host_density(v, grid) for v in np.reshape(value, zero.shape)])
 
     def score_brem(tables):
         return host_density(
@@ -597,11 +654,12 @@ def run_ladder(args):
 
     arrays = dict(grid_eV=grid, edges_eV=edges, cutoffs_invang=np.asarray(cuts))
     arrays["D_brem"] = score_brem(tables0)
-    rows, basal_sum, nonbasal_sum = [], np.zeros_like(grid), np.zeros_like(grid)
+    rows, basal_parts, nonbasal_parts = [], zero.copy(), zero.copy()
     for cut, model, domain, band in zip(cuts, models, domains, bands, strict=True):
         t0 = time.perf_counter()
-        basal_sum = basal_sum + score_rows(model, band["basal"])
-        nonbasal_sum = nonbasal_sum + score_rows(model, band["nonbasal"])
+        basal_parts = basal_parts + score_rows(model, band["basal"])
+        nonbasal_parts = nonbasal_parts + score_rows(model, band["nonbasal"])
+        basal_sum, nonbasal_sum = basal_parts[0], nonbasal_parts[0]
         t_lines = time.perf_counter() - t0
         tables, correction = domain.corrected_bremslib_tables(
             tables0, pilot["composition"], E_cut_keV=floor, max_energy_keV=max_energy
@@ -611,6 +669,12 @@ def run_ladder(args):
         tag = f"g{cut:g}"
         arrays[f"{tag}_basal_cxr"], arrays[f"{tag}_nonbasal_cxr"] = basal_sum, nonbasal_sum
         arrays[f"{tag}_brem"] = brem
+        split = {}
+        for i, part in enumerate(parts[1:], start=1):
+            arrays[f"{tag}_basal_{part}"] = basal_parts[i]
+            arrays[f"{tag}_nonbasal_{part}"] = nonbasal_parts[i]
+            split[f"basal_{part}_yield"] = float(basal_parts[i] @ widths)
+            split[f"nonbasal_{part}_yield"] = float(nonbasal_parts[i] @ widths)
         row = dict(
             cutoff_invang=cut,
             reflections=len(domain.hkls),
@@ -621,6 +685,7 @@ def run_ladder(args):
             basal_cxr_yield=float(basal_sum @ widths),
             nonbasal_cxr_yield=float(nonbasal_sum @ widths),
             continuum_correction=correction,
+            **split,
             **observables(grid, widths, cxr, brem),
         )
         if rows:
@@ -672,6 +737,7 @@ def run_ladder(args):
         spacing_eV=float(widths[0]),
         azimuth_count=args.azimuths,
         reflection_batch_size=args.batch,
+        components=bool(args.components),
         temperature_K=args.temperature,
         model=domains[-1].record()["model"],
         D=observables(grid, widths, np.zeros_like(grid), arrays["D_brem"]),
@@ -714,6 +780,9 @@ def main(argv=None):
         help="instead of arms A-D: opt-in model cutoff ladder [1/Angstrom], sector rolls",
     )
     parser.add_argument("--batch", type=int, default=256, help="ladder reflection batch size")
+    parser.add_argument(
+        "--components", action="store_true", help="ladder: also record PXR and CBS parts"
+    )
     args = parser.parse_args(argv)
     if args.ladder:
         run_ladder(args)
