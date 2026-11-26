@@ -68,7 +68,8 @@ with `--yes` deletes, only PyRITE-owned entries; results never depend on the
 cache.
 
 The `pyrite` command, Python sessions and notebooks (`import pyrite`) all store
-kernels under the PyRITE user cache directory (`~/.cache/pyrite/numba` and
+kernels under the PyRITE user cache directory (`~/.cache/pyrite/numba/env-<hash>`,
+one per Python environment so different Numba builds never share files, and
 `~/.cache/pyrite/cupy` on Linux) unless `NUMBA_CACHE_DIR` or `CUPY_CACHE_DIR` is
 already set to a non-empty value, which always wins. Older in-tree `__pycache__`
 entries beside the PyRITE sources and CuPy's `~/.cupy/kernel_cache` are not

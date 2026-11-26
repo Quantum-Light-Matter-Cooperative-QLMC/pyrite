@@ -34,9 +34,19 @@ def managed(monkeypatch, tmp_path):
 def test_apply_sets_only_unset_variables(managed):
     env = {"CUPY_CACHE_DIR": "/user/cupy", "NUMBA_CACHE_DIR": ""}
     applied = _jit_cache.apply_managed_cache_env(env)
-    assert applied == {"NUMBA_CACHE_DIR": str(managed / "numba")}
-    assert env == {"CUPY_CACHE_DIR": "/user/cupy", "NUMBA_CACHE_DIR": str(managed / "numba")}
+    numba = str(managed / "numba" / _jit_cache._environment_key())
+    assert applied == {"NUMBA_CACHE_DIR": numba}
+    assert env == {"CUPY_CACHE_DIR": "/user/cupy", "NUMBA_CACHE_DIR": numba}
     assert _jit_cache.apply_managed_cache_env(env) == {}
+
+
+def test_numba_cache_is_keyed_by_environment(managed, monkeypatch):
+    first = _jit_cache.managed_dir("numba")
+    monkeypatch.setattr(sys, "prefix", str(managed / "other-env"))
+    second = _jit_cache.managed_dir("numba")
+    assert first.parent == second.parent == managed / "numba"
+    assert first != second
+    assert _jit_cache.managed_dir("cupy") == managed / "cupy"
 
 
 def test_locations_classify_sources(managed, tmp_path):
@@ -187,14 +197,14 @@ def test_cli_entry_respects_overrides_after_import_defaults(tmp_path):
         [sys.executable, "-c", script], env=env, capture_output=True, text=True, check=True
     )
     report = json.loads(done.stderr.strip().splitlines()[-1])
-    managed_numba = str(tmp_path / "xdg" / "pyrite" / "numba")
+    managed_numba = str(tmp_path / "xdg" / "pyrite" / "numba" / _jit_cache._environment_key())
     assert report["before"] == {
         "NUMBA_CACHE_DIR": managed_numba,
         "CUPY_CACHE_DIR": str(tmp_path / "mine"),
     }
     assert report["loaded"] == {"numba": False, "cupy": False}
     assert report["after"]["CUPY_CACHE_DIR"] == str(tmp_path / "mine")
-    assert Path(report["after"]["NUMBA_CACHE_DIR"]).parts[-2:] == ("pyrite", "numba")
+    assert Path(report["after"]["NUMBA_CACHE_DIR"]).parts[-3:-1] == ("pyrite", "numba")
     assert not report["cupy"]
     status = json.loads(done.stdout)
     assert status["schema"] == "pyrite.cache.status.v1"
@@ -313,7 +323,7 @@ def _import_probe(mode: str, cache_root: Path, **overrides: str) -> dict:
 @pytest.mark.parametrize("mode", ["plain", "numba-first"])
 def test_import_pyrite_sets_managed_defaults(tmp_path, mode):
     out = _import_probe(mode, tmp_path)
-    assert out["numba"] == str(tmp_path / "pyrite" / "numba")
+    assert out["numba"] == str(tmp_path / "pyrite" / "numba" / _jit_cache._environment_key())
     assert out["cupy"] == str(tmp_path / "pyrite" / "cupy")
     assert out["config"] in (None, out["numba"])
     assert not out["cupy_imported"]

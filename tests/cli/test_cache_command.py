@@ -13,7 +13,7 @@ from tests.helpers.cli import assert_clean_result, invoke
 def managed(monkeypatch, tmp_path):
     root = tmp_path / "user-cache"
     monkeypatch.setattr(_jit_cache, "cache_dir", lambda: root)
-    monkeypatch.setenv("NUMBA_CACHE_DIR", str(root / "numba"))
+    monkeypatch.setenv("NUMBA_CACHE_DIR", str(_jit_cache.managed_dir("numba")))
     monkeypatch.setenv("CUPY_CACHE_DIR", str(root / "cupy"))
     (root / "cupy").mkdir(parents=True)
     (root / "cupy" / "abc.cubin").write_bytes(b"0123")

@@ -6,7 +6,8 @@ module never compiles and never builds a binary layer on top of them.
 
 :func:`apply_managed_cache_env` points *unset* (or empty) cache variables at
 :func:`pyrite.paths.cache_dir` subdirectories (``~/.cache/pyrite/numba`` and
-``~/.cache/pyrite/cupy`` on Linux). ``import pyrite`` calls it, as do the
+``~/.cache/pyrite/cupy`` on Linux; Numba's has one subdirectory per
+interpreter environment). ``import pyrite`` calls it, as do the
 ``pyrite`` CLI and remote ``python -m`` shims, before any PyRITE kernel module
 is decorated. Numba reads ``NUMBA_CACHE_DIR`` into ``numba.config.CACHE_DIR``
 when it is first imported, so when Numba is already loaded the config value is
@@ -44,10 +45,25 @@ _PACKAGE_ROOT = Path(__file__).resolve().parent
 _NUMBA_SUFFIXES = (".nbi", ".nbc")
 
 
+def _environment_key() -> str:
+    """Short stable key for the running interpreter's environment (``sys.prefix``)."""
+    prefix = str(Path(sys.prefix).resolve())
+    return "env-" + hashlib.sha256(prefix.encode()).hexdigest()[:12]
+
+
 def managed_dir(backend: str) -> Path:
-    """Return PyRITE's managed cache directory for ``numba`` or ``cupy``."""
+    """Return PyRITE's managed cache directory for ``numba`` or ``cupy``.
+
+    Numba's directory is one per interpreter environment: environments of one
+    checkout can carry different Numba builds (pixi's ``svml`` locks 0.61 beside
+    ``default``'s 0.68), and Numba names its data files by function, line and
+    Python tag only, so two versions sharing a directory overwrite each other's
+    ``.nbc`` files and load foreign pickles (#1462).
+    """
     if backend not in _ENV:
         raise ValueError(f"unknown JIT cache backend {backend!r}; expected numba or cupy")
+    if backend == "numba":
+        return cache_dir() / backend / _environment_key()
     return cache_dir() / backend
 
 
