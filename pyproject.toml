@@ -185,7 +185,6 @@ browser = [
 notebooks = [
     "pyrite-mc[apps]",
     "nbconvert>=7.17.1",
-    "pandoc>=2.4",
 ]
 
 [tool.pytest.ini_options]
@@ -647,10 +646,29 @@ platforms = [
 ]
 requires-pixi = ">=0.85"
 
-# The project installs editable from PyPI metadata; conda supplies only the
-# interpreter here and the native GPU/SVML stacks in their features.
+# The project installs editable from PyPI metadata. conda-forge supplies the
+# interpreter and the compiled scientific stack (one shared BLAS, HDF5 and
+# LLVM), so pixi skips the PyPI wheels of the same projects; pure-Python
+# dependencies stay on PyPI. Floors match [project.dependencies].
 [tool.pixi.dependencies]
 python = ">=3.13,<3.15"
+numpy = ">=2.2"
+scipy = ">=1.17.1"
+numba = ">=0.61"
+h5py = ">=3.16.0"
+pandas = ">=3.0.3"
+polars = ">=1.44.2"
+psutil = ">=7.2.2"
+gemmi = ">=0.7.5,<0.8"
+
+# nbconvert's Markdown/LaTeX exporters shell out to the pandoc binary.
+[tool.pixi.feature.notebooks.dependencies]
+matplotlib-base = ">=3.11.0"
+pandoc = "*"
+
+# Selenium drives Firefox through geckodriver (checks/plotly_*_622.py).
+[tool.pixi.feature.browser.dependencies]
+geckodriver = "*"
 
 [tool.pixi.pypi-dependencies]
 pyrite-mc = { path = ".", editable = true }
@@ -670,6 +688,7 @@ python = "3.14.*"
 # workspace manages environments; its tool/cache dirs stay inside `.pixi/` so
 # read-only homes and sandboxes need no extra setup.
 [tool.pixi.feature.docs.dependencies]
+matplotlib-base = ">=3.11.0"
 uv = "*"
 
 [tool.pixi.feature.docs.activation.env]
@@ -682,13 +701,16 @@ UV_CACHE_DIR = "$PIXI_PROJECT_ROOT/.pixi/uv-cache"
 [tool.pixi.feature.viz]
 platforms = ["linux-64"]
 
-[tool.pixi.feature.viz.pypi-dependencies]
+[tool.pixi.feature.viz.dependencies]
+vtk-base = "*"
 pyvista = "*"
+scikit-image = "*"
+pymupdf = "*"
+
+[tool.pixi.feature.viz.pypi-dependencies]
 trame = "*"
 trame-vtk = "*"
 trame-vuetify = "*"
-pymupdf = "*"
-scikit-image = "*"
 
 # CUDA 13 from conda-forge: CuPy and cuFINUFFT link one toolkit pinned by
 # `cuda-version`, replacing the CUDA 13 CuPy wheel plus CUDA 12 runtime wheels
@@ -700,6 +722,14 @@ platforms = ["linux-64-cuda"]
 cuda-version = "13.*"
 cupy = ">=14.1.1"
 cufinufft = ">=2.5.1,<2.6"
+
+# GPU environments solve alone (no solve-group with `default`, whose platforms
+# differ), so pin the scientific stack to the versions `default` locks; GPU
+# and CPU runs then compare like for like. SciPy is left free: conda-forge
+# CuPy 14.2 constrains scipy<1.18, so `nvidia` locks 1.17.x.
+[tool.pixi.feature.gpu-stack.dependencies]
+numpy = "2.5.*"
+numba = "0.68.*"
 
 [tool.pixi.feature.amd]
 platforms = ["linux-64"]
@@ -720,9 +750,11 @@ llvmlite = "0.44.*"
 intel-cmplr-lib-rt = "*"
 
 # pkgs/main has no published conda-to-PyPI map; without this pixi would also
-# install PyPI numpy/numba/llvmlite over the conda SVML builds.
+# install PyPI wheels over every pkgs/main Python package (numpy/numba/
+# llvmlite SVML builds, scipy, h5py, ...). tests/dev/test_pixi_lock.py fails
+# when a new pkgs/main package needs an entry.
 [tool.pixi.workspace.conda-pypi-map]
-"https://repo.anaconda.com/pkgs/main" = { mapping = { numpy = "numpy", numpy-base = false, numba = "numba", llvmlite = "llvmlite", python = false } }
+"https://repo.anaconda.com/pkgs/main" = { mapping = { numpy = "numpy", numpy-base = false, numba = "numba", llvmlite = "llvmlite", python = false, scipy = "scipy", h5py = "h5py", pandas = "pandas", polars = "polars", polars-runtime-32 = "polars-runtime-32", psutil = "psutil", mpi4py = "mpi4py", python-dateutil = "python-dateutil", python-tzdata = "tzdata", six = "six", packaging = "packaging" } }
 
 [tool.pixi.environments]
 # Contributor default: every dependency group plus the pure-Python extras.
@@ -731,8 +763,8 @@ py314 = { features = ["cpu", "py314", "test", "lint", "docs", "notebooks", "orac
 docs = { features = ["cpu", "py313", "docs"], solve-group = "py313" }
 # Lab/GPU environments carry the test group and the cluster extras jobs use;
 # nvidia also carries docs, to regenerate the CUDA tutorial captures.
-nvidia = { features = ["py313", "cuda", "test", "docs", "notebooks", "dask", "optimization"] }
-amd = { features = ["py313", "amd", "test", "notebooks", "dask", "optimization"] }
-intel = { features = ["py313", "intel", "test", "notebooks", "dask", "optimization"] }
+nvidia = { features = ["py313", "gpu-stack", "cuda", "test", "docs", "notebooks", "dask", "optimization"] }
+amd = { features = ["py313", "gpu-stack", "amd", "test", "notebooks", "dask", "optimization"] }
+intel = { features = ["py313", "gpu-stack", "intel", "test", "notebooks", "dask", "optimization"] }
 svml = { features = ["py313", "svml", "test"] }
 viz = { features = ["py313", "test", "notebooks", "viz"], solve-group = "py313" }

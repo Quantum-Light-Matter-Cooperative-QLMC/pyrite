@@ -33,7 +33,7 @@ install with `--locked`, so a manifest edit without `pixi lock` fails fast.
 | `amd` | linux-64 | PyPI `amd` extra (CuPy built against ROCm with `CUPY_INSTALL_USE_HIP=1`); same groups as `nvidia` without `docs` |
 | `intel` | linux-64 | PyPI `intel` extra (`dpnp`, `dpctl`); same groups as `amd` |
 | `svml` | linux-64 | Intel SVML Numba from Anaconda `pkgs/main`; `test` only. Separate terms: [`LICENSE-SVML.md`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/LICENSE-SVML.md) |
-| `viz` | linux-64 | One-off research viewers and digitizers (`pyvista`, `trame`, `pymupdf`, `scikit-image`) |
+| `viz` | linux-64 | One-off research viewers and digitizers (conda-forge `vtk-base`, `pyvista`, `pymupdf`, `scikit-image`; PyPI `trame`) |
 
 Design decisions (#1462):
 
@@ -43,17 +43,29 @@ Design decisions (#1462):
   `intel-cmplr-lib-rt` are stricter than the project licence, so the `svml`
   build carries its own notice. CI builds and tests it but publishes nothing
   built from it.
-- **conda versus PyPI.** conda supplies the interpreter and the native stacks
-  that wheels cannot express in one toolkit. That is the CUDA 13 CuPy and
-  cuFINUFFT pair in `nvidia`, which replaces the PyPI extra's CUDA 12 runtime
-  wheels, and the SVML Numba in `svml`. Everything else, including the
-  project, installs from PyPI at the versions `uv.lock` pinned before the
-  move, so default numerical output did not change. `nvidia` never includes
-  the PyPI `nvidia` extra, which would install CuPy twice.
+- **conda versus PyPI.** conda-forge supplies the interpreter and every
+  compiled scientific package, so one environment shares one BLAS, HDF5 and
+  LLVM: `numpy`, `scipy`, `numba`/`llvmlite`, `h5py`/`hdf5`, `pandas`,
+  `polars`, `psutil` and `gemmi` everywhere; `matplotlib-base` with `docs`
+  and `notebooks`; the `pandoc` binary nbconvert shells out to with
+  `notebooks`; `geckodriver` with `browser`; VTK/PyVista with `viz`. It also
+  supplies the native GPU stacks: the CUDA 13 CuPy and cuFINUFFT pair in
+  `nvidia` (replacing the PyPI extra's CUDA 12 runtime wheels) and the SVML
+  Numba in `svml`. The project and pure-Python dependencies install from
+  PyPI. The move kept the versions `uv.lock` pinned (numpy 2.5.5, scipy
+  1.18.1, numba 0.68.1); identity pins and physics baselines are unchanged.
+  `xraylib` stays on PyPI: the conda-forge build carries no PyPI identity,
+  so pixi would install it twice. `nvidia` never includes the PyPI `nvidia`
+  extra, which would install CuPy twice.
+- **GPU versions.** GPU environments cannot share a solve-group with
+  `default` (different platforms), so the `gpu-stack` feature pins numpy and
+  numba to `default`'s minor releases. SciPy stays free: conda-forge CuPy
+  14.2 constrains `scipy<1.18`, so `nvidia` locks 1.17.
 - **No double installs.** pixi skips a PyPI requirement only when its
   conda-to-PyPI map names the conda package. conda-forge ships that map;
-  `pkgs/main` does not, so `[tool.pixi.workspace.conda-pypi-map]` maps
-  `numpy`, `numba` and `llvmlite` for it. `tests/dev/test_pixi_lock.py`
+  `pkgs/main` does not, so `[tool.pixi.workspace.conda-pypi-map]` maps every
+  Python package `svml` takes from it (numpy, numba, llvmlite, scipy, h5py,
+  pandas, polars, ...). `tests/dev/test_pixi_lock.py`
   fails if any locked environment installs one distribution from both
   sources.
 - **Platforms.** Every environment on linux-64. The CPU-only `default`,
@@ -64,6 +76,10 @@ Design decisions (#1462):
 - **Floors.** `numpy>=2.2` and `numba>=0.61` are the oldest releases the code
   supports, which lets `svml` keep its conda builds. The other environments
   still resolve the latest releases.
+- **JIT caches.** Environments of one checkout carry different Numba builds
+  (`svml` 0.61, the rest 0.68). Numba names cache files by function, line
+  and Python tag only, so PyRITE's managed Numba cache is one directory per
+  interpreter environment (`~/.cache/pyrite/numba/env-<hash of sys.prefix>`).
 - **uv.** It is not used to manage environments. The `docs` feature carries a
   `uv` binary only because marimo's HTML-WASM export runs Ruff through
   `uv tool run`. Its tool and cache directories stay under `.pixi/`, so
@@ -77,7 +93,7 @@ manifest.
 
 ## Extras versus dependency groups
 
-Dependencies imported by shipped code for a user-facing feature are package extras, published in wheel metadata; contributor, CI, and validation-only tools are dependency groups, which wheels never carry. pixi turns each extra and each group into a feature of the same name. `plots` holds the runtime of `pyrite.plots` (and the lazily imported matplotlib figures in `perf/` and `validation/`); `apps` is `pyrite-mc[plots]` plus the marimo stack for `src/pyrite/apps/`. The `notebooks` group is `pyrite-mc[apps]` plus notebook conversion tools (`nbconvert`, `pandoc`) that nothing in `src/` imports, so the `default` environment stays complete. Entry points that need an extra check it with `pyrite._util.extras.require_extra` (CLI: `pyrite.cli._extras.require_cli_extra`), which names `pyrite-mc[<extra>]` and the checkout's pixi environment (`pyrite._util.extras.checkout_environment`) without importing the dependency. `pyrite-dev package-smoke` builds the wheel and installs it with plain `venv` and `pip`, without extras to assert those hints, then with `[apps]` to smoke-launch each app.
+Dependencies imported by shipped code for a user-facing feature are package extras, published in wheel metadata; contributor, CI, and validation-only tools are dependency groups, which wheels never carry. pixi turns each extra and each group into a feature of the same name. `plots` holds the runtime of `pyrite.plots` (and the lazily imported matplotlib figures in `perf/` and `validation/`); `apps` is `pyrite-mc[plots]` plus the marimo stack for `src/pyrite/apps/`. The `notebooks` group is `pyrite-mc[apps]` plus notebook conversion tools (`nbconvert`, plus the conda-forge `pandoc` binary) that nothing in `src/` imports, so the `default` environment stays complete. Entry points that need an extra check it with `pyrite._util.extras.require_extra` (CLI: `pyrite.cli._extras.require_cli_extra`), which names `pyrite-mc[<extra>]` and the checkout's pixi environment (`pyrite._util.extras.checkout_environment`) without importing the dependency. `pyrite-dev package-smoke` builds the wheel and installs it with plain `venv` and `pip`, without extras to assert those hints, then with `[apps]` to smoke-launch each app.
 
 ## Why source was not split across distributions
 
