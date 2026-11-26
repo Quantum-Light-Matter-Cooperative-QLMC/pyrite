@@ -164,7 +164,12 @@ extern "C" __global__ void rectangles(
 
 @lru_cache(maxsize=2)
 def _direct_kernel(precision="fp64"):
-    """One block per small rectangle; no line-by-mode workspace allocation."""
+    """One block per small rectangle; no line-by-mode workspace allocation.
+
+    Fast-math rejected (#1463): ``--use_fast_math``/``__sincosf`` ran 1.5 %
+    slower on RTX 5080 and only 7 % faster on gfx1151, at 2-3x the FP32 phase
+    error; NVRTC defaults (FMA) plus CuPy's ``-ftz`` are already applied.
+    """
     cp = import_module("cupy")
     flag = "1" if precision == "fp32" else "0"
     return cp.RawKernel(_DIRECT_SOURCE, "rectangles", options=(f"-DDIRECT_FP32={flag}",))

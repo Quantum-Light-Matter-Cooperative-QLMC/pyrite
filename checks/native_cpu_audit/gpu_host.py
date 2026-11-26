@@ -20,6 +20,13 @@ whichever host call blocks on it):
   attributed to code;
 - unsynchronized wall of ``_transport_case`` / ``_spectrum_case``, runner
   timing records, process CPU time, host peak RSS, output-array digests;
+- ``GPUHOST_THREADS=all`` (#1463): the sampler also samples every other
+  thread (scoring workers, beam-entry prefetch) by thread name and innermost
+  ``GPUHOST_DEPTH`` (default 5) ``pyrite`` frames, joined with NVML idle
+  (``worker_threads`` in the record); a thread parked in ``threading``/``queue``
+  or outside ``pyrite`` counts as waiting, not active;
+- ``GPUHOST_HISTORIES=N`` (#1463): fixed population of N electrons instead of
+  adaptive stopping, for bounded runs of spectrum-heavy cases;
 - ``--cprofile``: cProfile top rows instead of the stack sampler;
 - ``--nsys``: no sampler; run under ``nsys profile`` with ``PYRITE_MC_NSYS=1``
   so the production NVTX ranges are emitted (``nsys_gaps.py`` reduces them).
@@ -60,6 +67,14 @@ SAMPLE_S = 0.010
 NVML_S = 0.020
 FRAME_LIMIT = 150
 IDLE_PERCENT = 10
+#: ``GPUHOST_THREADS=all`` also samples every non-sampler thread (#1463):
+#: scoring workers and the beam-entry prefetch hold most worker-side idle.
+ALL_THREADS = os.environ.get("GPUHOST_THREADS") == "all"
+#: Innermost ``pyrite`` frames kept per worker-thread sample.
+THREAD_DEPTH = int(os.environ.get("GPUHOST_DEPTH", "5"))
+#: ``GPUHOST_HISTORIES=N`` fixes the population at N electrons (#1463), so a
+#: spectrum-heavy case (MoS2 on ``cleo_sub`` runs hours adaptively) stays short.
+HISTORIES = int(os.environ.get("GPUHOST_HISTORIES", "0") or 0)
 #: Host owners measured in job 15962 (module, function); wrapped with ranges.
 HOST_SPANS = (
     ("pyrite.montecarlo.runner.case_driver", "electron_cutoffs"),
@@ -228,13 +243,14 @@ class Nvml:
 
 
 class Sampler:
-    """Main-thread stack samples and NVML utilization on one clock."""
+    """Main-thread (optionally all-thread) stack samples and NVML utilization on one clock."""
 
     def __init__(self, ranges, enabled):
         self.ranges = ranges
         self.enabled = enabled
         self.main = threading.main_thread().ident
         self.stacks: list[tuple[float, str, str, str | None]] = []
+        self.thread_stacks: list[tuple[float, str, str, str]] = []
         self.util: list[tuple[float, int]] = []
         self.nvml = Nvml()
         self.phase = "setup"
@@ -242,8 +258,13 @@ class Sampler:
         self._threads: list[threading.Thread] = []
 
     def _stack(self):
+        own = {threading.get_ident()}
         while not self._stop.wait(SAMPLE_S):
-            frame = sys._current_frames().get(self.main)
+            frames = sys._current_frames()
+            if ALL_THREADS:
+                own.update(t.ident for t in self._threads)
+                self._sample_workers(frames, own)
+            frame = frames.get(self.main)
             if frame is None:
                 continue
             inner = f"{_short(frame.f_code.co_filename)}:{frame.f_code.co_name}:{frame.f_lineno}"
@@ -256,6 +277,58 @@ class Sampler:
                 frame = frame.f_back
             top = self.ranges.top()
             self.stacks.append((time.perf_counter(), inner, " < ".join(pyrite), top or self.phase))
+
+    def _sample_workers(self, frames, own):
+        names = {t.ident: t.name for t in threading.enumerate()}
+        now = time.perf_counter()
+        for ident, frame in frames.items():
+            if ident == self.main or ident in own:
+                continue
+            inner = f"{_short(frame.f_code.co_filename)}:{frame.f_code.co_name}:{frame.f_lineno}"
+            pyrite = []
+            while frame is not None and len(pyrite) < THREAD_DEPTH:
+                if "/src/pyrite/" in frame.f_code.co_filename:
+                    pyrite.append(f"{_short(frame.f_code.co_filename)}:{frame.f_code.co_name}")
+                frame = frame.f_back
+            self.thread_stacks.append(
+                (now, names.get(ident, str(ident)), inner, " < ".join(pyrite))
+            )
+
+    def _thread_summary(self, ut, uv, limit):
+        """Worker samples by thread, innermost frame and pyrite stack; idle via NVML."""
+        if not self.thread_stacks:
+            return {}
+        times = np.array([t for t, *_ in self.thread_stacks])
+        if ut is not None and ut.size:
+            busy = uv[np.clip(np.searchsorted(ut, times), 0, len(ut) - 1)]
+        else:
+            busy = np.full(times.shape, -1)
+        idle = (busy >= 0) & (busy < IDLE_PERCENT)
+        # A thread parked in a wait has no pyrite frame or sits in threading/queue.
+        active = np.array(
+            [
+                bool(s[3]) and "threading.py" not in s[2] and "queue.py" not in s[2]
+                for s in self.thread_stacks
+            ]
+        )
+
+        def top(mask, key):
+            counts = collections.Counter(
+                key(s) for s, keep in zip(self.thread_stacks, mask, strict=True) if keep
+            )
+            return [
+                {"where": where, "samples": n, "seconds": n * SAMPLE_S}
+                for where, n in counts.most_common(limit)
+            ]
+
+        return {
+            "samples": len(self.thread_stacks),
+            "by_thread_all": top(np.ones(times.shape, bool), lambda s: s[1]),
+            "by_thread_active": top(active, lambda s: s[1]),
+            "by_thread_stack_active": top(active, lambda s: f"{s[1]} | {s[3]}"),
+            "by_thread_stack_gpu_idle": top(active & idle, lambda s: f"{s[1]} | {s[3]}"),
+            "by_thread_innermost_gpu_idle": top(active & idle, lambda s: f"{s[1]} | {s[2]}"),
+        }
 
     def _poll(self):
         while not self._stop.wait(NVML_S):
@@ -287,8 +360,10 @@ class Sampler:
             busy = uv[index]
         else:
             uv = np.array([], dtype=int)
+            ut, uv = None, np.array([], dtype=int)
             busy = np.full(times.shape, -1)
         idle = (busy >= 0) & (busy < IDLE_PERCENT)
+        threads = self._thread_summary(ut, uv, FRAME_LIMIT) if ALL_THREADS else None
 
         def top(selector, key, rows=limit):
             counts = collections.Counter(
@@ -318,6 +393,7 @@ class Sampler:
             "by_range_frame_gpu_idle": top(idle, _range_frame, FRAME_LIMIT),
             "by_range_frame_all": top(everything, _range_frame, FRAME_LIMIT),
             "util_timeline": _timeline(self.util, times[0] if times.size else 0.0),
+            "worker_threads": threads,
         }
 
 
@@ -346,9 +422,26 @@ def digest(array):
     return hashlib.sha256(a.tobytes()).hexdigest()[:16]
 
 
+def _fixed_population(settings, n):
+    """Pin the adaptive population at ``n`` (as #1296 ``capture``; brem too, #1398)."""
+    import dataclasses
+
+    brem = (
+        {"brem_min_histories": n, "brem_max_histories": n}
+        if getattr(settings.precision, "brem_max_histories", None) is not None
+        else {}
+    )
+    precision = dataclasses.replace(
+        settings.precision, min_histories=n, max_histories=n, pilot_histories=None, **brem
+    )
+    return dataclasses.replace(settings, precision=precision)
+
+
 def resolve_case(material, e0_kev, tilt_deg):
     helper = runpy.run_path(str(ROOT / "checks/adaptive_block_size_1252.py"))
     scan, settings, sweep = helper["_profile_run"](material)
+    if HISTORIES:
+        settings = _fixed_population(settings, HISTORIES)
     cases = [
         c
         for c in scan.build_cases(sweep, settings)
@@ -439,6 +532,7 @@ def main(argv):
         "issue": 1432,
         "code_sha": os.environ.get("PROBE_SHA"),
         "profile": os.environ.get("PROFILE", "cleo_sub"),
+        "fixed_histories": HISTORIES or None,
         "material": material,
         "E0_keV": e0,
         "tilt_deg": tilt,

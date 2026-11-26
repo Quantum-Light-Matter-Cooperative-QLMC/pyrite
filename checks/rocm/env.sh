@@ -16,8 +16,11 @@ else
     export PYRITE_GPU_VENDOR=nvidia PYRITE_MC_BACKEND=cuda
 fi
 
+# pixi GPU environment of this node: `nvidia` or `amd` (#1462).
+export PYRITE_PIXI_ENV="$PYRITE_GPU_VENDOR"
+
 pyrite_gpu_sync() {
-    pixi install --extra "$PYRITE_GPU_VENDOR" --locked "$@"
+    pixi install --locked -e "$PYRITE_PIXI_ENV" "$@"
 }
 
 pyrite_gpu_info() {

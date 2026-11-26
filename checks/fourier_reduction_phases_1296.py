@@ -16,7 +16,8 @@ lines), so the reduction's share of the spectrum phase is measured against the
 line prologue upstream of it (tables, kinematics, line arrays). Flushes with
 the ``CAPTURE`` (default 3) most common line count, evenly spaced over the run,
 are saved as ``flush-<i>.npz`` (``E_res``, ``a_width``, ``weight``, ``axis``)
-for ``bench``. Record: ``capture.json``.
+for ``bench``; ``CAPTURE_MIN_LINES`` and ``CAPTURE_EVERY`` override the
+9M-line floor and 25-call stride (#1463). Record: ``capture.json``.
 
 ``selections`` in the record keeps each reflection selection's mode
 (``reference_quadrature``: ``band-mass`` or ``bin-mean``; ``rescored``), band,
@@ -79,6 +80,9 @@ import numpy as np
 
 PROFILE = os.environ.get("PROFILE", "cleo_sub_1281")
 CAPTURE = int(os.environ.get("CAPTURE", "3"))
+#: Smallest flush (lines) ``capture`` saves, and the call stride between saves (#1463).
+CAPTURE_MIN_LINES = int(os.environ.get("CAPTURE_MIN_LINES", "9000000"))
+CAPTURE_EVERY = int(os.environ.get("CAPTURE_EVERY", "25"))
 os.environ["PROFILE"] = PROFILE
 
 
@@ -142,8 +146,12 @@ def capture(material, e0_kev, tilt_deg, histories, out_dir):
         res = real(E_res, a_width, weight, axis, **kwargs)
         _sync()
         calls.append((int(np.size(E_res)), time.perf_counter() - t0))
-        # Save the 1st, then every 25th full flush, up to CAPTURE.
-        if len(saved) < CAPTURE and np.size(E_res) >= 9_000_000 and len(calls) % 25 == 1:
+        # Save the 1st, then every CAPTURE_EVERY-th full flush, up to CAPTURE.
+        if (
+            len(saved) < CAPTURE
+            and np.size(E_res) >= CAPTURE_MIN_LINES
+            and len(calls) % CAPTURE_EVERY == 1 % CAPTURE_EVERY
+        ):
             cp = _cp()
             path = out / f"flush-{len(saved)}.npz"
             np.savez(
