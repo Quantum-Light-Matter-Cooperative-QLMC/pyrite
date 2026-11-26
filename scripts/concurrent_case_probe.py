@@ -12,7 +12,10 @@ ELSEPA elastic, BremsLib continuum with ``bremslib-soft-hard`` coupling, fixed
 400-node line grid, per-electron core), one seed per job. ``transport`` times
 ``runner._transport_case``; ``case`` times the full ``run_case``. Both need the
 fetched tables (``pyrite tables verify``). ``PROBE_FAMILY=layered`` uses the
-#1432 MoS2-on-Si stack (100 keV, same physics) and ``PROBE_FAMILY=channeling``
+#1432 MoS2-on-Si stack (100 keV, same physics), ``PROBE_FAMILY=adaptive`` the
+HOPG slab with adaptive CXR and brem stopping (``PROBE_TARGET_RSE``, default
+0.02, variance-of-variance guard ``PROBE_MAX_VOV``, default 0.05, between
+``Ne/8`` and ``Ne`` histories; digests include the realized counts) and ``PROBE_FAMILY=channeling``
 the admitted planar Si demo (17 MeV, 2 um, plane (1-10)) through the public
 ``pyrite.simulate`` with ``Numerics(seed=...)``; both run in ``case`` mode only. ``PROBE_WORKERS`` (default
 ``1,2,4``) and ``PROBE_REPEATS`` (default 3) narrow the sweep; ``PROBE_KIND=procs``
@@ -44,6 +47,7 @@ import numpy as np
 import psutil
 
 from pyrite.montecarlo import runner
+from pyrite.montecarlo.runner.adaptive import without_wall_clock
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = runpy.run_path(str(ROOT / "checks/streamed_scoring_memory.py"))["_case"]
@@ -54,6 +58,8 @@ FAMILY = os.environ.get("PROBE_FAMILY", "hopg")
 def case(seed):
     if FAMILY == "layered":
         return dataclasses.replace(_layered_case(), seed=seed)
+    if FAMILY == "adaptive":
+        return dataclasses.replace(_adaptive_case(), seed=seed)
     return BUILD("hopg", NE, ENERGY_KEV, 1.0e4, seed)
 
 
@@ -77,6 +83,44 @@ def _layered_case():
         energy_bins=EnergyBins(cxr=np.linspace(1000, 20000, 400), brem=np.arange(1000, 1e5, 1000)),
     )
     return api.build_case(pr.Scene(beam, stack, pr.Detector(), physics=physics), numerics)
+
+
+def _adaptive_case():
+    import pyrite as pr
+    from pyrite import api
+    from pyrite._sampling import adaptive_sampling
+    from pyrite.detectors import EnergyBins
+
+    beam = pr.Beam(
+        energy_keV=ENERGY_KEV, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()
+    )
+    slab = pr.geometry.Slab(
+        "hopg", thickness_ang=1e4, tilt_deg=30.0, footprint=pr.geometry.Footprint(5, 5)
+    )
+    physics = pr.Physics(
+        bremsstrahlung_model="bremslib",
+        radiative_model="bremslib-soft-hard",
+        radiative_cutoff_eV=1000,
+    )
+    target = float(os.environ.get("PROBE_TARGET_RSE", "0.02"))
+    precision = pr.config.AdaptiveSampling(
+        target,
+        NE // 8,
+        NE,
+        observables=("cxr", "brem"),
+        brem_target_rse=target,
+        brem_min_histories=NE // 8,
+        brem_max_histories=NE,
+        max_variance_of_variance=float(os.environ.get("PROBE_MAX_VOV", "0.05")),
+    )
+    numerics = pr.Numerics(
+        sampling=adaptive_sampling(precision),
+        energy_model="midpoint",
+        energy_bins=EnergyBins(
+            cxr=np.linspace(1000, 8000, 400), brem=np.arange(1000, ENERGY_KEV * 1e3, 500)
+        ),
+    )
+    return api.build_case(pr.Scene(beam, slab, pr.Detector(), physics=physics), numerics)
 
 
 def _channeling(seed):
@@ -148,7 +192,10 @@ def job(seed):
         return _channeling(seed)
     if MODE == "transport":
         return runner._transport_case(case(seed), transport_core="per-electron")
-    return runner.run_case(case(seed), transport_core="per-electron")
+    out = runner.run_case(case(seed), transport_core="per-electron")
+    if "adaptive_sampling" in out:  # wall-clock fields differ between replays
+        out = {**out, "adaptive_sampling": without_wall_clock(out["adaptive_sampling"])}
+    return out
 
 
 class PssSampler:
