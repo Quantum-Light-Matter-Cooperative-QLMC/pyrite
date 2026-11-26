@@ -81,14 +81,14 @@ not even a correct plate calculation supplies them.
 
 ## Reproduction and next gate
 
-Run `uv run python checks/cxr_filter_first_collision_411.py` after fetching
-the pinned EPDL tables (`uv run pyrite tables fetch epdl`). It prints EPDL
+Run `pixi run python checks/cxr_filter_first_collision_411.py` after fetching
+the pinned EPDL tables (`pixi run pyrite tables fetch epdl`). It prints EPDL
 optical depths, uncollided probabilities and first-interaction partitions at
 250, 280, 290, 500, 1000 and 1500 eV, straddling the carbon K edge. These
 numbers are calculated at runtime from the active pinned table; no
 hand-entered attenuation constants or purported physics results are shipped.
 Run the CPU-only contract tests with
-`uv run pytest -q tests/checks/test_cxr_filter_first_collision_411.py`.
+`pixi run pyrite-dev test tests/checks/test_cxr_filter_first_collision_411.py`.
 The script requires no CXR photon source and does not launch photon transport.
 
 To move beyond this slice, (1) establish a physically supported joint boundary

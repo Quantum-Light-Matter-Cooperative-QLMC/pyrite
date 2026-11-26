@@ -3,7 +3,7 @@
 This deliberately does NOT construct a PXR/CBS source from trajectory segments.
 Inputs are an independently supplied, already escaped *joint* surface measure.
 The production CXR angular marginal is insufficient to construct these rows.
-Run with ``uv run python checks/cxr_boundary_contract_411.py`` to exercise a
+Run with ``pixi run python checks/cxr_boundary_contract_411.py`` to exercise a
 synthetic identity. No physics validation or photon-tracker integration implied.
 """
 

@@ -5,7 +5,7 @@ an admission to PhotonTransport. Only explicitly supplied *escaped* boundary
 cells may be projected through the downstream geometry. No electron segment or
 CXR angular marginal is interpreted as a photon birth position.
 
-    uv run python checks/cxr_filter_first_collision_411.py
+    pixi run python checks/cxr_filter_first_collision_411.py
 
 Requires the separately fetched, SHA-pinned EPDL2025 table for real coefficients.
 The pure geometry/probability functions can be tested without that dataset.
@@ -13,9 +13,9 @@ The pure geometry/probability functions can be tested without that dataset.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from math import pi
-from typing import Mapping
 
 import numpy as np
 
@@ -196,8 +196,7 @@ def first_collision_probabilities(
         raise ValueError("must supply all five EPDL interaction channels")
     mu = {name: np.asarray(coefficients_inv_mm[name], dtype=float) for name in CHANNELS}
     if any(
-        v.shape != path.shape or not np.all(np.isfinite(v)) or np.any(v < 0)
-        for v in mu.values()
+        v.shape != path.shape or not np.all(np.isfinite(v)) or np.any(v < 0) for v in mu.values()
     ):
         raise ValueError("coefficients must be nonnegative finite arrays matching paths")
     total = sum(mu.values())
@@ -315,10 +314,12 @@ def main() -> None:
     print("eV    tau_total   P_no_collision   P_Rayleigh_first   P_Compton_first   P_photo_first")
     for i, energy in enumerate(energies):
         tau = sum(rates[name][i] for name in CHANNELS) * path_mm
-        print(f"{energy:4.0f}   {tau:10.5g}     {event.uncollided[i]:12.6g}  "
-              f"{event.by_channel['coherent'][i]:15.6g}    "
-              f"{event.by_channel['incoherent'][i]:15.6g}    "
-              f"{event.by_channel['photoelectric'][i]:12.6g}")
+        print(
+            f"{energy:4.0f}   {tau:10.5g}     {event.uncollided[i]:12.6g}  "
+            f"{event.by_channel['coherent'][i]:15.6g}    "
+            f"{event.by_channel['incoherent'][i]:15.6g}    "
+            f"{event.by_channel['photoelectric'][i]:12.6g}"
+        )
     print("First-event probabilities are not photon scatter-in or fluorescence detector yields.")
 
 
