@@ -432,6 +432,15 @@ def test_legacy_omitted_elastic_model_keeps_mott(tmp_path, encoding):
     assert ckio.load(str(rewritten))["hopg"][30.0]["case"]["elastic_model"] == "mott"
 
 
+def test_legacy_staged_executor_input_keeps_mott(tmp_path):
+    path = tmp_path / "0.h5"
+    ckio.dump({"cases": [{"index": 0, "case": {"crystal": "hopg"}}]}, str(path))
+    with h5py.File(path, "r+") as handle:
+        del handle.attrs[ckio.CASE_ELASTIC_DEFAULT_ATTR]
+    (row,) = ckio.load(str(path))["cases"]
+    assert row["case"]["elastic_model"] == "mott"
+
+
 def test_new_stored_omission_resolves_to_elsepa(tmp_path):
     from pyrite._physics_provenance import resolved_physics_view
 

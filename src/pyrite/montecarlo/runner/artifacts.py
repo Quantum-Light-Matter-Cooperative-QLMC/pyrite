@@ -18,6 +18,7 @@ from ..groove import blazed_groove_spec
 from ..trajectories import (
     TrajectoryArtifact,
     TrajectoryArtifactError,
+    _artifact_case_matches,
     artifact_spectrum_inputs,
     case_digest,
     iter_electron_row_blocks,
@@ -163,15 +164,7 @@ def _checked_case_and_inputs(artifact, case):
         raise TrajectoryArtifactError(str(error)) from error
     inputs = artifact_spectrum_inputs(artifact)
     stored = artifact.case
-    recorded = dict(stored)
-    if (
-        artifact.attrs.get("case_elastic_default") == "mott"
-        and stored.get("elastic_model") == "mott"
-        and case_digest(recorded) != artifact.attrs.get("case_sha256")
-    ):
-        # Decoding names the old omitted choice; verify its original payload.
-        recorded.pop("elastic_model")
-    if case_digest(recorded) != artifact.attrs.get("case_sha256"):
+    if not _artifact_case_matches(artifact.attrs, stored):
         raise TrajectoryArtifactError(f"trajectory artifact {artifact.path} case is corrupt")
     if case is not None and case_digest(case) != case_digest(stored):
         raise TrajectoryArtifactError(

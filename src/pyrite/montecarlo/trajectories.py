@@ -204,6 +204,28 @@ def case_digest(case: Mapping[str, Any]) -> str:
     return hashlib.sha256(_dumps(case).encode("utf-8")).hexdigest()
 
 
+def _recorded_case_matches(case: Mapping[str, Any], digest: object) -> bool:
+    """Whether a stored :func:`case_digest` names ``case``.
+
+    Mott records written before #1383 hashed the case without ``elastic_model``,
+    which stored-case readers and campaign lowering now name.
+    """
+    if case_digest(case) == digest:
+        return True
+    if case.get("elastic_model") != "mott":
+        return False
+    return case_digest({k: v for k, v in case.items() if k != "elastic_model"}) == digest
+
+
+def _artifact_case_matches(header: Mapping[str, Any], case: Mapping[str, Any]) -> bool:
+    """Whether an artifact with root attributes ``header`` records ``case``."""
+    digest = header.get("case_sha256")
+    if header.get("case_elastic_default") != "mott":
+        return case_digest(case) == digest
+    # An old artifact's omitted key ran Mott; a live omission selects ELSEPA.
+    return "elastic_model" in case and _recorded_case_matches(case, digest)
+
+
 @dataclass(frozen=True)
 class TrajectoryCapture:
     """Where and how a run writes per-case transport artifacts.
@@ -1165,7 +1187,7 @@ def preflight_capture(
             continue
         header = read_trajectory_header(path)
         stored_parameters = header.get("parameter_sha256") or None
-        mismatched = header.get("case_sha256") != case_digest(case) or (
+        mismatched = not _artifact_case_matches(header, case) or (
             expected_parameters is not None
             and stored_parameters is not None
             and stored_parameters != expected_parameters

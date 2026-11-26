@@ -182,6 +182,10 @@ def _restore_case_models(obj: Any, h5: h5py.File | None = None) -> Any:
 
 
 def _name_legacy_mott_cases(obj: Any) -> None:
+    if isinstance(obj, (list, tuple)):  # staged executor inputs: {"cases": [row, ...]}
+        for item in obj:
+            _name_legacy_mott_cases(item)
+        return
     if not isinstance(obj, Mapping):
         return
     case = obj.get("case")

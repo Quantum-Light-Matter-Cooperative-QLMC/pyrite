@@ -447,6 +447,22 @@ def test_preflight_rejects_a_cached_artifact_of_different_physics(tmp_path, stal
         preflight_capture(capture, [case], [])
 
 
+@pytest.mark.parametrize("requested", ["mott", "elsepa", None])
+def test_preflight_matches_a_legacy_artifact_only_as_mott(tmp_path, requested):
+    legacy = _case()
+    legacy.pop("elastic_model", None)
+    capture = TrajectoryCapture(root=str(tmp_path))
+    with h5py.File(_seed(capture, legacy), "r+") as handle:
+        del handle["case"].attrs["elastic_default"]
+    case = legacy if requested is None else {**legacy, "elastic_model": requested}
+
+    if requested == "mott":
+        assert preflight_capture(capture, [case], []).kept == 1
+    else:
+        with pytest.raises(TrajectoryArtifactError, match="different physics"):
+            preflight_capture(capture, [case], [])
+
+
 # ---- run pipeline ----------------------------------------------------------
 
 
