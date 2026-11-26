@@ -54,6 +54,7 @@ def np_sin(v):
 
 np_sin = njit(inline="always")(np_sin)
 arms = [(name, fn, False) for name, fn in VARIANTS.items()]
+arms += [(name + " contract", fn, {"contract"}) for name, fn in VARIANTS.items() if name != "vector_sin"]
 arms += [("np.sin strict", np_sin, False), ("np.sin fastmath=True", np_sin, True)]
 cpu = next(
     (ln.split(":", 1)[1].strip() for ln in open("/proc/cpuinfo") if ln.startswith("model name")),
