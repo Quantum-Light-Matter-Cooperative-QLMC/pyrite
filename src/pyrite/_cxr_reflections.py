@@ -47,11 +47,15 @@ class CxrReflections:
         Experimental (#1480): a :class:`FiberAverage` (reciprocal cutoff, roll
         nodes, batch size) for the full non-basal domain of a fiber-textured
         crystal. ``None`` (default) keeps the catalog's basal-only ``(00l)``
-        domain. The campaign path does not score it yet (#1483) and refuses a
-        non-``None`` value; use
-        ``pyrite.montecarlo.spectrum.cxr.fiber.FiberCXRModel.from_numerics``,
-        which reads this field only: the other controls here, mosaic ones
-        included, do not reach the fiber scorer.
+        domain. Campaign runs (#1483) score it for HOPG on an explicit line
+        grid (``EnergyBins.cxr``) with incoherent emission, a single slab and
+        BremsLib; other routes refuse it. They lower ``mosaic_route`` and
+        ``mosaic_nodes`` into the case as basal runs do, and refuse
+        ``"mc-sampled"`` mosaicity. Excludes ``n_families``,
+        ``max_reflections`` and ``line_yield_tolerance``. The direct
+        ``pyrite.montecarlo.spectrum.cxr.fiber.FiberCXRModel.from_numerics``
+        reads this field only: the other controls here, mosaic ones included,
+        do not reach that scorer.
     """
 
     n_families: int | None = None
@@ -64,6 +68,15 @@ class CxrReflections:
     def __post_init__(self) -> None:
         if self.fiber is not None and not isinstance(self.fiber, FiberAverage):
             raise TypeError("fiber must be a FiberAverage or None")
+        if self.fiber is not None and (
+            self.n_families is not None
+            or self.max_reflections is not None
+            or self.line_yield_tolerance is not None
+        ):
+            raise ValueError(
+                "fiber owns the reflection domain; n_families, max_reflections and "
+                "line_yield_tolerance must be None"
+            )
         if self.n_families is not None and (
             type(self.n_families) is not int or self.n_families <= 0
         ):

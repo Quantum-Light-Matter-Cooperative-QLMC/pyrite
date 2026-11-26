@@ -16,12 +16,10 @@ def reflection_controls(numerics: Numerics, physics: Physics, channeling: object
     """Fall back to four families only for an unsupported automatic selection."""
     controls = numerics.cxr_reflections
     if controls.fiber is not None:
-        # Never fall through to basal-only scoring with fiber numerics set.
-        raise ValueError(
-            "CxrReflections.fiber is not yet scored by the campaign path (#1483); "
-            "score a transported scene with FiberCXRModel.from_numerics(...) and "
-            "pyrite.montecarlo.spectrum.cxr.fiber_case.score_fiber_case"
-        )
+        # The fiber domain owns the line reflections; the four catalog basal
+        # families only name the diffracted-brem and Kossel rows (#1483). The
+        # case carries the fiber record instead (:func:`fiber_case_fields`).
+        return replace(controls, fiber=None, n_families=4)
     # Streamed scoring selects on the electron prefix since #1281, so it no
     # longer falls back.
     if (
@@ -64,3 +62,36 @@ def resolve_reflection_sweep(
         n_families=sweep.n_families or 4,
         line_yield_tolerance=1e-3 if automatic else sweep.line_yield_tolerance,
     ), automatic
+
+
+def fiber_case_fields(numerics: Numerics) -> dict[str, object]:
+    """Case keys of the opt-in full-fiber domain (#1483); ``{}`` when basal-only.
+
+    The fiber domain has no qualified automatic or stored line grid: stored
+    catalog rows and automatic seeding know only the basal ``(00l)`` lines,
+    so an explicit ``EnergyBins.cxr`` grid is required. Lines are scored as
+    bin means (``line_quadrature="bin-mean"``).
+
+    Validation: cxr-fiber-intensity-average
+    """
+    fiber = numerics.cxr_reflections.fiber
+    if fiber is None:
+        return {}
+    bins = numerics.energy_bins
+    if bins is None or bins.cxr is None or numerics.line_resolution is not None:
+        raise ValueError(
+            "full-fiber CXR requires an explicit line grid (Numerics.energy_bins with "
+            "EnergyBins.cxr, no line_resolution): stored and automatic line grids "
+            "know only the basal (00l) lines (#1483)"
+        )
+    from .._fiber_average import FiberAverage
+    from ..montecarlo.spectrum.cxr.fiber import FiberCXRModel
+
+    # Bin means, as the paired scorer and the #1480 arms integrate the lines.
+    fields: dict[str, object] = {
+        "cxr_fiber": FiberCXRModel.from_numerics(fiber).case_record(),
+        "line_quadrature": "bin-mean",
+    }
+    if fiber.reflection_batch_size != FiberAverage(cutoff_invang=1.0).reflection_batch_size:
+        fields["cxr_fiber_batch_size"] = fiber.reflection_batch_size
+    return fields

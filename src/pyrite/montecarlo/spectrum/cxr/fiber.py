@@ -20,6 +20,9 @@ from ..brem_lattice_share import _lattice_share_tables, _reflection_shell_weight
 from ._spectrum import mc_cxr_spectrum
 
 FIBER_CXR_MODEL = "hopg-fiber-intensity-tensor-isotropic-share-v1"
+_CASE_RECORD_KEYS = frozenset(
+    {"model", "crystal", "cutoff_invang", "azimuth_count", "temperature_K", "thermal_source"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +66,42 @@ class FiberCXRModel:
                 raise ValueError("a measured uniaxial carbon tensor is required")
             temperature_K = site.temperature_K
         return cls(source, float(temperature_K), crystal)
+
+    def case_record(self) -> dict:
+        """Scientific identity carried by a campaign case (``Case.cxr_fiber``).
+
+        The batch size is execution-only and travels separately
+        (``Case.cxr_fiber_batch_size``), like the spectrum chunks.
+        """
+        return dict(
+            model=FIBER_CXR_MODEL,
+            crystal=self.crystal,
+            cutoff_invang=self.cutoff_invang,
+            azimuth_count=self.azimuth_count,
+            temperature_K=float(self.temperature_K),
+            thermal_source=self._site().source,
+        )
+
+    @classmethod
+    def from_case_record(cls, record, *, reflection_batch_size: int | None = None) -> FiberCXRModel:
+        """Rebuild the model a case record names; refuse a foreign or stale record."""
+        if not isinstance(record, dict) or set(record) != _CASE_RECORD_KEYS:
+            raise ValueError(f"cxr_fiber must hold exactly {sorted(_CASE_RECORD_KEYS)}")
+        if record["model"] != FIBER_CXR_MODEL:
+            raise ValueError(f"cxr_fiber model {record['model']!r} is not {FIBER_CXR_MODEL!r}")
+        numerics = FiberAverage(
+            cutoff_invang=record["cutoff_invang"],
+            azimuth_count=record["azimuth_count"],
+            **(
+                {}
+                if reflection_batch_size is None
+                else {"reflection_batch_size": reflection_batch_size}
+            ),
+        )
+        model = cls(numerics, float(record["temperature_K"]), str(record["crystal"]))
+        if record["thermal_source"] != model._site().source:
+            raise ValueError("cxr_fiber thermal source no longer matches the packaged tensor")
+        return model
 
     @property
     def cutoff_invang(self) -> float:

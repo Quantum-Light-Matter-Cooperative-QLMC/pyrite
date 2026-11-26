@@ -274,15 +274,6 @@ def test_fiber_numerics_sit_beside_mosaic_controls():
         fiber.FiberCXRModel.from_numerics(FiberAverage(cutoff_invang=80.0))
 
 
-def test_campaign_path_refuses_fiber_numerics():
-    from pyrite.campaign.reflection_selection import reflection_controls
-    from pyrite.config import Physics
-
-    numerics = Numerics(cxr_reflections=CxrReflections(fiber=FiberAverage(cutoff_invang=8.0)))
-    with pytest.raises(ValueError, match="#1483"):
-        reflection_controls(numerics, Physics(), None)
-
-
 def _real_kernel_scene():
     """Small frozen segment set; deterministic, CPU, seconds to score."""
     rng = np.random.default_rng(7)

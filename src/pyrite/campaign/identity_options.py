@@ -41,6 +41,8 @@ if TYPE_CHECKING:
 #   - ``spec_chunk`` / ``brem_chunk`` / ``characteristic_chunk``: GPU batch sizes. Chunk-invariant per the
 #     goldens, and only ever set on ``-p/--perf`` runs -- which bypass the cache
 #     entirely (perf implies ``--no-cache``) -- so the cache never mixes chunks.
+#   - ``cxr_fiber_batch_size``: full-fiber reflections per coupling-table batch
+#     (#1483). Changes float summation order only, like the chunks.
 # ``catalog_profile`` / ``variant`` / ``fidelity`` (the frozen identity tier,
 # #1079) are NOT case-dict fields today
 # -- the profile name never reaches a case, which is exactly what lets two
@@ -58,6 +60,7 @@ _CONTENT_KEY_DENYLIST = frozenset(
         "spec_chunk",
         "brem_chunk",
         "characteristic_chunk",
+        "cxr_fiber_batch_size",
         "catalog_profile",
         "variant",
         "fidelity",

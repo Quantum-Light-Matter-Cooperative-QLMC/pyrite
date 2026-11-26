@@ -539,21 +539,9 @@ def _cxr_for_segments(
     from ..._mixed_elastic_policy import refuse_mixed_cxr
 
     refuse_mixed_cxr(case)
-    if (case.get("transition_radiation") or {}).get("model") == "two-beam":
-        from .dtr_emission import case_dtr_spectrum
-
-        if coefficient_capture is not None or temporal is not None:
-            raise ValueError(
-                "two-beam scoring does not support coefficient capture or temporal output"
-            )
-        return case_dtr_spectrum(
-            case,
-            segs,
-            E_grid,
-            n_hat,
-            coherent=bool(case.get("coherent_emission", False)) if coherent is None else coherent,
-            count=Ne,
-        )
+    extras = (coherent, truncation_audit, temporal, coefficient_capture)
+    if whole := _whole_case_lines(segs, E_grid, case, n_hat, abs_layers, groove, Ne, extras):
+        return whole[0]
     from .axial import axial_zone_line_parts
 
     parts = axial_zone_line_parts(case, segs)
@@ -619,6 +607,27 @@ def _cxr_for_segments(
             restore_audit(truncation_audit, saved)
             BACKEND.release_memory()
             n_blocks = min(MAX_ELECTRON_BLOCKS, 2 * n_blocks)
+
+
+def _whole_case_lines(segs, E_grid, case, n_hat, abs_layers, groove, Ne, extras):
+    """``(spectrum,)`` of a route that owns every line of ``case``, else ``()``.
+
+    The full-fiber domain (#1483) and two-beam CXR replace the reflection sum.
+    """
+    coherent, _, temporal, capture = extras
+    if case.get("cxr_fiber") is not None:
+        from .fiber_emission import fiber_lines
+
+        return (fiber_lines(segs, E_grid, case, n_hat, abs_layers, groove, Ne, extras),)
+    if (case.get("transition_radiation") or {}).get("model") != "two-beam":
+        return ()
+    from .dtr_emission import case_dtr_spectrum
+
+    if capture is not None or temporal is not None:
+        raise ValueError("two-beam scoring does not support coefficient capture or temporal output")
+    if coherent is None:
+        coherent = bool(case.get("coherent_emission", False))
+    return (case_dtr_spectrum(case, segs, E_grid, n_hat, coherent=coherent, count=Ne),)
 
 
 def _score_line_parts(parts, E_grid, n_hat, abs_layers, groove, **options):

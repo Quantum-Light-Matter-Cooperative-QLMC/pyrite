@@ -56,6 +56,7 @@ In other words:
 0021-named-physics-numerics-presets
 0022-named-target-filter-presets
 0023-line-grid-selector-rules
+0024-texture-versus-reflection-domain
 ```
 
 | ADR                                                 | Title                               | Status                                 |
@@ -82,3 +83,4 @@ In other words:
 | [0021](0021-named-physics-numerics-presets.md) | Named Physics and Numerics presets | Accepted |
 | [0022](0022-named-target-filter-presets.md) | Named target and downstream filter presets | Proposed |
 | [0023](0023-line-grid-selector-rules.md) | Line-grid selector rules | Accepted |
+| [0024](0024-texture-versus-reflection-domain.md) | Texture versus CXR reflection domain | Accepted |

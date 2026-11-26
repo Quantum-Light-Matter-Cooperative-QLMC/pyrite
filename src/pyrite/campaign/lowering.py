@@ -153,6 +153,11 @@ def _with_run_options(cases: list[Case], numerics: Numerics) -> list[Case]:
     if numerics.cone_split is not None:
         record = numerics.cone_split.to_dict()
         cases = [replace(case, cone_split=record) for case in cases]
+    # Opt-in full-fiber CXR domain (#1483); absent keeps basal-only identity.
+    from .reflection_selection import fiber_case_fields
+
+    if fiber := fiber_case_fields(numerics):
+        cases = [replace(case, **fiber) for case in cases]
     # Execution-only (#1455): a case key, never in content or dataset identity.
     execution = numerics.resolved_execution
     chunk = execution.characteristic_chunk

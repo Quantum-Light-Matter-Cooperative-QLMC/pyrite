@@ -29,11 +29,15 @@ result = score_fiber_case(model, case, tp, grid)
 cxr, brem, total = result["cxr"], result["brem"], result["total"]
 ```
 
-`simulate()` and campaign lowering refuse `CxrReflections.fiber` until #1483
-wires it through the runner, so a fiber setting never silently falls back to
-the basal-only domain. `cutoff_invang` has no default. The case's
-`mosaic_mc_fwhm_rad` and `mosaic_mc_nodes` set the mosaic quadrature;
-`mosaic_route` and `mosaic_nodes` beside `fiber=` are not read.
+Since #1483, `simulate()` and campaign runs score `CxrReflections.fiber`
+directly when `Numerics.energy_bins` carries an explicit `EnergyBins.cxr`
+grid; the case then carries the model record as `cxr_fiber`
+([ADR-0024](../../adr/0024-texture-versus-reflection-domain.md)). Routes
+outside the qualified envelope refuse instead of falling back to the
+basal-only domain. `cutoff_invang` has no default. The case's
+`mosaic_mc_fwhm_rad` and `mosaic_mc_nodes` set the mosaic quadrature.
+Campaign runs lower them from `mosaic_route` and `mosaic_nodes`; the direct
+scorer above does not read those two beside `fiber=`.
 These cutoff and azimuth values are starting points, **not converged defaults**.
 `model.prepare()` also exposes a low-level `spectrum()` for independent line
 studies, and `corrected_bremslib_tables()` for use with the same prepared domain.
