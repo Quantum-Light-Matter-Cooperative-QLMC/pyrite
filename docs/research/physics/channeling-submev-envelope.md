@@ -227,7 +227,7 @@ The doublet is grouped to avoid arbitrary eigenvector rotations in its
 degenerate subspace. Rank labels may cease to identify orbitals at crossings.
 
 Run from the repository root with
-`PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=4 uv run python checks/channeling_submev_w001_entry.py`
+`PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=4 pixi run python checks/channeling_submev_w001_entry.py`
 (optionally `--energies-kev ...`). Divergence is an isotropic 2D Gaussian in
 the incident tilt, of width $\sigma = f\,\psi_c$. The overlaps vary on the
 angular scale $g/p$ of one reciprocal vector, which is 0.19, 0.18 and 0.15
