@@ -281,3 +281,81 @@ def test_campaign_path_refuses_fiber_numerics():
     numerics = Numerics(cxr_reflections=CxrReflections(fiber=FiberAverage(cutoff_invang=8.0)))
     with pytest.raises(ValueError, match="#1483"):
         reflection_controls(numerics, Physics(), None)
+
+
+def _real_kernel_scene():
+    """Small frozen segment set; deterministic, CPU, seconds to score."""
+    rng = np.random.default_rng(7)
+    n = 24
+    v = rng.normal(size=(n, 3)) * [0.3, 0.3, 1.0] + [0, 0, 2.0]
+    v /= np.linalg.norm(v, axis=1, keepdims=True)
+    r_mid = np.column_stack(
+        [rng.uniform(-2e4, 2e4, n), rng.uniform(-2e4, 2e4, n), rng.uniform(50, 3950, n)]
+    )
+    segments = dict(
+        r_mid=r_mid,
+        v_hat=v,
+        L_ang=rng.uniform(20, 80, n),
+        E_keV=rng.uniform(25, 30, n),
+        t_ang=np.zeros(n),
+        t0_ang=np.zeros(n),
+        elec_id=np.repeat(np.arange(4), n // 4),
+        layer=np.zeros(n, dtype=np.int16),
+        Ne=4,
+        thickness_ang=4000.0,
+        n_backscattered=0,
+        n_missed=0,
+    )
+    options = dict(surface_hkl=(0, 0, 1), theta_obs_rad=np.deg2rad(60.0))
+    return segments, np.linspace(1000.0, 12000.0, 600), options
+
+
+def _rolled(domain, segments, grid, options, phi, hkls):
+    return np.asarray(
+        fiber.mc_cxr_spectrum(
+            segments,
+            grid,
+            "hopg",
+            list(hkls),
+            B_ang2=domain._thermal_lookup().__getitem__,
+            azimuth_rad=phi,
+            line_quadrature="bin-mean",
+            **options,
+        )
+    )
+
+
+def test_real_kernel_is_sixty_degree_periodic():
+    """Validation: cxr-fiber-intensity-average (sector-closure premise, real kernel)."""
+    domain = _model().prepare()
+    segments, grid, options = _real_kernel_scene()
+    other = [h for h in domain.hkls if h[:2] != (0, 0)]
+    phi = 0.37
+    base = _rolled(domain, segments, grid, options, phi, other)
+    scale = np.abs(base).sum()
+    assert scale > 0
+    for shift in (np.pi / 3, 2 * np.pi / 3):
+        rolled = _rolled(domain, segments, grid, options, phi + shift, other)
+        assert np.abs(rolled - base).sum() / scale < 1e-12
+    half = _rolled(domain, segments, grid, options, phi + np.pi / 6, other)
+    assert np.abs(half - base).sum() / scale > 1e-2
+
+
+def test_sector_rule_matches_independent_full_circle_mean():
+    """Validation: cxr-fiber-intensity-average (sector rule vs full-circle average).
+
+    97 full-circle nodes (coprime with 6, so no aliasing onto the sixfold
+    period) give an orientation mean that never assumes the 60-degree sector.
+    """
+    segments, grid, options = _real_kernel_scene()
+    domain = _model(azimuth_count=32).prepare()
+    basal = [h for h in domain.hkls if h[:2] == (0, 0)]
+    other = [h for h in domain.hkls if h[:2] != (0, 0)]
+    nodes = np.linspace(0.0, 2 * np.pi, 97, endpoint=False) + 0.011
+    reference = _rolled(domain, segments, grid, options, 0.0, basal) + np.mean(
+        [_rolled(domain, segments, grid, options, x, other) for x in nodes], axis=0
+    )
+    got = np.asarray(domain.spectrum(segments, grid, **options))
+    total = reference.sum()
+    assert abs(got.sum() - total) / total < 1e-4
+    assert np.abs(got - reference).sum() / total < 1e-4

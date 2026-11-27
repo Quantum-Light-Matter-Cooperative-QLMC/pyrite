@@ -75,6 +75,7 @@ tr-interface-energy-scale
 tr-line-cross-term
 cross-reflection-coherence
 cxr-fiber-azimuthal-kinematics
+cxr-fiber-intensity-average
 epdl-photon-differential-data
 external-brem-subtraction
 finite-footprint-longitudinal-decoherence
