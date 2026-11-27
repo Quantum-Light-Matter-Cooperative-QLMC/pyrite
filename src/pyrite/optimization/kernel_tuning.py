@@ -27,7 +27,7 @@ import warnings
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
-from typing import Any, Literal
+from typing import IO, Any, Literal
 
 import numpy as np
 
@@ -263,10 +263,12 @@ class _Worker:
         self._payload, self._workdir, self._timeout = payload, workdir, timeout
         self._on_event = on_event
         self._process: subprocess.Popen[str] | None = None
+        self._stderr: IO[str] | None = None
         self.environment: dict[str, Any] | None = None
 
     def _start(self) -> None:
         env = os.environ | {"PYRITE_MC_BACKEND": "cuda"}  # no hidden CPU fallback in timings
+        self._close_stderr()
         self._stderr = tempfile.TemporaryFile("w+", dir=self._workdir)
         command = [sys.executable, "-m", "pyrite.optimization._kernel_worker", str(self._payload)]
         self._process = subprocess.Popen(
@@ -304,9 +306,13 @@ class _Worker:
 
     def _stop_and_read_stderr(self) -> str:
         """End the worker first: it shares this file's offset while it runs."""
-        self.close()
+        self._stop_process()
+        if self._stderr is None:
+            return ""
         self._stderr.seek(0)
-        return self._stderr.read().strip()[-2500:]
+        text = self._stderr.read().strip()[-2500:]
+        self._close_stderr()
+        return text
 
     def measure(self, request: dict[str, Any]) -> tuple[list[float], dict[str, Any]]:
         if self._process is None:
@@ -324,11 +330,21 @@ class _Worker:
                 return message["samples_s"], message["check"]
 
     def close(self) -> None:
+        """Stop the worker and release its stderr capture file."""
+        self._stop_process()
+        self._close_stderr()
+
+    def _stop_process(self) -> None:
         if self._process is not None:
             if self._process.poll() is None:
                 self._process.kill()
             self._process.wait()
             self._process = None
+
+    def _close_stderr(self) -> None:
+        if self._stderr is not None:
+            self._stderr.close()
+            self._stderr = None
 
 
 def _equivalent(candidate: Path, reference: Path, *, rtol: float, atol: float) -> str | None:

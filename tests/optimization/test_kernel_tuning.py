@@ -330,6 +330,24 @@ def test_worker_interrupt_keeps_stderr_as_a_note(tmp_path):
     assert any("worker said this" in note for note in caught.value.__notes__)
 
 
+def test_worker_error_releases_stderr_capture(tmp_path):
+    worker = _silent_worker(tmp_path)
+    stderr = worker._stderr
+    with pytest.raises(kt._WorkerError):
+        worker._next()
+    assert stderr.closed
+    assert worker._stderr is None
+
+
+def test_worker_close_releases_stderr_capture(tmp_path):
+    worker = _silent_worker(tmp_path)
+    stderr = worker._stderr
+    worker.close()
+    worker.close()
+    assert stderr.closed
+    assert worker._stderr is None
+
+
 @pytest.mark.parametrize(("reserved", "warns"), [(10.0, False), (4096.0, True)])
 def test_caller_pool_is_released_and_live_memory_warned(monkeypatch, reserved, warns):
     backend = SimpleNamespace(
