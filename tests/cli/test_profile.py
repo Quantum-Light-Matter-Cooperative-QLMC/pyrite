@@ -1697,6 +1697,186 @@ def test_show_reports_a_full_fiber_profile_as_owning_the_reflections(tmp_path, m
     assert_table_row(full.stdout, "cxr-fiber", "cutoff_invang=8 profile")
 
 
+def _fiber_row(catalog):
+    return tomlkit.parse(catalog.read_text())["profiles"]["sub_100keV"]
+
+
+def test_numerics_set_show_and_reset_the_full_fiber_table(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    numerics = ["profile", "numerics"]
+
+    created = invoke(
+        root_command,
+        [
+            *numerics,
+            "set",
+            "sub_100keV",
+            "--cxr-fiber-cutoff-invang",
+            "8",
+            "--cxr-fiber-roll-nodes",
+            "64",
+        ],
+    )
+    assert_clean_result(created)
+    assert _fiber_row(catalog)["cxr_fiber"].unwrap() == {"cutoff_invang": 8.0, "azimuth_count": 64}
+
+    # A later set patches one entry and keeps the others.
+    patched = invoke(root_command, [*numerics, "set", "sub_100keV", "--cxr-fiber-batch-size", "32"])
+    assert_clean_result(patched)
+    assert _fiber_row(catalog)["cxr_fiber"].unwrap() == {
+        "cutoff_invang": 8.0,
+        "azimuth_count": 64,
+        "reflection_batch_size": 32,
+    }
+    shown = invoke(root_command, [*numerics, "show", "sub_100keV"])
+    assert_clean_result(shown)
+    assert "full-fiber domain" in shown.stdout
+    assert "azimuth_count=64" in shown.stdout
+    assert_table_row(shown.stdout, "reflection families", "unused (full-fiber) default")
+
+    entry = invoke(root_command, [*numerics, "reset", "sub_100keV", "cxr-fiber-roll-nodes"])
+    assert_clean_result(entry)
+    assert _fiber_row(catalog)["cxr_fiber"].unwrap() == {
+        "cutoff_invang": 8.0,
+        "reflection_batch_size": 32,
+    }
+
+    removed = invoke(root_command, [*numerics, "reset", "sub_100keV", "cxr-fiber"])
+    assert_clean_result(removed)
+    assert "cxr_fiber" not in _fiber_row(catalog)
+    assert "cxr_fiber" not in catalog.read_text()
+
+
+def test_numerics_reset_all_removes_the_full_fiber_table(tmp_path, monkeypatch):
+    text = _CATALOG.replace(
+        "[profiles.sub_100keV]", "[profiles.sub_100keV]\ncxr_fiber = { cutoff_invang = 8.0 }"
+    )
+    catalog = _catalog(tmp_path, monkeypatch, text)
+
+    result = invoke(root_command, ["profile", "numerics", "reset", "sub_100keV"])
+
+    assert_clean_result(result)
+    assert "cxr_fiber" not in _fiber_row(catalog)
+
+
+@pytest.mark.parametrize(
+    ("args", "message"),
+    [
+        (["set", "sub_100keV", "--cxr-fiber-roll-nodes", "8"], "needs cutoff_invang"),
+        (
+            ["set", "sub_100keV", "--cxr-fiber-cutoff-invang", "8", "--reflection-families", "3"],
+            "owns the reflection domain",
+        ),
+    ],
+)
+def test_numerics_set_refuses_an_invalid_full_fiber_table_without_writing(
+    tmp_path, monkeypatch, args, message
+):
+    catalog = _catalog(tmp_path, monkeypatch)
+    original = catalog.read_bytes()
+
+    result = invoke(root_command, ["profile", "numerics", *args])
+
+    assert result.exit_code == 1
+    assert message in result.stderr
+    assert catalog.read_bytes() == original
+
+
+def test_numerics_reset_refuses_dropping_only_the_fiber_cutoff(tmp_path, monkeypatch):
+    text = _CATALOG.replace(
+        "[profiles.sub_100keV]",
+        "[profiles.sub_100keV]\ncxr_fiber = { cutoff_invang = 8.0, azimuth_count = 64 }",
+    )
+    catalog = _catalog(tmp_path, monkeypatch, text)
+    original = catalog.read_bytes()
+
+    result = invoke(
+        root_command, ["profile", "numerics", "reset", "sub_100keV", "cxr-fiber-cutoff-invang"]
+    )
+
+    assert result.exit_code == 1
+    assert "pyrite profile numerics reset sub_100keV cxr-fiber" in result.stderr
+    assert catalog.read_bytes() == original
+
+
+@pytest.mark.parametrize(
+    ("table", "message"),
+    [
+        ("{ cutoff_invang = 8.0, azimuth_cout = 128 }", "unknown entry 'azimuth_cout'"),
+        ("8.0", "cxr_fiber must be a table"),
+    ],
+)
+def test_numerics_set_refuses_a_malformed_stored_fiber_table(tmp_path, monkeypatch, table, message):
+    text = _CATALOG.replace("[profiles.sub_100keV]", f"[profiles.sub_100keV]\ncxr_fiber = {table}")
+    catalog = _catalog(tmp_path, monkeypatch, text)
+    original = catalog.read_bytes()
+
+    result = invoke(
+        root_command, ["profile", "numerics", "set", "sub_100keV", "--cxr-fiber-batch-size", "32"]
+    )
+
+    assert result.exit_code == 1
+    assert message in result.stderr
+    assert "Traceback" not in result.stderr
+    assert catalog.read_bytes() == original
+
+
+def test_numerics_set_refuses_a_fiber_cutoff_beyond_the_form_factor_range(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    original = catalog.read_bytes()
+
+    result = invoke(
+        root_command,
+        ["profile", "numerics", "set", "sub_100keV", "--cxr-fiber-cutoff-invang", "100"],
+    )
+
+    assert result.exit_code == 1
+    assert "exceeds the form-factor range" in result.stderr
+    assert catalog.read_bytes() == original
+
+
+_PRESET_FIBER = _CATALOG.replace(
+    "[profiles.sub_100keV]",
+    '[numerics.fib]\ncxr_fiber = { cutoff_invang = 8.0 }\n\n[profiles.sub_100keV]\nnumerics = "fib"',
+)
+
+
+def test_numerics_set_patches_a_preset_supplied_fiber_table(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch, _PRESET_FIBER)
+
+    result = invoke(
+        root_command, ["profile", "numerics", "set", "sub_100keV", "--cxr-fiber-roll-nodes", "128"]
+    )
+
+    assert_clean_result(result)
+    assert _fiber_row(catalog)["cxr_fiber"].unwrap() == {"cutoff_invang": 8.0, "azimuth_count": 128}
+
+
+def test_numerics_reset_names_a_preset_supplied_fiber_table(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch, _PRESET_FIBER)
+    original = catalog.read_bytes()
+
+    named = invoke(root_command, ["profile", "numerics", "reset", "sub_100keV", "cxr-fiber"])
+    assert named.exit_code == 1
+    assert "comes from its numerics preset" in named.stderr
+    assert catalog.read_bytes() == original
+
+    every = invoke(root_command, ["profile", "numerics", "reset", "sub_100keV"])
+    assert_clean_result(every)
+
+
+def test_full_fiber_options_are_profile_numerics_only(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+
+    help_text = invoke(root_command, ["profile", "numerics", "set", "--help"])
+    assert_clean_result(help_text)
+    assert "Full-fiber options (profile [cxr_fiber] table" in help_text.stdout
+    for command in (["profile", "physics", "set"], ["numerics", "set"], ["numerics", "create"]):
+        other = invoke(root_command, [*command, "--help"])
+        assert_clean_result(other)
+        assert "--cxr-fiber" not in other.stdout
+
+
 def test_show_groups_trial_grids_and_complete_numerics_in_aligned_columns(tmp_path, monkeypatch):
     import re
 

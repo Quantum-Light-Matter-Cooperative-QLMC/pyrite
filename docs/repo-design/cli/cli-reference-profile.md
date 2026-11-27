@@ -717,6 +717,10 @@ Usage: pyrite profile numerics reset [OPTIONS] PROFILE [FIELDS]...
 
   Reset selected fields, or every field this command owns, to the preset/default.
 
+  cxr-fiber removes PROFILE's whole [cxr_fiber] table; a cxr-fiber-* field reverts that
+  table entry to its default (resetting the required cutoff alone is refused while other
+  entries remain).
+
 Options:
   -y, --yes   Skip the standard-profile confirmation.
   --dry-run   Validate and preview without saving.
@@ -785,6 +789,21 @@ Channeling options (profile [channeling] table):
   --channeling-zone-max-ang FLOAT RANGE
                                   Zone length cap in angstrom (table zone_max_ang;
                                   default first layer thickness).  [x>0]
+
+Full-fiber options (profile [cxr_fiber] table; experimental):
+  --cxr-fiber-cutoff-invang INVANG
+                                  Select the full-fiber reflection domain up to
+                                  reciprocal cutoff |g| in 1/angstrom (required; no
+                                  converged default, at most 75.4). Replaces reflection
+                                  families, maximum reflections and the line-yield
+                                  tolerance; HOPG, incoherent emission, one slab and
+                                  BremsLib only.  [x>0.0]
+  --cxr-fiber-roll-nodes N        Midpoint roll nodes on one 60-degree sector about the
+                                  fiber axis (table azimuth_count; default 32, use >=
+                                  128 when narrow line shapes matter).  [x>=1]
+  --cxr-fiber-batch-size N        Full-fiber reflections per coupling-table batch (table
+                                  reflection_batch_size; default 256). Bounds memory
+                                  only; not part of the result identity.  [x>=1]
 ```
 
 ## `pyrite profile numerics show`

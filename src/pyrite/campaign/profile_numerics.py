@@ -1,7 +1,11 @@
 """Profile numerical controls and coupled transport validation."""
 
+from collections.abc import Mapping
+from dataclasses import fields as dataclass_fields
+
 import tomlkit
 
+from pyrite._fiber_average import FiberAverage
 from pyrite._numerics import (
     CHANNELING_KEYS,
     PROFILE_NUMERICS_KEYS,
@@ -85,6 +89,94 @@ def reset_numerics(document, name, fields=()):
     for key in removed:
         _pop_field(target, key)
     return removed
+
+
+#: Fields of the profile's ``[cxr_fiber]`` table (``FiberAverage``, #1483).
+FIBER_TABLE_KEYS = tuple(field.name for field in dataclass_fields(FiberAverage))
+_FIBER_TABLE = "cxr_fiber"
+
+
+def _fiber_values(name, table, owner="profile"):
+    """``table`` as plain values; refuse a non-table or unknown entries."""
+    if table is None:
+        return {}
+    if not isinstance(table, Mapping):
+        raise ValueError(f"{owner} {name!r} cxr_fiber must be a table of {list(FIBER_TABLE_KEYS)}")
+    values = dict(table.unwrap() if hasattr(table, "unwrap") else table)
+    unknown = sorted(set(values) - set(FIBER_TABLE_KEYS))
+    if unknown:
+        raise ValueError(
+            f"{owner} {name!r} cxr_fiber has unknown entry {unknown[0]!r}; "
+            f"expected {list(FIBER_TABLE_KEYS)}"
+        )
+    return values
+
+
+def _inherited_fiber(document, profile):
+    """The attached numerics preset's ``cxr_fiber`` values, or ``{}``."""
+    from .._config_presets import NUMERICS
+    from .config_presets import profile_preset
+
+    preset, values = profile_preset(document, NUMERICS, profile)
+    return _fiber_values(preset, values.get(_FIBER_TABLE), owner="numerics preset")
+
+
+def _checked_fiber(name, values):
+    """An inline ``cxr_fiber`` table in ``FIBER_TABLE_KEYS`` order, cutoff required."""
+    from ..montecarlo.runner.reflection_cutoff import F0_RANGE_INVANG
+
+    cutoff = values.get("cutoff_invang")
+    if isinstance(cutoff, int | float) and cutoff > F0_RANGE_INVANG:
+        raise ValueError(
+            f"cxr_fiber cutoff_invang {cutoff} exceeds the form-factor range "
+            f"({F0_RANGE_INVANG:.1f} 1/angstrom)"
+        )
+    if "cutoff_invang" not in values:
+        raise ValueError(
+            f"profile {name!r} cxr_fiber needs cutoff_invang (no default: the full-fiber "
+            f"domain is unconverged); pass --cxr-fiber-cutoff-invang, or remove the table "
+            f"with: pyrite profile numerics reset {name} cxr-fiber"
+        )
+    table = tomlkit.inline_table()
+    table.update({key: values[key] for key in FIBER_TABLE_KEYS if key in values})
+    return table
+
+
+def set_fiber(document, name, updates):
+    """Patch PROFILE's ``[cxr_fiber]`` table with ``updates`` (``FIBER_TABLE_KEYS``).
+
+    Unnamed fields keep their stored values; a profile without its own table
+    starts from the attached numerics preset's. The result is validated with
+    the other profile numerics before anything is written.
+    """
+    target = existing_profile(document, name)
+    current = _fiber_values(name, target.get(_FIBER_TABLE))
+    if _FIBER_TABLE not in target:
+        current = _inherited_fiber(document, target)
+    table = _checked_fiber(name, {**current, **updates})
+    return set_numerics(document, name, {_FIBER_TABLE: table})
+
+
+def reset_fiber(document, name, fields=(), *, explicit=True):
+    """Remove selected ``[cxr_fiber]`` fields, or the whole table when empty.
+
+    Only the profile's own table changes: a preset-supplied table stays in
+    effect; naming it (``explicit``) on a profile without its own is refused.
+    """
+    target = existing_profile(document, name)
+    if _FIBER_TABLE not in target:
+        if explicit and _inherited_fiber(document, target):
+            raise ValueError(
+                f"profile {name!r} has no cxr_fiber table of its own; the full-fiber domain "
+                "comes from its numerics preset (detach or edit the preset to remove it)"
+            )
+        return ()
+    values = _fiber_values(name, target[_FIBER_TABLE])
+    remaining = {key: value for key, value in values.items() if key not in fields}
+    if not fields or not remaining:
+        return reset_numerics(document, name, (_FIBER_TABLE,))
+    set_numerics(document, name, {_FIBER_TABLE: _checked_fiber(name, remaining)})
+    return (_FIBER_TABLE,)
 
 
 def _apply_transport_updates(target, updates):
