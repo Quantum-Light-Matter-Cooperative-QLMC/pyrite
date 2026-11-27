@@ -125,3 +125,11 @@ def test_shared_sink_matches_separate_reductions_within_the_fourier_residual():
     scale = float(np.max(np.abs(separate)))
     assert scale > 0.0
     np.testing.assert_allclose(shared, separate, rtol=0.0, atol=FOURIER_RESIDUAL_TOL * scale)
+
+
+def test_only_streamed_fiber_scorers_keep_tables():
+    """The retained route's per-case cache gets no fiber tables; streamed fiber scorers do."""
+    assert fiber_emission._fiber_tables({}) is None
+    assert fiber_emission.streamed_table_cache({}) == {}
+    cache = fiber_emission.streamed_table_cache(_case())
+    assert isinstance(fiber_emission._fiber_tables(cache), FiberTableCache)

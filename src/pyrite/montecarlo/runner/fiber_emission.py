@@ -183,13 +183,21 @@ class FiberTableCache(dict):
 #: Coupling-table bytes one fiber case keeps across streamed blocks (#1509).
 #: The #1490 scene holds about 14 MiB per (roll, batch) at cutoff 6 and 32 rolls.
 FIBER_TABLE_CACHE_BYTES = 512 * 2**20
+_TABLES_KEY = "fiber-tables"
+
+
+def streamed_table_cache(case: Mapping[str, Any]) -> dict:
+    """A streamed scorer's table cache: fiber cases opt into :class:`FiberTableCache`.
+
+    Only a cache that outlives one :func:`fiber_lines` call is reused, so the
+    retained route (one call per case) keeps none and its peak memory.
+    """
+    return {_TABLES_KEY: FiberTableCache(FIBER_TABLE_CACHE_BYTES)} if is_fiber_case(case) else {}
 
 
 def _fiber_tables(table_cache):
-    """This fiber case's budgeted table cache inside the caller's, or ``None``."""
-    if table_cache is None:
-        return None
-    return table_cache.setdefault("fiber-tables", FiberTableCache(FIBER_TABLE_CACHE_BYTES))
+    """The caller's opted-in fiber table cache, or ``None``."""
+    return None if table_cache is None else table_cache.get(_TABLES_KEY)
 
 
 def fiber_lines(
@@ -198,9 +206,9 @@ def fiber_lines(
     """Roll-averaged incoherent line density of a fiber ``case`` on ``E_grid``.
 
     Each roll node and reflection batch is one ordinary basal-route call with
-    the domain's rows and per-reflection projected B. Their coupling tables
-    persist in the caller's ``table_cache`` within :data:`FIBER_TABLE_CACHE_BYTES`
-    (:class:`FiberTableCache`), so streamed blocks reuse them. On the host their
+    the domain's rows and per-reflection projected B. A streamed scorer's
+    ``table_cache`` (:func:`streamed_table_cache`) keeps their coupling tables
+    within :data:`FIBER_TABLE_CACHE_BYTES`, so later blocks reuse them. On the host their
     bin-mean lines are reduced once per call of this function, not once per
     roll and batch (:meth:`.FiberReflectionSet._average`, #1509). ``extras`` are the caller's
     ``(coherent, truncation_audit, temporal, coefficient_capture)``. A
