@@ -80,7 +80,7 @@ reported; relative differences with a zero reference are null.
 Start small (one fresh HOPG transport):
 
 ```bash
-uv run python checks/fiber_paired_1480.py \
+pixi run python checks/fiber_paired_1480.py \
   --energy 300 --thickness 5000 --tilt 45 --electrons 16 \
   --band 50 3000 --spacing 1 --cutoff 8 --azimuths 8 \
   --output ~/dev/pyrite-benches/1480/smoke
@@ -90,7 +90,7 @@ Prefer an existing trusted schema-2 trajectory artifact, for example a
 `cleo_sub`, `bells_45deg`, or #1301 case with equal line/brem populations:
 
 ```bash
-uv run python checks/fiber_paired_1480.py \
+pixi run python checks/fiber_paired_1480.py \
   --artifact /path/to/trajectory.h5 \
   --band 50 3000 --spacing 1 --cutoff 8 --azimuths 8 \
   --output ~/dev/pyrite-benches/1480/cleo-8g-8phi
@@ -120,10 +120,23 @@ S/B and timings), and `SHA256SUMS`. Run `sha256sum -c SHA256SUMS` there.
 Retain raw evidence outside the repo; compare B-A (domain), C-B (thermal),
 C-A (combined) and A/B/C-D (net yield relative to amorphous emission).
 
+## Cutoff ladder
+
+`--ladder C1 C2 ...` replaces arms A–D with the opt-in model
+(`cxr-fiber-intensity-average`) over nested reciprocal cutoffs, on 60° sector
+rolls (`--azimuths`). Each disjoint |g| band is scored once, and every cutoff
+gets the matched continuum subtraction over its own full prefix domain. The
+smallest rung must equal `score_fiber_case` (the `integrity` record).
+`--components` also stores the PXR and CBS parts of the basal and non-basal
+sums per cutoff (`g<C>_{basal,nonbasal}_{pxr,cbs}`; their sum differs from the
+total by the PXR–CBS interference term). This route calls `mc_cxr_spectrum`
+directly with the runner's single-slab options; the integrity check confirms
+it reproduces the runner's total. Production CXR returns no
+polarization-resolved output, so polarization is not recorded.
+
 ## Remaining work
 
-No physical verdict follows until runs have completed and converged. Extend
-this to hBN after sourcing site-specific thermal tensors; add bounded-block
-artifact replay, family-resolved/PXR-CBS separation, polarization, detector
-acceptance integration, paired independent-seed uncertainty, memory profiling,
-and investigate texture-conditioned continuum subtraction and domain size.
+hBN needs site-specific thermal tensors (#1482). Not done: bounded-block
+artifact replay, detector acceptance integration, paired independent-seed
+uncertainty, a texture-conditioned continuum subtraction and domain size
+(#1485).
