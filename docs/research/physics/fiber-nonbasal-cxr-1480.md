@@ -4,7 +4,7 @@
 
 **Question.** The catalog marks HOPG and pyrolytic h-BN `texture = "fiber"`, and since #1301 (`reflection-yield-tolerance-selector`, v7) the reflection selector keeps only `(00l)` for them. The stated reason was that random in-plane crystallite azimuths remove the non-basal lines. Is that restriction an adequate CXR approximation, and where?
 
-**Short answer.** No, not in general. Random azimuths average non-basal intensity; they do not remove it. The intensity of one reflection is $\lvert A_g\rvert^2\ge0$ at every azimuth, so its average is positive. Phase averaging only removes interference between distinct reflections, and that interference is already zero for unshaped electrons (final-state orthogonality, see [Coherence](#coherence-what-averages-and-what-does-not)). Under the production per-reflection model, basal-only captures 2–75 % of the fiber-averaged yield in the scenes measured below at $\lvert g\rvert\le6$ Å⁻¹ (median about 30 %). The full sum converges only near 24 Å⁻¹, which halves those shares (16 % and 19 % converged in the two laddered scenes); the matched continuum subtraction absorbs most of the extra line yield, so total CXR + continuum changes by only 3–4 %. It is adequate only for narrow (00l) windows at backward, near-axial, high-energy geometry.
+**Short answer.** No, not in general. Random azimuths average non-basal intensity; they do not remove it. The intensity of one reflection is $\lvert A_g\rvert^2\ge0$ at every azimuth, so its average is positive. Phase averaging only removes interference between distinct reflections, and that interference is already zero for unshaped electrons (final-state orthogonality, see [Coherence](#coherence-what-averages-and-what-does-not)). Under the production per-reflection model, basal-only captures 2–75 % of the fiber-averaged yield in the scenes measured below at $\lvert g\rvert\le6$ Å⁻¹ (median about 30 %). The full sum converges only near 24 Å⁻¹, which halves those shares: converged, basal-only carries 5–19 % of the CXR line yield over 20°–135° (0.4 % at the basal back-reflection null), and the omitted part is mostly CBS. The matched continuum subtraction absorbs most of the extra line yield, so total CXR + continuum changes by only 3–7 %. The (00l) peak positions do not move. Basal-only is adequate only for narrow (00l) windows at backward, near-axial, high-energy geometry. Answers to each acceptance question: [Acceptance questions](#acceptance-questions).
 
 ## Literature
 
@@ -118,7 +118,7 @@ Observation angles are polar angles from the beam (+z = fiber axis). The 45° co
 
 ## Frozen-transport arms
 
-One local transport per scene (300 electrons, production `_simulate_trajectories`, catalog composition, tilt azimuth 180° as in the lab profiles). The lab detector direction is mapped into the sample frame with `detector_directions`. Every arm scores the same segments through `mc_cxr_spectrum` (incoherent, bin-mean, Henke), cutoff $\lvert g\rvert\le6$ Å⁻¹. Arms:
+The #1301 artifacts named in the plan (`cleo_sub`, `bells_45deg`, job 13676 shells) are no longer on qlmc or locally, so every arm uses a fresh seeded transport instead. Arms that share a transport are checked by segment fingerprint. One local transport per scene (300 electrons, production `_simulate_trajectories`, catalog composition, tilt azimuth 180° as in the lab profiles). The lab detector direction is mapped into the sample frame with `detector_directions`. Every arm scores the same segments through `mc_cxr_spectrum` (incoherent, bin-mean, Henke), cutoff $\lvert g\rvert\le6$ Å⁻¹. Arms:
 
 - **A** basal only, catalog $B_{33}$ (the current model);
 - **B** full allowed domain at one fixed roll $\phi=0$;
@@ -185,6 +185,25 @@ Percentages are steps from the previous cutoff. Yields are per electron per ster
 - **Arm F (converged reference).** Same transport as the 30 keV ladder (fingerprints equal), 128 sector rolls at 6/10/16 Å⁻¹. Against 32 rolls, integrated CXR differs by +0.06 %, +0.04 % and +0.03 %, but the spectral L1 is 3.3 %, 2.9 % and 2.4 %: integrated yield is roll-converged at 32, line shapes are not. Combining both axes, the converged reference for this scene is the 24 Å⁻¹, 32-roll ladder rung (CXR 2.161e-6, total 9.986e-6 per electron per sr), with an estimated residual of about +1–2 % in line yield from the cutoff tail (steps of 4.7 % then 2.0 %), under 0.1 % from rolls, and about 2–3 % spectral L1 from rolls. Its basal share, 0.16, is the converged arm-A/arm-F ratio. Wall 19.3 min on the GPU (832 s for the 16 Å⁻¹ band alone at 128 rolls), 1.4 GB host RSS. Raw: `armF/`.
 - **Cost.** Line scoring of the 24 Å⁻¹ band (2854 new reflections × 32 rolls × 600 electrons) took 373 s on the RTX 5080. The whole 30 keV ladder took 15.6 min wall and 1.4 GB host RSS; the 300 keV ladder 11.5 min. Cost grows with reflections × rolls (about cutoff³). On 8 CPU threads the same work is 4–5× slower; the thick 45° frozen scene took 81 min on 16 CPU threads against 19 min for the 15° scene on the GPU.
 
+### Converged observables: detector angle and PXR/CBS split
+
+`fiber_paired_1480.py --ladder 6 8 10 12 16 20 24 --components`, the same transports as the ladder (fingerprints equal; totals reproduce the ladder exactly), RTX 5080 device FP64, 32 rolls. HOPG 500 nm. The 30 keV, tilt 15° scene is scored at four detector polar angles; the angle to the fiber axis is in parentheses. Split columns give PXR / CBS / interference ($2\,\mathrm{Re}\,A_\text{PXR}A_\text{CBS}^*$) as fractions of each sum's CXR. "Window" is full over basal within ±2 % of the basal peak. Raw: `components/`.
+
+| scene | basal share at 6 → 24 Å⁻¹ | CXR at 24 (per e per sr) | basal split | non-basal split at 24 | window at 6 → 24 | CXR 6→24, total 6→24 |
+|---|---|---:|---|---|---|---|
+| 30 keV, lab 20° (35°) | 0.100 → 0.048 | 3.24e-6 | 0.21 / 0.34 / +0.45 | 0.08 / 0.69 / +0.23 | 1.31 → 1.79 | 2.13×, +4.6 % |
+| 30 keV, lab 45° (60°) | 0.307 → 0.159 | 2.16e-6 | 0.29 / 0.25 / +0.46 | 0.10 / 0.64 / +0.26 | 1.10 → 1.24 | 1.97×, +3.8 % |
+| 30 keV, lab 135° (150°) | 0.285 → 0.157 | 1.38e-6 | 0.79 / 0.02 / +0.19 | 0.18 / 0.55 / +0.27 | 1.08 → 1.16 | 1.82×, +5.8 % |
+| 30 keV, lab 160° (175°) | 0.008 → 0.004 | 1.20e-6 | 0.91 / 0.13 / −0.04 | 0.22 / 0.52 / +0.26 | 5.1 → 9.4 | 2.11×, +6.7 % |
+| 300 keV, tilt 60°, lab 45° | 0.341 → 0.185 | 1.01e-6 | 0.78 / 0.02 / +0.20 | 0.07 / 0.69 / +0.24 | 1.03 → 1.06 | 1.85×, +3.0 % |
+
+- **The omitted yield is mostly CBS.** At 24 Å⁻¹ the non-basal sum is 52–69 % CBS and 7–22 % PXR, with constructive interference of +0.23 to +0.27. Its PXR fraction falls with cutoff (high-|g| rows radiate mainly through CBS). Basal PXR dominates only backward (0.79–0.91) and at 300 keV.
+- **Angular dependence.** The converged basal share is 0.16 at 45° and 135° but 0.05 forward (20°), where basal PXR is polarization-suppressed. At 160° the detector is 5° from the basal back-reflection direction ($-\hat c$). There the basal yield is 50× lower than at 135°, and non-basal and $hk0$ lines carry the spectrum; the full-fiber maximum is a 169 eV $hk0$ feature, and 17 % of the yield lies below 300 eV. That scene is a geometric null of the basal model, not a typical backward value. Above 300 eV, the basal shares at 24 Å⁻¹ are 0.056, 0.175, 0.18 and 0.004.
+- **Narrow features.** The full-fiber peak stays on the basal (00l) peak in every scene except 160°. Within the ±2 % (002) window, non-basal adds 24 % (30 keV, 45°) and 16 % (135°) converged, against 10 % and 8 % at 6 Å⁻¹; at 300 keV, tilt 60°, it adds 6 %. The peak FWHM grows 21.6 → 23.2 eV (+7 %) at 30 keV and is unchanged (3.5 eV) at 300 keV. The peak line-to-continuum ratio rises 16 % and 7 %. The CXR centroid moves up by 420 eV and 1745 eV from 6 to 24 Å⁻¹: the added yield is spread over many weak high-energy lines rather than one new feature.
+- **Signal to background.** The integrated CXR-to-continuum ratio at 45° rises from 0.13 to 0.28 (30 keV) and 0.10 to 0.20 (300 keV) between 6 and 24 Å⁻¹, partly because the matched subtraction removes 13 % and 9 % of the continuum.
+- **Polarization** is not available: production CXR returns no polarization-resolved spectrum.
+- **Cost.** Components add a direct three-buffer call per batch: 33–46 min per ladder on the RTX 5080, against 12–16 min without.
+
 ## CBS continuum consistency
 
 `brem-lattice-coherent-fraction` removes from the BremsLib continuum, per scored reflection, the full-sphere orientation-averaged CBS share $\lvert U_g\rvert^2H(\lvert g\rvert)$. The continuum therefore keeps the average share of every **unscored** reflection. Under basal-only scoring:
@@ -212,7 +231,7 @@ All A/Q values in the frozen-arm table are at $\lvert g\rvert\le6$ Å⁻¹. The 
 - thick targets and multiple scattering, which add $hk0$ lines;
 - any lifting of the restriction while $B_{33}$ stays isotropic (12–15 % error).
 
-Even in the (002) window, non-basal adds 9–33 % in typical 30–300 keV scenes, because recoil shifts the (102) and (112) bands only 3–9 % below (002).
+Even in the (002) window, non-basal adds 9–33 % at 6 Å⁻¹ in typical 30–300 keV scenes, because recoil shifts the (102) and (112) bands only 3–9 % below (002). Converged (24 Å⁻¹) it adds 6 % (300 keV, tilt 60°), 16 % (30 keV, 135°), 24 % (45°) and 79 % (20°).
 
 ## Results to reassess
 
@@ -224,6 +243,20 @@ The basal restriction affects any HOPG/h-BN number read as a total, forward or s
 - **#1476 correspondence and Shi et al. 2024 SI §S5**: both concern narrow (002)/(004) windows. The +9–33 % in-window non-basal addition at 30–300 keV is within neither statement's scope, so it should be checked against their geometry (#1486).
 - **h-BN results** inherit the same restriction, plus a Bernal idealisation of a turbostratic material (#1485) and no in-plane ADP (#1482).
 - **Experimental comparisons** of HOPG integrated or forward-angle PXR yields that were judged against PyRITE basal-only output need re-reading. Anchored ledger claims that use HOPG (for example `line-recoil-in-crystal`, `cbs-amplitude`, `line-energy-dispersion`) concern line positions or per-reflection amplitudes, which the restriction leaves intact. Any whose anchor is an integrated HOPG yield should be re-checked (not audited row by row here).
+
+## Acceptance questions
+
+1. **Elimination or redistribution?** Redistribution. Each reflection's intensity is non-negative at every roll, so its average is positive. Phase averaging removes only cross terms, which already vanish for unshaped electrons. Measured: 8, 32 and 128 rolls agree in yield within 0.5 % (0.06 % between 32 and 128), and fixed $\phi=0$ is within 2 %.
+2. **Size for HOPG.** Converged at 24 Å⁻¹, basal-only is 5–19 % of the CXR line yield across 20°–135° (30 keV and 300 keV), so the omitted part is 4–20× the basal yield. Total CXR + continuum changes only 3–7 %, because the matched subtraction cancels 61–65 % of the added lines. **For h-BN**, measured only at 6 Å⁻¹ with isotropic $B_{33}$ (no in-plane ADP, #1482): basal share 0.38 and 0.51, and single-flight non-basal/basal ratios about half of HOPG's. Converged h-BN numbers wait for #1482, and its turbostratic stacking makes Bernal numbers an idealisation (#1485).
+3. **Dominant families.** At 6 Å⁻¹: (112), the odd-$l$ (101) at half the (002) energy, (110) with tilt or multiple scattering, (103), and (114) in thick targets. Beyond 6 Å⁻¹ no family dominates: the CXR doubles over thousands of weak, mostly CBS rows.
+4. **Scaling.** *Energy:* at oblique forward incidence the basal share falls from 0.32 (30 keV) to 0.037 (300 keV) and 0.020 (1 MeV, 6 Å⁻¹, tilt 15°), because (101) takes over; at backward axial 1 MeV it is 0.75. *Detector:* 0.05 forward, 0.16 at 45° and 135°, 0.004 at the basal back-reflection null. *Thickness:* 30 nm and 10 µm 0.26, 1 mm 0.12–0.19 at 10 Å⁻¹ (all lower converged). *Multiple scattering and tilt:* add $hk0$ lines and broaden by $(g_\perp/g_z)\tan\alpha$.
+5. **Recoil and azimuthal broadening.** At 119° and 30 keV, (112) sits 7–9 % below (002), spread over 27 eV; at 1 MeV, 0.6–1.4 %. Oblique broadening is 2.75 % at 1° and 13.8 % at 5° for $\{10l\}$, $l=2$. In the cutoff ladder the (002) peak FWHM grows 7 % at 30 keV (21.6 → 23.2 eV) and not at all at 300 keV. The (00l) peak positions do not move.
+6. **Anisotropic thermal factors.** Essential. Isotropic $B_{33}$ lowers in-plane-heavy families by 29–33 % in intensity and total fiber yield by 12–15 %.
+7. **CBS continuum extension.** Subtract the isotropic lattice-coherent share over the same full scored domain, with the per-reflection tensor $B$ in $U_g$, summing shells before the clamp (done in the opt-in route). It grows from 5.2 % to 13.0 % of the continuum at 30 keV (3.5 % to 8.6 % at 300 keV), with no clamped nodes. Lines and continuum then balance in total only; a texture-conditioned diffuse kernel is open (#1485).
+8. **When basal-only is adequate.** Only for narrow (00l)-window observables at backward, near-axial, high-energy geometry (1 MeV, axial, 135°: window +10 %, at 6 Å⁻¹). It fails for integrated, wide-window, forward or side, oblique and thick-target observables, and near the basal back-reflection direction. See [Applicability envelope](#applicability-envelope).
+9. **Cost of a fuller model.** A converged fiber ladder (24 Å⁻¹, 6828 reflections, 32 rolls, 600 electrons, 500 nm) takes 12–16 min on one RTX 5080 (device FP64, parity-checked against CPU FP64 to $2\times10^{-6}$), with 1.4 GB host memory. CPU is 4–5× slower. Cost scales with reflections × rolls, about cutoff³. Integrated yield needs 8 rolls; line shapes need about 128. A production default needs the selector over the fiber domain (#1484) to trim the cutoff tail.
+10. **Open domain and coherence assumptions.** One roll per coherent region (well justified for HOPG); no inter-domain phase in coherent mode (the model refuses coherent emission); basal phase between stacking-shifted crystallites; turbostratic rods (pyrolytic h-BN, a few percent in HOPG); mosaic combined with roll; texture-conditioned continuum (#1485).
+11. **Results to reassess.** Tutorials 04, 08 and 11 (basal-only yields at 30 keV backward); #1301 selector evidence (convergence within the basal set only); #1250 HOPG/h-BN continuum subtraction; the #1476 and Shi et al. SI §S5 window statements (#1486); all h-BN totals; HOPG integrated or forward yields compared with experiment. Line-position and per-reflection anchors are unaffected. Details: [Results to reassess](#results-to-reassess).
 
 ## Phase II
 
