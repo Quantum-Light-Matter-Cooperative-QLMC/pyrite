@@ -21,7 +21,8 @@ from pyrite.config import CxrReflections, FiberAverage
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner import fiber_emission
 from pyrite.montecarlo.runner.adaptive import AdaptiveSettings, case_measure
-from pyrite.montecarlo.runner.streamed_scoring import streaming_refusal
+from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed, streaming_refusal
+from pyrite.montecarlo.spectrum.cxr._bin_fourier import FOURIER_RESIDUAL_TOL
 
 FIELDS = ("spec", "spec_characteristic", "brem", "brem_wide", "E_grid", "E_grid_brem")
 
@@ -42,11 +43,12 @@ def _scene():
 
 
 def _precision(**extra):
+    # CXR starts checking at 30, brem at 20: brem freezes first, so later
+    # chunks score lines only and Ne_brem < Ne.
     return pr.config.AdaptiveSampling(
-        1.0,
-        20,
-        60,
-        10,
+        target_rse=1.0,
+        min_histories=30,
+        max_histories=60,
         observables=("cxr", "brem"),
         brem_target_rse=1.0,
         brem_min_histories=20,
@@ -102,6 +104,7 @@ def test_adaptive_fiber_run_is_the_fixed_n_run_at_its_realized_count():
     stats = output["adaptive_sampling"]
     n, n_brem = stats["realized_electrons"], stats["realized_electrons_brem"]
     assert stats["stop_reason"] == "converged" and n < case.Ne and n_brem < case.Ne_brem
+    assert n_brem < n
     assert float(np.max(output["spec"])) > 0.0
     reference = _fixed(case, n, n_brem)
     for field in FIELDS:
@@ -109,6 +112,24 @@ def test_adaptive_fiber_run_is_the_fixed_n_run_at_its_realized_count():
     assert output["brem_lattice_share"] == reference["brem_lattice_share"]
     record = output["brem_lattice_share"]["layers"][0]
     assert record["reflections"] == len(fiber_emission.fiber_domain(case).hkls)
+
+
+def test_streamed_adaptive_fiber_run_matches_the_retained_run():
+    case = _case(_precision())
+    retained = runner.run_case(case, transport_core="per-electron")
+    streamed = run_case_streamed(case, 7, transport_core="per-electron")
+    for key in ("realized_electrons", "realized_electrons_brem", "stop_reason"):
+        assert streamed["adaptive_sampling"][key] == retained["adaptive_sampling"][key], key
+    # Streamed bin-mean lines agree within the Fourier image residual relative
+    # to the peak (as in #1490); the rest is exact to summation order.
+    peak = float(np.max(np.abs(retained["spec"])))
+    np.testing.assert_allclose(
+        streamed["spec"], retained["spec"], rtol=0.0, atol=FOURIER_RESIDUAL_TOL * peak
+    )
+    for field in FIELDS[1:]:
+        np.testing.assert_allclose(
+            streamed[field], retained[field], rtol=1e-12, atol=0.0, err_msg=field
+        )
 
 
 def test_fiber_measure_is_one_finite_value_per_electron():
@@ -120,9 +141,10 @@ def test_fiber_measure_is_one_finite_value_per_electron():
         target_rse=1.0,
         min_histories=20,
         max_histories=20,
-        block_histories=20,
         observables=("cxr", "brem"),
         brem_target_rse=1.0,
+        brem_min_histories=20,
+        brem_max_histories=20,
     )
     values = case_measure(fixed, settings)(0, 20, tp["segs"])
     for name in ("cxr", "brem"):
@@ -139,8 +161,8 @@ def test_fiber_batch_means_reconstruct_the_band_of_the_final_spectra():
         output = runner.run_case(case, transport_core="per-electron")
     batch = output["adaptive_sampling"]["batch_means"]
     # Fiber lines are bin-mean: each batch's Fourier reducer picks its own span,
-    # so line batches add to the run only within FOURIER_RESIDUAL_TOL (1e-6);
-    # basal bin-mean cases show the same few-1e-6 gap. The continuum is exact.
+    # so line batches add to the run only to a few 1e-6 per bin (asserted at
+    # 1e-5); basal bin-mean cases show the same gap. The continuum is exact.
     rtol = {"spec": 1e-5, "brem_wide": 1e-9}
     for key, grid in (("spec", "E_grid"), ("brem_wide", "E_grid_brem")):
         energies = output[grid]

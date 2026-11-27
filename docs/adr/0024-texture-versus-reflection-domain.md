@@ -47,8 +47,8 @@ campaign path refused it.
    then cannot bypass the domain silently.
 5. **Refuse outside the qualified envelope.** HOPG only, incoherent, single
    flat slab, BremsLib, deterministic mosaic quadrature (a mosaic target needs
-   `mosaic_route="mc"`: the analytic width reads the basal geometry), fixed electron
-   counts, bin-mean lines. The line grid is explicit (`EnergyBins.cxr`) or
+   `mosaic_route="mc"`: the analytic width reads the basal geometry), fixed or
+   adaptive electron counts (#1503), bin-mean lines. The line grid is explicit (`EnergyBins.cxr`) or
    automatic, resolved and audited over the roll-averaged lines (#1489).
    Stored catalog rows, derived for the basal lines, are skipped. Measured
    selection, feature windows, line attribution, line roulette,
