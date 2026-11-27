@@ -21,6 +21,7 @@ brem-source-comparison
 brem-spectrum
 diffracted-bremsstrahlung
 diffracted-characteristic-radiation
+cxr-fiber-line-grid
 node-support-window-tail
 bremslib-angular-model
 bremslib-coupled-expected-spectrum

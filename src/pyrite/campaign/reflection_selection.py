@@ -126,7 +126,8 @@ def fiber_line_axis(sweep: Sweep) -> tuple[list | None, dict | None, dict[str, s
     bandwidth (``kinematic_cxr_stop_eV``); |g| is roll invariant, so the bound
     holds at every roll node. Fiber lines are scored as bin means and the
     resolution step and point budget follow the quadrature, so an unset
-    quadrature becomes ``bin-mean``.
+    quadrature becomes ``bin-mean``. Feature windows are refused: their
+    kinematic seeds read the case's basal ``hkl_list``, not the domain.
 
     Validation: cxr-fiber-intensity-average
     Validation: line-grid-kinematic-bandwidth
@@ -136,6 +137,8 @@ def fiber_line_axis(sweep: Sweep) -> tuple[list | None, dict | None, dict[str, s
         return None, per_call, {}
     from ..montecarlo.spectrum.cxr.fiber import FiberCXRModel
 
+    if (per_call or {}).get("windows"):
+        raise ValueError("full-fiber CXR does not support feature windows (#1489)")
     hkls = list(FiberCXRModel.from_numerics(sweep.cxr_fiber).prepare().hkls)
     sources = {"bandwidth_reflections": FIBER_DOMAIN_BANDWIDTH_MODEL}
     if not (per_call or {}).get("quadrature"):

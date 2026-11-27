@@ -108,6 +108,7 @@ def test_fiber_owns_the_reflection_domain():
         (dict(mosaic_mc_sampling="history"), "mosaic"),
         (dict(cxr_source="none"), "CXR lines"),
         (dict(line_quadrature=None), "bin-mean"),
+        (dict(line_grid_policy={"windows": {"providers": ["kinematic"]}}), "feature windows"),
         (dict(surface_hkl=(1, 0, 0)), "c axis"),
     ],
 )

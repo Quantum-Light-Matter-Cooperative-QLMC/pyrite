@@ -60,6 +60,7 @@ def _refusal(case: Mapping[str, Any]) -> str | None:
         (case.get("temporal_profile"), "does not support temporal profiles"),
         (case.get("reflection_selection") is not None, "owns its reflection domain"),
         (case.get("line_quadrature") != "bin-mean", "scores bin-mean lines"),
+        ((case.get("line_grid_policy") or {}).get("windows"), "does not support feature windows"),
         (case.get("line_roulette") is not None, "does not support line roulette"),
         (case.get("cone_split") is not None, "does not support cone splitting"),
         (case.get("channeling") not in (None, "off"), "requires ordinary Born-line transport"),

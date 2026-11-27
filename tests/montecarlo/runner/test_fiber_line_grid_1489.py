@@ -71,6 +71,17 @@ def test_explicit_grid_keeps_the_1483_payload():
     assert case.get("line_grid_policy") is None and case["line_quadrature"] == "bin-mean"
 
 
+def test_fiber_sweep_refuses_feature_windows():
+    """Window seeds read the basal ``hkl_list``, so they would miss domain rows."""
+    from types import SimpleNamespace
+
+    from pyrite.campaign.reflection_selection import fiber_line_axis
+
+    sweep = SimpleNamespace(cxr_fiber=AVERAGE, cxr_grid_policy={"windows": True})
+    with pytest.raises(ValueError, match="feature windows"):
+        fiber_line_axis(sweep)
+
+
 def test_measured_cache_key_reads_the_fiber_domain():
     case = dict(_lower())
     payload = case["line_grid_policy"]
