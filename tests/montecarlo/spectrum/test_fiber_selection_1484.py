@@ -81,6 +81,9 @@ def scene(monkeypatch):
     monkeypatch.setattr(runner, "_cxr_for_segments", line)
     monkeypatch.setattr(runner, "_segments_on_device", lambda x: x)
     monkeypatch.setattr(fiber_selection, "_FiberShellContinuum", _Continuum)
+    from pyrite.montecarlo.runner import case_tables
+
+    monkeypatch.setattr(case_tables, "_case_bremslib_tables", lambda _: {"C": object()})
     _Continuum.calls = []
     ids = np.repeat(np.arange(8), 3)
     segs = {"Ne": 8, "elec_id": ids, "L_ang": np.ones(ids.size)}
@@ -243,6 +246,33 @@ def test_bad_selection_arguments_are_refused_before_staging(
     monkeypatch.setattr(runner, "_segments_on_device", staged)
     with pytest.raises(ValueError, match=match):
         score_fiber_case(_model(), _case(pilot), tp, grid, **kwargs)
+    assert not seen and not _Continuum.calls
+
+
+@pytest.mark.parametrize(
+    ("energy_keV", "tables", "match"),
+    [
+        (2000.0, {"C": object()}, "exceeds the released subtraction kernel"),
+        (30.0, {}, "requires a carbon BremsLib table"),
+    ],
+)
+def test_correction_inputs_are_refused_before_selection_staging(
+    scene, monkeypatch, energy_keV, tables, match
+):
+    """Kernel energy range and carbon table fail before any selection work."""
+    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.runner import case_tables
+
+    pilot, tp, seen = scene
+
+    def staged(_):
+        raise AssertionError("staged before the correction inputs were checked")
+
+    monkeypatch.setattr(runner, "_segments_on_device", staged)
+    monkeypatch.setattr(case_tables, "_case_bremslib_tables", lambda _: tables)
+    case = dict(_case(pilot), E0_keV=energy_keV)
+    with pytest.raises(ValueError, match=match):
+        score_fiber_case(_model(), case, tp, _GRID, line_yield_tolerance=1e-3)
     assert not seen and not _Continuum.calls
 
 

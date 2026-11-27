@@ -5,7 +5,8 @@ fingerprint is compared with the ladder's and recorded). The measured selector r
 ``score_fiber_case(..., line_yield_tolerance=...)``; the same transport is then
 scored at fixed cutoffs with the unchanged opt-in model. The stop is judged on
 the CXR + corrected-continuum total in the band, the quantity the net metric
-measures. Writes ``summary.json``, ``spectra.npz`` and ``SHA256SUMS``.
+measures. Writes ``summary.json`` and ``spectra.npz`` after every arm
+(``complete: false`` until the last), then ``SHA256SUMS``.
 
 Validation: reflection-yield-tolerance-selector
 """
@@ -24,6 +25,12 @@ def _yields(result, widths):
     cxr = float(np.asarray(result["cxr"]) @ widths)
     brem = float(np.asarray(result["brem"]) @ widths)
     return dict(cxr_yield=cxr, brem_yield=brem, total_yield=cxr + brem)
+
+
+def _ratio(value, reference, offset=1.0):
+    """``value / reference - offset``, or ``None`` when the reference is zero or nonfinite."""
+    ratio = value / reference - offset if reference else float("nan")
+    return float(ratio) if np.isfinite(ratio) else None
 
 
 def _model(args, cutoff):
@@ -45,6 +52,8 @@ def run(args):
         raise ValueError("artifact detector geometry is fixed; omit --detector")
     if args.artifact is None and args.detector is None:
         args.detector = 45.0  # the #1480 ladder scenes' lab angle
+    if args.histories is not None and args.histories < 1:
+        raise ValueError("--histories must be positive")
     output = args.output
     output.mkdir(parents=True, exist_ok=True)
     if any((output / name).exists() for name in ("summary.json", "spectra.npz", "SHA256SUMS")):
@@ -66,6 +75,35 @@ def run(args):
     print("frozen fingerprint", json.dumps(dict(frozen, actual=fingerprint)), flush=True)
     arrays = dict(grid_eV=grid, edges_eV=edges)
 
+    summary = dict(
+        issue=1484,
+        complete=False,
+        source=dict(source, diagnostic_sha256=file_digest(Path(__file__))),
+        fingerprint=fingerprint,
+        frozen_fingerprint=frozen,
+        electrons=int(tp["Ne_lines"]),
+        E0_keV=float(case["E0_keV"]),
+        tilt_deg=case.get("tilt_deg"),
+        thickness_ang=case.get("thickness_ang"),
+        theta_obs_rad=float(case["theta_obs_rad"]) if "theta_obs_rad" in case else None,
+        band_eV=[float(edges[0]), float(edges[-1])],
+        spacing_eV=float(widths[0]),
+        azimuth_count=args.azimuths,
+        temperature_K=args.temperature,
+        tolerance=args.tolerance,
+        cap_invang=args.cap,
+        selected=None,
+        prefix=None,
+        fixed=[],
+    )
+
+    def flush():
+        """Persist every finished arm, so a late failure keeps the earlier ones."""
+        summary["wall_s"] = time.perf_counter() - started
+        np.savez_compressed(output / "spectra.npz", **arrays)
+        text = json.dumps(summary, indent=2, allow_nan=False) + "\n"
+        (output / "summary.json").write_text(text)
+
     def timed(label, fn):
         t0 = time.perf_counter()
         value = fn()
@@ -81,15 +119,15 @@ def run(args):
     )
     record = selected["reflection_selection"]
     arrays["selected_cxr"], arrays["selected_brem"] = selected["cxr"], selected["brem"]
-    sel = dict(
+    sel = summary["selected"] = dict(
         _yields(selected, widths),
         wall_s=wall,
         record=record,
         continuum_correction=selected["continuum_correction"],
     )
     print(json.dumps({k: v for k, v in record.items() if k != "shells"}), flush=True)
-    prefix = None
-    if args.histories:
+    flush()
+    if args.histories is not None:
         result, wall = timed(
             "prefix selection",
             lambda: score_fiber_case(
@@ -101,8 +139,10 @@ def run(args):
                 selection_histories=args.histories,
             ),
         )
-        prefix = dict(_yields(result, widths), wall_s=wall, record=result["reflection_selection"])
-    fixed = []
+        summary["prefix"] = dict(
+            _yields(result, widths), wall_s=wall, record=result["reflection_selection"]
+        )
+        flush()
     for cutoff in sorted(set(args.fixed)):
         result, wall = timed(
             f"fixed {cutoff:g}", lambda c=cutoff: score_fiber_case(_model(args, c), case, tp, grid)
@@ -116,37 +156,16 @@ def run(args):
             **_yields(result, widths),
         )
         # Positive: the fixed cutoff holds more net yield than the selected set.
-        row["total_vs_selected"] = row["total_yield"] / sel["total_yield"] - 1.0
-        row["cxr_vs_selected"] = row["cxr_yield"] / sel["cxr_yield"] - 1.0
-        row["cxr_l1_vs_selected"] = float(
-            np.abs(result["cxr"] - selected["cxr"]) @ widths / sel["cxr_yield"]
-        )
-        fixed.append(row)
+        row["total_vs_selected"] = _ratio(row["total_yield"], sel["total_yield"])
+        row["cxr_vs_selected"] = _ratio(row["cxr_yield"], sel["cxr_yield"])
+        l1 = float(np.abs(result["cxr"] - selected["cxr"]) @ widths)
+        row["cxr_l1_vs_selected"] = _ratio(l1, sel["cxr_yield"], offset=0.0)
+        summary["fixed"].append(row)
         print(json.dumps({k: v for k, v in row.items() if k != "continuum_correction"}), flush=True)
+        flush()
     require_identical_segments(fingerprint, tp["segs"])
-    summary = dict(
-        issue=1484,
-        source=dict(source, diagnostic_sha256=file_digest(Path(__file__))),
-        fingerprint=fingerprint,
-        frozen_fingerprint=frozen,
-        electrons=int(tp["Ne_lines"]),
-        E0_keV=float(case["E0_keV"]),
-        tilt_deg=case.get("tilt_deg"),
-        thickness_ang=case.get("thickness_ang"),
-        theta_obs_rad=float(case["theta_obs_rad"]) if "theta_obs_rad" in case else None,
-        band_eV=[float(edges[0]), float(edges[-1])],
-        spacing_eV=float(widths[0]),
-        azimuth_count=args.azimuths,
-        temperature_K=args.temperature,
-        tolerance=args.tolerance,
-        cap_invang=args.cap,
-        selected=sel,
-        prefix=prefix,
-        fixed=fixed,
-        wall_s=time.perf_counter() - started,
-    )
-    np.savez_compressed(output / "spectra.npz", **arrays)
-    (output / "summary.json").write_text(json.dumps(summary, indent=2, allow_nan=False) + "\n")
+    summary["complete"] = True
+    flush()
     (output / "SHA256SUMS").write_text(
         "".join(f"{file_digest(output / n)}  {n}\n" for n in ("spectra.npz", "summary.json"))
     )

@@ -324,21 +324,12 @@ class FiberReflectionSet:
 
         Validation: cxr-fiber-intensity-average
         """
-        from ...runner.lattice_share import _kernel
-
-        composition = _carbon_composition(composition)
-        if tables is None or "C" not in tables:
-            raise ValueError("full fiber CXR requires a carbon BremsLib table")
-        kernel = _kernel()
+        composition, kernel = check_correction_inputs(
+            tables, composition, E_cut_keV=E_cut_keV, max_energy_keV=max_energy_keV
+        )
         g, weights = self.shell_weights(composition)
         if g[0] < kernel.g_invang[0] or g[-1] > kernel.g_invang[-1]:
             raise ValueError("fiber reflection domain exceeds the released subtraction kernel")
-        if not (
-            math.isfinite(E_cut_keV)
-            and math.isfinite(max_energy_keV)
-            and kernel.T_keV[0] <= E_cut_keV <= max_energy_keV <= kernel.T_keV[-1]
-        ):
-            raise ValueError("line-active energy interval exceeds the released subtraction kernel")
         entries = [(tables[el], el, n, weights[el]) for el, n in composition]
         results = _lattice_share_tables(entries, kernel, g, T_floor_keV=E_cut_keV)
         out = dict(tables)
@@ -358,6 +349,32 @@ class FiberReflectionSet:
             shells=int(g.size),
             elements=records,
         )
+
+
+def check_correction_inputs(tables, composition, *, E_cut_keV, max_energy_keV):
+    """``(composition, kernel)`` of a fiber continuum correction, or refuse.
+
+    The domain-independent checks of
+    :meth:`FiberReflectionSet.corrected_bremslib_tables`: a single carbon row,
+    a carbon BremsLib table, and a line-active energy interval inside the
+    released subtraction kernel. Callers that stage or score before building
+    the correction (measured selection) run them first.
+
+    Validation: cxr-fiber-intensity-average
+    """
+    from ...runner.lattice_share import _kernel
+
+    composition = _carbon_composition(composition)
+    if tables is None or "C" not in tables:
+        raise ValueError("full fiber CXR requires a carbon BremsLib table")
+    kernel = _kernel()
+    if not (
+        math.isfinite(E_cut_keV)
+        and math.isfinite(max_energy_keV)
+        and kernel.T_keV[0] <= E_cut_keV <= max_energy_keV <= kernel.T_keV[-1]
+    ):
+        raise ValueError("line-active energy interval exceeds the released subtraction kernel")
+    return composition, kernel
 
 
 def _carbon_composition(composition):
