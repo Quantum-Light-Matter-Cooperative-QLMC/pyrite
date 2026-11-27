@@ -127,6 +127,7 @@ _CASE_KEY_ORDER = (
     "mosaic_mc_fwhm_rad",
     "mosaic_mc_nodes",
     "mosaic_mc_sampling",
+    "mosaic_route_model",
     "abs_layers",
     "layer_radiators",
     "brem_file",
@@ -203,6 +204,11 @@ class Case(Mapping[str, Any]):
         crystallite tilts per electron history instead of the Gauss-Hermite
         rule (#1185); absent is the quadrature. Incoherent only.
         Validation: mosaic-mc-sampled
+    mosaic_route_model
+        Identity-only marker of the default mosaic route
+        (``MOSAIC_ROUTE_DEFAULT_MODEL``, #1207), stamped only on cases that
+        ``mosaic_route="auto"`` resolves to the sampled average; absent
+        otherwise.
     abs_layers, layer_radiators
         Optional film-first absorber and coherent-radiator payloads.
     brem_file
@@ -392,6 +398,8 @@ class Case(Mapping[str, Any]):
     line_quadrature: Literal["bin-mean"] | _Absent = _ABSENT
     # Exact-mosaic orientation rule (#1185): absent is Gauss-Hermite.
     mosaic_mc_sampling: Literal["history"] | _Absent = _ABSENT
+    # Default mosaic route model (#1207): identity only, with the sampled rule.
+    mosaic_route_model: str | _Absent = _ABSENT
     groove_spacing_ang: float | _Absent = _ABSENT
     coherent_emission: Literal[True] | _Absent = _ABSENT
     temporal_profile: Literal[True] | _Absent = _ABSENT
@@ -637,7 +645,11 @@ class Case(Mapping[str, Any]):
         Validation: mosaic-mc-sampled
         """
         if self.mosaic_mc_sampling is _ABSENT:
+            if self.mosaic_route_model is not _ABSENT:
+                raise ValueError("mosaic_route_model marks the sampled mosaic rule only")
             return
+        if self.mosaic_route_model is not _ABSENT and not isinstance(self.mosaic_route_model, str):
+            raise ValueError("mosaic_route_model must be a string")
         if self.mosaic_mc_sampling != "history":
             raise ValueError("mosaic_mc_sampling must be absent or 'history'")
         if not self.mosaic_mc_fwhm_rad:

@@ -10,7 +10,7 @@ from typing import Literal
 
 from ._fiber_average import FiberAverage
 
-MosaicRoute = Literal["analytic", "mc", "mc-sampled"]
+MosaicRoute = Literal["auto", "analytic", "mc", "mc-sampled"]
 
 
 def fiber_average(value: object) -> FiberAverage | None:
@@ -48,11 +48,17 @@ class CxrReflections:
     mosaic_nodes
         Number of quadrature nodes per tilt axis used for mosaic averaging
         (``nodes**2`` orientations); under ``"mc-sampled"``, the number of
-        crystallite tilts drawn per electron history.
+        crystallite tilts drawn per electron history. ``None`` (default)
+        resolves to 5 nodes for ``"mc"`` and 256 draws for ``"mc-sampled"``
+        (#1207).
     mosaic_route
-        Mosaic integration strategy: ``"analytic"`` detector broadening,
-        ``"mc"`` Gauss-Hermite orientation quadrature, or ``"mc-sampled"``
-        per-history sampled crystallites (incoherent emission only).
+        Mosaic integration strategy: ``"auto"`` (default), ``"analytic"``
+        detector broadening, ``"mc"`` Gauss-Hermite orientation quadrature,
+        or ``"mc-sampled"`` per-history sampled crystallites (incoherent
+        emission only). ``"auto"`` resolves to ``"mc-sampled"`` for
+        incoherent emission, to ``"analytic"`` with a warning for coherent
+        emission, and to ``"analytic"`` for full-fiber runs, whose mosaic
+        needs an explicit ``"mc"`` (#1207).
     line_yield_tolerance
         Explicit measured reflection selection (#1173). The spectrum phase
         scores incoherent lines in reciprocal shells ``|g|`` of 2 1/Angstrom up
@@ -72,7 +78,8 @@ class CxrReflections:
         refuse it. They lower ``mosaic_route`` and
         ``mosaic_nodes`` into the case as basal runs do. A mosaic target needs
         ``mosaic_route="mc"``: ``"analytic"`` (its width reads the basal
-        geometry) and ``"mc-sampled"`` are refused. Excludes ``n_families``,
+        geometry, and ``"auto"`` resolves to it here) and ``"mc-sampled"``
+        are refused. Excludes ``n_families``,
         ``max_reflections`` and ``line_yield_tolerance``. The direct
         ``pyrite.montecarlo.spectrum.cxr.fiber.FiberCXRModel.from_numerics``
         reads this field only: the other controls here, mosaic ones included,
@@ -81,8 +88,8 @@ class CxrReflections:
 
     n_families: int | None = None
     max_reflections: int | None = None
-    mosaic_nodes: int = 5
-    mosaic_route: MosaicRoute = "analytic"
+    mosaic_nodes: int | None = None
+    mosaic_route: MosaicRoute = "auto"
     line_yield_tolerance: float | None = None
     fiber: FiberAverage | None = None
 
@@ -106,13 +113,18 @@ class CxrReflections:
             type(self.max_reflections) is not int or self.max_reflections <= 0
         ):
             raise ValueError("max_reflections must be a positive integer or None")
-        if type(self.mosaic_nodes) is not int or self.mosaic_nodes <= 0:
-            raise ValueError("mosaic_nodes must be a positive integer")
-        if self.mosaic_route not in {"analytic", "mc", "mc-sampled"}:
-            raise ValueError("mosaic_route must be 'analytic', 'mc' or 'mc-sampled'")
+        self._validate_mosaic()
         if self.line_yield_tolerance is not None and not (
             isinstance(self.line_yield_tolerance, int | float)
             and not isinstance(self.line_yield_tolerance, bool)
             and 0.0 < self.line_yield_tolerance < 1.0
         ):
             raise ValueError("line_yield_tolerance must lie in (0, 1) or be None")
+
+    def _validate_mosaic(self) -> None:
+        if self.mosaic_nodes is not None and (
+            type(self.mosaic_nodes) is not int or self.mosaic_nodes <= 0
+        ):
+            raise ValueError("mosaic_nodes must be a positive integer or None")
+        if self.mosaic_route not in {"auto", "analytic", "mc", "mc-sampled"}:
+            raise ValueError("mosaic_route must be 'auto', 'analytic', 'mc' or 'mc-sampled'")

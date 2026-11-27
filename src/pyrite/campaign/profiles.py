@@ -74,6 +74,7 @@ from .identity_options import (
     radiative_numerics_payload,
     transport_numerics_payload,
 )
+from .mosaic_route import project_mosaic_identity
 from .numerics_resolution import NUMERICS_GROUPS as NUMERICS_GROUPS
 from .numerics_resolution import NumericsResolution
 from .reflection_selection import project_fiber_identity
@@ -589,6 +590,9 @@ def _identity_v1(
         if sweep_payload.get(key) is None:
             sweep_payload.pop(key, None)
     project_fiber_identity(sweep_payload, sweep)
+    project_mosaic_identity(
+        sweep_payload, sweep, crystallography["crystal"], settings.coherent_emission
+    )
     # Same compatibility rule for catalog_profile (Phase 3 decision 2): only
     # join the hashed payload when it diverges from "standard", so every
     # pre-existing standard-profile identity keeps its historical digest.

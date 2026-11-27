@@ -174,9 +174,10 @@ The [study record](../check-records/mosaic-mc-sampled-1185-study.json) holds per
 - Whether this route should become the mosaic default is #1207.
 - **Harness note.** The straggling calls ran with `--arm baseline`, because the harness at `a2a7a4466` has no `straggling` choice. Under `--replay` the case, including `straggling=True`, comes from the transport pickle, and `--arm` only labels the report. The arm is therefore the call's tag prefix.
 
+(mosaic-default-qualification-1207)=
 ### Analytic route against the sampled route, and the $K$ ladder (#1207, jobs 16218, 16222)
 
-The [study record](../check-records/mosaic-default-1207-study.json) holds every per-seed comparison, the reference metrics, transport hashes, timings and device memory. Raw evidence and `SHA256SUMS` are on `qlmc` under `~/pyrite-1207-s1/evidence/s1207/`; the analysis script sits beside it in `source/`.
+The [study record](../check-records/mosaic-default-1207-study.json) holds every per-seed comparison, the reference metrics, transport hashes, timings and device memory. Raw evidence and `SHA256SUMS` are on `qlmc` under `~/pyrite-1207-s1/evidence/s1207/`, with the analysis script beside it in `source/`. A copy without the transport pickles is in the bench archive at `pyrite-benches/1207-mosaic-default/` (`SHA256SUMS.all`).
 - **Scene:** HOPG, 30 keV, 2 µm, 45°/180°: the #1142 t2 baseline transport, regenerated at source `7b9c0fd5d` with seeds 1142201–4.
 - **Mosaic widths:** the catalog 0.8°, and 0.1° on the same transports. HOPG is the only catalog crystal with a mosaic, so 0.1° stands in for a low-mosaic crystal.
 - **Grid:** Fourier bin-mean 0.1875 eV on 500–10000 eV, intrinsic source spectra only.

@@ -53,19 +53,32 @@ def _plain(rows: Iterable[Row]) -> list[tuple[str, object, object]]:
     return [(row["label"], row["effective"], row["source"]) for row in rows]
 
 
+#: Displayed default mosaic draws/nodes per resolved route (#1207).
+_MOSAIC_NODES_DISPLAY = {
+    "auto": "automatic (256 draws when sampled)",
+    "analytic": "unused (analytic)",
+    "mc": 5,
+    "mc-sampled": 256,
+}
+
+
 def reflection_rows(rows: list[Row]) -> list[tuple[str, object, object]]:
     """Describe omitted reflection controls as their requested automatic policy."""
     values = {row["key"]: row["effective"] for row in rows}
+    display: dict[str, object] = {}
+    if "mosaic_nodes" in values and values["mosaic_nodes"] is None:
+        route = values.get("mosaic_route", "auto")
+        display["mosaic_nodes"] = _MOSAIC_NODES_DISPLAY.get(str(route), "automatic")
     if values.get("cxr_fiber") is not None:  # the fiber domain owns the reflections
         owned = ("n_families", "max_reflections", "line_yield_tolerance")
-        display = dict.fromkeys(owned, "unused (full-fiber)")
+        display |= dict.fromkeys(owned, "unused (full-fiber)")
     elif values.get("n_families") is not None:
-        return _plain(rows)
+        pass
     else:
         automatic = values.get("max_reflections") is None
-        display = {
-            "n_families": "automatic" if automatic or values.get("line_yield_tolerance") else 4,
-        }
+        display["n_families"] = (
+            "automatic" if automatic or values.get("line_yield_tolerance") else 4
+        )
         if automatic and values.get("line_yield_tolerance") is None:
             display["line_yield_tolerance"] = "automatic (0.001)"
     return [

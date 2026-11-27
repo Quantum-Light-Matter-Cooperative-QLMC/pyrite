@@ -219,6 +219,11 @@ it resolves omitted family controls to tolerance 1e-3, preserves catalog pins
 and explicit counts/caps, and falls back on unsupported model/execution routes.
 `sweep.py`, public lowering and checkpoint grid repair share this policy.
 
+### `campaign/mosaic_route.py`
+Mosaic route resolution (#1207). The default `mosaic_route="auto"` resolves to the sampled crystallite average (`"mc-sampled"`, 256 draws) for incoherent emission on a mosaic crystal. Coherent emission gets `"analytic"` with a warning; full-fiber runs and perfect crystals also get `"analytic"`. `mosaic_case_keys` writes the case keys, and `project_mosaic_identity` hashes the route the cases run, so only sampled-default digests move (`MOSAIC_ROUTE_DEFAULT_MODEL`).
+- Public (package-internal): `mosaic_case_keys`, `project_mosaic_identity`, `MOSAIC_ROUTE_DEFAULT_MODEL`, `MOSAIC_SAMPLED_DRAWS_DEFAULT`, `MOSAIC_GH_NODES_DEFAULT`.
+- Deps: `materials` (`CATALOG`), NumPy; `sweep.Sweep` for typing only.
+
 ### `campaign/numerics_resolution.py`
 Immutable resolved numerics with value provenance and stable CLI/JSON grouping; re-exported by `campaign/profiles.py`, which owns numerics resolution.
 - Public: `NumericsResolution`, `NUMERICS_GROUPS`.

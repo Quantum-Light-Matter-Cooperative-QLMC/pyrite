@@ -23,6 +23,8 @@ BREM_GRID = np.arange(0.0, 1000.0, 100.0)
 
 
 def _sweep(material, **kw):
+    # This module covers the analytic route; "auto" samples incoherent mosaic (#1207).
+    kw.setdefault("mosaic_route", "analytic")
     return Sweep(
         material=material,
         thickness_ang=10000.0,
