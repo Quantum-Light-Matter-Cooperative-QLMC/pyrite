@@ -182,3 +182,29 @@ def test_prefix_selects_then_case_rescores_every_history(scene, monkeypatch):
     # Prefix rows (Ne=3) select; the selected set is then scored on all 8.
     assert {ne for ne, *_ in seen} == {3, 8}
     np.testing.assert_allclose(result["cxr"], sum(_line(h) for h in domain.hkls), rtol=1e-12)
+
+
+def test_tensor_share_tables_of_shells_add_to_the_selected_set():
+    """Real carbon BremsLib: per-shell share-only tables sum to the union's (no clamp)."""
+    from pyrite.montecarlo.runner.lattice_share import removed_share_tables
+    from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables
+
+    tables = load_bremsstrahlung_tables(["C"])
+    composition = [("C", 1.0)]
+    limits = dict(E_cut_keV=5.0, max_energy_keV=30.0)
+    model = _model(cutoff=8.0)
+    ddcs = sdcs = 0.0
+    for _, members in fiber_selection.iter_fiber_shells(model):
+        corrected, _ = model.domain(members).corrected_bremslib_tables(
+            tables, composition, **limits
+        )
+        share = removed_share_tables(tables, corrected, composition)["C"]
+        ddcs = ddcs + np.asarray(share.scaled_ddcs_mb_sr)
+        sdcs = sdcs + np.asarray(share.scaled_sdcs_mb)
+    corrected, record = model.prepare().corrected_bremslib_tables(tables, composition, **limits)
+    assert record["elements"][0]["clamped_nodes"] == 0
+    union = removed_share_tables(tables, corrected, composition)["C"]
+    scale = np.max(np.abs(np.asarray(tables["C"].scaled_ddcs_mb_sr)))
+    np.testing.assert_allclose(ddcs, union.scaled_ddcs_mb_sr, rtol=0, atol=1e-12 * scale)
+    assert np.max(np.abs(np.asarray(union.scaled_ddcs_mb_sr))) > 1e-8 * scale  # nontrivial
+    np.testing.assert_allclose(sdcs, union.scaled_sdcs_mb, rtol=1e-10, atol=0)

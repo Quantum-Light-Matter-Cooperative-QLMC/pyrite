@@ -76,7 +76,12 @@ def run(args):
     )
     record = selected["reflection_selection"]
     arrays["selected_cxr"], arrays["selected_brem"] = selected["cxr"], selected["brem"]
-    sel = dict(_yields(selected, widths), wall_s=wall, record=record)
+    sel = dict(
+        _yields(selected, widths),
+        wall_s=wall,
+        record=record,
+        continuum_correction=selected["continuum_correction"],
+    )
     print(json.dumps({k: v for k, v in record.items() if k != "shells"}), flush=True)
     prefix = None
     if args.histories:
