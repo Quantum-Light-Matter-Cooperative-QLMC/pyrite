@@ -124,29 +124,45 @@ def field_names(*, physics: bool, channeling: bool = True) -> dict[str, str]:
 CHANNELING_FLAGS = tuple(flag for flag, key in FIELD_NAMES.items() if key in CHANNELING_KEYS)
 
 
-class ChannelingSectionCommand(click.Command):
-    """Command whose ``--channeling-*`` options render under their own heading.
+#: Full-fiber option spellings -> ``[cxr_fiber]`` table keys (#1491). Profile
+#: only: they patch one table, so they stay out of :data:`FIELD_NAMES`.
+FIBER_FIELDS = {
+    "cxr-fiber-cutoff-invang": "cutoff_invang",
+    "cxr-fiber-roll-nodes": "azimuth_count",
+    "cxr-fiber-batch-size": "reflection_batch_size",
+}
+#: ``reset`` choice that removes the whole ``[cxr_fiber]`` table.
+FIBER_RESET = "cxr-fiber"
 
-    The flags write the profile's ``[channeling]`` table (#1017), so help lists
-    them apart from the Physics/Numerics fields.
+
+class ChannelingSectionCommand(click.Command):
+    """Command whose table-backed options render under their own headings.
+
+    ``--channeling-*`` flags write the profile's ``[channeling]`` table (#1017)
+    and ``--cxr-fiber-*`` flags its ``[cxr_fiber]`` table (#1491), so help
+    lists each apart from the flat Physics/Numerics fields.
     """
 
+    _SECTIONS = (
+        ("Channeling options (profile [channeling] table)", CHANNELING_FLAGS),
+        ("Full-fiber options (profile [cxr_fiber] table; experimental)", tuple(FIBER_FIELDS)),
+    )
+
     def format_options(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
-        """Render ordinary options, then the channeling-table options."""
-        flags = {f"--{flag}" for flag in CHANNELING_FLAGS}
+        """Render ordinary options, then each table's options."""
+        sections = [(title, {f"--{flag}" for flag in flags}, []) for title, flags in self._SECTIONS]
         rows: list[tuple[str, str]] = []
-        channeling: list[tuple[str, str]] = []
         for param in self.get_params(ctx):
             record = param.get_help_record(ctx)
-            if record is not None:
-                target = channeling if flags.intersection(getattr(param, "opts", ())) else rows
-                target.append(record)
-        if rows:
-            with formatter.section("Options"):
-                formatter.write_dl(rows)
-        if channeling:
-            with formatter.section("Channeling options (profile [channeling] table)"):
-                formatter.write_dl(channeling)
+            if record is None:
+                continue
+            opts = set(getattr(param, "opts", ()))
+            target = next((items for _, flags, items in sections if flags & opts), rows)
+            target.append(record)
+        for title, items in (("Options", rows), *((t, i) for t, _, i in sections)):
+            if items:
+                with formatter.section(title):
+                    formatter.write_dl(items)
 
 
 @removed_option("--cxr-trials", "--cxr-histories")
@@ -409,3 +425,41 @@ def field_params(
         if names.get((param.name or "").replace("_", "-")) is not None
         or (removed and not physics and not param.expose_value)
     ]
+
+
+@click.option(
+    "--cxr-fiber-cutoff-invang",
+    type=click.FloatRange(min=0.0, min_open=True),
+    metavar="INVANG",
+    help=(
+        "Select the full-fiber reflection domain up to reciprocal cutoff |g| in 1/angstrom "
+        "(required; no converged default, at most 75.4). Replaces reflection families, "
+        "maximum reflections and the line-yield tolerance; HOPG, incoherent emission, "
+        "one slab and BremsLib only."
+    ),
+)
+@click.option(
+    "--cxr-fiber-roll-nodes",
+    type=click.IntRange(min=1),
+    metavar="N",
+    help=(
+        "Midpoint roll nodes on one 60-degree sector about the fiber axis (table "
+        "azimuth_count; default 32, use >= 128 when narrow line shapes matter)."
+    ),
+)
+@click.option(
+    "--cxr-fiber-batch-size",
+    type=click.IntRange(min=1),
+    metavar="N",
+    help=(
+        "Full-fiber reflections per coupling-table batch (table reflection_batch_size; "
+        "default 256). Bounds memory only; not part of the result identity."
+    ),
+)
+def _fiber_holder(**_values):
+    """Parameter holder; never invoked."""
+
+
+def fiber_params() -> list[click.Parameter]:
+    """Fresh copies of the profile-only ``--cxr-fiber-*`` options."""
+    return [copy(param) for param in reversed(getattr(_fiber_holder, "__click_params__", []))]

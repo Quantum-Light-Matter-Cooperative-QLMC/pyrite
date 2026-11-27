@@ -60,6 +60,12 @@ format value (`wide`) may be rejected as a usage error once its equivalent
 JSON content receives a distinct schema name; the old profile-resolved payload
 remains available through explicit range inspection during migration.
 
+Table-backed Numerics fields keep flat, prefixed setter flags rather than a
+subcommand per table: `--channeling-*` writes the profile `[channeling]` table
+and `--cxr-fiber-*` (#1491) the `[cxr_fiber]` table, each under its own help
+heading. `set` patches named entries; `reset` takes the table name to remove
+it or a flag name to revert one entry.
+
 ## Consequences
 
 No numerical defaults, saved profile keys, catalog precedence, checkpoint

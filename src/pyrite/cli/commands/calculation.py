@@ -135,19 +135,32 @@ def _setter_error(exc, name, physics):
     return coupled or CLIError(str(exc))
 
 
+def _pop_fiber(values, fields):
+    """Remove the ``--cxr-fiber-*`` values (named in ``fields``) from ``values``."""
+    return {
+        key: value
+        for flag, key in fields.items()
+        if (value := values.pop(flag.replace("-", "_"), None)) is not None
+    }
+
+
 def _set(name, yes, dry_run, *, physics, emission=None, **values):
     names = _calculation_options.FIELD_NAMES
+    fiber = _pop_fiber(values, _calculation_options.FIBER_FIELDS)
     updates = {
         names[key.replace("_", "-")]: value for key, value in values.items() if value is not None
     }
-    if not updates and emission is None:
+    if not updates and not fiber and emission is None:
         raise click.UsageError("provide at least one setting option")
     try:
         original, document = _catalog_io.catalog_text()
         target = _profile_document.existing_profile(document, name)
         if emission is not None:
             target["emission"] = emission
-        profile_numerics.set_numerics(document, name, updates)
+        if updates:
+            profile_numerics.set_numerics(document, name, updates)
+        if fiber:
+            profile_numerics.set_fiber(document, name, fiber)
         mode = _sampling_mode(document, name)
     except (OSError, ValueError, ParseError) as exc:
         raise _setter_error(exc, name, physics) from None
@@ -159,9 +172,10 @@ def _set(name, yes, dry_run, *, physics, emission=None, **values):
 
 
 def _reset(name, selected, yes, dry_run, *, physics):
-    names = _field_names(physics)
-    every = (*names, *(("emission",) if physics else ()))
+    every = _profile_reset_choices(physics)
     fields = tuple(selected) or every
+    fiber_fields = _calculation_options.FIBER_FIELDS
+    table_choices = ("emission", _calculation_options.FIBER_RESET, *fiber_fields)
     try:
         original, document = _catalog_io.catalog_text()
         target = _profile_document.existing_profile(document, name)
@@ -169,11 +183,17 @@ def _reset(name, selected, yes, dry_run, *, physics):
             target.pop("emission", None)
         keys = tuple(
             dict.fromkeys(
-                _calculation_options.FIELD_NAMES[field] for field in fields if field != "emission"
+                _calculation_options.FIELD_NAMES[field]
+                for field in fields
+                if field not in table_choices
             )
         )
         if keys:
             profile_numerics.reset_numerics(document, name, keys)
+        if _calculation_options.FIBER_RESET in fields:
+            profile_numerics.reset_fiber(document, name)
+        elif fiber_keys := tuple(fiber_fields[field] for field in fields if field in fiber_fields):
+            profile_numerics.reset_fiber(document, name, fiber_keys)
     except (OSError, ValueError, ParseError) as exc:
         raise _setter_error(exc, name, physics) from None
     confirm_standard(name, f"reset {_noun(physics)} on", yes, dry_run)
@@ -204,6 +224,7 @@ def _profile_set_params(physics):
     params: list[click.Parameter] = [
         click.Argument(("name",), metavar="PROFILE", shell_complete=_completion.complete_profile),
         *_calculation_options.field_params(physics=physics),
+        *(() if physics else _calculation_options.fiber_params()),
     ]
     if physics:
         params.append(
@@ -222,7 +243,20 @@ def _profile_set_params(physics):
 
 def _profile_reset_choices(physics):
     names = tuple(_field_names(physics))
-    return (*names, "emission") if physics else names
+    if physics:
+        return (*names, "emission")
+    return (*names, _calculation_options.FIBER_RESET, *_calculation_options.FIBER_FIELDS)
+
+
+def _reset_help(physics):
+    text = "Reset selected fields, or every field this command owns, to the preset/default."
+    if physics:
+        return text
+    return (
+        f"{text}\n\ncxr-fiber removes PROFILE's whole [cxr_fiber] table; a cxr-fiber-* "
+        "field reverts that table entry to its default (resetting the required cutoff "
+        "alone is refused while other entries remain)."
+    )
 
 
 def _build_profile_group(physics):
@@ -281,7 +315,7 @@ def _build_profile_group(physics):
         )
     )
 
-    @group.command("reset")
+    @group.command("reset", help=_reset_help(physics))
     @click.argument("name", metavar="PROFILE", shell_complete=_completion.complete_profile)
     @click.argument(
         "selected",
@@ -292,7 +326,6 @@ def _build_profile_group(physics):
     @click.option("-y", "--yes", is_flag=True, help="Skip the standard-profile confirmation.")
     @click.option("--dry-run", is_flag=True, help="Validate and preview without saving.")
     def reset(name, selected, yes, dry_run):
-        """Reset selected fields, or every field this command owns, to the preset/default."""
         return _reset(name, selected, yes, dry_run, physics=physics)
 
     @group.command("validate")

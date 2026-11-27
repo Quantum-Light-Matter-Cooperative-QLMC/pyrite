@@ -76,6 +76,7 @@ Numerics (`profile numerics set`):
 | `cxr_histories`, `brem_histories` | `--cxr-histories`, `--brem-histories` | fixed counts; ignored while adaptive sampling is active. `profile set\|add -l/-b` edit them as sweepable grids |
 | `n_families`, `max_reflections` | `--reflection-families`, `--maximum-reflections` | |
 | `mosaic_nodes`, `mosaic_route` | `--mosaic-nodes`, `--mosaic-route` | |
+| `[cxr_fiber] cutoff_invang`, `azimuth_count`, `reflection_batch_size` | `--cxr-fiber-cutoff-invang`, `--cxr-fiber-roll-nodes`, `--cxr-fiber-batch-size` | experimental full-fiber domain (#1483); profile only. `set` patches the table (the cutoff is required); `reset PROFILE cxr-fiber` removes it, `reset PROFILE cxr-fiber-*` reverts one entry. No `none` spelling yet: a preset's table is replaced, not turned off |
 | `energy_model`, `max_dE_frac` | `--energy-model`, `--maximum-fractional-energy-loss` | also accepted by `profile create\|set` for compatibility |
 
 Physics (`profile physics set`):
