@@ -157,10 +157,10 @@ def _set(name, yes, dry_run, *, physics, emission=None, **values):
         target = _profile_document.existing_profile(document, name)
         if emission is not None:
             target["emission"] = emission
-        if updates:
-            profile_numerics.set_numerics(document, name, updates)
-        if fiber:
+        if fiber:  # first: it names a malformed stored table before validation does
             profile_numerics.set_fiber(document, name, fiber)
+        # Always run: an empty update still checks the line-grid policy (#117).
+        profile_numerics.set_numerics(document, name, updates)
         mode = _sampling_mode(document, name)
     except (OSError, ValueError, ParseError) as exc:
         raise _setter_error(exc, name, physics) from None
@@ -191,7 +191,7 @@ def _reset(name, selected, yes, dry_run, *, physics):
         if keys:
             profile_numerics.reset_numerics(document, name, keys)
         if _calculation_options.FIBER_RESET in fields:
-            profile_numerics.reset_fiber(document, name)
+            profile_numerics.reset_fiber(document, name, explicit=bool(selected))
         elif fiber_keys := tuple(fiber_fields[field] for field in fields if field in fiber_fields):
             profile_numerics.reset_fiber(document, name, fiber_keys)
     except (OSError, ValueError, ParseError) as exc:

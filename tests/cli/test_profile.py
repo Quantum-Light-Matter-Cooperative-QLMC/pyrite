@@ -1799,6 +1799,72 @@ def test_numerics_reset_refuses_dropping_only_the_fiber_cutoff(tmp_path, monkeyp
     assert catalog.read_bytes() == original
 
 
+@pytest.mark.parametrize(
+    ("table", "message"),
+    [
+        ("{ cutoff_invang = 8.0, azimuth_cout = 128 }", "unknown entry 'azimuth_cout'"),
+        ("8.0", "cxr_fiber must be a table"),
+    ],
+)
+def test_numerics_set_refuses_a_malformed_stored_fiber_table(tmp_path, monkeypatch, table, message):
+    text = _CATALOG.replace("[profiles.sub_100keV]", f"[profiles.sub_100keV]\ncxr_fiber = {table}")
+    catalog = _catalog(tmp_path, monkeypatch, text)
+    original = catalog.read_bytes()
+
+    result = invoke(
+        root_command, ["profile", "numerics", "set", "sub_100keV", "--cxr-fiber-batch-size", "32"]
+    )
+
+    assert result.exit_code == 1
+    assert message in result.stderr
+    assert "Traceback" not in result.stderr
+    assert catalog.read_bytes() == original
+
+
+def test_numerics_set_refuses_a_fiber_cutoff_beyond_the_form_factor_range(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    original = catalog.read_bytes()
+
+    result = invoke(
+        root_command,
+        ["profile", "numerics", "set", "sub_100keV", "--cxr-fiber-cutoff-invang", "100"],
+    )
+
+    assert result.exit_code == 1
+    assert "exceeds the form-factor range" in result.stderr
+    assert catalog.read_bytes() == original
+
+
+_PRESET_FIBER = _CATALOG.replace(
+    "[profiles.sub_100keV]",
+    '[numerics.fib]\ncxr_fiber = { cutoff_invang = 8.0 }\n\n[profiles.sub_100keV]\nnumerics = "fib"',
+)
+
+
+def test_numerics_set_patches_a_preset_supplied_fiber_table(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch, _PRESET_FIBER)
+
+    result = invoke(
+        root_command, ["profile", "numerics", "set", "sub_100keV", "--cxr-fiber-roll-nodes", "128"]
+    )
+
+    assert_clean_result(result)
+    assert _fiber_row(catalog)["cxr_fiber"].unwrap() == {"cutoff_invang": 8.0, "azimuth_count": 128}
+
+
+def test_numerics_reset_names_a_preset_supplied_fiber_table(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch, _PRESET_FIBER)
+    original = catalog.read_bytes()
+
+    named = invoke(root_command, ["profile", "numerics", "reset", "sub_100keV", "cxr-fiber"])
+    assert named.exit_code == 1
+    assert "comes from its numerics preset" in named.stderr
+    assert catalog.read_bytes() == original
+
+    every = invoke(root_command, ["profile", "numerics", "reset", "sub_100keV"])
+    assert_clean_result(every)
+
+
 def test_full_fiber_options_are_profile_numerics_only(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 

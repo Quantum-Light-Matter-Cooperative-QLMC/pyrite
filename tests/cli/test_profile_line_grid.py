@@ -170,6 +170,19 @@ def test_coherent_profile_refuses_any_policy(catalog):
     assert _profile_file(catalog, "hopg_short") == before
 
 
+def test_physics_set_emission_alone_still_checks_the_line_grid_policy(catalog):
+    """#1491 review: an emission-only physics set keeps the #117 coherent refusal."""
+    before = _profile_file(catalog, "high_energy")
+
+    refused = invoke(
+        root_command, ["profile", "physics", "set", "high_energy", "--emission", "coherent", "-y"]
+    )
+
+    assert refused.exit_code == 1
+    assert "coherent emission route does not support" in refused.stderr
+    assert _profile_file(catalog, "high_energy") == before
+
+
 def test_coherent_profile_accepts_a_windowed_policy(catalog):
     """#350: feature windows resolve the coherent route, so the editor allows them."""
     path = catalog / "profiles" / "hopg_short.toml"
