@@ -380,10 +380,6 @@ def share_only_tables(case, layer, composition, tables, hkls):
 
     Validation: reflection-yield-tolerance-selector
     """
-    from dataclasses import replace
-
-    import numpy as np
-
     if (
         tables is None
         or case.get("bremsstrahlung_model") != "bremslib"
@@ -395,6 +391,21 @@ def share_only_tables(case, layer, composition, tables, hkls):
     corrected, _, _ = _corrected_tables(
         _radiator(case, layer), hkls, composition, tables, _line_cutoff_keV(case)
     )
+    return removed_share_tables(tables, corrected, composition)
+
+
+def removed_share_tables(tables, corrected, composition):
+    """Tables whose DDCS is ``tables - corrected`` for each tabled ``composition`` element.
+
+    Other entries pass through unchanged. Scoring the result gives the
+    continuum yield a correction removed (the scorer is linear in the table).
+
+    Validation: brem-lattice-coherent-fraction
+    """
+    from dataclasses import replace
+
+    import numpy as np
+
     out = dict(tables)
     for element, _ in composition:
         if element not in tables:

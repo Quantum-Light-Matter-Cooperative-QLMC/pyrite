@@ -40,7 +40,9 @@ class FiberAverage:
         (non-basal included) reflection domain. Required: no value is a
         converged default. In the two #1480 HOPG ladder scenes (30 and 300 keV)
         the CXR line yield still grew 2 % from 20 to 24 1/Angstrom. The scorer
-        refuses cutoffs beyond the form-factor range (75.4 1/Angstrom).
+        refuses cutoffs beyond the form-factor range (75.4 1/Angstrom). Under
+        measured selection (``score_fiber_case(..., line_yield_tolerance=...)``,
+        #1484) it is the search cap instead.
     azimuth_count
         Midpoint roll nodes on one 60-degree sector about the fiber (c) axis;
         each node is a distinct crystallite orientation. Integrated yields

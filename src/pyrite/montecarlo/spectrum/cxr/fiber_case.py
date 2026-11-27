@@ -4,6 +4,12 @@ import numpy as np
 
 from ...._backend import _to_cpu
 from .fiber import FiberCXRModel, _validate_scoring
+from .fiber_selection import (
+    check_selection_arguments,
+    flag_clamped_share,
+    row_scorer,
+    select_fiber_reflections,
+)
 
 
 def _single_radiator(case, segments):
@@ -74,7 +80,9 @@ def _checked_pilot(model, case, tp, E_grid_eV):
     return pilot, grid
 
 
-def score_fiber_case(model, case, tp, E_grid_eV):
+def score_fiber_case(
+    model, case, tp, E_grid_eV, *, line_yield_tolerance=None, selection_histories=None
+):
     """Score a transported runner scene with the full-fiber production kernels.
 
     ``model`` is a :class:`FiberCXRModel`, or ``Numerics``/``CxrReflections``
@@ -85,9 +93,21 @@ def score_fiber_case(model, case, tp, E_grid_eV):
     escape geometry and photon nodes. The line density is a bin mean; the
     continuum is evaluated at the supplied nodes, as in the paired diagnostic.
     The result is a standalone emission record, not a normal sweep checkpoint.
-    Existing automatic reflection and line-grid policies are not run here.
+    The automatic line-grid policy is not run here.
     ``total`` is CXR plus the BremsLib continuum only: characteristic,
     transition and diffracted radiation are not included.
+
+    ``line_yield_tolerance`` (#1484) selects the reciprocal cutoff by measured
+    yield instead of scoring the whole domain: ``model.cutoff_invang`` becomes
+    the search cap, and
+    :func:`~pyrite.montecarlo.spectrum.cxr.fiber_selection.select_fiber_reflections`
+    stops on roll-averaged net shell rows of the electron prefix (at most
+    ``selection_histories``, default 4096, and the row budget). The selected
+    set is scored on every history, and the result gains
+    ``reflection_selection`` (domain, roll count, cutoff, tail, shells).
+    If the selected set's continuum correction clamps at any node, the record
+    reports ``converged=False`` (``share_clamped_nodes``). ``selection_histories``
+    without a tolerance is refused.
 
     Validation: cxr-fiber-intensity-average
     """
@@ -98,10 +118,13 @@ def score_fiber_case(model, case, tp, E_grid_eV):
     if not isinstance(model, FiberCXRModel):
         model = FiberCXRModel.from_numerics(model)
     pilot, grid = _checked_pilot(model, case, tp, E_grid_eV)
+    if line_yield_tolerance is not None:
+        check_selection_arguments(grid, line_yield_tolerance, selection_histories)
+    elif selection_histories is not None:
+        raise ValueError("selection_histories requires line_yield_tolerance")
     segments = tp["segs"]
     count = int(tp["Ne_lines"])
     phi0 = float(pilot.get("azimuth_rad", 0.0))
-    domain = model.prepare()
     pilot.update(
         reflection_selection=None,
         line_quadrature="bin-mean",
@@ -111,35 +134,39 @@ def score_fiber_case(model, case, tp, E_grid_eV):
     if pilot.get("beam_uvw") is None and pilot.get("surface_hkl") is None:
         pilot["surface_hkl"] = (0, 0, 1)
     floor = float(pilot.get("E_cut_lines_keV", 5.0))
+    max_energy = _max_energy(pilot, segments)
+    cxr, selection, staged = None, None, None
+    if line_yield_tolerance is None:
+        domain = model.prepare()
+    else:
+        domain, cxr, selection, staged = select_fiber_reflections(
+            model,
+            pilot,
+            tp,
+            grid,
+            line_yield_tolerance,
+            floor_keV=floor,
+            max_keV=max_energy,
+            histories=selection_histories,
+        )
     tables, correction = domain.corrected_bremslib_tables(
         _case_bremslib_tables(pilot),
         pilot["composition"],
         E_cut_keV=floor,
-        max_energy_keV=_max_energy(pilot, segments),
+        max_energy_keV=max_energy,
     )
-    # Stage only after validation and table construction. The private pilot's
-    # callable B is never serialized, hashed or sent to a worker.
-    segments = runner._segments_on_device(segments)
+    if selection is not None:
+        selection = flag_clamped_share(selection, correction)
+    # Stage after validation and table construction; a selection whose prefix
+    # was the whole population already staged it. The private pilot's callable
+    # B is never serialized, hashed or sent to a worker.
+    segments = runner._segments_on_device(segments) if staged is None else staged
     n_hat, groove = tp["n_hat"], tp.get("groove")
     abs_layers = pilot.get("abs_layers")
-    lookup = domain._thermal_lookup()
-
-    def score(hkls, phi):
-        return _to_cpu(
-            runner._cxr_for_segments(
-                segments,
-                grid,
-                dict(pilot, hkl_list=hkls, B_ang2=lookup.__getitem__, azimuth_rad=phi),
-                n_hat,
-                abs_layers,
-                groove,
-                coherent=False,
-                Ne=count,
-                table_cache=None,
-            )
+    if cxr is None:
+        cxr = domain._average(
+            row_scorer(segments, grid, pilot, n_hat, groove, count, domain), grid.shape, phi0
         )
-
-    cxr = domain._average(score, grid.shape, phi0)
     brem = np.asarray(
         _to_cpu(
             _layer_brem_from_segments(
@@ -158,7 +185,7 @@ def score_fiber_case(model, case, tp, E_grid_eV):
     )
     if brem.shape != grid.shape or not np.isfinite(brem).all():
         raise RuntimeError("invalid continuum spectrum from BremsLib scorer")
-    return dict(
+    result = dict(
         E_grid_eV=grid,
         cxr=cxr,
         brem=brem,
@@ -172,3 +199,6 @@ def score_fiber_case(model, case, tp, E_grid_eV):
         line_quadrature="bin-mean",
         continuum_quadrature="node",
     )
+    if selection is not None:
+        result["reflection_selection"] = selection
+    return result

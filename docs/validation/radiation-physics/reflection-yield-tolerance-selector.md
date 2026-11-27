@@ -531,7 +531,163 @@ is not a converged fiber spectrum outside narrow $(00l)$ windows at backward,
 near-axial, high-energy geometry. The full table, the applicability envelope
 and the opt-in full-fiber model (`cxr-fiber-intensity-average`) are in the
 [#1480 research note](../../research/physics/fiber-nonbasal-cxr-1480.md#applicability-envelope).
-Selector extension to the fiber domain: #1484.
+Selector extension to the fiber domain: #1484, below.
+
+### Full-fiber domain selection (#1484)
+
+Opt-in, outside campaigns (campaign wiring is #1483). With
+`score_fiber_case(model, case, tp, grid, line_yield_tolerance=tol)` the
+fiber model's `cutoff_invang` becomes the search cap $G_{\max}$ and the
+selector chooses the cutoff on the full reciprocal domain of
+`cxr-fiber-intensity-average`, rather than on the basal $(00l)$ set.
+
+**Shells.** Candidates are the non-extinct reflections of the full lattice
+(zero-B enumeration, metric above $10^{-9}$ of the strongest family, the
+same rule as `FiberCXRModel.prepare`), partitioned into
+$\mathcal G_k=\{g: G_k-\Delta<\lvert g\rvert\le G_k\}$, $\Delta=2$ Å⁻¹. A roll
+$R$ by $\pi/3$ about $c$ and Friedel inversion are isometries of the
+reciprocal lattice of Bernal graphite that map the allowed set to itself
+($\lvert S\rvert$ is invariant under both), so they preserve $\lvert g\rvert$
+and every shell is closed under them: a shell is a union of complete
+roll-closed families. `FiberReflectionSet` re-checks this closure for every
+shell. Because the strongest family $(002)$ lies at 1.87 Å⁻¹, the metric
+floor is the same at every $G\ge2$ Å⁻¹, so
+$\bigcup_{j\le k}\mathcal G_j$ is exactly `prepare()` at cutoff $G_k$
+(enumerated identity at $G=2,\dots,24$: 2, 34, 108, 242, 478, 852, 1358,
+2008, 2880, 3974, 5332, 6828 reflections).
+
+**Row.** The line row of a shell is its roll average on the model's own
+sector quadrature, $L_k=\int_{\rm band}\bigl[\sum_{g\in\mathcal G_k^{00l}}
+I_g+\tfrac1N\sum_{i=1}^{N}\sum_{g\in\mathcal G_k\setminus00l}I_g(\phi_i)\bigr]dE$,
+$\phi_i=\phi_0+(\pi/3)(i+\tfrac12)/N$, with the same $N$ as production. The
+sector average of a set closed under $R$ equals its full-circle average
+(each $R$ permutes the set), so it holds for each shell alone. Incoherent
+intensities add over reflections and the average is linear, so
+$\sum_{j\le k}L_j$ is the roll-averaged line yield of the union, up to
+floating-point reassociation (the same additivity as §1, applied per roll
+node). The band is the outer bin edges of the case's `bin-mean` axis and
+the weights are its bin widths (§2). The background log grid needs a
+positive lower edge, so an axis whose first spacing is at least twice its
+first node (lower edge clamped to 0 eV) is refused before any staging, as are
+a tolerance outside $(0,1)$ and `selection_histories` without a tolerance.
+
+**Net metric.** The paired fiber continuum is always lattice-share
+corrected, so the stop uses the v4 net form: $s_k=L_k-S_k$ with $S_k$ the
+in-band continuum yield of $\chi_{\rm base}-\chi_{\rm corr}(\mathcal G_k)$,
+where $\chi_{\rm corr}$ uses the shell weights $\sum_{g\in\mathcal G_k}\lvert
+U_g(B(g))\rvert^2$ with the projected tensor $B(g)$ of each reflection,
+exactly the correction the selected set receives. $C$ is the uncorrected
+in-band continuum (96 log nodes per decade, trapezoid, as v4). By §3 the
+shares add to the selected set's removed share at every unclamped node; the
+production correction of the selected set sums all shells before the clamp,
+and its `clamped_nodes` count is recorded with the result. A selected set
+whose correction clamps at any node is reported `converged=False`
+(`share_clamped_nodes`), since there the summed shares exceed the share
+production removes.
+
+**Estimator and stop.** Unchanged: `select_reflection_cutoff` with
+`share_yield` and `background`, i.e. $\tau_k=|s_k|r_k/[(1-r_k)(\sum_{j\le k}
+s_j+C)]$, $r_k=\max(|s_k/s_{k-1}|,|s_{k-1}/s_{k-2}|)$, two consecutive
+decreases required, exhaustion at $G_{\max}$ reports `converged=False`. It
+inherits every limit stated above (not a bound; zero-crossing early stops
+of the net form).
+
+**Prefix.** Rows, shares and background are scored on the row-budget
+electron prefix of v9 (`SELECTION_HISTORIES`, `SELECTION_ROWS`), with the
+same $k$ normalizing lines and continuum, so the decision uses ratios of
+one estimator. A prefix shorter than the population rescores the selected
+set on every history; otherwise the shell sum is the production CXR
+spectrum (no second pass).
+
+**Identity.** The selection record carries `domain="full-fiber"`, the
+fiber model marker, the roll count `azimuth_count`, the temperature, cap,
+shell width, cutoff, tail and the shell table (`metric="net"`, per-shell
+`share`, `background_yield`). `selected_set_sha256` hashes the domain,
+crystal, texture axis, roll count and sorted reflection list, so equal sets
+at different roll counts are distinct identities. The result's model record
+names the selected cutoff. No default output, catalog or
+`CXR_REFLECTION_SELECTION_MODEL` changes: the basal path is untouched.
+
+**Limits.** HOPG only (the fiber model's scope); the selection axis is the
+caller's photon axis, so a wide band dilutes the tolerance with continuum;
+roll-quadrature error enters every row through the same $N$-node rule and is
+not estimated by the tail. The isotropic continuum share and the absence of inter-domain phase
+are properties of the model, not of the selector.
+
+**Code.** `montecarlo/spectrum/cxr/fiber_selection.py::{iter_fiber_shells,
+check_selection_arguments,select_fiber_reflections,flag_clamped_share,
+_FiberShellContinuum,fiber_selection_record}`,
+`montecarlo/spectrum/cxr/fiber.py::FiberCXRModel.domain`,
+`montecarlo/spectrum/cxr/fiber_case.py::score_fiber_case`,
+`montecarlo/runner/lattice_share.py::removed_share_tables`.
+
+**Tests.** `tests/montecarlo/spectrum/test_fiber_selection_1484.py`: shells
+partition `prepare()` at each cutoff and are closed alone; on real carbon BremsLib tables the per-shell
+tensor share-only tables sum to the selected set's (no clamped node); on a
+synthetic
+roll-dependent scorer the stop, tail, selected set and summed spectrum
+equal an independent recomputation from exact roll-averaged net shell
+yields; set identity changes with roll count at fixed reflections; an
+unconverged cap keeps every shell; a short prefix selects on $k$ electrons
+and `score_fiber_case` rescores the selected set on all of them; the real
+`_FiberShellContinuum` scores the uncorrected background and the share-only
+tables of a shell on the prefix (stubbed BremsLib scorer, real tables); bad
+arguments are refused before staging; a clamped correction flags the
+selection unconverged.
+
+**Replay on the #1480 ladder scenes (2026-11-26, CPU FP64).** Each scene
+was transported once (seed 1480, 600 electrons, 500 nm HOPG, lab 45°, 32
+rolls, 2 eV bins), selected at tolerance $10^{-3}$ with cap 40 Å⁻¹, then
+scored at fixed cutoffs on the same transport and axis with the unchanged
+opt-in model (`checks/fiber_selector_1484.py`). The #1480 ladder transported
+on CUDA FP64. These CPU transports keep its segment counts but not its
+digest, and their fixed-cutoff totals agree with the ladder to
+$\le3.4\times10^{-7}$. "Total" is CXR plus the corrected continuum in the
+band, the quantity the net metric measures. No node was clamped in any
+recorded fixed-cutoff correction (6–32 Å⁻¹). The selected sets'
+corrections were not written to these summaries; the check now records
+them.
+
+| | 30 keV, tilt 15°, 20–25000 eV | 300 keV, tilt 60°, 20–60000 eV |
+|---|---|---|
+| Selected cutoff, reflections | 24 Å⁻¹, 6828 | 28 Å⁻¹, 10804 |
+| Tail estimate $\tau$ at the stop | 8.5e-4 | 6.6e-4 |
+| Fixed 32 Å⁻¹ total vs selected | +3.3e-4 | +2.0e-4 |
+| Fixed 24 Å⁻¹ total vs selected | 0 (same set) | −4.4e-4 |
+| Fixed 6 / 8 / 10 Å⁻¹ total vs selected | −3.7 % / −2.7 % / −1.8 % | −3.0 % / −2.3 % / −1.6 % |
+| Fixed 32 Å⁻¹ CXR vs selected | +1.1 % | +0.35 % |
+| Selection wall time | 21 min | 32 min |
+| Fixed 32 Å⁻¹ wall time | 47 min | 41 min |
+
+Both scenes stop with a recorded tail. Against the highest fixed cutoff, the
+omitted total is within the tolerance and below the stop's own estimate.
+The estimates are 2.6 (30 keV) and 3.2 (300 keV) times the measured
+omission to 32 Å⁻¹. The net rows fall in pairs of shells (14/16 and 18/20
+within 12 % at 30 keV), and the stop's max-of-two ratio is the slower
+within-pair step: 0.69 for 22→24 against 0.38 between pairs at 30 keV,
+0.77 at 300 keV. Fixed 6–10 Å⁻¹ omit 1.6–3.7 %
+of the total, and 25–49 % of the CXR lines. The selection stops at
+24–28 Å⁻¹, consistent with the ladder's 24 Å⁻¹ convergence judgment. The CXR
+lines alone still grow 0.35–1.1 % from the selected cutoff to 32 Å⁻¹, because
+their CBS part is offset by the continuum share. A line-only metric would
+need a larger cutoff. On a 256-electron prefix (2384 rows) the 30 keV scene
+selects the same 24 Å⁻¹ set ($\tau=8.6\times10^{-4}$), and rescoring on all
+600 electrons gives the same total to $10^{-15}$. Jobs 16166 (qlmc-queen)
+and 16167 (qlmc-ace CPU), code `aae2c5689`. Raw:
+`~/dev/pyrite-benches/1484-fiber-selector/`. Two scenes do not qualify a
+default, and the stop is an extrapolation, not a bound.
+
+**Fresh-context review (2026-11-26): `rederived`.** An independent
+enumeration with the exact extinction rule ($h-k\equiv0 \bmod 3$, odd $l$)
+reproduced the closure of every shell and the union with `prepare()` for
+$G=2\ldots40$ Å⁻¹. A table-level probe on the carbon BremsLib table found the
+per-shell share tables summing to the union's to $7.5\times10^{-20}$ of the
+maximum DDCS. The stop, $\tau$ and cutoffs were recomputed from the raw shell
+tables of both scenes and the prefix run. The review found no code defects.
+Its wording corrections (pair-of-shells ratios, clamp scope, quadrature
+limit) are applied above, and its anchor gap (the scene tests stub the
+continuum) is closed by the table-additivity test. CI has not been
+observed.
 
 ### Fiber-texture re-verification (v7, #1301, 2026-11-18)
 

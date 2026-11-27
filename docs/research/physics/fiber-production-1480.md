@@ -29,6 +29,13 @@ result = score_fiber_case(model, case, tp, grid)
 cxr, brem, total = result["cxr"], result["brem"], result["total"]
 ```
 
+To measure the cutoff instead of fixing it (#1484), pass
+`line_yield_tolerance=1e-3` to `score_fiber_case`. `cutoff_invang` is then
+the search cap (40 Å⁻¹ is ample for 30–300 keV HOPG), and
+`result["reflection_selection"]` records the selected cutoff, tail, shells,
+roll count and set digest. See
+[full-fiber domain selection](../../validation/radiation-physics/reflection-yield-tolerance-selector.md#full-fiber-domain-selection-1484).
+
 Since #1483, `simulate()` and campaign runs score `CxrReflections.fiber`
 directly; the case then carries the model record as `cxr_fiber`. Since
 #1489 an explicit `EnergyBins.cxr` grid is optional: the default automatic

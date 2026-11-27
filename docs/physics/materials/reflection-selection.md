@@ -138,6 +138,21 @@ automatic selection raises the 30 keV HOPG and h-BN line yield by 3.8 % and
 lattice-share continuum falls by at most 0.15 %. These are scene-specific
 measurements, not a universal omitted-yield guarantee.
 
+### Opt-in full-fiber domain (#1484)
+
+The experimental full-fiber model (`FiberCXRModel`, #1480) can select its
+own cutoff: `score_fiber_case(model, case, tp, grid,
+line_yield_tolerance=1e-3)` treats `FiberAverage.cutoff_invang` as the search
+cap. Shells are 2 Å⁻¹ bands of the full reciprocal lattice, so each is a set
+of complete families closed under 60° rolls about c. Each shell's yield is
+its roll average on the model's sector quadrature, less the continuum its
+projected-tensor lattice share removes. The tail estimate and stop are the
+ones above, on the same electron prefix. The record carries
+`domain="full-fiber"` and `azimuth_count`, and both enter
+`selected_set_sha256`. The campaign path still refuses fiber numerics
+(#1483). Derivation and replay:
+[full-fiber domain selection](../../validation/radiation-physics/reflection-yield-tolerance-selector.md#full-fiber-domain-selection-1484).
+
 ## Explicit controls and qualification
 
 An explicit `CxrReflections(n_families=4)` or `--n-families 4` restores the
