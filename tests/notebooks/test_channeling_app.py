@@ -283,7 +283,7 @@ def test_axial_radiation_reports_vortex_helicity_and_far_field():
     assert options[strongest] == 0 and len(vortex.catalog.lines) == 1
     photons = vortex.photons(len(vortex.depths_ang) - 1)
     assert photons[0] > 0
-    spectrum, far, moments = axial_radiation_figures(vortex, len(vortex.depths_ang) - 1, 0)
+    _spectrum, far, moments = axial_radiation_figures(vortex, len(vortex.depths_ang) - 1, 0)
     assert moments["J_z"] == pytest.approx(1.0, abs=1e-3)
     assert far is not None and "purity 1.000" in far.texts[0].get_text()
     plt.close("all")

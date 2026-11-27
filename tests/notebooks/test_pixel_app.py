@@ -100,7 +100,7 @@ def test_inverted_window_falls_back_to_the_full_range_with_a_warning(tmp_path) -
     observation = inventory.load(digest)
     edges = observation.acquisition.measured_edges_eV
 
-    scored, image, warnings = resolve_pixel_image(
+    _scored, image, warnings = resolve_pixel_image(
         observation,
         _Values(kind="window", counts="expected", low=edges[2], high=edges[1], scale="log").value,
     )
@@ -118,7 +118,7 @@ def test_poisson_observation_defaults_to_its_labelled_realization(tmp_path) -> N
     observation = inventory.load(digest)
     controls = make_pixel_image_controls(mo, observation)
 
-    scored, image, warnings = resolve_pixel_image(observation, controls.value)
+    _scored, image, warnings = resolve_pixel_image(observation, controls.value)
 
     assert controls.value["counts"] == "realized"
     assert image.value_title == "realized counts"

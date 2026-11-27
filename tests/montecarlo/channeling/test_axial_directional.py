@@ -92,7 +92,7 @@ def test_linear_weights_integrate_the_interpolant_exactly(omega):
 
 def test_linear_quadrature_has_no_line_replicas_at_large_angle():
     """One line, far off axis: the trapezoid sum aliases replicas, linear does not."""
-    gamma, beta = longitudinal_kinematics(KINETIC)
+    _gamma, beta = longitudinal_kinematics(KINETIC)
     hbar_v = HBARC_EV_ANG * beta
     z = np.linspace(0.0, 3000.0, 201)
     delta = 30.0  # eV transition

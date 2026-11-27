@@ -114,7 +114,7 @@ def test_selection_band_scales_with_the_limit(small_selection, monkeypatch):
         seen.clear()
         selected = sinc_spacing_by_selection(lambda: iter([(width, weight)]), limit)
         total = math.fsum(float(c.sum()) for c in np.array_split(weight, 50))
-        low, center, high = seen[0]
+        _low, center, high = seen[0]
         expected = spacing_selection.DELTA_FACTOR * width.size * np.finfo(float).eps / 2
         assert center == limit * total
         assert (high - center) == pytest.approx(expected * limit * total, rel=1e-9)

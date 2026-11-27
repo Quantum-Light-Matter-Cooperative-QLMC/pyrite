@@ -392,7 +392,7 @@ def test_detected_image_physical_blur_redistributes_flux_across_pixels():
     E = np.arange(500.0, 1200.0, 1.0)
     spec = np.exp(-0.5 * ((E - 850.0) / 0.5) ** 2)  # a very narrow input line
     kwargs = dict(active_um=100.0, v_dep=0.5, temp_c=20.0)
-    centers, counts = detected_image_physical(E, spec, g, ccd, distance_mm=200.0, **kwargs)
+    _centers, counts = detected_image_physical(E, spec, g, ccd, distance_mm=200.0, **kwargs)
     x, inten = disperse_spectrum(
         E, spec * qe_absorption(E, active_um=100.0), g, distance_mm=200.0, weight_by_throughput=True
     )

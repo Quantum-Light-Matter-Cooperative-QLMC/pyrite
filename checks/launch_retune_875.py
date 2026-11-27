@@ -206,7 +206,7 @@ def attributes(args):
     arms = Arms(args.arms)
     records = {}
     for name in args.arms:
-        precision, threads, _ = arms.spec[name]
+        precision, _threads, _ = arms.spec[name]
         arms.select(name)
         simulate_trajectories(**kwargs, Ne=500, seed=1, transport_precision=precision)
         _sync()

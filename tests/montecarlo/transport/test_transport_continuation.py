@@ -382,7 +382,7 @@ def test_shell_schema_rows_and_budget(secondaries, keep_on_device):
     budget = 2 * (4 * (2 * row_bytes + 24) + 13)
     records = []
     cont = TransportContinuationConfig(rows_per_round=4, on_round=records.append)
-    counts, rows, _, _ = _drive(cont, budget=budget, keep_on_device=keep_on_device, alloc=alloc)
+    _counts, rows, _, _ = _drive(cont, budget=budget, keep_on_device=keep_on_device, alloc=alloc)
     history, ordinal = _expected()
     np.testing.assert_array_equal(rows[5], history)
     np.testing.assert_array_equal(rows[2], ordinal)
@@ -483,7 +483,7 @@ def test_automatic_quantum_resizes_after_the_first_round(keep_on_device):
 def test_draining_rounds_spread_scratch_over_remaining_lanes():
     row_bytes = continuation_row_bytes(_alloc(1))
     budget = 8 * (256 * (2 * row_bytes + 24) + 13)
-    _, _, launches, records = _short_rows(TransportContinuationConfig(), budget)
+    _, _, _launches, records = _short_rows(TransportContinuationConfig(), budget)
     drain = [r for r in records[1:] if not r["pending"] and not r["refilled"]]
     # The 300-row history finishes in fewer rounds than 300 / 16.
     assert drain and len(records) - 1 < int(np.ceil(300 / 16))

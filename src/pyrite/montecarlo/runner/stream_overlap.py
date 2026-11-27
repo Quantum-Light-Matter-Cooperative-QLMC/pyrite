@@ -82,7 +82,7 @@ def stream_overlapped(
     failed_at = None
 
     def collect(entry) -> bool:
-        future, index, block_counts = entry
+        future, _index, block_counts = entry
         try:
             future.result()
         except Exception as error:

@@ -66,7 +66,7 @@ def test_loss_matches_full_transfer_planar_diagonal(mechanism, hkl):
 
 def _coherent_state(inputs):
     """Normalized superposition of the three lowest k = 0 states with distinct phases."""
-    energies, vectors = inputs.channels.spectrum((0.0, 0.0))
+    _energies, vectors = inputs.channels.spectrum((0.0, 0.0))
     chi = vectors[:, :3] @ np.array([0.7, 0.5j, -0.5])
     return chi / np.linalg.norm(chi)
 

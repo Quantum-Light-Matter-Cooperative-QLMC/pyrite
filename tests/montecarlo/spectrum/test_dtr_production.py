@@ -123,7 +123,7 @@ def test_two_beam_checkpoint_and_full_streamed_replay(dtr_run, tmp_path):
 
 def test_two_beam_reline_uses_the_same_amplitude_path(dtr_run):
     case, transport, live = dtr_run
-    spec, coherent, characteristic, tr = runner._cxr_pair_for_case(
+    spec, coherent, _characteristic, tr = runner._cxr_pair_for_case(
         case,
         transport["E_grid"],
         want_coherent=False,

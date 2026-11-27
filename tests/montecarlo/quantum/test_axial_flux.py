@@ -62,7 +62,7 @@ def test_periodic_face_flux_matches_divergence_volume_integral():
     phi = _normalized(state, grid)
     contour = FluxContour((-5, 29), (11, 18))
     obs = AxialFluxObservable(grid, 5e6, divergence=True, contour=contour)
-    currents, div, sides = obs.unpack(obs(phi, (0.4, 0.5))[None])
+    _currents, div, sides = obs.unpack(obs(phi, (0.4, 0.5))[None])
     xx = np.arange(contour.start[0], contour.start[0] + contour.size[0]) % grid.shape[0]
     yy = np.arange(contour.start[1], contour.start[1] + contour.size[1]) % grid.shape[1]
     integral = div[0][np.ix_(xx, yy)].sum() * grid.cell_area_ang2

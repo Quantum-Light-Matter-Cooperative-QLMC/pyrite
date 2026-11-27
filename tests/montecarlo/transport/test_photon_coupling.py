@@ -77,7 +77,7 @@ def test_stage_receives_only_launchable_electrons_and_photons_return():
     out = _run(stage, [(0.0, 1e7, CU)])
     _assert_closed(out)
     assert out.rounds >= 1 and out.ledger["complete"].all()
-    rows, seed = stage.calls[0]
+    rows, _seed = stage.calls[0]
     assert np.all(rows["species"] == ELECTRON)
     assert np.all(rows["kinetic_eV"] > stage.threshold_eV)
     first = out.charged["round"] == 0
@@ -173,7 +173,7 @@ def silicon_stage():
 
 @pytest.mark.slow
 def test_cascade_stage_closes_per_row_and_returns_its_radiation(silicon_stage):
-    layers, stage = silicon_stage
+    _layers, stage = silicon_stage
     n = 8
     angle = np.linspace(0.0, 1.2, n)
     rows = {

@@ -251,7 +251,7 @@ def test_tilt_is_measured_from_the_cut_face_normal(cut, tilt):
 
     scene = replace(_scene(), target=_slab(cut, tilt=tilt, allow_normal_incidence=True))
     case = build_case(scene)
-    beam, n_hat = tilted_geometry(case["theta_obs_rad"], np.deg2rad(case["tilt_deg"]), 0.0)
+    beam, _n_hat = tilted_geometry(case["theta_obs_rad"], np.deg2rad(case["tilt_deg"]), 0.0)
     rotation = _orientation_R(
         HOPG.lattice,
         case["beam_uvw"],

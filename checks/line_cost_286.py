@@ -146,7 +146,7 @@ class Recorder:
         t0 = time.perf_counter()
         tree = self._orig_build(E_r, aw, w, **kw)
         if self._current is not None:
-            e, a, _wt, first, last, center, half, radius, _m = tree
+            e, a, _wt, first, last, _center, _half, radius, _m = tree
             exact = float(kw.get("exact_widths", _bin_quadrature.BIN_MEAN_EXACT_WIDTHS))
             r = exact * np.pi / a.astype(np.float64)
             n_leaves = len(first) // 2

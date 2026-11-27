@@ -904,7 +904,7 @@ def test_mismatched_case_is_refused(tmp_path):
     "node", ["spectrum_inputs/n_hat", "spectrum_inputs/E_grid", "spectrum_inputs/Ne_brem"]
 )
 def test_inputs_that_disagree_with_their_case_are_refused(tmp_path, node):
-    _case_, path = _captured(tmp_path)
+    _case, path = _captured(tmp_path)
     with h5py.File(path, "r+") as handle:
         dataset = handle[node]
         dataset[...] = dataset[()] + 1
@@ -1018,7 +1018,7 @@ def test_stream_refuses_cases_that_need_every_segment(tmp_path):
 
 
 def test_stream_refuses_schema_1(tmp_path):
-    _case_, path = _captured(tmp_path)
+    _case, path = _captured(tmp_path)
     downgrade(path, 1)
 
     with pytest.raises(TrajectoryArtifactError, match="predates spectrum-phase inputs"):

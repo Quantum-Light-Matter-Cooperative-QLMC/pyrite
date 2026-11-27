@@ -216,7 +216,7 @@ def _mos2_or_skip():
 
 
 def test_mos2_dataset_reproduces_stated_peaks(omega_ev):
-    dielectric, entry = _mos2_or_skip()
+    dielectric, _entry = _mos2_or_skip()
     energy = np.linspace(2.0, dielectric.energy_eV[-1], 4000)
     perp = dielectric.elf(0.0, energy)
     par = dielectric.elf(1.0, energy)

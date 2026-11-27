@@ -60,7 +60,7 @@ def test_fixed_count_standard_profile_keeps_the_bare_canonical_stem(monkeypatch)
     args = argparse.Namespace(catalog_profile="standard")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
-        settings, _sweep, _identity, stem = scan._resolved_run(args, "hopg")
+        settings, _sweep, _identity, _stem = scan._resolved_run(args, "hopg")
 
     assert settings.precision is None
     assert canonical_profile_run("standard") is True

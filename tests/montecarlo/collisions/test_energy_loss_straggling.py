@@ -125,7 +125,7 @@ def sample_losses(Z, J_keV, C, E_keV, s_ang, n_draws, seed=20260820):
 def test_sigma_units_are_inverse_length_and_counts_scale_with_step():
     """``<n_i> = s Sigma_i`` is dimensionless and linear in the step."""
     Z, J = element_params("C")
-    valid, sigma_1, E_1, sigma_2, E_2, sigma_3 = _urban_channels_scalar(Z, J, 0.01, 25.0)
+    valid, sigma_1, E_1, sigma_2, E_2, _sigma_3 = _urban_channels_scalar(Z, J, 0.01, 25.0)
     assert valid == 1.0
     # Sigma_i [1/Ang] times E_i [keV] must recover C [keV/Ang].
     assert sigma_1 * E_1 + sigma_2 * E_2 > 0.0

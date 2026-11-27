@@ -167,7 +167,7 @@ def test_zero_uncertainty_saturation_and_missing_band_refused():
 
 
 def test_nonphysical_templates_and_bounds_refused():
-    s, i, dets, shifts = _setup()
+    s, i, dets, _shifts = _setup()
     with pytest.raises(ValueError, match="nonnegative"):
         GaussianCTRTemplates(
             s.energy_eV,
@@ -223,7 +223,7 @@ def test_persistence_provenance_and_open_interval(tmp_path):
 
 
 def test_energy_dependent_detector_and_instrument_jitter_reused():
-    scan, template, instrument, detectors = _synth()
+    scan, template, _instrument, detectors = _synth()
     e = template.energy_eV
     measured_response = CalibratedPulseEnergyDetector(
         np.array([0.0001, 0.03]),

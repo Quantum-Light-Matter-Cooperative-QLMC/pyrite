@@ -205,7 +205,7 @@ def plan(flush_dir, out_json, repeats=5):
     from pyrite.montecarlo.spectrum.cxr._fourier_cutoffs import cutoff_rectangle_array
 
     cp = _cp()
-    name, E, a, w, axis, kwargs = next(iter(_flushes(flush_dir)))
+    name, E, a, w, axis, _kwargs = next(iter(_flushes(flush_dir)))
     # Period of the flush as the driver picks it is not needed: the plan cost
     # depends on the sorted counts; a representative period is the widest-line one.
     from pyrite.montecarlo.spectrum.cxr._bin_fourier import fourier_period

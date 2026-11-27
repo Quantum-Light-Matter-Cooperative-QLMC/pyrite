@@ -187,7 +187,7 @@ def test_zero_channel_conserves_photon_mass():
     """The added channel must neither invent nor drop photons."""
     grid = geometric_continuum_grid("hopg", 29_000.0, 513)
     density = np.exp(-grid / 5_000.0)
-    source_edges, source_widths = node_bin_edges_and_widths(grid)
+    _source_edges, source_widths = node_bin_edges_and_widths(grid)
     edges, _, padded = zero_based_detector_edges(grid)
     padded_density = np.concatenate(([0.0], density)) if padded else density
 

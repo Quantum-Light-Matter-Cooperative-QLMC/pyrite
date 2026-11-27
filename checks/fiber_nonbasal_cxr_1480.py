@@ -922,7 +922,7 @@ def cmd_stream(args):
     from pyrite.montecarlo.runner import streamed_scoring
     from pyrite.montecarlo.runner.fiber_emission import fiber_domain
 
-    E, case = _campaign_case(args)
+    _E, case = _campaign_case(args)
     blocks: dict[int, dict] = {}  # keyed by first electron id: a replayed block overwrites
     t0 = time.time()
     if args.route == "retained":

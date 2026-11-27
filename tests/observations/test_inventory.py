@@ -127,7 +127,7 @@ def test_inventory_reports_an_unreadable_record_and_keeps_the_rest(tmp_path) -> 
 
 
 def test_unknown_manifest_schema_is_a_problem_and_entries_fall_back_to_keys(tmp_path) -> None:
-    source, digest, longer = _stored(tmp_path)
+    source, _digest, _longer = _stored(tmp_path)
     directory = tmp_path / "checkpoints" / "hopg"
     directory.mkdir(parents=True)
     (directory / "cases.json").write_text(json.dumps({"schema": "other", "cases": []}))

@@ -225,7 +225,7 @@ def test_off_grid_values_track_direct_physics_across_every_decade():
     # densely, on deliberately off-node energies, against the scalar physics the
     # direct cores evaluate.
     E_min, E_max = 0.1, 1.0e5
-    L_Js, L_Zs, L_ks, L_coeffs, L_xc, L_sr, L_mn, L_d1, L_d2, L_sj = _synthetic_layer()
+    L_Js, _L_Zs, L_ks, L_coeffs, L_xc, L_sr, _L_mn, _L_d1, _L_d2, L_sj = _synthetic_layer()
     lut = _build(E_min, E_max)
 
     rng = np.random.default_rng(99)
@@ -247,7 +247,7 @@ def test_off_grid_values_track_direct_physics_across_every_decade():
 
 def test_off_grid_values_track_direct_physics_at_the_cutoff_and_the_stopping_join():
     E_min, E_max = 0.1, 1.0e5
-    L_Js, L_Zs, L_ks, L_coeffs, L_xc, L_sr, L_mn, L_d1, L_d2, L_sj = _synthetic_layer()
+    L_Js, _L_Zs, L_ks, L_coeffs, L_xc, L_sr, _L_mn, _L_d1, _L_d2, L_sj = _synthetic_layer()
     lut = _build(E_min, E_max)
 
     # The Joy-Luo/Berger-Seltzer crossover is a kink, not a jump: the two laws

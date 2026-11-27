@@ -211,7 +211,7 @@ def _model_moments(case, track_um, plasma_eV, thresholds_eV):
     from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables
 
     target, E0 = CASES[case]
-    element, rho, A, _ = TARGETS[target]
+    element, rho, _A, _ = TARGETS[target]
     table = load_bremsstrahlung_tables([element])[element]
     n_cm3 = rho * 6.02214076e23 / TRANSPORT_ELEMENTS[element]["A"]
     # 100 merged bins: each partition restages the table, and these checks

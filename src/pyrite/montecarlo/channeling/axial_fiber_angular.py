@@ -199,7 +199,7 @@ def polarization_spectrum(
     g = np.asarray(values, dtype=complex)
     if g.shape != (z.size, z.size, 2, 2):
         raise ValueError("values must have shape (depth, depth, 2, 2)")
-    gamma, beta = longitudinal_kinematics(kinetic_energy_eV)
+    _gamma, beta = longitudinal_kinematics(kinetic_energy_eV)
     hbar_v = HBARC_EV_ANG * beta
     spacing = np.diff(z)
     if quadrature not in ("trapezoid", "linear"):
