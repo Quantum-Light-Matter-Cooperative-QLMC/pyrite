@@ -173,3 +173,61 @@ The [study record](../check-records/mosaic-mc-sampled-1185-study.json) holds per
 - **Cost:** 115–126 s per first bin-mean scoring call on the RTX 5080, with 2.9 GB device peak. The Radeon 8060S took more than 25 min per call on this scene.
 - Whether this route should become the mosaic default is #1207.
 - **Harness note.** The straggling calls ran with `--arm baseline`, because the harness at `a2a7a4466` has no `straggling` choice. Under `--replay` the case, including `straggling=True`, comes from the transport pickle, and `--arm` only labels the report. The arm is therefore the call's tag prefix.
+
+### Analytic route against the sampled route, and the $K$ ladder (#1207, jobs 16218, 16222)
+
+The [study record](../check-records/mosaic-default-1207-study.json) holds every per-seed comparison, the reference metrics, transport hashes, timings and device memory. Raw evidence and `SHA256SUMS` are on `qlmc` under `~/pyrite-1207-s1/evidence/s1207/`; the analysis script sits beside it in `source/`.
+- **Scene:** HOPG, 30 keV, 2 µm, 45°/180°: the #1142 t2 baseline transport, regenerated at source `7b9c0fd5d` with seeds 1142201–4.
+- **Mosaic widths:** the catalog 0.8°, and 0.1° on the same transports. HOPG is the only catalog crystal with a mosaic, so 0.1° stands in for a low-mosaic crystal.
+- **Grid:** Fourier bin-mean 0.1875 eV on 500–10000 eV, intrinsic source spectra only.
+- **Reference:** at each transport seed, the mean density of $K=256$ over 4 independent mosaic shifts (1207101–4). Ladder arms $K\in\{1,4,16,64,256\}$ share one further shift (1207001).
+- **`analytic` arm:** the perfect-crystal intrinsic spectrum convolved with the analytic route's mosaic-only Gaussian. The width is the `results.store_result` width $\min(E_{pk}\lvert\tan\psi\rvert\eta, E_{pk})$, with EDS and aperture left out. Without that detector-stage convolution, the analytic route's intrinsic spectrum *is* the `perfect` arm.
+- **Statistics:** mean and [min, max] over the 4 transport seeds. Margins are the #1143 ones; normalized 100 eV mass-L1 uses $10^{-2}$.
+
+**16384 histories, 0.8° (RTX 5080 job 16218).** Analytic mosaic FWHM is 11.8 eV; the reference FWHM is 37.5 eV.
+
+| arm | yield | centroid | peak | FWHM | mass-L1 | all margins |
+|---|---|---|---|---|---|---|
+| perfect (analytic intrinsic) | $-3.7\times10^{-5}$ | $-4.7\times10^{-5}$ | **+137 %** | **−90.7 %** | $2.1\times10^{-3}$ | no |
+| analytic, mosaic Gaussian | $-5.4\times10^{-4}$ | $+1.9\times10^{-4}$ | +0.39 % | **−2.6 % [−3.2, −1.9]** | $1.5\times10^{-3}$ | no |
+| $K=1$ | $+4\times10^{-5}$ | $\pm3\times10^{-5}$ | +1.4 % | −12 % [−20, −3.7] | $7.9\times10^{-4}$ | no |
+| $K=4$ | $+2\times10^{-5}$ | $\pm1\times10^{-5}$ | +0.29 % | −1.9 % [−3.4, +0.1] | $3.0\times10^{-4}$ | no |
+| $K=16$ | $-1.5\times10^{-5}$ | $-4\times10^{-6}$ | +0.18 % | −1.2 % [−1.7, −0.27] | $9.8\times10^{-5}$ | no |
+| $K=64$ | $\pm4\times10^{-6}$ | $\pm5\times10^{-7}$ | ±0.07 % | +0.17 % [−0.38, +0.46] | $2.3\times10^{-5}$ | yes |
+| $K=256$ | $\le1.2\times10^{-6}$ | $\le2\times10^{-7}$ | ±0.04 % | −0.13 % [−0.45, +0.08] | $7.9\times10^{-6}$ | yes |
+
+**16384 histories, 0.1° (job 16218).** Analytic mosaic FWHM is 1.5 eV; the reference FWHM is 4.3 eV.
+- `perfect`: peak +11 %, FWHM −19 %.
+- `analytic`: passes every margin (peak +0.19 %, FWHM −0.35 %, yield $-6\times10^{-5}$).
+- Sampled $K\ge4$ passes every margin. $K=1$ fails on FWHM (−0.98 %, range to −2.3 %).
+
+**Population scaling, 0.8° (Radeon 8060S job 16222; same-device reference).**
+
+| histories | analytic FWHM | $K=16$ FWHM | $K=64$ FWHM | $K=256$ FWHM | smallest passing $K$ |
+|---|---|---|---|---|---|
+| 1024 | −2.6 % [−4.6, +0.2] | −0.2 % [−5.1, +6.3] | +0.4 % [−1.3, +2.0] | −0.13 % [−0.42, +0.33] | 256 |
+| 4096 | −2.6 % [−3.3, −1.8] | −1.7 % [−2.8, −1.0] | +1.1 % [+0.74, +1.6] | +0.06 % [−0.11, +0.14] | 256 |
+| 16384 | −2.6 % [−3.2, −1.9] | −1.2 % [−1.7, −0.27] | +0.17 % [−0.38, +0.46] | −0.13 % [−0.45, +0.08] | 64 |
+
+- The analytic error is a model error, not noise: about −2.6 % in FWHM at every population.
+- The sampled FWHM error shrinks with population at fixed $K$, but no single $KN$ threshold fits. At $KN=2.6\times10^5$, $1024\times256$ passes while $4096\times64$ and $16384\times16$ fail. The $1024\times256$ pass is also the weakest test, because its reference has only 4× its draws.
+- $K=256$ passes at every tested population. $K=64$ passes only at 16384 histories.
+- Small-$K$ FWHM deviations keep one sign across seeds (for example $K=16$ at 16384: −1.7…−0.27 %). These arms share one mosaic shift, so the sign may belong to that shift rather than to $K$.
+- FWHM is always the binding observable; yield, centroid and mass-L1 pass at every $K\ge1$.
+- Single-shift $K=256$ scatter at 16384 histories is $10^{-3}$ in FWHM and $1.2\times10^{-4}$ in peak, so the reference is converged well inside the margins.
+
+**Cost per call** (first transport seed, RTX 5080, 16384 histories, 1.2M rows; first call ≈ warm call because setup sits outside the call):
+
+| arm | s/call | × perfect | device peak in use |
+|---|---:|---:|---:|
+| perfect | 21.0 | 1.00 | 2.9 GiB |
+| $K=1$ | 0.25 | 0.01 | 3.0 GiB |
+| $K=4$ | 0.69 | 0.03 | 4.0 GiB |
+| $K=16$ | 2.5 | 0.12 | 4.1 GiB |
+| $K=64$ | 9.6 | 0.46 | 4.1 GiB |
+| $K=256$ | 38 | 1.81 | 4.1 GiB |
+
+- Sampled cost is linear in $K$, at about 0.15 s per draw.
+- The perfect crystal takes the batched $(n_{seg}, N_g)$ route; the sampled mosaic takes the per-hkl route. Both reduce through the device Fourier bin-mean queues, so the perfect crystal costs more than sampled $K\le64$ because of its route.
+- $K=256$ is 3.1× faster than in job 12666 (118 s at `a2a7a4466`).
+- On the Radeon 8060S at 4096 histories, $K=256$ takes 28 s/call, 1.8× its perfect crystal (15 s).
