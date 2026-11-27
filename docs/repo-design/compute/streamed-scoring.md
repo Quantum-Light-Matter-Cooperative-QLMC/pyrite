@@ -111,8 +111,8 @@ Equality: the sinc samples of consecutive whole-electron blocks concatenate to
 the joined samples, so the sinc spacing, and with it the uniform grid, is
 exact. `resonance-local` seeds are integer coverage counts. The
 `resonance-population` stop search sums line masses per collected chunk, and
-chunk boundaries follow the blocks, so its sums can differ from the joined
-path's in the last ulp. The stop is rounded up to a whole 100 eV step, so the
+chunk boundaries follow the blocks and their line slices, so its sums can
+differ from the joined path's in the last ulp. The stop is rounded up to a whole 100 eV step, so the
 grid differs only if a tail ratio lands within rounding of the truncation
 limit. The truncation audit and `line_grid_resolved` record match the joined
 path to summation order.
@@ -122,16 +122,27 @@ grows with the electron count. Above `GridSpillPolicy.threshold_bytes`
 (default `default_spill_threshold_bytes()`, #1453: a quarter of
 `host_memory.host_headroom_bytes()`, floor 2 GiB, 2 GiB if unreadable; evidence
 held, or projected over the run from the blocks so far), `runner/line_grid_spill.py` moves it to a per-run scratch directory
-under the output `cache/line-grid-spill/`, and later blocks are written there
-as they arrive (#1141). Host memory is then bounded independent of N; disk is
+under the output `cache/line-grid-spill/`, and later evidence is written there
+as it arrives (#1141). Host memory is then bounded independent of N; disk is
 not. `KernelTuning.stream_spill_dir` / `stream_spill_mib` (#1283) set the
 policy's directory and threshold from `pyrite.simulate`
 (`transport_options.stream_spill_policy`); unset, the default applies.
 
-- **Blocks.** Each block's sinc samples are two raw arrays, written before the
-  block commits, so a block replayed after an allocator OOM is never counted
-  twice. Production lines are appended to one raw file (`LineFile`, truncated
-  back on a failed block) and served after transport as views of a single
+- **Line slices (#1527).** Transport blocks are sized by their rows, but a
+  block's line population can be far larger: a full-fiber HOPG case holds
+  thousands of lines per segment. Lines are therefore collected over
+  consecutive electron-aligned slices of a block
+  (`electron_blocks.iter_sized_electron_blocks`), and each slice is recorded,
+  and spilled, before the next is collected. The first slice takes
+  `LINE_SLICE_FIRST_ROWS` rows; later ones aim at `LINE_SLICE_BYTES` of lines
+  from the most bytes per row seen so far, growing at most
+  `LINE_SLICE_GROWTH`-fold. An electron owning more rows than that is
+  collected whole. The sinc samples are still taken per block.
+- **Blocks.** Each block's sinc samples are two raw arrays. A failed block,
+  such as one replayed after an allocator OOM, is rolled back as a whole,
+  slices already spilled included, so it is never counted twice. Production
+  lines are appended to one raw file (`LineFile`, truncated back on a failed
+  block) and served after transport as views of a single
   read-only memory map, in the in-memory block layout. One map per array ran
   out of file descriptors at 64 h-BN blocks (job 13610).
 - **Selection first (#1453).** For float64 populations of at least
@@ -166,10 +177,11 @@ policy's directory and threshold from `pyrite.simulate`
   (`tests/montecarlo/transport/test_streamed_line_grid_spill.py`, including
   ties and single-valued populations).
 - **Disk.** Peak is about twice the sinc evidence (raw blocks, then buckets
-  and sorted output) plus the lines. Each spilled block re-projects that peak
-  over the run and raises `LineGridSpillError` when the file system cannot
-  hold it; the projection starts at the first block, so a short disk refuses
-  before the bulk of the transport.
+  and sorted output) plus the lines. Each spilled block and line slice
+  re-projects that peak over the run, each part from the electrons it covers,
+  and raises `LineGridSpillError` when the file system cannot hold it; the
+  projection starts at the first slice, so a short disk refuses before the
+  bulk of the transport and line collection.
 - **Cleanup.** `resolve_streamed_line_grid` removes the directory in a
   `finally`, so success, errors and `KeyboardInterrupt` leave nothing. A
   killed process cannot, so each new store prunes this host's directories

@@ -455,6 +455,7 @@ def test_copy_audit_folds_line_mass_onto_parents():
 def test_grid_populations_carry_copy_lines_at_their_weight():
     from pyrite.montecarlo.runner.cone_split_strata import copy_strata
     from pyrite.montecarlo.runner.cxr_grid import _direction_populations
+    from pyrite.montecarlo.runner.electron_blocks import iter_sized_electron_blocks
 
     n = 24
     case = {**_split(), "Ne": n, "Ne_brem": n}
@@ -477,6 +478,11 @@ def test_grid_populations_carry_copy_lines_at_their_weight():
         expected += scale * n / n_copies * alone
     assert expected > 0.0
     np.testing.assert_allclose(full, primaries + expected, rtol=1e-10)
+    # The streamed grid pass collects a block slice by slice (#1527).
+    parts = list(iter_sized_electron_blocks(segs, lambda: 7))
+    assert len(parts) > 1
+    sliced = sum(mass(_direction_populations(args[0], part, *args[1:])) for part in parts)
+    np.testing.assert_allclose(sliced, full, rtol=1e-10)
 
 
 @pytest.mark.parametrize("blocks", [None, 3])

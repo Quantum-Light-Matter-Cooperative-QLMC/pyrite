@@ -1,5 +1,6 @@
 """Electron-aligned segment blocks for over-budget line sums (#192)."""
 
+import sys
 from dataclasses import replace
 
 import numpy as np
@@ -46,6 +47,43 @@ def test_one_block_is_the_input_itself():
 def test_single_electron_is_never_split():
     parts = list(blocks.iter_electron_blocks(_segments([7] * 5), 4))
     assert len(parts) == 1 and parts[0]["L_ang"].size == 5
+
+
+@pytest.mark.parametrize("ids", [[0, 0, 1, 1, 1, 2, 3, 3, 4, 5], [3, 0, 1, 3, 0, 2, 1, 5, 4, 1]])
+def test_sized_blocks_follow_each_request_without_splitting_electrons(ids):
+    segments = _segments(ids)
+    sizes = iter([2, 4, 1, 99])
+    parts = list(blocks.iter_sized_electron_blocks(segments, lambda: next(sizes)))
+    # Cut before the electron owning the target row; electron 3 (rows 6-7) is
+    # larger than its one-row request, so it goes whole.
+    owners = [sorted(set(part["electron_id"].tolist())) for part in parts]
+    assert owners == [[0], [1, 2], [3], [4, 5]]
+    rows = np.concatenate([part["L_ang"] for part in parts])
+    assert sorted(rows) == list(segments["L_ang"])
+    for part in parts:
+        assert part["Ne"] == 99
+        np.testing.assert_array_equal(part["r_mid"][:, 0], 3 * part["L_ang"])
+        assert np.all(np.diff(part["L_ang"]) > 0)
+
+
+def test_a_population_within_the_first_request_is_the_input_itself():
+    segments = _segments([0, 1, 2])
+    assert list(blocks.iter_sized_electron_blocks(segments, lambda: 3)) == [segments]
+
+
+@pytest.mark.parametrize("parent_range", [None, (1, 5)])
+def test_sized_blocks_give_each_cone_copy_parent_to_one_block(parent_range):
+    record = {"weight": None} if parent_range is None else {"parent_range": parent_range}
+    segments = {**_segments([1, 1, 2, 4, 4]), "cone_split": record}
+    parts = list(blocks.iter_sized_electron_blocks(segments, lambda: 2))
+    ranges = [part["cone_split"]["parent_range"] for part in parts]
+    low, high = parent_range or (0, sys.maxsize)
+    # Contiguous over the caller's range, parent 3 (no primary row) included.
+    assert ranges[0][0] == low and ranges[-1][1] == high
+    assert all(a[1] == b[0] for a, b in zip(ranges, ranges[1:], strict=False))
+    for part, (first, last) in zip(parts, ranges, strict=True):
+        assert all(first <= i < last for i in part["electron_id"])
+    assert segments["cone_split"] is record and record.get("parent_range") == parent_range
 
 
 def test_block_count_follows_headroom():

@@ -6,6 +6,7 @@ every flight and secondary track of an electron together. Cases whose segments
 fit the device run as one block, unchanged.
 """
 
+import sys
 from math import ceil
 
 import numpy as np
@@ -92,6 +93,51 @@ def iter_electron_blocks(segments, n_blocks):
             if key in block:
                 block[key] = _take(block[key], rows)
         yield block
+
+
+def iter_sized_electron_blocks(segments, block_rows):
+    """Consecutive electron-aligned blocks of about ``block_rows()`` rows each.
+
+    ``block_rows`` is asked before every block, so a consumer can size the next
+    block from what the last one produced. A block never splits an electron, so
+    an electron owning more rows than asked is yielded whole. Scalar fields are
+    shared, as in :func:`iter_electron_blocks`, and detector-cone copies follow
+    their primaries through ``parent_range`` (#379). A population within the
+    first request is yielded unchanged.
+    """
+    n = int(segments["L_ang"].shape[0])
+    size = max(1, int(block_rows()))
+    if size >= n:
+        yield segments
+        return
+    ids = _electron_ids(segments)
+    ordered = bool(np.all(ids[1:] >= ids[:-1]))
+    order = None if ordered else np.argsort(ids, kind="stable")
+    sorted_ids = ids if ordered else ids[order]
+    record = segments.get("cone_split")
+    low, high = (record or {}).get("parent_range", (0, sys.maxsize))
+    start = 0
+    while start < n:
+        if start:
+            size = max(1, int(block_rows()))
+        stop = n
+        if start + size < n:
+            # Cut before the electron owning the target row, else after it.
+            owner = sorted_ids[start + size]
+            stop = int(np.searchsorted(sorted_ids, owner, side="left"))
+            if stop <= start:
+                stop = int(np.searchsorted(sorted_ids, owner, side="right"))
+        rows = slice(start, stop) if order is None else np.sort(order[start:stop])
+        block = dict(segments)
+        for key in _SEG_ARRAYS:
+            if key in block:
+                block[key] = _take(block[key], rows)
+        if record is not None:
+            first = low if start == 0 else int(sorted_ids[start])
+            last = high if stop == n else int(sorted_ids[stop])
+            block["cone_split"] = {**record, "parent_range": (first, last)}
+        yield block
+        start = stop
 
 
 def electron_prefix(segments, n_electrons):

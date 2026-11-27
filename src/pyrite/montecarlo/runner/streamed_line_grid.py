@@ -23,6 +23,12 @@ every production line (#1257). The first pass therefore keeps the lines for
 that resolution too, under any bandwidth; the joined resolver then builds the
 same axis from them.
 
+A production line population can be far larger than the transport rows it
+comes from (full-fiber CXR holds thousands of lines per row), while transport
+blocks are sized by their rows. Each block's lines are therefore collected over
+consecutive electron-aligned slices of about :data:`LINE_SLICE_BYTES`, and each
+slice is recorded, and spilled, before the next is collected (#1527).
+
 Windowed policies read whole-population seed providers and are refused.
 
 Under CuPy each block's sinc samples come from the device route the joined
@@ -39,6 +45,13 @@ from ..._cxr_grid_policy import OVERSAMPLED_RESOLUTION_POLICY, RESONANCE_BANDWID
 
 if TYPE_CHECKING:
     from .line_grid_spill import LineFile, SpillStore
+
+#: Line evidence one collection call of the grid pass aims to produce.
+LINE_SLICE_BYTES = 512 * 2**20
+#: Transport rows of the first line slice, which measures the bytes per row.
+LINE_SLICE_FIRST_ROWS = 1024
+#: Most a line slice's row count may grow over the one before.
+LINE_SLICE_GROWTH = 8
 
 #: Line-grid policy features live streaming cannot resolve from block evidence.
 WINDOWED_POLICY_REFUSAL = "windowed line_grid_policy is not supported by live streamed scoring"
@@ -78,6 +91,7 @@ class BlockGridEvidence:
     per valid line row plus, when lines are kept, three backend reals per
     production line. Whether a ``sinc-oversampled`` axis exceeds its budget
     is known only from the final sinc spacing, so its lines are always kept.
+    They are collected a slice of a block at a time (:meth:`_line_slices`).
 
     Under ``spill`` (:class:`.line_grid_spill.GridSpillPolicy`), once the
     evidence held, or projected over the run from the blocks so far, exceeds
@@ -104,29 +118,17 @@ class BlockGridEvidence:
         self._weight: list[np.ndarray] | None = []
         self._populations: list = []
         self._dtypes = None
-        self._seen = [0, 0, 0]  # transported electrons, sinc bytes, line bytes
+        # Transported electrons, sinc bytes, line bytes, electrons those lines cover.
+        self._seen = [0, 0, 0, 0]
+        self._slice_rows, self._row_bytes = LINE_SLICE_FIRST_ROWS, 0.0
         self._store: SpillStore | None = None
         self._lines: LineFile | None = None
         self._runs: list = []
         self.spill_peak_bytes = 0
 
     def add(self, segs) -> None:
-        """Record one block; commits only after every block quantity succeeded."""
-        from .cxr_grid import _direction_populations
-
+        """Record one block; a failure leaves none of the block recorded."""
         width, weight = _block_sinc_samples(segs, self.n_hat, self.Ne)
-        populations = []
-        if self.keeps_lines and int(segs["L_ang"].shape[0]):
-            populations = _direction_populations(
-                self.case,
-                segs,
-                self.n_hat,
-                self.Ne,
-                self.abs_layers,
-                self.groove,
-                *self.band,
-                None,
-            )
         if self._width is None or self._weight is None:
             raise RuntimeError("streamed sinc evidence was already reduced")
         if self._dtypes is None:
@@ -134,26 +136,116 @@ class BlockGridEvidence:
         # The joined samples take the first block's dtypes (_drain).
         width = width.astype(self._dtypes[0], copy=False)
         weight = weight.astype(self._dtypes[1], copy=False)
-        seen = [
-            self._seen[0] + int(segs.get("Ne", 0)),
-            self._seen[1] + width.nbytes + weight.nbytes,
-            self._seen[2] + _population_bytes(populations),
-        ]
-        if self._store is None and self._should_spill(seen):
-            self._start_spill(seen)
-        elif self._store is not None:
-            self._check_disk(self._store, seen)
+        mark = self._mark()
+        try:
+            self._record_samples(width, weight, int(segs.get("Ne", 0)))
+            if self.keeps_lines and int(segs["L_ang"].shape[0]):
+                for populations, electrons in self._line_slices(segs):
+                    self._record_lines(populations, electrons)
+        except BaseException:
+            self._rollback(mark)
+            raise
+
+    def _line_slices(self, segs):
+        """``(populations, electrons)`` of consecutive electron-aligned block slices.
+
+        Each slice's row count comes from the most line bytes per row seen so
+        far, aiming at :data:`LINE_SLICE_BYTES`. ``electrons`` is the slice's
+        share of the block's electrons by rows, for the spill projection; the
+        shares sum to the block's count.
+        """
+        from .cxr_grid import _direction_populations
+        from .electron_blocks import iter_sized_electron_blocks
+
+        total, electrons = int(segs["L_ang"].shape[0]), int(segs.get("Ne", 0))
+        done = covered = 0
+        for part in iter_sized_electron_blocks(segs, lambda: self._slice_rows):
+            populations = _direction_populations(
+                self.case,
+                part,
+                self.n_hat,
+                self.Ne,
+                self.abs_layers,
+                self.groove,
+                *self.band,
+                None,
+            )
+            rows = int(part["L_ang"].shape[0])
+            self._size_next_slice(rows, _population_bytes(populations))
+            done += rows
+            share = -(-electrons * done // total) - covered
+            covered += share
+            yield populations, share
+
+    def _size_next_slice(self, rows, nbytes) -> None:
+        if not nbytes:
+            return  # rows past the line electrons say nothing about the next slice
+        self._row_bytes = max(self._row_bytes, nbytes / rows)
+        fit = int(LINE_SLICE_BYTES / self._row_bytes)
+        self._slice_rows = max(1, min(fit, LINE_SLICE_GROWTH * self._slice_rows))
+
+    def _record_samples(self, width, weight, electrons) -> None:
+        seen = list(self._seen)
+        seen[0] += electrons
+        seen[1] += width.nbytes + weight.nbytes
+        self._admit(seen)
         if self._store is not None:
-            self._spill_block(self._store, width, weight, populations)
+            self._runs.append(_write_run(self._store, width, weight))
+            self._track_peak()
         else:
+            assert self._width is not None and self._weight is not None
             self._width.append(width)
             self._weight.append(weight)
+        self._seen = seen
+
+    def _record_lines(self, populations, electrons) -> None:
+        seen = list(self._seen)
+        seen[2] += _population_bytes(populations)
+        seen[3] += electrons
+        self._admit(seen)
+        if self._lines is not None:
+            self._populations.extend(self._lines.append(populations))
+            self._track_peak()
+        else:
             self._populations.extend(populations)
         self._seen = seen
 
+    def _admit(self, seen) -> None:
+        """Before recording up to ``seen``: spill, or check the scratch disk."""
+        if self._store is not None:
+            self._check_disk(self._store, seen)
+        elif self._should_spill(seen):
+            self._start_spill(seen)
+
+    def _mark(self):
+        """``(seen, sample blocks, populations)`` that :meth:`_rollback` returns to."""
+        blocks = self._runs if self._store is not None else self._width or ()
+        return list(self._seen), len(blocks), len(self._populations)
+
+    def _rollback(self, mark) -> None:
+        """Drop everything recorded since ``mark``, held or spilled.
+
+        A spill that started since then stays: it holds the earlier blocks.
+        """
+        self._seen, blocks, populations = mark
+        del self._populations[populations:]
+        if self._store is None:
+            assert self._width is not None and self._weight is not None
+            del self._width[blocks:], self._weight[blocks:]
+            return
+        for run in self._runs[blocks:]:
+            self._store.unlink(run.width)
+            self._store.unlink(run.weight)
+        del self._runs[blocks:]
+        assert self._lines is not None
+        self._lines.rewind(self._populations)
+
     def _projected(self, seen) -> tuple[float, float]:
-        scale = self._electrons / max(seen[0], 1)
-        return seen[1] * scale, seen[2] * scale
+        """Run-total ``(sinc, line)`` bytes at the per-electron rate seen so far."""
+        return (
+            seen[1] * (self._electrons / max(seen[0], 1)),
+            seen[2] * (self._electrons / max(seen[3], 1)),
+        )
 
     def _should_spill(self, seen) -> bool:
         threshold = self.policy.threshold_bytes
@@ -191,19 +283,6 @@ class BlockGridEvidence:
             self._store, self._lines, self._runs = None, None, []
             raise
         self._width, self._weight, self._populations = [], [], populations
-        self._track_peak()
-
-    def _spill_block(self, store, width, weight, populations) -> None:
-        assert self._lines is not None
-        run = _write_run(store, width, weight)
-        try:
-            spilled = self._lines.append(populations)
-        except BaseException:
-            store.unlink(run.width)
-            store.unlink(run.weight)
-            raise
-        self._runs.append(run)
-        self._populations.extend(spilled)
         self._track_peak()
 
     def _track_peak(self) -> None:

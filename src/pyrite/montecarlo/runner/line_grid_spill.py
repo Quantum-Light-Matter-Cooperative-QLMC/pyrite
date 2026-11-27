@@ -445,6 +445,16 @@ class LineFile:
         self.size = offset
         return records
 
+    def rewind(self, records) -> None:
+        """Cut the file after ``records``, the first ones appended (empty: all gone)."""
+        end = 0
+        if records:
+            offset, dtype, size = records[-1][1][-1]
+            end = offset + np.dtype(dtype).itemsize * size
+        os.truncate(self.path, end)
+        self.store.bytes -= self.size - end
+        self.size = end
+
     def populations(self, records) -> list:
         """The recorded populations as read-only views of the file."""
         from ..spectrum.cxr_seeds import ResonancePopulation

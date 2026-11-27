@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from pyrite.montecarlo import runner
-from pyrite.montecarlo.runner import line_grid_spill
+from pyrite.montecarlo.runner import line_grid_spill, streamed_line_grid
 from pyrite.montecarlo.runner.line_grid_spill import (
     GridSpillPolicy,
     LineGridSpillError,
@@ -34,6 +34,7 @@ from pyrite.paths import cache_dir
 
 from .test_streamed_line_grid import (
     _assert_matches,
+    _assert_record_close,
     _case,
     _clear_grid_cache,
     _joined,
@@ -193,6 +194,131 @@ def test_insufficient_disk_refuses_at_the_first_block(monkeypatch, tmp_path):
         run_case_streamed(_case(), 4, transport_core="per-electron")
     assert len(blocks) == 1
     assert list(spill_dir.iterdir()) == []
+
+
+#: First-slice rows and line-byte target that cut ``_case``'s one block (about 620
+#: rows, at most 47 per electron, 23 kB of lines) into about a dozen slices.
+SLICE_ROWS, SLICE_BYTES = 64, 2048
+
+
+def _small_slices(monkeypatch):
+    monkeypatch.setattr(streamed_line_grid, "LINE_SLICE_FIRST_ROWS", SLICE_ROWS)
+    monkeypatch.setattr(streamed_line_grid, "LINE_SLICE_BYTES", SLICE_BYTES)
+
+
+def _spy_line_calls(monkeypatch, fail_on=()):
+    """``(rows, line bytes)`` of every line collection; calls in ``fail_on`` raise."""
+    collect = runner.cxr_grid._direction_populations
+    calls = []
+
+    def spy(case, segments, *args, **kwargs):
+        calls.append((int(segments["L_ang"].shape[0]), 0))
+        if len(calls) in fail_on:
+            raise MemoryError("injected")
+        populations = collect(case, segments, *args, **kwargs)
+        calls[-1] = (calls[-1][0], streamed_line_grid._population_bytes(populations))
+        return populations
+
+    monkeypatch.setattr(runner.cxr_grid, "_direction_populations", spy)
+    return calls
+
+
+def _grid_pass(case, block, **spill):
+    _clear_grid_cache()
+    return resolve_streamed_line_grid(
+        case,
+        block,
+        transport_core="per-electron",
+        n_hat=_n_hat(case),
+        groove=None,
+        spill=GridSpillPolicy(**spill),
+    )
+
+
+@pytest.mark.parametrize("threshold", [None, 0])
+def test_a_large_block_collects_its_lines_in_bounded_slices(monkeypatch, tmp_path, threshold):
+    """Line bytes per call follow the slice target, not the transport block."""
+    case = _case(_measured_policy(_case()))
+    with monkeypatch.context() as unsliced:
+        whole = _spy_line_calls(unsliced)
+        reference, record, held_pass = _grid_pass(case, 1000, threshold_bytes=None)
+    ((rows, line_bytes),) = whole
+    assert line_bytes > 8 * SLICE_BYTES and rows > 8 * SLICE_ROWS
+
+    _small_slices(monkeypatch)
+    calls = _spy_line_calls(monkeypatch)
+    add, covered = BlockGridEvidence.add, []
+
+    def counted(self, segs):
+        add(self, segs)
+        covered.append((self._seen[0], self._seen[3]))
+
+    monkeypatch.setattr(BlockGridEvidence, "add", counted)
+    grid, sliced_record, grid_pass = _grid_pass(
+        case, 1000, threshold_bytes=threshold, directory=tmp_path / "spill"
+    )
+    assert len(calls) > 4 and sum(r for r, _ in calls) == rows
+    # A cut can only move to an electron boundary, so allow twice the target.
+    assert max(b for _, b in calls[1:]) <= 2 * SLICE_BYTES
+    assert covered == [(30, 30)]  # the shares sum to the block's electrons
+    assert grid_pass["evidence_bytes"] == held_pass["evidence_bytes"]
+    assert grid_pass["spilled"] == (threshold == 0)
+    np.testing.assert_array_equal(grid, reference)
+    _assert_record_close(
+        {k: v for k, v in sliced_record.items() if k != "cache"},
+        {k: v for k, v in record.items() if k != "cache"},
+        "record",
+    )
+    assert not any(tmp_path.rglob("*.raw"))
+
+
+def test_lines_are_refused_for_disk_before_the_block_is_collected(monkeypatch, tmp_path):
+    """A block of more lines than the scratch disk holds stops at its first slice.
+
+    Regression: the whole block's lines were collected in host memory before
+    the spill and disk checks ran, so a full-fiber case was OOM-killed (#1527).
+    """
+    case = _case(_measured_policy(_case()))
+    _small_slices(monkeypatch)
+    calls = _spy_line_calls(monkeypatch)
+    monkeypatch.setattr(BlockGridEvidence, "_should_spill", lambda self, seen: seen[2] > 0)
+    monkeypatch.setattr(SpillStore, "free_bytes", lambda self: 0)
+    with pytest.raises(LineGridSpillError, match="scratch disk"):
+        _grid_pass(case, 1000, threshold_bytes=0, directory=tmp_path / "spill")
+    assert [rows <= SLICE_ROWS for rows, _ in calls] == [True]
+    assert list((tmp_path / "spill").iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    "spills",
+    [
+        lambda self, seen: False,  # held throughout
+        lambda self, seen: True,  # spilled from the first samples
+        lambda self, seen: seen[2] > 2 * SLICE_BYTES,  # spill starts inside the block
+    ],
+    ids=["held", "spilled", "spill-mid-block"],
+)
+def test_a_failure_in_a_later_slice_leaves_no_part_of_the_block(monkeypatch, tmp_path, spills):
+    case = _case(_measured_policy(_case()))
+    reference, _, held_pass = _grid_pass(case, 1000, threshold_bytes=None)
+    _small_slices(monkeypatch)
+    calls = _spy_line_calls(monkeypatch, fail_on={5})
+    monkeypatch.setattr(BlockGridEvidence, "_should_spill", spills)
+    add, failures = BlockGridEvidence.add, []
+
+    def replayed(self, segs):
+        try:
+            add(self, segs)
+        except MemoryError:
+            failures.append((list(self._seen), len(self._populations)))
+            add(self, segs)
+
+    monkeypatch.setattr(BlockGridEvidence, "add", replayed)
+    grid, _, grid_pass = _grid_pass(case, 1000, threshold_bytes=0, directory=tmp_path / "spill")
+    assert failures == [([0, 0, 0, 0], 0)] and len(calls) > 5
+    assert grid_pass["evidence_bytes"] == held_pass["evidence_bytes"]
+    np.testing.assert_array_equal(grid, reference)
+    assert not any(tmp_path.rglob("*.raw"))
 
 
 def test_stale_directories_of_dead_processes_are_pruned(tmp_path):

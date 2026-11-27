@@ -202,7 +202,10 @@ electron for h-BN at 5 MeV, 1 mm. Above 2 GiB of evidence, held or projected
 over the run, the grid pass spills it to the output cache and reduces it out
 of core with the same arithmetic, so host memory stays bounded and disk use
 grows instead (about twice the sinc evidence plus the lines); a disk that
-cannot hold the projection is refused at the first block. Explicit
+cannot hold the projection is refused early in the first block, whose lines
+are collected in slices. Full-fiber CXR keeps thousands of lines per segment
+(about 130 kB per electron for 0.5 um HOPG at 300 keV), so it reaches that
+limit at far fewer histories. Explicit
 `energy_bins` or a cached grid avoid both. Measurements are in
 [Live streamed scoring](../repo-design/compute/streamed-scoring.md#resolved-line-grids-memory-and-wall-time).
 
