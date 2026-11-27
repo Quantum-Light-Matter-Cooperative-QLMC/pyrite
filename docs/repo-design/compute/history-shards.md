@@ -151,7 +151,21 @@ FP64 summation order changes:
   rounding is a fraction of the peak, not of the bin: measured at most
   2e-14 of the peak;
 - the tests hold both to the streamed tolerance, `rtol = 1e-11` plus
-  `atol = 1e-14` of the peak.
+  `atol = 1e-14` of the peak;
+- `line_quadrature="bin-mean"` lines on the uniform runs of their axis take
+  the Fourier reduction ([`cxr-line-fourier-reduction`](../../validation/ledger-core-coherent-physics.md#cxr-line-fourier-reduction)).
+  It chooses its period, broad split and mode cap per flushed line batch, and
+  a shard flushes other batches than the join. The difference is then the
+  reduction's own approximation, not summation order. Each flush is within
+  that claim's bounds of the exact bin means (host: measured at most 5e-6 of
+  the peak), so the two results differ by at most the sum of both errors.
+  The tests hold this to `1e-5` of the peak. With the dense evaluator
+  (`bin_reduction_override`) the streamed tolerance holds again. Measured:
+  - hopg 30 keV regression case: 1e-10 of the peak;
+  - #1320 thick-target case (Hoffman2 2859297 vs 2859298, N = 8, K = 1):
+    5.4e-8 of the peak, and 29 % of bins outside the streamed tolerance,
+    mostly below 100 keV. 99.99995 % of that axis is in Fourier runs. The
+    integrated spectrum moves by 1.4e-12, relative.
 
 The two population-wide transport steps the join redoes are skipped, as
 streaming skips them (no shard-summed estimator reads bunch timing or completed

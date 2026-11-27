@@ -8,7 +8,8 @@ selection) and their spectra add in shard order. The result must
 - be bitwise repeatable for a fixed shard size, whatever order the shards
   were scored in and after a pickle round trip;
 - match the #1387 join (``run_case`` on the per-electron core) to FP64
-  summation order, for shard counts that do and do not divide N.
+  summation order, for shard counts that do and do not divide N; ``bin-mean``
+  Fourier lines to that reduction's per-batch approximation instead.
 
 Seeds are fixed by the sweep.
 """
@@ -128,6 +129,31 @@ def test_merge_refuses_a_stale_plan(plain):
         merge_shard_spectra(case, plan, partials)
 
 
+@pytest.mark.slow
+def test_bin_mean_fourier_lines_differ_from_the_join_only_by_their_batches():
+    """Fourier bin-mean lines: per-flush approximation, not summation order (#1395).
+
+    The host Fourier route picks its period and broad split per flushed line
+    batch, and shards flush other batches than the join. With the dense
+    evaluator the reordering contract holds; on the default route the line
+    spectrum stays within the restated bound (two reductions, each within the
+    ``cxr-line-fourier-reduction`` error of the exact bin means).
+    """
+    from pyrite.montecarlo.spectrum.cxr._bin_quadrature import bin_reduction_override
+
+    case = {**_case(), "line_quadrature": "bin-mean"}
+    with bin_reduction_override("auto"):
+        dense_joined = run_case_from_shards(case, _shards(case, 13))
+        dense = run_case_shard_scored(case, 4)
+    _assert_within_reordering(dense, dense_joined)
+    joined = run_case_from_shards(case, _shards(case, 13))
+    got = run_case_shard_scored(case, 4)
+    peak = np.abs(joined["spec"]).max()
+    excess = np.abs(got["spec"] - joined["spec"])
+    assert excess.max() > 1e-14 * peak  # batching shows: not the reordering contract
+    np.testing.assert_allclose(got["spec"], joined["spec"], rtol=0, atol=1e-5 * peak)
+
+
 def test_measured_policy_grid_is_frozen_from_the_shards():
     """resonance-population bandwidth, resonance-local bin-mean axis (the #1320 shape)."""
     case = _case()
@@ -193,7 +219,7 @@ def test_shard_sum_realization_identity():
     # HDF5 round trips return NumPy integers.
     assert normalize_realization({**dict(summed), "shard_electrons": np.int64(5)}) == summed
     for bad in ({"shard_electrons": 0}, {"shard_electrons": None}, {"reduction": "tree"}):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"shard_electrons|reduction"):
             normalize_realization({**dict(summed), **bad})
     with pytest.raises(ValueError, match="shard-sum"):
         TransportRealization(shard_electrons=5)

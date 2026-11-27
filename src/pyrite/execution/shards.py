@@ -90,10 +90,15 @@ def shard_content_key(case_key: str, start: int, stop: int, transport_core: str)
     return digest.hexdigest()
 
 
-def shard_plan_key(case_key: str) -> str:
-    """Key of the frozen scoring plan of the shard-summed case ``case_key`` (#1395)."""
-    digest = hashlib.sha256(b"pyrite.history-shard-plan.v1\x00")
+def shard_plan_key(case_key: str, parent_digest: str | None = None) -> str:
+    """Key of the initial plan, or its immutable successor after a bandwidth refusal."""
+    if parent_digest is None:
+        digest = hashlib.sha256(b"pyrite.history-shard-plan.v1\x00")
+    else:
+        digest = hashlib.sha256(b"pyrite.history-shard-plan-extension.v1\x00")
     digest.update(bytes.fromhex(_key(case_key)))
+    if parent_digest is not None:
+        digest.update(bytes.fromhex(_key(parent_digest)))
     return digest.hexdigest()
 
 

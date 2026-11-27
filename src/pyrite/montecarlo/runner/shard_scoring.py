@@ -23,7 +23,10 @@ Numerical contract: the result is the streamed route's (:func:`.streamed_scoring
 with ``block_electrons = shard_electrons``, bit for bit, because each shard
 commits one block and the merge adds the blocks in the same order. It is
 deterministic for a fixed shard size and differs from the joined route
-(``run_case`` or the #1387 join) only in floating-point summation order. The
+(``run_case`` or the #1387 join) in floating-point summation order and, for
+``bin-mean`` lines on the Fourier reduction, in that reduction's per-batch
+approximation (within its ``cxr-line-fourier-reduction`` bounds; see
+``docs/repo-design/compute/history-shards.md``). The
 two population-wide transport steps the join redoes (bunch-centroid timing,
 hard-photon direction completion) are skipped, as streaming skips them: no
 eligible estimator reads them. A marked ``reduction="shard-sum"`` realization
@@ -45,6 +48,7 @@ from typing import Any
 
 import numpy as np
 
+from ..._cxr_grid_policy import CxrGridToleranceError
 from .history_shards import SHARD_TRANSPORT_CORE
 
 #: Private output key recording how a shard-summed result was reduced.
@@ -108,7 +112,6 @@ def resolve_shard_plan(
     Validation: reflection-yield-tolerance-selector
     """
     from .artifacts import _case_geometry
-    from .streamed_selection import _select_on_blocks, automatic_selection
 
     refuse_shard_scoring(case)
     E_grid, _, _, n_hat, groove = _case_geometry(case)
@@ -123,6 +126,51 @@ def resolve_shard_plan(
         E_grid, record, grid_pass = resolve_streamed_line_grid(
             case, None, transport_core=SHARD_TRANSPORT_CORE, n_hat=n_hat, groove=groove, feed=feed
         )
+    return _plan_on_axis(case, shards, E_grid, record, grid_pass, distribute)
+
+
+def extend_shard_plan(
+    case: Mapping[str, Any],
+    shards: Callable[[], Iterable[Mapping[str, Any]]],
+    plan: ShardScoringPlan,
+    refusal: CxrGridToleranceError,
+    *,
+    distribute: Callable[[list], AbstractContextManager] | None = None,
+) -> ShardScoringPlan:
+    """Extend a refused default bandwidth using the retained history shards (#1243).
+
+    Resolve the wider axis from the same rows and rerun automatic selection
+    on its prefix: neither the old selected set nor the old partial spectra
+    is valid on the new axis. Explicit bandwidths still raise their refusal.
+    """
+    from .artifacts import _case_geometry
+    from .streamed_line_grid import streamed_fallback_grid
+
+    _, _, _, n_hat, groove = _case_geometry(case)
+
+    def feed(consumer):
+        for rows in shards():
+            consumer(rows)
+
+    E_grid, record, grid_pass = streamed_fallback_grid(
+        case,
+        refusal,
+        plan.grid_record,
+        None,
+        transport_core=SHARD_TRANSPORT_CORE,
+        n_hat=n_hat,
+        groove=groove,
+        feed=feed,
+    )
+    if not float(E_grid[-1]) > float(plan.E_grid[-1]):
+        raise refusal from None
+    return _plan_on_axis(case, shards, E_grid, record, grid_pass, distribute)
+
+
+def _plan_on_axis(case, shards, E_grid, record, grid_pass, distribute):
+    """Freeze selection and identity on this particular scoring axis."""
+    from .streamed_selection import _select_on_blocks, automatic_selection
+
     selection = None
     if automatic_selection(case):
         inputs = _inputs(case, E_grid)
@@ -229,9 +277,22 @@ def run_case_shard_scored(
                 transport_history_shard(case, start, stop, transport_core=core)
                 for start, stop in shard_ranges(case, size)
             ]
-        plan = resolve_shard_plan(case, lambda: iter(shards))
-        partials = [score_history_shard(case, rows, plan) for rows in shards]
-        return merge_shard_spectra(case, plan, partials)
+
+        retained = shards
+
+        def read_shards():
+            return iter(retained)
+
+        plan = resolve_shard_plan(case, read_shards)
+        while True:
+            partials = [score_history_shard(case, rows, plan) for rows in retained]
+            try:
+                return merge_shard_spectra(case, plan, partials)
+            except CxrGridToleranceError as refusal:
+                # Do not retain old-axis partials during another grid/score pass.
+                partials.clear()
+                refusal.__traceback__ = None
+                plan = extend_shard_plan(case, read_shards, plan, refusal)
 
 
 def _shard_size(case, shard_electrons):

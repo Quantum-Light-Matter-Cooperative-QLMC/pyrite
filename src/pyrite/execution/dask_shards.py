@@ -165,8 +165,27 @@ def _load_one(store, material, key):
     return store.load(ref, expected_content_key=key)
 
 
+def _plan_chain(store, material, entry):
+    """Committed plans in order; the successor key is derived from the parent digest."""
+    key = entry["plan_key"]
+    previous = None
+    while True:
+        frozen = _load_one(store, material, key)["plan"]
+        if previous is not None and not float(frozen.E_grid[-1]) > previous:
+            raise ArtifactIntegrityError("shard plan extension did not increase the stop")
+        yield key, frozen
+        previous = float(frozen.E_grid[-1])
+        key = shard_plan_key(entry["content_key"], frozen.digest)
+        if store.reference(material, key) is None:
+            return
+
+
 def _frozen_plan(store, material, entry):
-    return _load_one(store, material, entry["plan_key"])["plan"]
+    chain = _plan_chain(store, material, entry)
+    _, frozen = next(chain)
+    for _, successor in chain:
+        frozen = successor
+    return frozen
 
 
 def _spectrum_keys(entry, digest):
@@ -184,20 +203,27 @@ def _plan_stage(plan, entry):
 
     from ..montecarlo.runner.shard_scoring import resolve_shard_plan, scoring_scope
 
+    with single_native_thread(), scoring_scope(case):
+        frozen = resolve_shard_plan(
+            case, _shard_reader(store, material, entry), distribute=_distribution(plan, case)
+        )
+    return asdict(store.publish(material, entry["plan_key"], {"plan": frozen}))
+
+
+def _shard_reader(store, material, entry):
     def shards():
         for key in entry["shard_keys"]:
             yield _load_one(store, material, key)
 
+    return shards
+
+
+def _distribution(plan, case):
     # A device-scored plan keeps the selection in process: its seceded task
     # would hold the GPU resource its subtasks wait for.
-    distribute = (
-        None
-        if plan["transport_realization"].get("scoring", "cpu") == "gpu"
-        else (lambda held: _scattered_selection(case, held))
-    )
-    with single_native_thread(), scoring_scope(case):
-        frozen = resolve_shard_plan(case, shards, distribute=distribute)
-    return asdict(store.publish(material, entry["plan_key"], {"plan": frozen}))
+    if plan["transport_realization"].get("scoring", "cpu") == "gpu":
+        return None
+    return lambda held: _scattered_selection(case, held)
 
 
 @contextmanager
@@ -258,44 +284,76 @@ def _score_stage(plan, entry, shard_index):
 
 
 def _merge_stage(run_dir: str, case_index: int) -> dict[str, Any]:
-    """Dask task (#1395): add the shard spectra in shard order and publish the case artifact."""
+    """Merge one scoring round, or publish a successor plan and request another round."""
     plan, entry = _staged(run_dir, case_index)
     store = HistoryShardStore(plan["artifact_root"])
-    case, material = entry["case"], entry["case"]["crystal"]
+    material = entry["case"]["crystal"]
     prior = _published_case(plan, entry)
     if prior is None:
         try:
-            frozen = _frozen_plan(store, material, entry)
-            keys = _spectrum_keys(entry, frozen.digest)
-            partials = [_load_one(store, material, key) for key in keys]
+            prior = _merge_or_extend(plan, entry, store, material)
         except (ArtifactIntegrityError, OSError):
             prior = _published_case(plan, entry)
             if prior is None:
                 raise
         if prior is None:
-            from ..montecarlo.runner.shard_scoring import merge_shard_spectra, scoring_scope
-
-            with single_native_thread(), scoring_scope(case):
-                out = merge_shard_spectra(case, frozen, partials)
-            prior = CaseArtifactStore(plan["artifact_root"]).publish(
-                material, entry["content_key"], out
-            )
+            return {"rescore": True}
     if not plan["keep_shards"]:
         _remove_payloads(store, material, entry)
     return asdict(prior)
 
 
-def _remove_payloads(store, material, entry):
-    """Delete a merged case's rows, spectra and plan (the plan last: it names the spectra)."""
-    keys = list(entry["shard_keys"])
-    plan_ref = store.reference(material, entry["plan_key"])
-    if plan_ref is not None:
+def _merge_or_extend(plan, entry, store, material):
+    from .._cxr_grid_policy import CxrGridToleranceError
+    from ..montecarlo.runner.shard_scoring import (
+        extend_shard_plan,
+        merge_shard_spectra,
+        scoring_scope,
+    )
+
+    case = entry["case"]
+    frozen = _frozen_plan(store, material, entry)
+    keys = _spectrum_keys(entry, frozen.digest)
+    # A concurrent coordinator (or a retried merge) may already have extended
+    # the plan, before this coordinator has scored the successor's shards.
+    if (frozen.grid_record or {}).get("bandwidth_fallback") is not None and any(
+        store.reference(material, key) is None for key in keys
+    ):
+        return None
+    partials = [_load_one(store, material, key) for key in keys]
+    with single_native_thread(), scoring_scope(case):
         try:
-            digest = store.load(plan_ref, expected_content_key=entry["plan_key"])["plan"].digest
+            out = merge_shard_spectra(case, frozen, partials)
+        except CxrGridToleranceError as refusal:
+            partials.clear()
+            refusal.__traceback__ = None
+            successor = shard_plan_key(entry["content_key"], frozen.digest)
+            if store.reference(material, successor) is None:
+                extended = extend_shard_plan(
+                    case,
+                    _shard_reader(store, material, entry),
+                    frozen,
+                    refusal,
+                    distribute=_distribution(plan, case),
+                )
+                store.publish(material, successor, {"plan": extended})
+            return None
+    return CaseArtifactStore(plan["artifact_root"]).publish(material, entry["content_key"], out)
+
+
+def _remove_payloads(store, material, entry):
+    """Remove all rounds' spectra and rows, then the plans from newest to oldest."""
+    keys = list(entry["shard_keys"])
+    plans = []
+    if store.reference(material, entry["plan_key"]) is not None:
+        try:
+            for key, frozen in _plan_chain(store, material, entry):
+                plans.append(key)
+                keys.extend(_spectrum_keys(entry, frozen.digest))
         except (ArtifactIntegrityError, OSError):
-            digest = None  # a concurrent merge is removing it
-        keys += [] if digest is None else _spectrum_keys(entry, digest)
-    for key in [*keys, entry["plan_key"]]:
+            # A concurrent merge may already be removing the chain.
+            pass
+    for key in [*keys, *reversed(plans)]:
         ref = store.reference(material, key)
         if ref is not None:
             store.remove(ref)
@@ -609,7 +667,10 @@ def _collect(executor, run_dir, pending, cases, keys, results, callback, options
     with closing(_completed_tasks(executor, run_dir, pending)) as completed:
         for (index, stage, shard), future in completed:
             try:
-                future.result()
+                outcome = future.result()
+                if stage == "join" and outcome.get("rescore") is True:
+                    pending.scores(index, range(pending.shards[index]))
+                    continue
                 pending.succeeded(index, stage, shard)
                 if stage == "join":
                     for consumer in pending.consumers[index]:
