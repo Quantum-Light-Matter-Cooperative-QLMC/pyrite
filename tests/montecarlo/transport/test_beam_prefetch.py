@@ -184,6 +184,9 @@ def test_growing_adaptive_chunks_are_served_and_completed_exactly(kind):
     # Look-ahead is 2x the served block: [12, 40) outgrows 14 rows and [41, 130)
     # outgrows 2 (partial); [5, 12), [40, 41) and [130, 200) fit (hits).
     assert (prefetch.misses, prefetch.partial, prefetch.hits) == (1, 2, 3)
+    # Unused look-ahead rows carry over (#1481): the worker samples each row at
+    # most once, here every row but the first block and the two serial tails.
+    assert prefetch.prefetched_rows == n - 5 - (40 - 26) - (130 - 96)
 
 
 def test_retry_keeps_the_prefetch_and_replay_restarts_cleanly():
@@ -204,3 +207,18 @@ def test_served_rows_are_private_copies():
         _, (first, _, _), (second, _, _) = _serve(prefetch, [(0, 10), (10, 15), (15, 20)], kw)
         first[:] = 0.0
     np.testing.assert_array_equal(second, initial_beam_positions(11, 5, start=15, **kw)[0])
+
+
+@pytest.mark.parametrize("block", [1, 7, 32])
+def test_shrinking_blocks_reuse_the_carried_rows(block):
+    """A small block after a large one is served from the carry without new draws."""
+    kw = _beam("spot")
+    n = 120
+    spans = [(0, 40), (40, 40 + block), (40 + block, 80), (80, 120)]
+    with BeamEntryPrefetch(n) as prefetch:
+        parts = _serve(prefetch, spans, kw)
+    whole = initial_beam_positions(11, n, **kw)[0]
+    for (a, b), got in zip(spans, parts, strict=True):
+        np.testing.assert_array_equal(got[0], whole[a:b])
+    assert (prefetch.misses, prefetch.partial, prefetch.hits) == (1, 0, 3)
+    assert prefetch.prefetched_rows == n - 40

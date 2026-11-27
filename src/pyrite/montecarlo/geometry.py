@@ -368,14 +368,29 @@ def project_beam_entry(offsets_uv, tilt_polar_rad, tilt_azim_rad=0.0):
         # R = I: the lab transverse plane IS the sample z=0 face; no projection.
         return offsets_uv.copy()
     e_x, e_y, beam_dir = beam_entry_basis(tilt_polar_rad, tilt_azim_rad)
-    # sample-frame origin of each lab ray = its transverse offset carried into
-    # the sample frame (the ray then continues along beam_dir).
-    o = offsets_uv[:, 0:1] * e_x + offsets_uv[:, 1:2] * e_y  # (N, 3)
-    s_star = -o[:, 2] / beam_dir[2]
-    p0 = o + s_star[:, None] * beam_dir
-    # entrance face ``z = 0`` and return the (N, 2) sample-frame (x, y) entry
-    # points. Solve for s* that zeroes the z-component, form p0, drop z.
-    return p0[:, :2]
+    return _project_entry_rows(offsets_uv, e_x, e_y, beam_dir)
+
+
+@njit(cache=True, nogil=True)
+def _project_entry_rows(offsets_uv, e_x, e_y, beam_dir):
+    """Rows of :func:`project_beam_entry` in one pass (#1481).
+
+    Per row the operations and their order of the NumPy expression
+    ``o = u e_x + v e_y``, ``s* = -o_z / b_z``, ``p0 = o + s* b`` (no fused
+    multiply-add without fastmath), so the result is bit-identical; only the
+    ``(N, 3)`` temporaries are gone.
+    """
+    n = offsets_uv.shape[0]
+    out = np.empty((n, 2))
+    for i in range(n):
+        u = offsets_uv[i, 0]
+        v = offsets_uv[i, 1]
+        # sample-frame origin of the lab ray (it continues along beam_dir);
+        # s* zeroes its z-component on the entrance face z = 0.
+        s_star = -(u * e_x[2] + v * e_y[2]) / beam_dir[2]
+        out[i, 0] = (u * e_x[0] + v * e_y[0]) + s_star * beam_dir[0]
+        out[i, 1] = (u * e_x[1] + v * e_y[1]) + s_star * beam_dir[1]
+    return out
 
 
 def beam_entry_basis(tilt_polar_rad, tilt_azim_rad=0.0):

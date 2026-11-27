@@ -28,7 +28,12 @@ from ._bin_fourier import (
     fourier_period,
 )
 from ._fourier_cutoffs import cutoff_rectangle_array
-from ._fourier_spread import SPREADERS, es_gather_moments, es_mode_evaluate, es_mode_transform
+from ._fourier_spread import (
+    SPREADERS,
+    es_gather_accumulate,
+    es_mode_evaluate,
+    es_mode_transform,
+)
 
 
 def cufinufft_mode_transform(phase, strengths, j0, j1, *, eps=1e-12, plans=None):
@@ -115,7 +120,9 @@ def _plan(cp, modes, eps):
 #: 5080, #1230 for FP64, #1296 job 13647 for FP32).
 _NUFFT_MIN_WORK = {"fp64": 1 << 22, "fp32": 1 << 24}
 #: Flushes with at most this many lines plan cutoff rectangles on the host.
-_HOST_PLAN_MAX_LINES = 1 << 20
+#: RTX 5080, MoS2 300 keV line prefixes (#1481, job 16112): host 10 ms vs
+#: device 12 ms at 2^16 lines, 19 vs 12 ms at 2^17, 148 vs 12 ms at 2^20.
+_HOST_PLAN_MAX_LINES = 1 << 17
 
 
 #: Direct-rectangle phase factors: ``"fp32"`` (default since
@@ -322,18 +329,19 @@ def cuda_positive_modes(
     counts = cp.floor(2.0 * a_width / dt).astype(cp.int64)
     order = cp.argsort(counts)
     counts = counts[order]
-    last = int(counts[-1]) if counts.size else 0
     phase = (E_res[order] - c0) * dt
     a = a_width[order]
     constant = weight[order] * np.pi / a
     linear = constant / (2.0 * a)
-    out = cp.zeros(last + 1, dtype=cp.complex128)
-    # Integer planning: one copy and host passes beat a synchronizing device
-    # pass per bit unless the flush is large. Same rectangles either way.
+    # Integer planning: one copy and host passes for small flushes, the
+    # device odd-prefix search otherwise. Same rectangles either way.
     if counts.size <= _HOST_PLAN_MAX_LINES:
         rects = cutoff_rectangle_array(cp.asnumpy(counts))
     else:
         rects = cp.asnumpy(cutoff_rectangle_array(counts, xp=cp))
+    # The rectangles of the sorted lines end at the largest last mode.
+    last = int(rects[:, 1].max()) - 1 if rects.size else 0
+    out = cp.zeros(last + 1, dtype=cp.complex128)
     modes, sources = rects[:, 1] - rects[:, 0], rects[:, 3] - rects[:, 2]
     min_work = _NUFFT_MIN_WORK[direct_precision]
     large = (sources >= 64) & (modes >= 32) & (sources * modes >= min_work)
@@ -341,7 +349,8 @@ def cuda_positive_modes(
         large[:] = False
     plans = {}
     if nufft == "es" and spread == "gather":
-        moments = es_gather_moments(phase, (constant, linear), rects[large], eps=eps, plans=plans)
+        es_gather_accumulate(phase, (constant, linear), rects[large], out, dt, eps=eps, plans=plans)
+        moments = ()
     else:
         moments = (
             (
@@ -451,15 +460,17 @@ def cuda_fourier_bin_mean_reduce(
     if E.size == 0:
         return out
     finite = cp.isfinite(E).all() & cp.isfinite(w).all() & cp.isfinite(a).all()
-    if not bool(finite & (a > 0.0).all()):
-        raise ValueError("lines need finite E_res and weight and positive finite a_width")
     # ``None`` keeps every line on the Fourier route, as in the host reference.
     # Otherwise ``broad_width_eV`` is a floor, raised until the broad bound
     # holds on this axis (coarse bins, long spans).
     if broad_width_eV is not None:
         broad_width_eV = broad_width_for_axis(h, (n_bins - 1) * h, residual_tol, broad_width_eV)
     broad = a <= (0.0 if broad_width_eV is None else np.pi / broad_width_eV)
-    if bool(broad.any()):
+    # One readback for the input check and the broad split (#1481).
+    valid, any_broad = cp.asnumpy(cp.stack((finite & (a > 0.0).all(), broad.any())))
+    if not valid:
+        raise ValueError("lines need finite E_res and weight and positive finite a_width")
+    if any_broad:
         sel = cp.flatnonzero(broad)
         values = broad_bin_mean_reduce(
             E[sel],
@@ -506,7 +517,7 @@ def cuda_fourier_bin_mean_reduce(
         folded = cp.bincount(idx, positive.real, minlength=n_fft) + 1j * cp.bincount(
             idx, positive.imag, minlength=n_fft
         )
-    g0 = float(cp.sum(w * np.pi / a))
+    g0 = cp.sum(w * np.pi / a)  # stays on the device: same FP64 add below
     out += (g0 + 2.0 * (n_fft * cp.fft.ifft(folded)).real[:n_bins]) / P
     out -= cp.asarray(
         _envelope_image_correction(

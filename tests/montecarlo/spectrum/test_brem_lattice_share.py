@@ -121,6 +121,47 @@ def test_kernel_rows_interpolate_alone():
     assert _kernel_at_T(kernel, 5.0, rows) is None
 
 
+def test_profile_cache_stitches_rows_bitwise():
+    """#1481: nested shell sets through the row cache equal fresh profiles bit for bit.
+
+    The reflection selector grows its shell set step by step; every step's
+    stitched rows (cached plus newly computed) must equal computing that set
+    alone, at several lengths so vectorized and tail paths both occur.
+    """
+    from pyrite.montecarlo.spectrum.brem_lattice_share import ProfileCache, _share_profiles
+
+    rng = np.random.default_rng(1481)
+    kernel = LatticeShareKernel(
+        np.geomspace(0.5, 20.0, 9),
+        np.array([10.0, 30.0, 90.0]),
+        np.array([20.0, 45.0, 70.0, 95.0]),
+        np.linspace(0.0, 1.05, 12),
+        rng.random((9, 3, 4, 11)),
+        1,
+        1,
+    )
+    g = np.sort(rng.uniform(0.3, 25.0, 300))  # some outside the kernel's |g| range
+    k = np.geomspace(50.0, 40_000.0, 37)
+    cache = ProfileCache()
+    for T in (12.0, 30.0, 77.0):
+        for n in (1, 10, 37, 98, 211, 300):
+            used = np.zeros(g.size, dtype=bool)
+            used[rng.permutation(g.size)[:n]] = True
+            fresh = _share_profiles(kernel, g, T, k, used)
+            got = _share_profiles(kernel, g, T, k, used, cache)
+            if fresh is None:
+                assert got is None
+                continue
+            np.testing.assert_array_equal(got[0], fresh[0])
+            np.testing.assert_array_equal(got[1], fresh[1])
+    assert _share_profiles(kernel, g, 5.0, k, None, cache) is None
+    small = ProfileCache(max_bytes=1)  # clears on every insert, still exact
+    fresh = _share_profiles(kernel, g, 30.0, k)
+    for _ in range(2):
+        got = _share_profiles(kernel, g, 30.0, k, None, small)
+        np.testing.assert_array_equal(got[1], fresh[1])
+
+
 def test_out_of_range_energy_is_left_alone(kernel):
     g, w = _si_low_order()
     assert not lattice_share_density(kernel, g, w["Si"], 5.0, [1000.0]).any()

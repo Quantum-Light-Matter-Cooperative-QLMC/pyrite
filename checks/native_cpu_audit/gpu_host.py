@@ -113,6 +113,15 @@ HOST_SPANS = (
     ("pyrite.montecarlo.runner.streamed_adaptive", "MonitoredScoringSink.finish"),
     ("pyrite.montecarlo.runner.streamed_adaptive", "MonitoredScoringSink.result"),
     ("pyrite.montecarlo.runner.streamed_line_grid", "BlockGridEvidence.add"),
+    # #1481 slice 2: split the line prologue's memcpy-closed idle by owner.
+    ("pyrite.montecarlo.spectrum.cxr._kernels", "_accumulate_edge_truncation"),
+    ("pyrite.montecarlo.spectrum._ordered_bincount", "ordered_bincount"),
+    ("pyrite.montecarlo.spectrum._ordered_bincount", "_route"),
+    ("pyrite.montecarlo.spectrum._ordered_bincount", "_host_bincount"),
+    ("pyrite.montecarlo.spectrum._device_sizing", "collect_lines"),
+    ("pyrite.montecarlo.spectrum.cxr._batched", "_reduction_unit_cuts"),
+    ("pyrite.montecarlo.spectrum.cxr._batched", "_escape_weights"),
+    ("pyrite.montecarlo.spectrum.cxr._batched", "_line_amplitudes"),
 )
 
 

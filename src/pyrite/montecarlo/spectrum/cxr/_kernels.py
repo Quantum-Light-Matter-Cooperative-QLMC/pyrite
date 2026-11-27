@@ -24,6 +24,7 @@ from ...transport import (
     beta_from_keV,
 )
 from ...transport._continuation_join import _copy_bytes
+from .._deferred_mass import defer_electron_mass as defer
 from .._device_sizing import collect_lines
 from .._ordered_bincount import ordered_bincount
 from . import _fused
@@ -171,9 +172,9 @@ def _accumulate_edge_truncation(audit, E_r, a_width, weight, electron=None):
         tail = 1.0 / (xp.pi * a_width * xp.maximum(distance, tiny))
         beyond.append(xp.where(distance > 0.0, xp.minimum(tail, 1.0), 1.0))
     n_electrons = audit.get("n_electrons")
-    if n_electrons is not None and electron is not None:
-        # Fixed-order sum: atomic device bincount would jitter in the last ulp
-        # and break same-seed adaptive replay (#1292).
+    # Off the main thread on CuPy (#1481), else here: both fixed-order sums,
+    # since atomic bincount would break same-seed adaptive replay (#1292).
+    if n_electrons is not None and electron is not None and not defer(audit, electron, mass):
         per_electron = ordered_bincount(electron, mass, minlength=int(n_electrons))
         if per_electron.size != int(n_electrons):
             raise ValueError(f"line electron id outside the {n_electrons} line electrons")

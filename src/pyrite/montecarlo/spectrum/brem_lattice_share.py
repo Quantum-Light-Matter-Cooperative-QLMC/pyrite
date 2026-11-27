@@ -312,7 +312,7 @@ def _kernel_at_T(
     return total * shape
 
 
-def _share_profiles(kernel, g, T_keV, k, used=None):
+def _share_profiles(kernel, g, T_keV, k, used=None, cache=None):
     """Per-reflection share density at unit weight, ``(rows, D)``, or ``None``.
 
     ``rows`` indexes the ``g`` inside the kernel's ``|g|`` range and ``D`` is
@@ -321,7 +321,10 @@ def _share_profiles(kernel, g, T_keV, k, used=None):
     reuse one profile. Every ``g`` row is computed on its own: a row equals
     the one a smaller set of ``g`` would give. ``None`` outside the kernel's
     ``T`` range or with no ``g`` in range. ``used`` (a mask over ``g``) skips
-    rows no weight set uses.
+    rows no weight set uses. With ``cache`` (a :class:`ProfileCache`), rows
+    already computed for this kernel, ``T`` and ``k`` are reused and only the
+    others are computed (#1481): the reflection selector's nested shell sets
+    then compute each shell once.
 
     Validation: brem-lattice-coherent-fraction
     """
@@ -329,7 +332,15 @@ def _share_profiles(kernel, g, T_keV, k, used=None):
     rows = np.flatnonzero(in_range if used is None else in_range & used)
     if rows.size == 0:
         return None
-    g = g[rows]
+    if cache is None:
+        dens = _profile_rows(kernel, g[rows], T_keV, k)
+        return None if dens is None else (rows, dens)
+    dens = cache.rows(kernel, g[rows], T_keV, k)
+    return None if dens is None else (rows, dens)
+
+
+def _profile_rows(kernel, g, T_keV, k):
+    """``(S, theta_node, K)`` densities of in-range ``g`` (see :func:`_share_profiles`)."""
     lg = np.log(kernel.g_invang)
     ig = np.clip(np.searchsorted(lg, np.log(g)) - 1, 0, lg.size - 2)
     wg = (np.log(g) - lg[ig]) / (lg[ig + 1] - lg[ig])
@@ -357,7 +368,57 @@ def _share_profiles(kernel, g, T_keV, k, used=None):
         return (1 - f) * rho[r, t_idx, j] + f * rho[r, t_idx, j + 1]
 
     dens = ((1 - wg)[:, None, None] * at(ig) + wg[:, None, None] * at(ig + 1)) * inside
-    return rows, dens / scale[..., None]
+    return dens / scale[..., None]
+
+
+class ProfileCache:
+    """:func:`_profile_rows` rows by ``(|g|, T, k)`` for one kernel, bounded in bytes (#1481).
+
+    Rows are independent of the other rows they are computed with, so a
+    stitched result equals a fresh one bit for bit. Cleared when it would
+    pass ``max_bytes``.
+    """
+
+    def __init__(self, max_bytes=256 << 20):
+        self.max_bytes = int(max_bytes)
+        self.kernel = None
+        self.store: dict[tuple, np.ndarray] = {}
+        self.nbytes = 0
+
+    def rows(self, kernel, g, T_keV, k):
+        if kernel is not self.kernel:
+            self.kernel, self.store, self.nbytes = kernel, {}, 0
+        # A local reference: a concurrent clear swaps in a new dict, never
+        # empties the one this call reads.
+        store = self.store
+        k = np.ascontiguousarray(k, dtype=float)
+        base = (float(T_keV), k.size, k.tobytes())
+        keys = [(float(x), *base) for x in g]
+        missing = [i for i, key in enumerate(keys) if key not in store]
+        if not missing:
+            return np.stack([store[key] for key in keys])
+        fresh = _profile_rows(kernel, g[missing], T_keV, k)
+        if fresh is None or len(missing) == len(keys):
+            self._keep(store, [keys[i] for i in missing], fresh)
+            return fresh
+        fresh_rows = dict(zip(missing, fresh, strict=True))
+        self._keep(store, [keys[i] for i in missing], fresh)
+        return np.stack(
+            [fresh_rows[i] if i in fresh_rows else store[key] for i, key in enumerate(keys)]
+        )
+
+    def _keep(self, store, keys, fresh):
+        if fresh is None:
+            return
+        if self.nbytes + fresh.nbytes > self.max_bytes:
+            self.store, self.nbytes = {}, 0
+            store = self.store
+        store.update(zip(keys, fresh, strict=True))
+        self.nbytes += fresh.nbytes
+
+
+#: Process-wide row cache of the corrected-table route (#1481).
+_PROFILE_CACHE = ProfileCache()
 
 
 def _share_from_profiles(profiles, weights, shape):
@@ -480,7 +541,7 @@ def _corrected_group(entries, kernel, g, T_floor_keV):
         kr = kap.copy()
         kr[-1] = float(first.top_reduced_energy[i])
         k = kr * Ti * 1e3
-        profiles = _share_profiles(kernel, g, Ti, k, used) if used.any() else None
+        profiles = _share_profiles(kernel, g, Ti, k, used, _PROFILE_CACHE) if used.any() else None
         for d, w, norm in zip(ddcs, weights, norms, strict=True):
             S = _share_from_profiles(profiles, w, shape)  # (Th_kernel, K)
             delta = _MB_PER_ANG2 * k[None, :] * S / norm

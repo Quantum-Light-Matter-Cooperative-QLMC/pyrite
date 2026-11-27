@@ -56,6 +56,33 @@ def _half_rule():
     return z[half], 2.0 * q[half]
 
 
+def _rule_values(width):
+    """Positive nodes and kernel-weighted doubled weights for ``width`` (host FP64)."""
+    beta = _BETA_PER_WIDTH * width
+    z, q = _half_rule()
+    return z, q * np.exp(beta * (np.sqrt(1.0 - z * z) - 1.0))
+
+
+@lru_cache(maxsize=32)
+def _device_rule(device_id, width):
+    """Device copies of :func:`_rule_values`, uploaded once per device and width.
+
+    Each upload from pageable memory synchronizes the stream (#1481); the
+    copies are completed before first use, so any stream may read them.
+    """
+    cp = import_module("cupy")
+    with cp.cuda.Device(device_id):
+        z, phi = (cp.asarray(v) for v in _rule_values(width))
+        cp.cuda.get_current_stream().synchronize()
+    return z, phi
+
+
+def _rule_arrays(xp, width):
+    if xp is np:
+        return _rule_values(width)
+    return _device_rule(xp.cuda.Device().id, width)
+
+
 def _deconvolution(cp, modes, n_fine, width):
     """``2 / (width * I(m))`` for centred modes ``m``, ``I`` the ES transform.
 
@@ -63,10 +90,7 @@ def _deconvolution(cp, modes, n_fine, width):
     ``m >= 0`` and the positive nodes are evaluated (4x fewer cosines, the
     dominant cold-start cost); the result is mirrored onto the centred modes.
     """
-    beta = _BETA_PER_WIDTH * width
-    z, q = _half_rule()
-    phi = cp.asarray(q * np.exp(beta * (np.sqrt(1.0 - z * z) - 1.0)))
-    z = cp.asarray(z)
+    z, phi = _rule_arrays(cp, width)
     scale = np.pi * width / n_fine
     n_pos = modes // 2 + 1  # 0 .. max |centred m|
     kernel_ft = cp.empty(n_pos, dtype=cp.float64)
@@ -243,7 +267,7 @@ def _gather_kernel(name):
     return cp.RawKernel(_GATHER_SOURCE, name)
 
 
-def _gather_items(cp, sorted_key, off, width):
+def _gather_items(cp, sorted_key, off, width, d_off=None):
     """``(g, s_lo, s_hi)`` warp items covering every fine point's source window.
 
     Point ``l`` of a rectangle takes the copies keyed ``l-w+1 .. l``: one
@@ -252,7 +276,7 @@ def _gather_items(cp, sorted_key, off, width):
     is split into chunks of at most ``_ITEM_SOURCES`` copies.
     """
     total = int(off[-1])
-    d_off = cp.asarray(off)
+    d_off = cp.asarray(off) if d_off is None else d_off
     g = cp.arange(total, dtype=cp.int64)
     r = cp.searchsorted(d_off, g, side="right") - 1
     base, end = d_off[r], d_off[r + 1]
@@ -292,23 +316,17 @@ def _batches(lens, fine=None):
         yield start, len(lens)
 
 
-def es_gather_moments(phase, rows, rects, *, eps=1e-12, plans=None):
-    """Two-row type-1 transforms of many rectangles; yields ``(j0, j1, moments)``.
+def _gather_spectra(phase, rows, rects, *, eps, plans):
+    """Batched ES gathers of :func:`es_gather_moments`; yields fine-grid spectra.
 
-    Rectangle ``(j0, j1, lo, hi)`` transforms the lines ``lo:hi`` of
-    ``phase`` with strength rows ``rows[0][lo:hi]``, ``rows[1][lo:hi]`` into
-    modes ``j0..j1-1``, as ``es_mode_transform(..., spread="atomic")`` would:
-    the same ES terms, summed by sorted warp gathers instead of atomics. The
-    rectangles of a batch share one key sort and one gather launch; each
-    keeps its own fine grid and FFT. ``moments`` is ``(2, j1 - j0)``
-    complex128 on the current stream; ``plans`` caches deconvolution factors.
-
-    Validation: cxr-line-fourier-reduction
+    Yields ``(j0, j1, spectrum, deconv)`` per rectangle in input order:
+    ``spectrum`` the ``(2, n_fine)`` FFT of its fine grid, ``deconv`` its
+    deconvolution factors (cached in ``plans`` by mode count). A batch's
+    rectangle tables go to the device in one packed copy (#1481).
     """
     cp = import_module("cupy")
     width = es_width(eps)
     beta = np.float64(_BETA_PER_WIDTH * width)
-    plans = {} if plans is None else plans
     phase = cp.ascontiguousarray(phase, dtype=cp.float64)
     c0, c1 = (cp.ascontiguousarray(row, dtype=cp.float64) for row in rows)
     rects = np.asarray(rects, dtype=np.int64).reshape(-1, 4)
@@ -321,7 +339,11 @@ def es_gather_moments(phase, rows, rects, *, eps=1e-12, plans=None):
         off = np.concatenate(([0], np.cumsum(n_fine)))
         first = np.concatenate(([0], np.cumsum(lens[a:b])))
         n, nrect = int(first[-1]), np.int32(b - a)
-        d_first, d_lo, d_off = (cp.asarray(v) for v in (first, group[:, 2], off))
+        # One upload: first (nrect+1), lo (nrect), off (nrect+1), shift (nrect).
+        k = b - a
+        tables = cp.asarray(np.concatenate((first, group[:, 2], off, group[:, 0] + modes // 2)))
+        d_first, d_lo = tables[: k + 1], tables[k + 1 : 2 * k + 1]
+        d_off = tables[2 * k + 1 : 3 * k + 2]
         grid = cp.zeros(2 * int(off[-1]), dtype=cp.complex128)
         if n:
             blocks = ((n + 255) // 256,)
@@ -336,7 +358,8 @@ def es_gather_moments(phase, rows, rects, *, eps=1e-12, plans=None):
             u = cp.empty(n, dtype=cp.float64)
             l0 = cp.empty(n, dtype=cp.int64)
             src = cp.empty(4 * n, dtype=cp.float64)
-            shift = cp.asarray((group[:, 0] + modes // 2).astype(np.float64))
+            # Exact integers below 2**53: the same FP64 values as a host cast.
+            shift = tables[3 * k + 2 :].astype(cp.float64)
             _gather_kernel("es_batch_sources")(
                 blocks,
                 (256,),
@@ -358,7 +381,7 @@ def es_gather_moments(phase, rows, rects, *, eps=1e-12, plans=None):
                 ),
             )
             del order
-            item = _gather_items(cp, key, off, width)
+            item = _gather_items(cp, key, off, width, d_off)
             del key
             n_items = item.shape[0]
             _gather_kernel("es_gather")(
@@ -373,9 +396,98 @@ def es_gather_moments(phase, rows, rects, *, eps=1e-12, plans=None):
             if deconv is None:
                 deconv = plans[m] = _deconvolution(cp, m, nf, width)
             fine = grid[2 * int(off[k]) : 2 * int(off[k + 1])].reshape(2, nf)
-            spectrum = cp.fft.fft(fine, axis=1)
-            centred = cp.arange(-(m // 2), m - m // 2) % nf
-            yield j0, j1, spectrum[:, centred] * deconv
+            yield j0, j1, cp.fft.fft(fine, axis=1), deconv
+
+
+def es_gather_moments(phase, rows, rects, *, eps=1e-12, plans=None):
+    """Two-row type-1 transforms of many rectangles; yields ``(j0, j1, moments)``.
+
+    Rectangle ``(j0, j1, lo, hi)`` transforms the lines ``lo:hi`` of
+    ``phase`` with strength rows ``rows[0][lo:hi]``, ``rows[1][lo:hi]`` into
+    modes ``j0..j1-1``, as ``es_mode_transform(..., spread="atomic")`` would:
+    the same ES terms, summed by sorted warp gathers instead of atomics. The
+    rectangles of a batch share one key sort and one gather launch; each
+    keeps its own fine grid and FFT. ``moments`` is ``(2, j1 - j0)``
+    complex128 on the current stream; ``plans`` caches deconvolution factors.
+
+    Validation: cxr-line-fourier-reduction
+    """
+    cp = import_module("cupy")
+    plans = {} if plans is None else plans
+    for j0, j1, spectrum, deconv in _gather_spectra(phase, rows, rects, eps=eps, plans=plans):
+        m, nf = j1 - j0, spectrum.shape[1]
+        centred = cp.arange(-(m // 2), m - m // 2) % nf
+        yield j0, j1, spectrum[:, centred] * deconv
+
+
+_COMBINE_SOURCE = r"""
+// out[j] += (s0[c] d - t s1[c] d) for j = j0 + k, k < m, t = dt j and
+// c = (k - m/2) mod nf: the moments of es_gather_moments combined as
+// cuda_positive_modes did with separate CuPy ops. Explicit _rn operations
+// (no FMA contraction) round every product and sum as those ops do; the
+// zero imaginary parts of the real factors only add exact signed zeros.
+extern "C" __global__ void es_combine(
+    const double* spec, const double* deconv, const long long m, const long long nf,
+    const long long j0, const double dt, double* out) {
+    const long long k = (long long)blockIdx.x * blockDim.x + threadIdx.x;
+    if (k >= m) return;
+    long long c = (k - m / 2) % nf;
+    if (c < 0) c += nf;
+    const double d = deconv[k];
+    const double* s0 = spec + 2 * c;
+    const double* s1 = spec + 2 * (nf + c);
+    const double t = __dmul_rn(dt, (double)(j0 + k));
+    const double re = __dsub_rn(__dmul_rn(s0[0], d), __dmul_rn(t, __dmul_rn(s1[0], d)));
+    const double im = __dsub_rn(__dmul_rn(s0[1], d), __dmul_rn(t, __dmul_rn(s1[1], d)));
+    double* o = out + 2 * (j0 + k);
+    o[0] = __dadd_rn(o[0], re);
+    o[1] = __dadd_rn(o[1], im);
+}
+"""
+
+
+@lru_cache(maxsize=1)
+def _combine_kernel():
+    cp = import_module("cupy")
+    return cp.RawKernel(_COMBINE_SOURCE, "es_combine")
+
+
+def combine_moments(out, j0, j1, spectrum, deconv, dt):
+    """``out[j] += m0[j] - dt j m1[j]`` for the moments of one gathered rectangle.
+
+    ``spectrum``/``deconv`` as yielded by :func:`_gather_spectra`; ``m`` is
+    ``spectrum[:, centred] * deconv`` of :func:`es_gather_moments`. One
+    launch, with the rounding of the separate CuPy operations it replaces.
+    """
+    m = j1 - j0
+    _combine_kernel()(
+        ((m + 255) // 256,),
+        (256,),
+        (
+            spectrum,
+            deconv,
+            np.int64(m),
+            np.int64(spectrum.shape[1]),
+            np.int64(j0),
+            np.float64(dt),
+            out,
+        ),
+    )
+
+
+def es_gather_accumulate(phase, rows, rects, out, dt, *, eps=1e-12, plans=None):
+    """Add ``moments[0] - dt j moments[1]`` of :func:`es_gather_moments` into ``out[j]``.
+
+    Same rectangles, order and FP64 arithmetic as accumulating the yielded
+    moments with separate CuPy operations, in one launch per rectangle
+    instead of about nine (#1481). ``out`` is a contiguous complex128 device
+    vector covering every ``j1 - 1``.
+
+    Validation: cxr-line-fourier-reduction
+    """
+    plans = {} if plans is None else plans
+    for j0, j1, spectrum, deconv in _gather_spectra(phase, rows, rects, eps=eps, plans=plans):
+        combine_moments(out, j0, j1, spectrum, deconv, dt)
 
 
 def es_mode_transform(phase, strengths, j0, j1, *, eps=1e-12, plans=None, spread="atomic"):

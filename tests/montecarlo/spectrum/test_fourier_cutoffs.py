@@ -4,6 +4,8 @@ import numpy as np
 import pytest
 
 from pyrite.montecarlo.spectrum.cxr._fourier_cutoffs import (
+    _odd_prefix_rectangles,
+    cutoff_rectangle_array,
     cutoff_rectangles,
     partitioned_positive_modes,
 )
@@ -21,6 +23,18 @@ def test_rectangles_cover_each_active_pair_once(counts):
     expected = (np.arange(cover.shape[1])[None, :] <= counts[:, None]).astype(int)
     expected[:, 0] = 0
     np.testing.assert_array_equal(cover, expected)
+
+
+@pytest.mark.parametrize(
+    "counts", [[1], [3, 3, 8], list(range(65)), _RANDOM_COUNTS, [0, 0, 5, 2**20]]
+)
+def test_odd_prefix_plan_equals_per_bit_plan(counts):
+    """#1481: the device planner's odd-prefix search, run on NumPy, gives the same rows."""
+    counts = np.array(counts, dtype=np.int64)
+    expected = cutoff_rectangle_array(counts)
+    got = _odd_prefix_rectangles(counts, int(counts[-1]))
+    assert got.dtype == np.int64
+    np.testing.assert_array_equal(got, expected)
 
 
 def test_large_repeated_cutoffs_need_no_line_index_duplication():

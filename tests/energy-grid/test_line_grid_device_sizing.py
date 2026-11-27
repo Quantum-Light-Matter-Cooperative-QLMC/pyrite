@@ -252,3 +252,39 @@ def test_cuda_spacing_repeats_bitwise():
         for _ in range(4)
     }
     assert len(results) == 1
+
+
+@pytest.mark.parametrize("flights", [False, True])
+def test_streamed_block_samples_take_the_host_route_on_the_cpu(flights):
+    """Without CuPy the streamed evidence keeps the exact host samples (#1481)."""
+    from pyrite.montecarlo.runner.streamed_line_grid import _block_sinc_samples
+
+    if _device_sizing.sizing_module(np.zeros(1)) is not None:
+        pytest.skip("CPU backend required")
+    segments = _segments(np.random.default_rng(5), 5_000, flights=flights)
+    got = _block_sinc_samples(segments, (0.3, -0.2, 0.93), 900)
+    want = sinc_feature_samples(segments, (0.3, -0.2, 0.93), electron_limit=900)
+    for a, b in zip(got, want, strict=True):
+        np.testing.assert_array_equal(a, b)
+
+
+@pytest.mark.hardware
+@pytest.mark.parametrize("flights", [False, True])
+def test_streamed_block_samples_equal_the_joined_device_sizing(flights):
+    """Device blocks reduce on the device, as joined sizing does (#1481).
+
+    Grouped (out-of-order) flights fall back to the host samples on both.
+    """
+    from pyrite.montecarlo.runner.streamed_line_grid import _block_sinc_samples
+
+    cupy = _cupy()
+    segments = _segments(np.random.default_rng(6), 50_000, flights=flights)
+    device_segments = {key: cupy.asarray(value) for key, value in segments.items()}
+    n_hat = (0.3, -0.2, 0.93)
+    got = _block_sinc_samples(device_segments, n_hat, 9_000)
+    joined = _device_sizing.device_sinc_samples(device_segments, n_hat, electron_limit=9_000)
+    if joined is None:
+        joined = sinc_feature_samples(segments, n_hat, electron_limit=9_000)
+    for a, b in zip(got, joined, strict=True):
+        assert isinstance(a, np.ndarray)
+        np.testing.assert_array_equal(a, cupy.asnumpy(cupy.asarray(b)))
