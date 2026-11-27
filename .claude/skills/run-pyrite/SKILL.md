@@ -26,9 +26,15 @@ Own local runtime confirmation only. Unit/regression design belongs to
 
 Choose only the affected runtime probe and test modules using `AGENTS.md`
 "Choose tests by impact". Do not start all tests after a local smoke check.
+Lean `runtime-*` environments are for simulations, not developer checks or
+plotting. Use a developer environment for the checkpoint-to-plot smoke above.
 
-Static repository gate (no tests):
+Static repository gates (no tests):
 
 ```bash
-pixi run pyrite-dev verify
+pixi run --locked verify-quick
+pixi run --locked verify  # full gate including docs
 ```
+
+Use `pixi run --locked doctor` for dependency-policy checks; see `AGENTS.md`
+if a stale lock prevents activation.

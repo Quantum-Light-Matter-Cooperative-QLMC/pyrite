@@ -159,9 +159,11 @@ def remote_run_command(args: argparse.Namespace, run: str) -> str:
 def _slice_payload(jobdir: str, command: str, remote, sync_block: str) -> str:
     """The derive job's chained-slice contract with this ladder as the body.
 
-    ``sync_block`` is the standard remote dependency sync
-    (``remote.scripts._pixi_install_block``); the body runs ``pixi run --as-is``,
-    so without it a box whose environment predates the lockfile fails on import.
+    ``sync_block`` is the standard remote environment provisioning
+    (``remote.scripts._pixi_install_block``). ``command`` runs through
+    ``remote.config.shell_job_run()`` (``pixi run --as-is``, or the unpacked
+    environment with ``env_transfer=pack``), so without the block a box whose
+    environment predates the lockfile fails on import.
     """
     from ..remote import config as remote_config
 
@@ -232,7 +234,7 @@ def start(args: argparse.Namespace) -> str:
     _validate(args)
     jobid = remote._new_jobid()
     jobdir = remote.remote_path(remote.JOBS_SUBDIR, jobid)
-    command = remote_run_command(args, remote.shell_remote_run())
+    command = remote_run_command(args, remote.config.shell_job_run())
     script = remote._slurm_batch_script(
         jobid,
         _slice_payload(jobdir, command, remote, _pixi_install_block(once=True)),
@@ -275,7 +277,7 @@ def start_windows(args: argparse.Namespace) -> str:
     _validate_windows(args)
     jobid = remote._new_jobid()
     jobdir = remote.remote_path(remote.JOBS_SUBDIR, jobid)
-    command = remote_windows_command(args, remote.shell_remote_run())
+    command = remote_windows_command(args, remote.config.shell_job_run())
     script = remote._slurm_batch_script(
         jobid,
         _slice_payload(jobdir, command, remote, _pixi_install_block(once=True)),
@@ -446,7 +448,7 @@ def start_precision(args: argparse.Namespace) -> str:
         raise SystemExit("--bands may contain only digits, '.', ',', ':'")
     jobid = remote._new_jobid()
     jobdir = remote.remote_path(remote.JOBS_SUBDIR, jobid)
-    commands = remote_precision_commands(args, remote.shell_remote_run())
+    commands = remote_precision_commands(args, remote.config.shell_job_run())
     script = remote._slurm_batch_script(
         jobid,
         _precision_payload(jobdir, commands, remote, _pixi_install_block()),
@@ -501,7 +503,7 @@ def start_bandwidth(args: argparse.Namespace) -> str:
         raise SystemExit("--configs may contain only digits, '.', ',', ':', 'e'")
     jobid = remote._new_jobid()
     jobdir = remote.remote_path(remote.JOBS_SUBDIR, jobid)
-    commands = remote_bandwidth_commands(args, remote.shell_remote_run())
+    commands = remote_bandwidth_commands(args, remote.config.shell_job_run())
     script = remote._slurm_batch_script(
         jobid,
         _precision_payload(jobdir, commands, remote, _pixi_install_block(), label="bandwidth"),

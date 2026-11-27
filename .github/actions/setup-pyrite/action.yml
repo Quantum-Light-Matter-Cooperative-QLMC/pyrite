@@ -1,0 +1,16 @@
+name: Set up locked PyRITE environment
+description: Install the pinned Pixi version and a locked workspace environment.
+inputs:
+  environment:
+    description: Pixi environment to install
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
+      with:
+        pixi-version: v0.85.0
+        environments: ${{ inputs.environment }}
+        locked: true
+        cache: true
+        cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}

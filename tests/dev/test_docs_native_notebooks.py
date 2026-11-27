@@ -456,9 +456,8 @@ def test_regenerated_capture_is_ruff_format_clean(tmp_path, monkeypatch):
     docs = tmp_path / "docs"
     sources = docs / "notebooks"
     (sources / "fundamentals").mkdir(parents=True)
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nversion = "0.23.0"\n[tool.ruff]\nline-length = 100\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[project]\nversion = "0.23.0"\n')
+    (tmp_path / "ruff.toml").write_text('line-length = 100\ntarget-version = "py313"\n')
     (sources / "first.py").write_text("# marimo source\n")
     nbformat.write(
         nbformat.v4.new_notebook(metadata={"pyrite_docs": {"title": "First", "footer": "Next"}}),
@@ -492,7 +491,7 @@ def test_regenerated_capture_is_ruff_format_clean(tmp_path, monkeypatch):
     module.regenerate(["first"])
     page = sources / "fundamentals/first.ipynb"
     check = [sys.executable, "-m", "ruff", "format", "--check", "--config"]
-    run([*check, str(tmp_path / "pyproject.toml"), str(page)], check=True)
+    run([*check, str(tmp_path / "ruff.toml"), str(page)], check=True)
     assert nbformat.read(page, as_version=4).cells[1].outputs[0].data["image/png"]
     module.check_notebooks()
 

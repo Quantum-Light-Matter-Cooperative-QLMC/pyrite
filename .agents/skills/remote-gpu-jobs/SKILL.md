@@ -22,9 +22,14 @@ Run before every submission; most failed remote runs were stale state.
    node (`--exclude=<node>`). A job pending for minutes is checked with
    `squeue`/`sacct`, not waited on.
 4. Environment: the box needs `pixi` (default `~/.pixi/bin/pixi`, target
-   field `pixi`); jobs run `pixi install --locked -e <env>` from the synced
-   `pixi.lock`, where `<env>` is the target's `environment` or its GPU
-   vendor's (`nvidia`/`amd`). CPU-only jobs (qlmc-queen) use `default`.
+   field `pixi`); install-mode jobs run `pixi install --locked -e <env>` from
+   the synced `pixi.lock`. Existing vendor defaults stay unchanged. Prefer
+   explicit `runtime-cpu`, `runtime-nvidia`, or `runtime-amd` for production
+   simulations; retain developer environments for tests and plots.
+   For opt-in `env_transfer=pack` targets, submit from the contributor
+   environment with `pixi-pack` installed; check `pixi-unpack` on compute-node
+   PATH, shared cache space, and transfer host. AMD source builds are not packable.
+   The queue unpacks offline and logs the lock hash; do not install on-node.
 5. Ad-hoc `sbatch` scripts (not `pyrite run --remote`) must
    `export PATH=$HOME/.pixi/bin:$PATH` (SLURM batch env lacks `pixi`), run
    Python through `pixi run --as-is -e <env>` after one

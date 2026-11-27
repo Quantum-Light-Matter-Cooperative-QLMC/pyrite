@@ -112,6 +112,10 @@ class _ProfilingModes:
             raise SystemExit("cpu-only mode cannot set GPU chunk pins")
 
     def _validate_py_spy(self, chunked):
+        if config.remote_env_transfer() == "pack":
+            raise SystemExit(
+                "py-spy requires env_transfer=install (pixi exec can download packages)"
+            )
         if self.nsys or self.cpu_only:
             raise SystemExit("py-spy cannot be combined with nsys or cpu-only mode")
         if chunked:

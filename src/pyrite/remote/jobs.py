@@ -9,6 +9,12 @@ from .reporting import is_quiet
 
 def _stage_job_script(jobid: str, stems: list[str], upload: str, script: str) -> None:
     """Reserve stems and upload a batch script, releasing on upload failure."""
+    if config.remote_env_transfer() == "pack":
+        if "PYRITE_PACK_PREFIX=" not in script:
+            raise SystemExit("this remote job type does not yet support env_transfer=pack")
+        from ._environment_pack import stage_pack
+
+        stage_pack()
     transport._run(
         config.ssh_argv(
             "-n",

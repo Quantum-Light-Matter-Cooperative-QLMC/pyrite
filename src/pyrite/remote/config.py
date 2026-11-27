@@ -693,6 +693,23 @@ def shell_remote_run() -> str:
     return f"{shell_remote_pixi()} run --as-is -e {remote_environment()}"
 
 
+def remote_env_transfer() -> str:
+    """Environment provisioning policy for the selected target."""
+    return _target_field("env_transfer", "install")
+
+
+def shell_job_run() -> str:
+    """Run a command after the queue has activated its environment."""
+    return "env" if remote_env_transfer() == "pack" else shell_remote_run()
+
+
+def shell_job_python() -> str:
+    """Interpreter for a queue profiler, which cannot run through pixi."""
+    if remote_env_transfer() == "pack":
+        return '"$PYRITE_PACK_PREFIX/env/bin/python"'
+    return shell_remote_env_python()
+
+
 def shell_remote_path(*parts: str) -> str:
     return shell_word(remote_path(*parts))
 
@@ -863,6 +880,7 @@ class RemoteTarget:
     # pixi environment each job installs and runs in; empty uses the GPU
     # vendor's environment (``nvidia``/``amd``/``intel``).
     environment: str = ""
+    env_transfer: str = "install"
 
     def __post_init__(self):
         from .targets import validate_name
@@ -887,6 +905,7 @@ class RemoteTarget:
             "qos",
             "sbatch_extra",
             "environment",
+            "env_transfer",
         ):
             value = getattr(self, field)
             if not isinstance(value, str) or any(ord(c) < 32 or ord(c) == 127 for c in value):
@@ -895,6 +914,8 @@ class RemoteTarget:
         if self.transfer_host:
             validate_remote_target(self.transfer_host)
         object.__setattr__(self, "environment", parse_environment(self.environment))
+        if self.env_transfer not in ("install", "pack"):
+            raise ValueError("env_transfer must be install or pack")
         if self.name is not None:
             validate_name(self.name)
         if not (PurePosixPath(self.remote_dir).is_absolute() or self.remote_dir.startswith("~/")):

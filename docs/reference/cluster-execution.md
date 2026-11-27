@@ -51,6 +51,41 @@ Distributed runs require:
   running until work finishes; on an HPC site run it as a compute-node job
   (see [Coordinator job](#coordinator-job)), never on a login node.
 
+### Offline environments for SSH remote targets
+
+For compute nodes without package-network access, opt in on a named remote target:
+
+```bash
+pyrite remote target edit hoffman2 --env-transfer pack --environment runtime-nvidia
+```
+
+The submitter needs `pixi-pack` on PATH and the contributor environment's
+`build` and PyYAML packages. Install `pixi global install pixi-pack` on the
+submitter and `pixi global install pixi-unpack` on the cluster login host
+(with its user-local installation visible from compute nodes). A
+`pixi-unpack` binary copied to `~/.pixi/bin/` also works. Sync and submission
+check the login host for `pixi-unpack`, not `pixi`: the host needs `pixi` only
+for the login-host helpers noted below.
+Use the contributor environment to submit; choose `runtime-cpu` or
+`runtime-nvidia` on the target to omit developer dependencies. For online
+install-mode jobs, `runtime-amd` and `runtime-intel` are also available where
+the execution backend supports those GPUs. Existing targets remain unchanged.
+Downloaded packages are cached locally across lock changes, separately from
+completed archives; both caches can consume substantial disk space.
+Use versions supporting named lock platforms and unpacking a pack directory.
+The pack mode caches the locked Linux dependency archive by lock SHA-256,
+environment and platform, and stages a pure-Python PyRITE wheel separately by
+synced content digest. Bulk uploads use the target's transfer host.
+A shared, content-keyed prefix is constructed under the remote checkout's
+`cache/environment-packs/` and reused by subsequent allocations; keep that
+directory on a filesystem with sufficient space and working flock support.
+Compute nodes unpack and activate without contacting package indexes.
+A missing pack, mismatched checkout/lock, or unsupported non-wheel dependency
+fails closed. AMD source-build environments and py-spy's network-capable
+launcher are not supported in this mode. Leave `env_transfer = "install"`
+(the default) for existing sites such as qlmc. This setting affects SSH
+queue payloads, not standalone execution profiles or login-host helpers.
+
 ## Run and inspect a profile
 
 Built-in smoke-oriented profiles need no TOML file:

@@ -18,6 +18,128 @@ pixi run pyrite-dev --help
 the `dask` and `optimization` extras and the interactive apps. Run commands
 through `pixi run`, or open an activated shell with `pixi shell`.
 
+## Pixi tasks
+
+The manifest owns the common workflow entry points and their dependencies.
+`pyrite-dev` remains the implementation of repository-aware operations and
+can still be invoked directly inside an activated environment. Discover
+available tasks with `pixi task list -e default` or `pixi task list -e nvidia`.
+
+```bash
+pixi run --locked lint
+pixi run --locked fmt
+pixi run --locked verify-quick
+pixi run --locked verify
+pixi run --locked test tests/remote/test_environment_pack.py
+pixi run --locked -e nvidia test-suite transport --slow
+pixi run --locked -e docs docs
+pixi run --locked -e runtime-cpu fetch-tables
+pixi run --locked -e runtime-cpu quickstart
+```
+
+`verify` runs the same ordered, non-mutating gates as `pyrite-dev verify`;
+`verify-quick` omits only the documentation build. Neither runs pytest.
+The separate CI skill-mirror and repository-map checks are available as
+`check-skills` and `repo-map-check`. Generation and formatting tasks are
+explicit writes (`fmt`, `cli-reference-write`, `validation-ledger-write`,
+`repo-map-write`, `sync-skills`); they are not verification dependencies.
+
+### Ruff workflow
+
+The repository's lint and formatting policy lives in `ruff.toml`, with the
+same enabled rules as before and an explicit Python 3.13 target. Use the
+Pixi-locked executable for custom commands or the convenience tasks:
+
+```bash
+pixi run --locked lint-diff src/pyrite/remote
+pixi run --locked lint-fix src/pyrite/remote
+pixi run --locked lint-stats
+pixi run --locked lint-watch
+pixi run --locked sort-imports src/pyrite/remote
+pixi run --locked ruff format src/pyrite/remote
+pixi run --locked fix
+```
+
+`fix` is intentionally repository-wide: apply safe fixes, format, then check
+remaining violations. Use it only when a full-tree edit is wanted. The other
+new lint tasks accept paths (no path means the workspace root). `lint-diff`
+shows available fixes, not all diagnostics; `lint` still checks all enabled
+rules. Verification is unchanged and non-mutating with respect to source.
+
+Marimo sources in `src/pyrite/apps/`, `docs/notebooks/`, `docs/examples/`, and
+`docs/demo/` inherit the root rules but disable every automatic lint fix.
+Cell returns and final expressions encode the reactive dependency graph;
+Ruff's safe-fix classification does not understand that contract. These
+conservative directory-level protections also cover ordinary helper modules
+and captures there. Diagnostics and whitespace formatting remain enabled.
+Do not pass an overriding `--config`, `--fixable`, or `--unfixable` to force
+fixes in these directories, and disable fix-on-save/import organization for
+Marimo in editors that override project settings. Add new Marimo notebooks in
+one of these directories and run `marimo check` after reviewing edits.
+
+Rule-family audits are opt-in and report-only, e.g. `pixi run --locked ruff
+check --extend-select SIM,PERF,RUF,NPY --statistics src/pyrite`. Consider
+correctness-oriented `RUF`, `NPY`, `FURB`, and selected `SIM`/`PERF` rules
+first; review changes in JIT kernels and array semantics independently.
+`TC`, `ARG`, `PLR`, and `TRY` can be noisy for scientific APIs and generated
+cell signatures. Do not enable whole rule families or unsafe fixes globally
+without an audited, separate policy change.
+
+Task definitions are scoped to their dependency features. For example,
+`test` and `test-suite` require the test feature, while `lint` and `verify`
+require lint; lean runtimes expose simulation tasks but not developer gates.
+The `test-cpu` task explicitly selects CPU; `test` and `test-suite` preserve
+normal backend selection and forward arguments to `pyrite-dev`. The
+experimental `py315` environment has no default feature; use the direct
+`pyrite tables fetch` and `pyrite run quickstart` commands there. No task
+caching is enabled: scientific execution, checks, and generation must not
+silently skip work due to an incomplete input fingerprint.
+
+For focused development, the following environments omit unrelated contributor
+features while sharing the corresponding interpreter solve group:
+
+| Environment | Scope | Example |
+|---|---|---|
+| `quality` | Python 3.14; lint, docs and runtime imports for type checking, including apps and oracles; no test, notebook-conversion or browser group | `pixi run --locked -e quality verify` |
+| `test-physics` | Python 3.13; tests, oracles, Dask and optimization; no app, docs or lint tooling | `pixi run --locked -e test-physics test-cpu tests/montecarlo/transport/` |
+| `packaging` | Python 3.13; test/build tooling, no optional app stack in the outer environment | `pixi run --locked -e packaging package-smoke` |
+
+These are opt-in. The full contributor environments remain the reference
+for CI and whole-suite coverage, since some tests require app/plot, notebook,
+Sphinx or static-analysis dependencies. The package smoke installs the wheel
+and editable project in fresh pip venvs, including app extras in those venvs.
+Run `pixi lock` after dependency edits, check the lock, and commit it.
+
+Test ownership now lives in `pyrite.devtools.test_suites`; worker sizing and
+BLAS thread caps live in `pyrite.devtools.test_resources`. `dev_cli` retains
+its command dispatch and compatibility imports. CI generates its matrices from
+`src/pyrite/devtools/suite_inventory.py` before installing Pixi environments.
+It keeps the existing interpreter matrix, conditional quantum job and measured
+JIT-disabled shard groups. New unassigned primary suites join the data shard.
+The local composite actions under `.github/actions/` own locked setup and
+pinned-data cache provisioning.
+
+## Workspace diagnostics
+
+Run `pixi run --locked doctor` for manifest policy checks. To diagnose a lock
+that prevents activation, run the standalone stdlib tool using an available
+system Python, without relying on an active Pixi environment:
+
+```bash
+python3 src/pyrite/devtools/workspace_doctor.py --lock
+```
+
+Python older than 3.11 has no TOML parser: the lock probe still runs, and the
+manifest policy checks are reported as skipped.
+
+The lock probe invokes Pixi with `--locked --no-install` and identifies
+cross-platform Conda/PyPI ownership errors. Do not bypass them with `--frozen`.
+Declare shared dependencies in the base feature only when all runtimes need
+them (e.g. `packaging`); declare narrower dependencies in their owning feature
+(e.g. `matplotlib-base` in `oracle`, `docs`, and `notebooks`). Keep solve groups
+and compare their locked builds. The static doctor checks these known policy
+rules; Pixi remains the authority for arbitrary transitive dependency conflicts.
+
 ## Pixi workspace
 
 `[tool.pixi]` in `pyproject.toml` defines the environments; `pixi.lock`
@@ -35,6 +157,19 @@ install with `--locked`, so a manifest edit without `pixi lock` fails fast.
 | `intel` | linux-64 | PyPI `intel` extra (`dpnp`, `dpctl`); same groups as `amd` |
 | `svml` | linux-64 | Intel SVML Numba from Anaconda `pkgs/main`; `test` only. Separate terms: [`LICENSE-SVML.md`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/LICENSE-SVML.md) |
 | `viz` | linux-64 | One-off research viewers and digitizers (conda-forge `vtk-base`, `pyvista`, `pymupdf`, `scikit-image`; PyPI `trame`) |
+| `runtime-cpu` | linux-64, osx-arm64, win-64 | Core, Dask, optimization; shares the `py313` solve |
+| `runtime-nvidia` | linux-64 (CUDA 13 driver) | Core, Dask, optimization, conda-forge CUDA stack; shares the `nvidia` solve |
+| `runtime-amd` | linux-64 | Core, Dask, optimization, ROCm CuPy source build; shares the `amd` solve |
+| `runtime-intel` | linux-64 | Core, Dask, optimization, Intel SYCL; shares the `intel` solve |
+
+Production environments omit test, lint, documentation, notebook, browser and
+oracle groups and the app/plot extras. A shared solve-group keeps common
+packages pinned to the same builds as the corresponding developer environment.
+For tests, plotting, tutorials, and validation, continue using the existing
+developer environments. Select a runtime explicitly on named remote targets
+(e.g. `--environment runtime-nvidia`); omitted fields still select the vendor's
+original environment. Submit pack-mode jobs from the contributor environment,
+not from the lean environment; only the destination needs the runtime.
 
 Design decisions (#1462):
 
@@ -68,10 +203,10 @@ Design decisions (#1462):
   C++, and detects the GPU architecture, so `pixi install --locked -e amd`
   builds CuPy for that GPU. On qlmc-ace (Ubuntu 26.04 ROCm 7.1 under `/usr`)
   the first build takes about 11 minutes; the built wheel is cached.
-- **GPU versions.** GPU environments cannot share a solve-group with
-  `default` (different platforms), so the `gpu-stack` feature pins numpy and
-  numba to `default`'s minor releases. SciPy stays free: conda-forge CuPy
-  14.2 constrains `scipy<1.18`, so `nvidia` locks 1.17.
+- **GPU versions.** Each GPU family has its own solve-group shared by its
+  runtime and developer environments, separate from `default`. The
+  `gpu-stack` feature pins numpy and numba to `default`'s minor releases.
+  SciPy stays free: conda-forge CuPy 14.2 constrains `scipy<1.18`.
 - **No double installs.** pixi skips a PyPI requirement only when its
   conda-to-PyPI map names the conda package. conda-forge ships that map;
   `pkgs/main` does not, so `[tool.pixi.workspace.conda-pypi-map]` maps every
@@ -120,8 +255,9 @@ Commands below assume `pyrite` and `pyrite-dev` are on your `PATH`: run them ins
 # Normal contributor setup: the default environment (every dependency group).
 pixi install --locked
 
-# A lab GPU environment, as remote jobs install it.
+# A lab GPU development environment, or a lean production environment.
 pixi install --locked -e nvidia
+pixi install --locked -e runtime-nvidia
 
 # Start with the changed behavior's test node or owning module.
 pyrite-dev test path/to/test.py -k test_name
@@ -179,15 +315,19 @@ pyrite-dev package-smoke
 
 Agent and git hooks:
 
-- `pixi run pre-commit install` installs both configured stages: commit-time Ruff,
-  notebook stripping and skill-mirror sync, and pre-push import-linter,
-  `check-skills` and `repo-map --check`. `pyrite-dev verify` stays the full
+- `pixi run --locked pre-commit install` installs both configured stages:
+  commit-time Pixi-managed Ruff (including native Jupyter linting) and
+  skill-mirror sync, and pre-push import-linter, `check-skills` and
+  `repo-map --check`. The separate nbQA hook environment is no longer needed;
+  the explicit legacy `nbqa` task remains. `pyrite-dev verify` stays the full
   repository gate, including tutorial capture validation and rendering.
 - `.agents/hooks/guard_bash.sh` (Claude Code and Codex `PreToolUse`) blocks
   pattern kills, bulk `git add`, non-lease force pushes, and pushes to `main`.
-- `.agents/hooks/ruff_after_edit.sh` (Claude Code `PostToolUse`) formats each
-  edited Python file and applies safe Ruff fixes, leaving unused-import
-  findings for the agent.
+- `.agents/hooks/ruff_after_edit.sh` (Claude Code `PostToolUse`) checks each
+  edited Python file, applies safe fixes only outside Marimo directories,
+  and formats afterward. Unused-import/variable findings remain for the agent.
+  It never installs or re-locks; when Ruff cannot format (stale lock, missing
+  environment, syntax error) it reports the skip instead of staying silent.
 - `.claude/settings.json` pins Claude Code's tool shell to bash
   (`CLAUDE_CODE_SHELL`); zsh does not word-split unquoted variables.
 

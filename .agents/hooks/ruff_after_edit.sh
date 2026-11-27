@@ -5,10 +5,13 @@
 # whole-repo churn of `pyrite-dev format`.
 #
 # F401/F841 stay unfixable: AGENTS.md adds imports with first use, so an
-# import written one edit before its use must not be deleted. Remaining
-# findings return to the agent as additionalContext; the hook never blocks.
-# Fail open: missing tools, files outside the project, and Ruff-excluded
-# paths (--force-exclude) are skipped.
+# import written one edit before its use must not be deleted. Marimo's nested
+# config also sets fixable=[] so this CLI override cannot enable lint fixes.
+# Findings return to the agent as additionalContext; the hook never blocks.
+# Fail open: files outside the project, Ruff-excluded paths (--force-exclude)
+# and a missing jq are skipped silently. A file Ruff cannot format (stale
+# pixi.lock, uninstalled environment, syntax error) is reported as skipped;
+# --locked --no-install keeps the hook from changing the lock or environment.
 set -uo pipefail
 
 command -v jq >/dev/null 2>&1 || exit 0
@@ -25,13 +28,17 @@ case "$file" in
 esac
 cd "$root" || exit 0
 
-ruff=(timeout 30 pixi run --quiet --as-is ruff)
-"${ruff[@]}" format --quiet --force-exclude -- "$file" >/dev/null 2>&1 || exit 0
-findings=$("${ruff[@]}" check --fix --unfixable F401,F841 --force-exclude \
+ruff=(timeout 30 pixi run --quiet --locked --no-install -e default ruff)
+findings=$("${ruff[@]}" check --fix --no-unsafe-fixes --unfixable F401,F841 --force-exclude \
     --output-format concise --quiet -- "$file" 2>/dev/null)
-[ -n "$findings" ] || exit 0
+skipped=
+error=$("${ruff[@]}" format --quiet --force-exclude -- "$file" 2>&1 >/dev/null) ||
+    skipped="Ruff did not format this file (exit $?). ${error:0:2000}"
+report="$skipped${skipped:+${findings:+
+}}$findings"
+[ -n "$report" ] || exit 0
 
-jq -n --arg ctx "Ruff findings after editing ${file#"$root"/}:
-$findings" \
+jq -n --arg ctx "Ruff report after editing ${file#"$root"/}:
+$report" \
     '{hookSpecificOutput: {hookEventName: "PostToolUse", additionalContext: $ctx}}'
 exit 0

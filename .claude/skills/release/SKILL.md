@@ -9,10 +9,11 @@ Policy: `docs/repo-design/releasing.md`. Versions bump only in a release PR
 titled `chore(release): bump version to X.Y.Z`; never mix with feature work.
 
 ```bash
-pixi run pyrite-dev release X.Y.Z --check
-pixi run pyrite-dev release X.Y.Z --notes-file <scratch>/notes.md
-pixi run pyrite-dev verify
-pixi run pyrite-dev test --slow
+pixi run --locked pyrite-dev release X.Y.Z --check
+pixi run --locked pyrite-dev release X.Y.Z --notes-file <scratch>/notes.md
+pixi run --locked doctor --lock
+pixi run --locked verify
+pixi run --locked test --slow
 ```
 
 `verify` is static-only. Release validation explicitly runs the full slow-inclusive

@@ -203,7 +203,7 @@ def _physics_preflight_block(expected) -> str:
 
     payload = config.shell_arg(json.dumps(expected, sort_keys=True, separators=(",", ":")))
     verify = (
-        f"{config.remote_runtime_env()} {config.shell_remote_run()} "
+        f"{config.remote_runtime_env()} {config.shell_job_run()} "
         f"python -m pyrite.remote.physics_identity {payload}"
     )
     return f"""if ! {verify} >> "$JOBDIR/log" 2>&1; then
@@ -229,6 +229,10 @@ def _pixi_install_block(once: bool = False) -> str:
     AMD jobs sharing one checkout never rebuild each other's packages. AMD
     targets build CuPy from source against the node's ROCm toolchain, which
     ``CUPY_INSTALL_USE_HIP=1`` selects."""
+    if config.remote_env_transfer() == "pack":
+        from ._environment_pack import unpack_block
+
+        return unpack_block()
     build_env = "CUPY_INSTALL_USE_HIP=1 " if config.remote_gpu_vendor() == "amd" else ""
     environment = config.remote_environment()
     sync = f"""pixi_install_start_ns=$(date +%s%N)
@@ -264,14 +268,14 @@ def _cpu_profile_block(catalog_profile, performance_profile, cpu_flags):
   mkdir -p "$(dirname "$cpu_prof_base")" "$cpu_ckpt"
   printf '%s\\n' "cProfile pass (serial CPU)" >> "$JOBDIR/log"
   cpu_prof_rc=0
-  env -u PYRITE_MC_NSYS PYRITE_MC_BACKEND=cpu {config.shell_remote_run()} python \\
+  env -u PYRITE_MC_NSYS PYRITE_MC_BACKEND=cpu {config.shell_job_run()} python \\
     -m pyrite._entry.profile_module "$cpu_prof_base.prof" \\
     pyrite._entry.scan {config.shell_word(catalog_profile)} -m "$m"{cpu_flags} --workers 0 \\
     --max-minutes 10 \\
     --checkpoint-dir "$cpu_ckpt" --progress-file "$JOBDIR/progress/$m.cpu.json" \\
     --progress-phase cpu --no-progress >> "$JOBDIR/log" 2>&1 || cpu_prof_rc=$?
   if [ "$cpu_prof_rc" -eq 0 ] && [ -f "$cpu_prof_base.prof" ]; then
-    {config.shell_remote_run()} python -c '{pstats_dump}' \\
+    {config.shell_job_run()} python -c '{pstats_dump}' \\
       "$cpu_prof_base.prof" > "$cpu_prof_base.txt" 2>&1 || cpu_prof_rc=$?
   fi
   if [ "$cpu_prof_rc" -ne 0 ] || [ ! -f "$cpu_prof_base.prof" ] || [ ! -f "$cpu_prof_base.txt" ]; then
@@ -310,6 +314,19 @@ def _fallback_runtime(allow):
     return "", "\nexport PYRITE_STRICT_PHYSICS_FALLBACK=1"
 
 
+def _py_spy_launch_args(py_spy, performance_profile, nsys, cpu_only):
+    """Validate profiler compatibility and render its shell arguments."""
+    if py_spy and (performance_profile is None or nsys or cpu_only):
+        raise ValueError("py_spy requires a performance profile and excludes nsys/cpu_only")
+    if py_spy and config.remote_env_transfer() == "pack":
+        raise ValueError("py-spy requires env_transfer=install (pixi exec can download packages)")
+    # The output path stays a double-quoted shell word so "$trace_base" expands.
+    return " ".join(
+        f'"$trace_base{PY_SPY_SUFFIX}"' if arg == "__OUTPUT__" else config.shell_word(arg)
+        for arg in py_spy_record_args("__OUTPUT__")
+    )
+
+
 def _queue_script(
     jobid,
     materials,
@@ -346,8 +363,7 @@ def _queue_script(
         raise ValueError("cpu and cpu_only are mutually exclusive")
     if cpu_only and nsys:
         raise ValueError("cpu_only cannot be combined with nsys")
-    if py_spy and (performance_profile is None or nsys or cpu_only):
-        raise ValueError("py_spy requires a performance profile and excludes nsys/cpu_only")
+    py_spy_args = _py_spy_launch_args(py_spy, performance_profile, nsys, cpu_only)
     if no_cache and recompute:
         raise ValueError("no_cache and recompute are mutually exclusive")
     flags = _trajectory_flags(trajectories, overwrite_trajectories, trajectory_storage)
@@ -391,11 +407,6 @@ def _queue_script(
     runtime_exports += _forwarded_env_exports()
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
-    # The output path stays a double-quoted shell word so "$trace_base" expands.
-    py_spy_args = " ".join(
-        f'"$trace_base{PY_SPY_SUFFIX}"' if arg == "__OUTPUT__" else config.shell_word(arg)
-        for arg in py_spy_record_args("__OUTPUT__")
-    )
     return f"""JOBDIR={config.shell_word(jobdir)}
 PERFDIR={config.shell_word(config.remote_output_path("performance", jobid))}
 PERFCKPT={config.shell_word(config.remote_output_path("checkpoints", "performance", jobid))}
@@ -445,9 +456,9 @@ run_material() {{
       printf '%s\\n' "py-spy uncached sampling profile" >> "$JOBDIR/log"
     fi
     if [ "$nsys_enabled" -eq 1 ] || [ "$py_spy_enabled" -eq 1 ]; then
-      scan_launcher=({config.shell_remote_env_python()})
+      scan_launcher=({config.shell_job_python()})
     else
-      scan_launcher=({config.shell_remote_run()} python)
+      scan_launcher=({config.shell_job_run()} python)
     fi
     scan_command=(
       "${{scan_launcher[@]}}" -u -m pyrite._entry.scan {config.shell_word(catalog_profile)} -m "$m"{flags}
@@ -499,7 +510,7 @@ run_material() {{
       rm -f "$trace_base{PY_SPY_STATUS_SUFFIX}"
       {config.shell_remote_pixi()} exec --spec {config.shell_word(PY_SPY_REQUIREMENT)} py-spy \\
         {py_spy_args} \\
-        {config.shell_remote_env_python()} -m pyrite.perf.py_spy \\
+        {config.shell_job_python()} -m pyrite.perf.py_spy \\
         "$trace_base{PY_SPY_STATUS_SUFFIX}" -- \\
         "${{scan_command[@]}}" >> "$JOBDIR/log" 2>&1
       scan_rc=$(cat "$trace_base{PY_SPY_STATUS_SUFFIX}" 2>/dev/null || echo 1)
@@ -745,7 +756,7 @@ for m in "${{mats[@]}}"; do
   (
     job_pid=
     trap '[ -z "$job_pid" ] || {{ kill -TERM "$job_pid" 2>/dev/null || true; wait "$job_pid" 2>/dev/null || true; }}; echo 143 > "$JOBDIR/.child_rc"; exit 143' TERM
-    {config.shell_remote_run()} python -u -m pyrite._entry.scan {config.shell_word(catalog_profile)} -m "$m"{flags} "${{resume_flags[@]}}" --max-minutes "$remaining_min" \
+    {config.shell_job_run()} python -u -m pyrite._entry.scan {config.shell_word(catalog_profile)} -m "$m"{flags} "${{resume_flags[@]}}" --max-minutes "$remaining_min" \
       --progress-file "$JOBDIR/progress/$m.json" --no-progress >> "$JOBDIR/log" 2>&1 &
     job_pid=$!
     wait "$job_pid"
@@ -785,7 +796,7 @@ echo "started: $(date -Is)" >> "$JOBDIR/meta"
 {_pixi_install_block(once=True)}
 {_tables_preflight_block()}
 echo "running zhai reproduction since $(date -Is)" > "$JOBDIR/state"
-if ! {config.shell_remote_run()} python -m pyrite._entry.reproduce_zhai{flags} >> "$JOBDIR/log" 2>&1
+if ! {config.shell_job_run()} python -m pyrite._entry.reproduce_zhai{flags} >> "$JOBDIR/log" 2>&1
 then
   echo "FAILED $(date -Is)" > "$JOBDIR/state"
   exit 1
@@ -849,7 +860,7 @@ for m in "${{mats[@]}}"; do
   n=$((n + 1))
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
-  if ! {config.shell_remote_run()} pyrite checkpoint recompute brem "$m"{flags} \
+  if ! {config.shell_job_run()} pyrite checkpoint recompute brem "$m"{flags} \
     --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1
   then
     echo "WARNING: rebrem failed for $m; continuing" >> "$JOBDIR/log"
@@ -922,7 +933,7 @@ for m in "${{mats[@]}}"; do
   (
     job_pid=
     trap '[ -z "$job_pid" ] || {{ kill -TERM "$job_pid" 2>/dev/null || true; wait "$job_pid" 2>/dev/null || true; }}; echo 143 > "$JOBDIR/.child_rc"; exit 143' TERM
-    {config.shell_remote_run()} pyrite checkpoint recompute brem "$m"{flags} --max-minutes "$remaining_min" \
+    {config.shell_job_run()} pyrite checkpoint recompute brem "$m"{flags} --max-minutes "$remaining_min" \
       --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1 &
     job_pid=$!
     wait "$job_pid"
@@ -1023,7 +1034,7 @@ for m in "${{mats[@]}}"; do
   n=$((n + 1))
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
-  if ! {config.shell_remote_run()} pyrite checkpoint recompute cxr "$m"{flags} \
+  if ! {config.shell_job_run()} pyrite checkpoint recompute cxr "$m"{flags} \
     --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1
   then
     echo "WARNING: reline failed for $m; continuing" >> "$JOBDIR/log"
@@ -1096,7 +1107,7 @@ for m in "${{mats[@]}}"; do
   (
     job_pid=
     trap '[ -z "$job_pid" ] || {{ kill -TERM "$job_pid" 2>/dev/null || true; wait "$job_pid" 2>/dev/null || true; }}; echo 143 > "$JOBDIR/.child_rc"; exit 143' TERM
-    {config.shell_remote_run()} pyrite checkpoint recompute cxr "$m"{flags} --max-minutes "$remaining_min" \
+    {config.shell_job_run()} pyrite checkpoint recompute cxr "$m"{flags} --max-minutes "$remaining_min" \
       --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1 &
     job_pid=$!
     wait "$job_pid"

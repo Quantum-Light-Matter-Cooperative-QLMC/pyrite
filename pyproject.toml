@@ -134,6 +134,8 @@ test = [
     "pytest-cov>=7.1.0",
     # Builds the wheel `pyrite-dev package-smoke` installs with plain pip.
     "build>=1.2",
+    # Lock parsing in pyrite-dev and offline pack submission (not simulation).
+    "pyyaml>=6",
     # Real dask-jobqueue job scripts for the SLURM Dask provisioning tests.
     "dask-jobqueue>=0.9",
 ]
@@ -564,49 +566,6 @@ source_modules = ["pyrite.devtools"]
 forbidden_modules = ["pyrite._dev"]
 allow_indirect_imports = true
 
-[tool.ruff]
-line-length = 100
-
-# keep this tight; avoid duplicate exclusion logic
-exclude = [
-    ".pixi",
-    ".venv",
-    "__pycache__",
-    ".ruff_cache",
-    ".pytest_cache",
-    "docs/_build",
-    "docs/_autosummary",
-]
-
-[tool.ruff.lint]
-# core useful rules without the “style noise overload”
-select = [
-    "E",  # pycodestyle errors
-    "F",  # pyflakes
-    "I",  # import sorting
-    "UP", # pyupgrade (keeps Python 3.12/3.13 modern)
-    "B",  # bugbear (real bugs, not stylistic nitpicks)
-]
-
-ignore = [
-    "E501", # long lines in physics formulas/comments
-    "E402", # import-not-at-top — notebook cells have docstrings before imports
-    "B008", # np.deg2rad() in default args — pure math call, not a real bug
-]
-
-[tool.ruff.lint.per-file-ignores]
-"*.ipynb" = [
-    "F821",
-] # cross-cell references are always undefined to static analysis
-# marimo apps display a cell's value as its bare last
-# expression (e.g. a UI element on its own line) -- that's the framework's render
-# mechanism, not a useless statement.
-"src/pyrite/apps/*_app.py" = ["B018"]
-
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-
 [tool.pixi.workspace]
 # Contributor, CI and lab environments (#1462). Users still install the PyPI
 # package (`pip install pyrite-mc`); pixi only manages development checkouts.
@@ -626,6 +585,7 @@ requires-pixi = ">=0.85"
 # LLVM), so pixi skips the PyPI wheels of the same projects; pure-Python
 # dependencies stay on PyPI. Floors match [project.dependencies].
 [tool.pixi.dependencies]
+packaging = "*"
 python = ">=3.13,<3.15"
 numpy = ">=2.2"
 scipy = ">=1.17.1"
@@ -637,6 +597,9 @@ psutil = ">=7.2.2"
 gemmi = ">=0.7.5,<0.8"
 
 # nbconvert's Markdown/LaTeX exporters shell out to the pandoc binary.
+[tool.pixi.feature.oracle.dependencies]
+matplotlib-base = ">=3.11.0"
+
 [tool.pixi.feature.notebooks.dependencies]
 matplotlib-base = ">=3.11.0"
 pandoc = "*"
@@ -710,6 +673,58 @@ UV_TOOL_DIR = "$PIXI_PROJECT_ROOT/.pixi/uv-tools"
 UV_TOOL_BIN_DIR = "$PIXI_PROJECT_ROOT/.pixi/uv-tools/bin"
 UV_CACHE_DIR = "$PIXI_PROJECT_ROOT/.pixi/uv-cache"
 
+# Workflow entry points, scoped to the features that supply their tools.
+# Keep the commands usable directly in an activated environment as well.
+# No inputs/outputs on gates or scientific tasks: they must run on invocation.
+[tool.pixi.tasks]
+fetch-tables = { cmd = "pyrite tables fetch", description = "Fetch and verify pinned reference data" }
+quickstart = { cmd = "pyrite run quickstart", description = "Run the bundled simulation example" }
+
+[tool.pixi.feature.test.tasks]
+test = { cmd = "pyrite-dev test", description = "Run focused tests with the project runner" }
+test-cpu = { cmd = "pyrite-dev test", env = { PYRITE_MC_BACKEND = "cpu" }, description = "Run focused tests on CPU" }
+test-suite = { cmd = "pyrite-dev test-suite", description = "Run a named domain suite" }
+package-smoke = { cmd = "pyrite-dev package-smoke", description = "Build and smoke-test the distribution" }
+
+[tool.pixi.feature.lint.tasks]
+lint = { cmd = "python -m ruff check .", description = "Check lint rules" }
+# These commands omit a default path so a forwarded file/directory scopes the run.
+# Nested Ruff configs protect Marimo sources even when users run Ruff directly.
+lint-fix = { cmd = "python -m ruff check --fix --no-unsafe-fixes", description = "Apply safe lint fixes outside Marimo directories" }
+lint-diff = { cmd = "python -m ruff check --diff --no-unsafe-fixes", description = "Preview safe lint fixes" }
+lint-stats = { cmd = "python -m ruff check --statistics", description = "Summarize lint violations" }
+lint-watch = { cmd = "python -m ruff check --watch", description = "Watch for lint violations" }
+sort-imports = { cmd = "python -m ruff check --select I --fix --no-unsafe-fixes", description = "Sort imports outside Marimo directories" }
+# Full-tree repair is explicit. Format even if non-fixable findings remain, then check.
+fix = { cmd = "python -m ruff check --fix-only --no-unsafe-fixes . && python -m ruff format . && python -m ruff check .", description = "Repair and format the repository, then report remaining lint" }
+fmt = { cmd = "python -m ruff format .", description = "Format source files" }
+fmt-check = { cmd = "python -m ruff format --check .", description = "Check formatting without editing" }
+typecheck = { cmd = "python -m ty check --exit-zero-on-warning", description = "Check Python types" }
+imports = { cmd = "lint-imports --no-cache", description = "Check import boundaries" }
+precommit = { cmd = "python -m pre_commit run --all-files", description = "Run pre-commit hooks" }
+nbqa = { cmd = "pyrite-dev nbqa", description = "Lint maintained notebooks" }
+nbstrip = { cmd = "pyrite-dev nbstrip", description = "Strip maintained notebook outputs" }
+doctor = { cmd = "pyrite-dev doctor", description = "Check workspace dependency policy" }
+check-lines = { cmd = "pyrite-dev check-lines", description = "Check source-module line budgets" }
+check-complexity = { cmd = "pyrite-dev complexity --check", description = "Check the complexity ratchet" }
+check-api = { cmd = "pyrite-dev api check", description = "Check the governed API inventory" }
+check-skills = { cmd = "pyrite-dev check-skills", description = "Check agent skill mirrors" }
+repo-map-check = { cmd = "pyrite-dev repo-map --check", description = "Check the generated repository map" }
+repo-map-write = { cmd = "pyrite-dev repo-map --write", description = "Regenerate the repository map" }
+sync-skills = { cmd = "pyrite-dev sync-skills", description = "Synchronize agent skill mirrors" }
+# All current lint environments also contain docs. Keep the full gate order
+# identical to pyrite-dev verify; verify-quick omits only the docs build.
+verify-quick = { depends-on = ["typecheck", "lint", "fmt-check", "check-lines", "check-complexity", "check-api", "imports"] }
+verify = { depends-on = ["typecheck", "lint", "fmt-check", "check-lines", "check-complexity", "check-api", "docs", "imports"] }
+
+[tool.pixi.feature.docs.tasks]
+docs = { cmd = "pyrite-dev docs", description = "Build clean warnings-as-errors documentation" }
+docs-linkcheck = { cmd = "pyrite-dev docs --linkcheck", description = "Check documentation links" }
+cli-reference-check = { cmd = "pyrite-dev cli-reference --check", description = "Check generated CLI reference" }
+cli-reference-write = { cmd = "pyrite-dev cli-reference --write", description = "Regenerate CLI reference" }
+validation-ledger-check = { cmd = "pyrite-dev validation-ledger --check", description = "Check generated validation ledger" }
+validation-ledger-write = { cmd = "pyrite-dev validation-ledger --write", description = "Regenerate validation ledger" }
+
 # One-off research scripts (trajectory scene viewers, PDF figure digitizing)
 # that need packages nothing else uses: `pixi run -e viz python checks/...`.
 [tool.pixi.feature.viz]
@@ -737,10 +752,10 @@ cuda-version = "13.*"
 cupy = ">=14.1.1"
 cufinufft = ">=2.5.1,<2.6"
 
-# GPU environments solve alone (no solve-group with `default`, whose platforms
-# differ), so pin the scientific stack to the versions `default` locks; GPU
-# and CPU runs then compare like for like. SciPy is left free: conda-forge
-# CuPy 14.2 constrains scipy<1.18, so `nvidia` locks 1.17.x.
+# GPU families solve separately from `default` (different platforms).
+# Pin the scientific stack to the minor versions `default` locks; SciPy is
+# left free because conda-forge CuPy 14.2 constrains scipy<1.18.
+# Each production environment shares a solve-group with its developer peer.
 [tool.pixi.feature.gpu-stack.dependencies]
 numpy = "2.5.*"
 numba = "0.68.*"
@@ -775,12 +790,25 @@ intel-cmplr-lib-rt = "*"
 default = { features = ["cpu", "py313", "test", "lint", "docs", "notebooks", "oracle", "browser", "dask", "optimization"], solve-group = "py313" }
 py314 = { features = ["cpu", "py314", "test", "lint", "docs", "notebooks", "oracle", "browser", "dask", "optimization"], solve-group = "py314" }
 docs = { features = ["cpu", "py313", "docs"], solve-group = "py313" }
+# Focused developer environments: full default/py314 remain the CI reference.
+# Quality retains runtime app/oracle imports for type checking and docs.
+quality = { features = ["cpu", "py314", "lint", "docs", "apps", "oracle", "dask", "optimization"], solve-group = "py314" }
+# Focused numerical tests; do not use for full-suite coverage or app tests.
+test-physics = { features = ["cpu", "py313", "test", "oracle", "dask", "optimization"], solve-group = "py313" }
+# The package smoke creates its own plain pip venvs; the outer env needs build.
+packaging = { features = ["cpu", "py313", "test"], solve-group = "py313" }
 # Every default group except `oracle` (abtem needs pyFFTW, no cp315 build).
 py315 = { features = ["py315", "test", "lint", "docs", "notebooks", "browser", "dask", "optimization"], no-default-feature = true }
-# Lab/GPU environments carry the test group and the cluster extras jobs use;
-# nvidia also carries docs, to regenerate the CUDA tutorial captures.
-nvidia = { features = ["py313", "gpu-stack", "cuda", "test", "docs", "notebooks", "dask", "optimization"] }
-amd = { features = ["py313", "gpu-stack", "amd", "test", "notebooks", "dask", "optimization"] }
-intel = { features = ["py313", "gpu-stack", "intel", "test", "notebooks", "dask", "optimization"] }
+# Developer GPU environments retain their existing capabilities. Each shares
+# its solve with the corresponding lean runtime, not with other GPU vendors.
+nvidia = { features = ["py313", "gpu-stack", "cuda", "test", "docs", "notebooks", "dask", "optimization"], solve-group = "gpu-nvidia" }
+amd = { features = ["py313", "gpu-stack", "amd", "test", "notebooks", "dask", "optimization"], solve-group = "gpu-amd" }
+intel = { features = ["py313", "gpu-stack", "intel", "test", "notebooks", "dask", "optimization"], solve-group = "gpu-intel" }
+# Production simulations: core + cluster/optimization extras, no contributor
+# groups or app/plot extras. Select explicitly; existing targets are unchanged.
+runtime-cpu = { features = ["cpu", "py313", "dask", "optimization"], solve-group = "py313" }
+runtime-nvidia = { features = ["py313", "gpu-stack", "cuda", "dask", "optimization"], solve-group = "gpu-nvidia" }
+runtime-amd = { features = ["py313", "gpu-stack", "amd", "dask", "optimization"], solve-group = "gpu-amd" }
+runtime-intel = { features = ["py313", "gpu-stack", "intel", "dask", "optimization"], solve-group = "gpu-intel" }
 svml = { features = ["py313", "svml", "test"] }
 viz = { features = ["py313", "test", "notebooks", "viz"], solve-group = "py313" }
