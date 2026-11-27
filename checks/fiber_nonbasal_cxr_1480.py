@@ -600,6 +600,8 @@ def cmd_frozen(args):
         raise ValueError("reference must be at least as fine as every sector quadrature")
     if args.full_circle_reference < 0:
         raise ValueError("full-circle-reference must be nonnegative")
+    if args.full_circle_reference and math.gcd(args.full_circle_reference, 6) > 1:
+        raise ValueError("full-circle-reference must be coprime with 6, or its nodes alias")
     cuts = sorted(set([*args.g_cuts, args.g_max]))
     if any(g <= 0 or g > args.g_max for g in cuts):
         raise ValueError("g-cuts must be positive and no greater than g-max")

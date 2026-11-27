@@ -211,7 +211,8 @@ Percentages are steps from the previous cutoff. Yields are per electron per ster
 - non-basal CBS is not lost; it stays in the continuum, smeared as an amorphous-like background;
 - non-basal PXR is not in BremsLib at all, so it is lost.
 
-Energy-weighted share of the scored set ($\lvert g\rvert\le6$ Å⁻¹, `scratch/share1480.py`): non-basal over basal is 4.70, 4.66 and 4.60 for HOPG at 30 keV, 300 keV and 1 MeV, and 3.43, 3.40 and 3.36 for h-BN. The subtraction grows about 5.7× when the full domain is scored. The mechanism already takes an explicit reflection list, so the extension needs no new kernel. It needs the per-reflection tensor $B$ in $U_g$ (with $B_{33}$ isotropic the HOPG non-basal share is 24 % low) and the shells summed before the clamp. The opt-in model does both (`cxr-fiber-intensity-average`). The isotropic kernel is not texture-conditioned: for a fiber, the per-orientation line yield differs from the 4π average, so subtraction and lines balance only in total. #1250 is the precedent.
+Energy-weighted share of the scored set ($\lvert g\rvert\le6$ Å⁻¹; script archived at
+`~/dev/pyrite-benches/1480-fiber-nonbasal/share1480.py`): non-basal over basal is 4.70, 4.66 and 4.60 for HOPG at 30 keV, 300 keV and 1 MeV, and 3.43, 3.40 and 3.36 for h-BN. The subtraction grows about 5.7× when the full domain is scored. The mechanism already takes an explicit reflection list, so the extension needs no new kernel. It needs the per-reflection tensor $B$ in $U_g$ (with $B_{33}$ isotropic the HOPG non-basal share is 24 % low) and the shells summed before the clamp. The opt-in model does both (`cxr-fiber-intensity-average`). The isotropic kernel is not texture-conditioned: for a fiber, the per-orientation line yield differs from the 4π average, so subtraction and lines balance only in total. #1250 is the precedent.
 
 ## Domain coherence (open)
 

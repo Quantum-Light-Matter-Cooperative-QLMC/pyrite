@@ -38,7 +38,10 @@ Existing graphite site averaging and assumed room temperature are inherited
 from #535. hBN is deliberately refused: its element-resolved tensor data
 are not present in that thermal catalog as of this slice.
 
-B and C average non-basal **intensities** over the same uniform fiber rolls.
+B and C average non-basal **intensities** over the same uniform fiber rolls:
+`N` midpoint nodes on one 60-degree sector, the opt-in model's nodes at zero
+offset. The reflection set is closed under 60-degree rolls, and equally spaced
+full-circle nodes would alias whenever `gcd(N, 6) > 1`.
 The basal score is invariant under those rolls, so it is evaluated once and
 added to both averages. The stored per-azimuth arrays contain non-basal
 spectra, not amplitudes. Existing mosaic settings of the source case are
@@ -107,8 +110,8 @@ submit to SLURM; use the group's normal remote workflow for large runs.
 Repeat on the **same artifact**, using fresh output directories, to converge
 azimuth count (8, 32, 128), shifted quadrature (`--azimuth-offset 0.5`),
 reciprocal cutoff (e.g. 8, 16, 24 inverse angstrom, within the released
-kernel range), and photon spacing (1, 0.5, 0.25 eV). The 8-point and 32-point
-unshifted grids are nested. A high-energy upper band must be checked for
+kernel range), and photon spacing (1, 0.5, 0.25 eV). Unshifted midpoint grids
+nest only when the count ratio is odd (8 and 32 do not). A high-energy upper band must be checked for
 omitted peaks; a fixed band is not a statement of total emitted yield.
 Tensor grouping is deliberately simple and may be expensive at high cutoffs.
 
@@ -126,7 +129,10 @@ C-A (combined) and A/B/C-D (net yield relative to amorphous emission).
 (`cxr-fiber-intensity-average`) over nested reciprocal cutoffs, on 60° sector
 rolls (`--azimuths`). Each disjoint |g| band is scored once, and every cutoff
 gets the matched continuum subtraction over its own full prefix domain. The
-smallest rung must equal `score_fiber_case` (the `integrity` record).
+smallest rung must equal `score_fiber_case` (the `integrity` record) within
+1e-9 of peak in FP64 or 1e-4 in FP32; otherwise the outputs are written with
+`complete: false` and the script exits non-zero. Cases that `score_fiber_case`
+refuses, and cutoffs outside the kernel, are rejected before line scoring.
 `--components` also stores the PXR and CBS parts of the basal and non-basal
 sums per cutoff (`g<C>_{basal,nonbasal}_{pxr,cbs}`; their sum differs from the
 total by the PXR–CBS interference term). This route calls `mc_cxr_spectrum`

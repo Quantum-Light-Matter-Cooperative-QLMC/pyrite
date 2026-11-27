@@ -196,6 +196,21 @@ def azimuth_average(score, groups, angles, grid):
     return total, np.stack(samples)
 
 
+def roll_angles(origin, count, offset=0.0):
+    """Midpoint roll nodes on one 60-degree sector, as in the opt-in model.
+
+    ``offset`` shifts the nodes by that fraction of one step. Equally spaced
+    full-circle nodes alias whenever ``gcd(count, 6) > 1``.
+    """
+    return origin + (math.pi / 3) * (np.arange(count) + 0.5 + offset) / count
+
+
+def integrity_passes(record, fp64):
+    """Whether the first ladder rung matches ``score_fiber_case`` at its precision."""
+    tolerance = 1e-9 if fp64 else 1e-4
+    return all(record[key] <= tolerance for key in ("cxr_max_rel", "brem_max_rel"))
+
+
 def validate_case(case, tp):
     if case.get("crystal") != "hopg":
         raise ValueError("this slice supports HOPG only: no verified hBN tensor in #535")
@@ -321,10 +336,7 @@ def run(args):
     groups = tensor_groups(case["crystal"], nonbasal, site, args.temperature)
     tensor = {b: list(hkls) for b, hkls in groups.items()}
     tensor.setdefault(b33, []).extend(basal)
-    angles = (
-        float(case.get("azimuth_rad", 0.0))
-        + 2 * np.pi * (np.arange(args.azimuths) + args.azimuth_offset) / args.azimuths
-    )
+    angles = roll_angles(float(case.get("azimuth_rad", 0.0)), args.azimuths, args.azimuth_offset)
     tables = _case_bremslib_tables(case)
     if tables is None or any(el not in tables for el, _ in case["composition"]):
         raise ValueError("all BremsLib tables must be present; no EEDL fallback allowed")
@@ -560,7 +572,7 @@ def run_ladder(args):
     """
     import resource
 
-    from pyrite._backend import _to_cpu
+    from pyrite._backend import REAL, _to_cpu
     from pyrite.config import FiberAverage
     from pyrite.energy_grid.convergence import require_identical_segments, segment_fingerprint
     from pyrite.montecarlo import runner
@@ -568,7 +580,11 @@ def run_ladder(args):
     from pyrite.montecarlo.runner.emission import _layer_brem_from_segments
     from pyrite.montecarlo.runner.oom import _ensure_pool_limit
     from pyrite.montecarlo.spectrum.cxr.fiber import FiberCXRModel, FiberReflectionSet
-    from pyrite.montecarlo.spectrum.cxr.fiber_case import _max_energy, score_fiber_case
+    from pyrite.montecarlo.spectrum.cxr.fiber_case import (
+        _checked_pilot,
+        _max_energy,
+        score_fiber_case,
+    )
 
     cuts = sorted(set(args.ladder))
     grid, edges = photon_axis(*args.band, args.spacing)
@@ -593,6 +609,8 @@ def run_ladder(args):
         )
         for cut in cuts
     ]
+    # The final integrity score has stricter preconditions than validate_case.
+    _checked_pilot(models[0], case, tp, grid)
     domains = [m.prepare() for m in models]
     bands = ladder_bands(domains)
     pilot = dict(case, reflection_selection=None, line_quadrature="bin-mean")
@@ -601,6 +619,13 @@ def run_ladder(args):
     floor = float(pilot.get("E_cut_lines_keV", 5.0))
     max_energy = _max_energy(pilot, tp["segs"])
     tables0 = _case_bremslib_tables(pilot)
+    # Build every correction first: kernel coverage errors must precede scoring.
+    corrections = [
+        domain.corrected_bremslib_tables(
+            tables0, pilot["composition"], E_cut_keV=floor, max_energy_keV=max_energy
+        )
+        for domain in domains
+    ]
     segments = runner._segments_on_device(tp["segs"])
     n_hat, groove, count = tp["n_hat"], tp.get("groove"), int(tp["Ne_lines"])
     phi0 = float(pilot.get("azimuth_rad", 0.0))
@@ -655,15 +680,14 @@ def run_ladder(args):
     arrays = dict(grid_eV=grid, edges_eV=edges, cutoffs_invang=np.asarray(cuts))
     arrays["D_brem"] = score_brem(tables0)
     rows, basal_parts, nonbasal_parts = [], zero.copy(), zero.copy()
-    for cut, model, domain, band in zip(cuts, models, domains, bands, strict=True):
+    for cut, model, domain, band, (tables, correction) in zip(
+        cuts, models, domains, bands, corrections, strict=True
+    ):
         t0 = time.perf_counter()
         basal_parts = basal_parts + score_rows(model, band["basal"])
         nonbasal_parts = nonbasal_parts + score_rows(model, band["nonbasal"])
         basal_sum, nonbasal_sum = basal_parts[0], nonbasal_parts[0]
         t_lines = time.perf_counter() - t0
-        tables, correction = domain.corrected_bremslib_tables(
-            tables0, pilot["composition"], E_cut_keV=floor, max_energy_keV=max_energy
-        )
         brem = score_brem(tables)
         cxr = basal_sum + nonbasal_sum
         tag = f"g{cut:g}"
@@ -701,7 +725,7 @@ def run_ladder(args):
         print(json.dumps({k: v for k, v in row.items() if k != "continuum_correction"}), flush=True)
     # Integrity: the smallest rung must equal the public paired entry point.
     t0 = time.perf_counter()
-    check = score_fiber_case(models[0], source_case, tp, grid)
+    check = score_fiber_case(models[0], case, tp, grid)
     first = f"g{cuts[0]:g}"
     ref_cxr = arrays[f"{first}_basal_cxr"] + arrays[f"{first}_nonbasal_cxr"]
     scale = max(float(np.max(np.abs(check["cxr"]))), 1e-300)
@@ -713,6 +737,7 @@ def run_ladder(args):
         ),
         seconds=time.perf_counter() - t0,
     )
+    integrity["passed"] = integrity_passes(integrity, np.dtype(REAL).itemsize == 8)
     print("integrity", json.dumps(integrity), flush=True)
     require_identical_segments(fingerprint, tp["segs"])
     try:
@@ -722,7 +747,7 @@ def run_ladder(args):
     summary = dict(
         issue=1480,
         mode="cutoff-ladder",
-        complete=True,
+        complete=integrity["passed"],
         code_sha=code_sha,
         source=source,
         fingerprint=fingerprint,
@@ -752,6 +777,8 @@ def run_ladder(args):
             f"{file_digest(output / name)}  {name}\n" for name in ("spectra.npz", "summary.json")
         )
     )
+    if not integrity["passed"]:
+        raise SystemExit("ladder integrity check failed; outputs are marked complete=false")
 
 
 def main(argv=None):

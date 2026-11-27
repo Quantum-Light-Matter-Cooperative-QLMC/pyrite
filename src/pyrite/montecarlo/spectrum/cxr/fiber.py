@@ -47,7 +47,9 @@ class FiberCXRModel:
     ) -> FiberCXRModel:
         """Build from ``Numerics``/``CxrReflections.fiber`` or a ``FiberAverage``.
 
-        ``temperature_K`` defaults to the measured tensor's own temperature.
+        Only the ``fiber`` field is read; mosaic settings come from the scored
+        case or ``spectrum()`` keywords. ``temperature_K`` defaults to the
+        measured tensor's own temperature.
         """
         if isinstance(source, Numerics):
             source = source.cxr_reflections

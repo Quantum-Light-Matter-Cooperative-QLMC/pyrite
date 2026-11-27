@@ -87,7 +87,7 @@ The `coherent-emission` and `coherent-segment-midpoint-time` rows are `rederived
 
 **Human sign-off is still pending on all of them**, and the following remain open before scientific use:
 
-1. cross-reflection ($\mathbf g\neq\mathbf g'$) coherence is dropped. It is bounded (`cross-reflection-coherence`, `filtered`) below ~1.6% of the integrated yield over the catalog's basal-plane families, but only `filtered`: the bound is worst-case in relative phase, and a reflection set with near-degenerate resonances at the observation angle is not covered;
+1. cross-reflection ($\mathbf g\neq\mathbf g'$) coherence is dropped. It is bounded (`cross-reflection-coherence`, `filtered`) below ~1.6% of the integrated yield over the catalog's basal-plane families, but only `filtered`: the bound is worst-case in relative phase and does not cover a reflection set with near-degenerate resonances at the observation angle, where only the final-state-orthogonality derivation for unshaped electrons (#1480) applies;
 2. physical bunch charge weights the production cross-electron excess; the stored spectrum stays per incident electron. The distinct-pair estimator has limiting-case regressions but still needs independent verification and a production sampling-error certificate;
 3. CUDA blend regression tests cover the fast paths, but do not establish validation across all materials, geometries, and precision settings;
 4. the harmonic sign that places each line is resolved under `line-energy-dispersion`. The Bijvoet-sensitive coupling pairing {eq}`eq-coherent-radiation-friedel-pairing` is anchored for the incoherent path. The coherent phase sum reuses the same tables;

@@ -170,7 +170,7 @@ The default `incoherent` policy sums intensities over flights and electrons unde
 
 - kinematic/Born treatment: no dynamical diffraction, no extinction, no photon multiple scattering, and no depletion of the incident wave;
 - straight, constant-velocity, constant-amplitude motion within each transport segment; the finite-time factor and the midpoint pairing both rest on this;
-- reflections and polarizations add incoherently; cross-$\mathbf g$ interference is bounded only for the reflection families tested under `cross-reflection-coherence`;
+- reflections and polarizations add incoherently; for unshaped electrons this rests on final-state orthogonality (#1480), while the measured classical bound on cross-$\mathbf g$ interference covers only the reflection families tested under `cross-reflection-coherence`;
 - couplings frozen at $\omega_{\rm res}$ across each line;
 - tabulated or CIF-derived crystal structure, form factors, Debye–Waller factors, and the selected orientation fully determine the coupling — a wrong $B$ factor or basis moves the yield directly;
 - a single fixed far-field observation direction per evaluation; the finite detector face is handled by summing directions, not by parallax within one;

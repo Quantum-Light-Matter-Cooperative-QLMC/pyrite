@@ -26,26 +26,29 @@ def _positive_count(value: object, name: str) -> None:
 class FiberAverage:
     """Reciprocal cutoff and roll quadrature of the full-fiber CXR average.
 
+    Basal ``(00l)`` rows are roll invariant and are scored once. Mosaic
+    quadrature applies on top of each roll node. It comes from the scored
+    case (``mosaic_mc_fwhm_rad``, ``mosaic_mc_nodes``) or from ``spectrum()``
+    keywords, not from ``mosaic_nodes``/``mosaic_route`` beside this object
+    on ``CxrReflections``.
+
     Parameters
     ----------
     cutoff_invang
         Reciprocal-vector magnitude cutoff ``|g|`` [1/Angstrom] of the full
-        (non-basal included) reflection domain. Required: #1480 found the
-        full-fiber yield still growing at 8-10 1/Angstrom, so no value is a
-        converged default. The scorer refuses cutoffs beyond the form-factor
-        range (75.4 1/Angstrom).
+        (non-basal included) reflection domain. Required: no value is a
+        converged default. In the two #1480 HOPG ladder scenes (30 and 300 keV)
+        the CXR line yield still grew 2 % from 20 to 24 1/Angstrom. The scorer
+        refuses cutoffs beyond the form-factor range (75.4 1/Angstrom).
     azimuth_count
         Midpoint roll nodes on one 60-degree sector about the fiber (c) axis;
         each node is a distinct crystallite orientation. Integrated yields
-        converged to about 0.5 % by 8 nodes in the #1480 scenes; 32 leaves
-        margin for narrow line shapes.
+        converged to about 0.5 % by 8 nodes in the #1480 scenes. The default
+        32 is not converged for line shapes (spectral L1 1.5-3.3 % against
+        128 nodes); use at least 128 when narrow lines matter.
     reflection_batch_size
         Reflections scored per coupling-table batch. Bounds memory only; it
         is not a physics truncation and changes float summation order only.
-
-    Basal ``(00l)`` rows are roll invariant and are scored once; mosaic
-    quadrature (``mosaic_nodes``, ``mosaic_route``) applies on top of each
-    roll node.
     """
 
     cutoff_invang: float

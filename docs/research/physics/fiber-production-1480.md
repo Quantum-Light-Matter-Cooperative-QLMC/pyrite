@@ -15,11 +15,9 @@ from pyrite.config import CxrReflections, FiberAverage, Numerics
 from pyrite.montecarlo.spectrum.cxr.fiber import FiberCXRModel
 from pyrite.montecarlo.spectrum.cxr.fiber_case import score_fiber_case
 
-# Fiber numerics sit beside the mosaic controls on CxrReflections.
+# Only the fiber field is read; mosaic settings come from the scored case.
 numerics = Numerics(
     cxr_reflections=CxrReflections(
-        mosaic_route="mc",
-        mosaic_nodes=5,
         fiber=FiberAverage(cutoff_invang=8.0, azimuth_count=32, reflection_batch_size=256),
     )
 )
@@ -33,12 +31,15 @@ cxr, brem, total = result["cxr"], result["brem"], result["total"]
 
 `simulate()` and campaign lowering refuse `CxrReflections.fiber` until #1483
 wires it through the runner, so a fiber setting never silently falls back to
-the basal-only domain. `cutoff_invang` has no default.
+the basal-only domain. `cutoff_invang` has no default. The case's
+`mosaic_mc_fwhm_rad` and `mosaic_mc_nodes` set the mosaic quadrature;
+`mosaic_route` and `mosaic_nodes` beside `fiber=` are not read.
 These cutoff and azimuth values are starting points, **not converged defaults**.
 `model.prepare()` also exposes a low-level `spectrum()` for independent line
 studies, and `corrected_bremslib_tables()` for use with the same prepared domain.
-Use the paired entry point for total spectra; adding the full amorphous continuum
-would double-count the CBS share. The result carries the model marker, exact
+Use the paired entry point for CXR plus continuum; adding the full amorphous
+continuum would double-count the CBS share. Its `total` omits characteristic,
+transition and diffracted radiation. The result carries the model marker, exact
 reflection and thermal rows, temperature/source, quadrature and subtraction
 record (including clamped nodes). Do not cache it under a basal-only case key.
 
@@ -94,7 +95,7 @@ HOPG 30 keV, 500 nm, tilt 15°, lab 45°, 150 electrons, one frozen transport,
 | Cutoff 8 / 10 Å⁻¹ vs 6 | yield **+22 % / +43 %** (242 / 478 reflections) |
 | Wall time, cutoff 6, 32 rolls | 44 s model, 137 s check (per-family loop) |
 
-Integrated yield converges by 8 rolls; spectral shape needs about 32 or more.
+Integrated yield converges by 8 rolls; spectral shape still moves at 32 (arm F below).
 The cutoff was not converged at 10 Å⁻¹; see the ladder below.
 
 ### Cutoff ladder with the paired continuum (2026-11-26, qlmc RTX 5080)

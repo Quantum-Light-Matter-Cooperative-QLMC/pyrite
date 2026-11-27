@@ -52,7 +52,7 @@ The same reading applies to the worst qualifying bins in the table: they are *in
 ## Assumptions and limits
 
 - The bound is Cauchy--Schwarz, so it is worst-case in relative phase and ignores the decorrelation factor entirely; the two columns must be read together, not multiplied.
-- Measured on the catalog's basal-plane families $\{(0,0,\pm2),(0,0,\pm4)\}$, whose harmonics are separated by roughly their own resonance energy. It says nothing about a hypothetical reflection set with near-degenerate resonances at the chosen observation angle, where the bound approaches unity at the peak and the approximation would fail.
+- Measured on the catalog's basal-plane families $\{(0,0,\pm2),(0,0,\pm4)\}$, whose harmonics are separated by roughly their own resonance energy. The classical bound does not cover a reflection set with near-degenerate resonances at the chosen observation angle, where it approaches unity at the peak. For unshaped electrons, [Final-state orthogonality](#final-state-orthogonality-1480) argues separately that the cross term vanishes there too.
 - Single-orientation runs. Mosaic orientations are squared per row for the same reason and are not covered here.
 - The decorrelation factor is a property of the transport's midpoint distribution, so it is a Monte Carlo quantity: it shrinks with electron count and does not certify any single realization.
 

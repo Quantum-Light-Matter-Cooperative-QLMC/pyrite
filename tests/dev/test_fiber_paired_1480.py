@@ -5,11 +5,13 @@ import pytest
 
 from checks.fiber_paired_1480 import (
     azimuth_average,
+    integrity_passes,
     merge_shell_weights,
     observables,
     paired_differences,
     photon_axis,
     reflection_domain,
+    roll_angles,
     tensor_groups,
     validate_case,
 )
@@ -61,6 +63,20 @@ def test_azimuth_average_sums_intensities_and_preserves_nodes():
     np.testing.assert_allclose(samples, [[9, 9], [3, 3]])
     np.testing.assert_allclose(average, [6, 6])
     assert [call[2] for call in calls] == [0, 0, np.pi, np.pi]
+
+
+@pytest.mark.parametrize("count", [6, 8])
+def test_roll_angles_are_distinct_modulo_the_sixfold_period(count):
+    angles = roll_angles(0.2, count)
+    assert len(set(np.round((angles - 0.2) % (np.pi / 3), 12))) == count
+    np.testing.assert_allclose(angles, 0.2 + (np.pi / 3) * (np.arange(count) + 0.5) / count)
+
+
+def test_ladder_integrity_tolerance_follows_precision():
+    record = dict(cxr_max_rel=1e-6, brem_max_rel=0.0)
+    assert integrity_passes(record, fp64=False)
+    assert not integrity_passes(record, fp64=True)
+    assert not integrity_passes(dict(record, brem_max_rel=float("nan")), fp64=False)
 
 
 def test_refuses_mismatched_populations():

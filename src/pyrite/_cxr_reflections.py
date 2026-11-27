@@ -49,7 +49,9 @@ class CxrReflections:
         crystal. ``None`` (default) keeps the catalog's basal-only ``(00l)``
         domain. The campaign path does not score it yet (#1483) and refuses a
         non-``None`` value; use
-        ``pyrite.montecarlo.spectrum.cxr.fiber.FiberCXRModel.from_numerics``.
+        ``pyrite.montecarlo.spectrum.cxr.fiber.FiberCXRModel.from_numerics``,
+        which reads this field only: the other controls here, mosaic ones
+        included, do not reach the fiber scorer.
     """
 
     n_families: int | None = None

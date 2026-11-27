@@ -38,27 +38,8 @@ def _max_energy(case, segments):
     return maximum
 
 
-def score_fiber_case(model, case, tp, E_grid_eV):
-    """Score a transported runner scene with the full-fiber production kernels.
-
-    ``model`` is a :class:`FiberCXRModel`, or ``Numerics``/``CxrReflections``
-    carrying ``fiber=FiberAverage(...)`` (tensor at its measured temperature).
-
-    ``tp`` is the complete runner transport result (or reconstructed artifact
-    inputs including ``segs``). Both channels use the same electrons, detector,
-    escape geometry and photon nodes. The line density is a bin mean; the
-    continuum is evaluated at the supplied nodes, as in the paired diagnostic.
-    The result is a standalone emission record, not a normal sweep checkpoint.
-    Existing automatic reflection and line-grid policies are not run here.
-
-    Validation: cxr-fiber-intensity-average
-    """
-    from ... import runner
-    from ...runner.case_tables import _case_bremslib_tables
-    from ...runner.emission import _layer_brem_from_segments
-
-    if not isinstance(model, FiberCXRModel):
-        model = FiberCXRModel.from_numerics(model)
+def _checked_pilot(model, case, tp, E_grid_eV):
+    """Return the radiator pilot and photon grid, or refuse before any scoring."""
     segments = tp["segs"]
     pilot = _single_radiator(case, segments)
     if pilot.get("crystal") != model.crystal:
@@ -79,9 +60,8 @@ def score_fiber_case(model, case, tp, E_grid_eV):
         or np.any(np.diff(grid) <= 0.0)
     ):
         raise ValueError("expected a finite increasing photon grid starting at 10 eV or above")
-    phi0 = float(pilot.get("azimuth_rad", 0.0))
     _validate_scoring(
-        phi0,
+        float(pilot.get("azimuth_rad", 0.0)),
         dict(
             beam_uvw=pilot.get("beam_uvw"),
             surface_hkl=pilot.get("surface_hkl"),
@@ -89,6 +69,36 @@ def score_fiber_case(model, case, tp, E_grid_eV):
             composition=pilot["composition"],
         ),
     )
+    return pilot, grid
+
+
+def score_fiber_case(model, case, tp, E_grid_eV):
+    """Score a transported runner scene with the full-fiber production kernels.
+
+    ``model`` is a :class:`FiberCXRModel`, or ``Numerics``/``CxrReflections``
+    carrying ``fiber=FiberAverage(...)`` (tensor at its measured temperature).
+
+    ``tp`` is the complete runner transport result (or reconstructed artifact
+    inputs including ``segs``). Both channels use the same electrons, detector,
+    escape geometry and photon nodes. The line density is a bin mean; the
+    continuum is evaluated at the supplied nodes, as in the paired diagnostic.
+    The result is a standalone emission record, not a normal sweep checkpoint.
+    Existing automatic reflection and line-grid policies are not run here.
+    ``total`` is CXR plus the BremsLib continuum only: characteristic,
+    transition and diffracted radiation are not included.
+
+    Validation: cxr-fiber-intensity-average
+    """
+    from ... import runner
+    from ...runner.case_tables import _case_bremslib_tables
+    from ...runner.emission import _layer_brem_from_segments
+
+    if not isinstance(model, FiberCXRModel):
+        model = FiberCXRModel.from_numerics(model)
+    pilot, grid = _checked_pilot(model, case, tp, E_grid_eV)
+    segments = tp["segs"]
+    count = int(tp["Ne_lines"])
+    phi0 = float(pilot.get("azimuth_rad", 0.0))
     domain = model.prepare()
     pilot.update(
         reflection_selection=None,
