@@ -11,9 +11,10 @@ TestEm5/src/TrackingAction.cc``.
 """
 
 import sys
+from pathlib import Path
 
 path = sys.argv[1]
-s = open(path).read()
+s = Path(path).read_text()
 include = '#include "G4Track.hh"\n'
 anchor = "  G4bool notabsor = (transmit || reflect);\n"
 assert s.count(include) == 1 and s.count(anchor) == 1, "unexpected TrackingAction.cc"
@@ -35,4 +36,4 @@ s = s.replace(
   }
 """,
 )
-open(path, "w").write(s)
+Path(path).write_text(s)

@@ -76,6 +76,7 @@ import sys
 import threading
 import time
 from dataclasses import replace
+from pathlib import Path
 
 import numpy as np
 
@@ -531,10 +532,10 @@ def _numpy_default(value):
 
 
 def compare(ref_path, *others):
-    ref = json.load(open(ref_path))
+    ref = json.loads(Path(ref_path).read_text())
     worst = 0.0
     for path in others:
-        other = json.load(open(path))
+        other = json.loads(Path(path).read_text())
         if other.get("E_grid") != ref.get("E_grid"):
             print(f"{path} E_grid differs from {ref_path}")
             return 1

@@ -269,7 +269,8 @@ class _Worker:
     def _start(self) -> None:
         env = os.environ | {"PYRITE_MC_BACKEND": "cuda"}  # no hidden CPU fallback in timings
         self._close_stderr()
-        self._stderr = tempfile.TemporaryFile("w+", dir=self._workdir)
+        # Released by _close_stderr (close() and error reports), not a with block.
+        self._stderr = tempfile.TemporaryFile("w+", dir=self._workdir)  # noqa: SIM115
         command = [sys.executable, "-m", "pyrite.optimization._kernel_worker", str(self._payload)]
         self._process = subprocess.Popen(
             command, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,

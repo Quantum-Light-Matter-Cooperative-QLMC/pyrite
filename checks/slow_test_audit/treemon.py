@@ -7,7 +7,7 @@ import time
 import psutil
 
 root = psutil.Process(int(sys.argv[1]))
-out = open(sys.argv[2], "w", buffering=1)
+out = open(sys.argv[2], "w", buffering=1)  # noqa: SIM115 - lives until the monitored tree exits
 out.write("t,total_rss,n_procs,max_proc_rss,load1\n")
 t0 = time.time()
 while root.is_running():

@@ -142,7 +142,7 @@ def run(mode, ne, block, out_path, material, *rest):
         **{f"char.{k}": v for k, v in s.items()},
         "char.setup": s["total"] - s["clip"] - s["escape"] - s["accumulate"],
     }
-    record = json.load(open(out_path))
+    record = json.loads(Path(out_path).read_text())
     record["char_s"] = split
     record["char_calls"] = timers.calls
     with open(out_path, "w") as handle:
@@ -151,10 +151,10 @@ def run(mode, ne, block, out_path, material, *rest):
 
 
 def compare(ref_path, *others, rtol=0.0):
-    ref = json.load(open(ref_path))
+    ref = json.loads(Path(ref_path).read_text())
     worst = 0.0
     for path in others:
-        other = json.load(open(path))
+        other = json.loads(Path(path).read_text())
         assert other["n_segments"] == ref["n_segments"], path
         for key in harness.SPECTRA:
             a, b = np.asarray(other[key]), np.asarray(ref[key])

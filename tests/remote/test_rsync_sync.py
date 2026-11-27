@@ -10,6 +10,7 @@ import shlex
 import shutil
 import subprocess
 import tarfile
+from pathlib import Path
 
 import pytest
 
@@ -348,7 +349,7 @@ def test_external_catalog_dir_is_mirrored_through_an_include_filter(tmp_path, mo
         calls.append(argv)
         merge = [a for a in argv if a.startswith("--filter=merge ")]
         if merge:
-            rules.append(open(merge[0].split(" ", 1)[1]).read())
+            rules.append(Path(merge[0].split(" ", 1)[1]).read_text())
 
     monkeypatch.setattr(transport, "_run", run)
 

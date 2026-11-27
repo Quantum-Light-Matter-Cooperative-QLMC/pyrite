@@ -57,7 +57,8 @@ def pytest_runtest_protocol(item, nextitem):
     global _OUT
     if _OUT is None:
         os.makedirs(_DIR, exist_ok=True)
-        _OUT = open(os.path.join(_DIR, f"{_WORKER}.jsonl"), "a", buffering=1)
+        # Lives for the whole pytest worker; line-buffered so a killed worker keeps its rows.
+        _OUT = open(os.path.join(_DIR, f"{_WORKER}.jsonl"), "a", buffering=1)  # noqa: SIM115
     start = _self_rss()
     maxrss0 = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     sampler = _Sampler()

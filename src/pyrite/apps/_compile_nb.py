@@ -16,7 +16,8 @@ nbs = [
 ]
 bad = 0
 for path in nbs:
-    nb = json.load(open(path, encoding="utf-8"))
+    with open(path, encoding="utf-8") as handle:
+        nb = json.load(handle)
     n_code = 0
     for i, c in enumerate(nb["cells"]):
         if c["cell_type"] != "code":

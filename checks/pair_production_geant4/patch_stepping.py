@@ -1,9 +1,10 @@
 """Insert pair-conversion recording into TestEm5 SteppingAction.cc (issue #275)."""
 
 import sys
+from pathlib import Path
 
 path = sys.argv[1]
-s = open(path).read()
+s = Path(path).read_text()
 s = s.replace(
     '#include "G4Step.hh"\n',
     """#include "G4Step.hh"
@@ -61,4 +62,4 @@ s = s.replace(
     1,
 )
 assert s.count("PairOut()") == 2
-open(path, "w").write(s)
+Path(path).write_text(s)

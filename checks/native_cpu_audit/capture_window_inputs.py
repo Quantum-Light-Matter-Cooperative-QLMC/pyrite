@@ -59,5 +59,5 @@ def rec(E_r, a_width, weights, E_grid, node, lo, hi, mode, mu, step, bounds, out
 nw._sincsq_window_reduce = rec
 run, meta = audit.photon_case_workload() if case == "photon-case" else audit.case_workload(case)
 run()
-json.dump(calls, open(outdir / "calls.json", "w"), indent=1)
+(outdir / "calls.json").write_text(json.dumps(calls, indent=1))
 print(json.dumps(calls))
