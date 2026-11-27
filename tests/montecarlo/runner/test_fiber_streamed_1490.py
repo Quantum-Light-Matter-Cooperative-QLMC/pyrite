@@ -82,14 +82,22 @@ def test_fiber_cases_stream():
 
 @pytest.mark.slow
 @pytest.mark.parametrize("grid", [GRID, None], ids=["explicit-grid", "policy-grid"])
-def test_streamed_fiber_spectrum_equals_retained_to_summation_order(grid):
-    """Exact bin means: lines, continuum and lattice-share record match (#1490)."""
+def test_streamed_fiber_spectrum_equals_retained_to_summation_order(grid, tmp_path, monkeypatch):
+    """Exact bin means: lines, continuum and lattice-share record match (#1490).
+
+    Each streamed run gets an empty speed cache, so a policy grid is resolved
+    by the streamed grid pass over block evidence, not reused from the
+    retained run.
+    """
     case = _case(grid)
     with bin_reduction_override("pairs"):  # the host's exact dense bin mean
         _, retained = _retained(case)
         for block in (3, 5):
+            monkeypatch.setenv("PYRITE_CACHE_DIR", str(tmp_path / f"cache-{block}"))
             streamed = run_case_streamed(case, block, transport_core="per-electron")
             _assert_parity(streamed, retained)
+            if grid is None:
+                assert streamed["_streamed_line_grid_pass"]["transported"] is True
     assert np.max(retained["spec"]) > 0.0
     assert retained["brem_lattice_share"]["layers"][0]["reflections"] == len(
         fiber_emission.fiber_domain(case).hkls

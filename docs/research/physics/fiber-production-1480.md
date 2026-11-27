@@ -163,8 +163,8 @@ differently per kernel call (#1492), not from the fiber route. Integrated
 yield converges by 8 rolls, but at 2 eV bins the line shape is still
 moving between 32 and 128 rolls. Cutoff convergence remains open (#1484).
 
-Remaining phase II work: joint roll/reciprocal adaptive convergence with a
+Streamed scoring landed in #1490. Remaining phase II work: joint roll/reciprocal adaptive convergence with a
 reported unresolved status, symmetry-reduced quadrature with verified weights,
-streamed scoring (#1490), CLI flags (#1491), and independent physical
+CLI flags (#1491), and independent physical
 validation of the campaign route. No production default, shared table identity,
 or existing golden is changed.

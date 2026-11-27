@@ -64,6 +64,10 @@ Supported: incoherent line `spec`, characteristic lines and the EEDL or BremsLib
 continuum, including coupled BremsLib radiative transport, on the per-electron
 or CUDA core, with a fixed electron count and either a final line grid or a
 supported non-windowed `line_grid_policy` (see [Resolved line grids](#resolved-line-grids)).
+Full-fiber CXR cases (`cxr_fiber`, #1490) stream through the same line and
+continuum seams. With an exact bin mean they match the retained route to
+summation order. The default host Fourier bin-mean reduction (#1192) sets its
+image period per flush, so their lines agree within that reduction's residual.
 
 `streaming_refusal(case, live=True)` refuses the following before any transport:
 

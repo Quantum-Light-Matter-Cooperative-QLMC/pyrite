@@ -923,7 +923,7 @@ def cmd_stream(args):
     from pyrite.montecarlo.runner.fiber_emission import fiber_domain
 
     E, case = _campaign_case(args)
-    blocks = []
+    blocks: dict[int, dict] = {}  # keyed by first electron id: a replayed block overwrites
     t0 = time.time()
     if args.route == "retained":
         tp = runner._transport_case(case, transport_core=args.transport_core)
@@ -931,13 +931,25 @@ def cmd_stream(args):
         rss_transport = _rss_mib()
         out = runner._spectrum_case(case, tp)
     else:
+        from pyrite._backend import _to_cpu
+
         original = streamed_scoring.BlockSpectrumScorer.add
 
         def timed(self, segs):
             start = time.time()
             original(self, segs)
             rows = int(segs["L_ang"].shape[0])
-            blocks.append(dict(rows=rows, seconds=time.time() - start, peak_rss_mib=_rss_mib()))
+            if rows == 0:
+                return
+            first = int(np.min(np.asarray(_to_cpu(segs["elec_id"]))))
+            attempts = blocks.get(first, {}).get("attempts", 0) + 1
+            blocks[first] = dict(
+                first_electron=first,
+                rows=rows,
+                seconds=time.time() - start,
+                peak_rss_mib=_rss_mib(),
+                attempts=attempts,
+            )
 
         streamed_scoring.BlockSpectrumScorer.add = timed
         out = streamed_scoring.run_case_streamed(
@@ -962,7 +974,7 @@ def cmd_stream(args):
         seconds=dict(total=wall, transport=t_transport),
         peak_rss_mib=_rss_mib(),
         rss_after_transport_mib=rss_transport,
-        blocks=blocks,
+        blocks=[blocks[key] for key in sorted(blocks)],
         brem_lattice_share=out.get("brem_lattice_share"),
     )
     print(json.dumps({k: record[k] for k in ("route", "n_segments", "seconds", "peak_rss_mib")}))
