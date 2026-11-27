@@ -17,9 +17,20 @@ from ...._numerics import CxrReflections, Numerics
 from ....materials.channeling.thermal import UniaxialThermalSite, thermal_site
 from ....materials.crystal import CRYSTALS, _reflection_families, reciprocal_g_vector
 from ..brem_lattice_share import _lattice_share_tables, _reflection_shell_weights
+from ._bin_queue import shared_bin_lines
 from ._spectrum import mc_cxr_spectrum
 
 FIBER_CXR_MODEL = "hopg-fiber-intensity-tensor-isotropic-share-v1"
+
+
+def _checked(value, shape):
+    """``value`` as a finite FP64 array of ``shape``, else a scorer error."""
+    value = np.asarray(value, dtype=np.float64)
+    if value.shape != shape or not np.isfinite(value).all():
+        raise RuntimeError("invalid fiber spectrum from CXR scorer")
+    return value
+
+
 _CASE_RECORD_KEYS = frozenset(
     {"model", "crystal", "cutoff_invang", "azimuth_count", "temperature_K", "thermal_source"}
 )
@@ -281,28 +292,32 @@ class FiberReflectionSet:
         roll invariant and scored once. Batches bound table allocations only.
         ``weighted`` passes each call's quadrature weight (1 for basal rows,
         ``1/N`` otherwise) as a third argument, for roll-weighted audits.
+        Host bin-mean lines of every call are reduced together at their
+        quadrature weight (:func:`._bin_queue.shared_bin_lines`, #1509): the
+        host Fourier route's per-flush cost is paid once, not per roll and batch.
 
         Validation: cxr-fiber-intensity-average
+        Validation: cxr-line-fourier-reduction
         """
         basal = [h for h in self.hkls if h[:2] == (0, 0)]
         other = [h for h in self.hkls if h[:2] != (0, 0)]
         total = np.zeros(shape, dtype=np.float64)
         batch = int(self.model.reflection_batch_size)
         count = int(self.model.azimuth_count)
-        for rows, rolls in ((basal, 1), (other, count)):
-            for i in range(rolls):
-                phi = (
-                    azimuth_rad + (math.pi / 3.0) * (i + 0.5) / rolls
-                    if rows is other
-                    else azimuth_rad
-                )
-                for start in range(0, len(rows), batch):
-                    hkls = rows[start : start + batch]
-                    value = score(hkls, phi, 1.0 / rolls) if weighted else score(hkls, phi)
-                    value = np.asarray(value, dtype=np.float64)
-                    if value.shape != total.shape or not np.isfinite(value).all():
-                        raise RuntimeError("invalid fiber spectrum from CXR scorer")
-                    total += value / rolls
+        with shared_bin_lines() as sink:
+            for rows, rolls in ((basal, 1), (other, count)):
+                for i in range(rolls):
+                    phi = (
+                        azimuth_rad + (math.pi / 3.0) * (i + 0.5) / rolls
+                        if rows is other
+                        else azimuth_rad
+                    )
+                    sink.weight = 1.0 / rolls
+                    for start in range(0, len(rows), batch):
+                        hkls = rows[start : start + batch]
+                        value = score(hkls, phi, 1.0 / rolls) if weighted else score(hkls, phi)
+                        total += _checked(value, total.shape) / rolls
+            total += _checked(sink.result(shape), total.shape)
         return total
 
     def shell_weights(self, composition):

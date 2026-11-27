@@ -193,6 +193,47 @@ does once. Streaming pays off only when the segments, not the tables,
 dominate memory; use the largest block the device admits. Caching tables
 across blocks is the open lever.
 
+### Shared host flush and streamed table cache (#1509, 2026-11-27)
+
+Profiling showed that the per-block cost was mostly not table rebuilds. A
+table set costs about 7 ms and 14 MiB per (roll, batch). Each of the 33
+(roll, batch) calls per block also ran its own host Fourier bin-mean flush,
+at about 42 ms fixed each (local, 200 e⁻, 2 → 8 blocks: tables +1.3 s, flush
++8.4 s). `FiberReflectionSet._average` now queues every call's host bin-mean
+lines in one sink, at quadrature weight / Ne, and reduces them together
+(`_bin_queue.shared_bin_lines`). That is one flush per `fiber_lines` call (per
+block, or per retained case) up to the existing `HOST_FOURIER_FLUSH_LINES`.
+Streamed scorers also keep the tables within a 512 MiB insertion budget
+(`FiberTableCache`). On a CUDA or ROCm device they take at most 1/8 of the pool
+headroom, and a recognized device OOM drops them for the rest of the run, so its
+retries run without them. The timings below are CPU; the device cache is not
+benchmarked. The retained route keeps no tables because it never reuses them.
+
+Same scene and arms, DESKTOP-QNIHO3D CPU (FP64, 16 CPUs), one process per arm,
+serial. `f7a3f8116` (#1490) vs `95d5948ca`, jobs 16245–16251; raw:
+`~/dev/pyrite-benches/1509-fiber-table-cache/`.
+
+| Arm | Cutoff | Blocks | #1490 total | #1509 total | Per block mean (#1509) | Peak RSS #1490 → #1509 |
+|---|---|---|---|---|---|---|
+| Retained | 6 | — | 73.1 s | 52.5 s | — | 1.37 → 2.23 GiB |
+| Streamed, 250 e⁻ | 6 | 8 | 122.5 s | 45.3 s | 5.6 s | 1.64 → 2.46 GiB |
+| Streamed, 50 e⁻ | 6 | 40 | — | 60.5 s | 1.5 s | 1.98 GiB |
+| Retained | 8 | — | — | 106.6 s | — | 2.20 GiB |
+| Streamed, 250 e⁻ | 8 | 8 | — | 102.7 s | 12.8 s | 2.69 GiB |
+
+Eight streamed blocks now take 0.86× retained time at cutoff 6 and 0.96× at
+cutoff 8. On qlmc-ace (`a04474177`, jobs 16228–16232) the times relative to
+#1490 were 55 → 42 s retained, 86 → 34 s for 8 blocks and 188 → 43 s for 40
+blocks. Streamed minus retained, relative to each spectrum's peak: lines
+1.8–5.2e-12 (Fourier residual), characteristic 2.5e-15, continuum 1.2e-14.
+The new retained route differs from the #1490 retained route by 7e-15 of peak
+(flush grouping). `brem_lattice_share` is unchanged.
+
+Peak memory rises about 0.85 GiB because the shared queue reduces up to 4M
+lines at once. Per-call flushes held fewer lines. Locally a 2M threshold gave
+1.79 GiB at +10 % retained score time, and 1M gave 1.68 GiB at +28 %. The
+project-wide 4M threshold is kept.
+
 Streamed scoring landed in #1490. Remaining phase II work: joint roll/reciprocal adaptive convergence with a
 reported unresolved status, symmetry-reduced quadrature with verified weights,
 CLI flags (#1491), and independent physical

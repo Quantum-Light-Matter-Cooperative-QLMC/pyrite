@@ -147,7 +147,9 @@ class BlockSpectrumScorer:
         self.Ne_lines, self.Ne_brem = inputs["Ne_lines"], inputs["Ne_brem"]
         self.audit = cxr_truncation_audit(case, self.E_grid, n_electrons=self.Ne_lines)
         self.line_screen = line_screen_for(case, self.Ne_lines)
-        self.table_cache: dict = {}
+        from .fiber_emission import streamed_table_cache
+
+        self.table_cache: dict = streamed_table_cache(case)
         from .diffracted_brem import DiffractedDepthAccumulator
 
         self.diffracted = DiffractedDepthAccumulator(case, self.E_grid, self.n_hat)

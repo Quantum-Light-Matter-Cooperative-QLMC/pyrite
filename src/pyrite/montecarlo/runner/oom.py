@@ -1,11 +1,28 @@
 """Accelerator OOM tagging, pool release cadence, and pool limits."""
 
+from typing import Any
+from weakref import WeakValueDictionary
+
 from ..._backend import BACKEND
 from .chunking import _RESOURCE_POLICY
 
 #: Set to ``1`` to keep terminal-OOM traceback frames (and the device memory
 #: their locals pin) for post-mortem debugging. Default off.
 KEEP_OOM_FRAMES_ENV = "PYRITE_KEEP_OOM_FRAMES"
+
+#: Live caches of device arrays a recognized OOM drops before its retry (#1509).
+_EVICTABLE: WeakValueDictionary[int, Any] = WeakValueDictionary()
+
+
+def _register_evictable(cache):
+    """Track ``cache`` weakly; :func:`_evict_caches` calls its ``evict()``."""
+    _EVICTABLE[id(cache)] = cache
+
+
+def _evict_caches():
+    """Free what registered caches hold: pool release cannot free live arrays."""
+    for cache in list(_EVICTABLE.values()):
+        cache.evict()
 
 
 class _SpectrumPhaseOOM(Exception):
