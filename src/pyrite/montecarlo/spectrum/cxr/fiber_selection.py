@@ -118,6 +118,29 @@ class _FiberShellContinuum:
         return self._scorer._yield(None, tables, True)
 
 
+def check_selection_arguments(grid: np.ndarray, tolerance: float, histories=None) -> None:
+    """Refuse a fiber selection before any staging or scoring.
+
+    The tolerance must lie in ``(0, 1)``. The continuum background is scored on
+    a log grid over the ``bin-mean`` band, so the band's lower edge must be
+    positive: the first bin's mirrored edge ``grid[0] - (grid[1] - grid[0])/2``
+    is clamped to 0 eV when the first spacing is at least ``2 * grid[0]``.
+
+    Validation: reflection-yield-tolerance-selector
+    """
+    tolerance = float(tolerance)
+    if not 0.0 < tolerance < 1.0:
+        raise ValueError("line_yield_tolerance must lie in (0, 1)")
+    if histories is not None and int(histories) < 1:
+        raise ValueError("selection histories must be positive")
+    lo, hi = axis_band_eV(grid, "bin-mean")
+    if not 0.0 < lo < hi:
+        raise ValueError(
+            "fiber selection needs a positive lower band edge: make the first photon-grid "
+            "spacing smaller than twice the first node"
+        )
+
+
 def selection_prefix(segments: dict, count: int, histories=None, rows=None):
     """``(k, rows, segments)``: the electron prefix the selection scores (#1281, #1368).
 
@@ -149,7 +172,7 @@ def select_fiber_reflections(
     histories: int | None = None,
     rows: int | None = None,
     width_invang: float = DEFAULT_SHELL_WIDTH_INVANG,
-) -> tuple[FiberReflectionSet, np.ndarray | None, dict]:
+) -> tuple[FiberReflectionSet, np.ndarray | None, dict, object]:
     """Measured cutoff of the full fiber domain on ``pilot``'s transported scene.
 
     ``pilot`` is the validated single-slab HOPG case of
@@ -165,12 +188,16 @@ def select_fiber_reflections(
     Returns the selected set (prepared at the selected cutoff, so its
     ``record()`` names that cutoff), the shell-summed CXR density when the
     prefix is the whole population (else ``None``: rescore on every
-    history), and the selection record.
+    history), the selection record, and the staged population segments when
+    the prefix is the whole population (else ``None``), so the caller stages
+    them once. The arguments are checked by :func:`check_selection_arguments`
+    before anything is staged.
 
     Validation: reflection-yield-tolerance-selector
     """
     from ... import runner
 
+    check_selection_arguments(grid, tolerance, histories)
     count = int(tp["Ne_lines"])
     k, prefix_rows, segments = selection_prefix(tp["segs"], count, histories, rows)
     staged = runner._segments_on_device(segments)
@@ -216,11 +243,33 @@ def select_fiber_reflections(
         record["selection_histories"] = dict(
             lines=k, continuum=k, rows=prefix_rows, row_budget=int(rows or SELECTION_ROWS)
         )
-    return selected, (total if k == count else None), record
+    if k == count:
+        return selected, total, record, staged
+    return selected, None, record, None
+
+
+def flag_clamped_share(record: dict, correction: dict) -> dict:
+    """Mark a selection unconverged when the selected set's share correction clamped.
+
+    Shell shares are scored per shell; production sums the selected set's
+    share before clamping it at the base DDCS. At a clamped node the summed
+    shell shares exceed the share production removes, so the net metric no
+    longer matches the scored total and the stop is not trusted.
+
+    Validation: reflection-yield-tolerance-selector
+    """
+    clamped = sum(int(row.get("clamped_nodes", 0)) for row in correction.get("elements", ()))
+    record = dict(record, share_clamped_nodes=clamped)
+    if clamped:
+        record["converged"] = False
+    return record
 
 
 def row_scorer(segments, grid, pilot, n_hat, groove, count, domain):
-    """``score(hkls, phi)`` of one roll node through the runner's incoherent line route."""
+    """``score(hkls, phi)`` of one roll node through the runner's incoherent line route.
+
+    Validation: cxr-fiber-intensity-average
+    """
     from ... import runner
 
     lookup = domain._thermal_lookup()

@@ -41,9 +41,13 @@ def run(args):
     from pyrite.montecarlo.runner.oom import _ensure_pool_limit
     from pyrite.montecarlo.spectrum.cxr.fiber_case import score_fiber_case
 
+    if args.artifact is not None and args.detector is not None:
+        raise ValueError("artifact detector geometry is fixed; omit --detector")
+    if args.artifact is None and args.detector is None:
+        args.detector = 45.0  # the #1480 ladder scenes' lab angle
     output = args.output
     output.mkdir(parents=True, exist_ok=True)
-    if any((output / name).exists() for name in ("summary.json", "spectra.npz")):
+    if any((output / name).exists() for name in ("summary.json", "spectra.npz", "SHA256SUMS")):
         raise FileExistsError("use a fresh output directory")
     _ensure_pool_limit()
     started = time.perf_counter()
@@ -65,8 +69,9 @@ def run(args):
     def timed(label, fn):
         t0 = time.perf_counter()
         value = fn()
-        print(label, f"{time.perf_counter() - t0:.1f} s", flush=True)
-        return value, time.perf_counter() - t0
+        elapsed = time.perf_counter() - t0
+        print(label, f"{elapsed:.1f} s", flush=True)
+        return value, elapsed
 
     selected, wall = timed(
         "selection",
@@ -128,6 +133,7 @@ def run(args):
         E0_keV=float(case["E0_keV"]),
         tilt_deg=case.get("tilt_deg"),
         thickness_ang=case.get("thickness_ang"),
+        theta_obs_rad=float(case["theta_obs_rad"]) if "theta_obs_rad" in case else None,
         band_eV=[float(edges[0]), float(edges[-1])],
         spacing_eV=float(widths[0]),
         azimuth_count=args.azimuths,
@@ -153,7 +159,9 @@ def main(argv=None):
     parser.add_argument("--thickness", type=float, default=5000.0, help="slab thickness [A]")
     parser.add_argument("--tilt", type=float, default=15.0)
     parser.add_argument("--tilt-azimuth", type=float, default=180.0)
-    parser.add_argument("--detector", type=float, default=45.0, help="polar angle [degrees]")
+    parser.add_argument(
+        "--detector", type=float, help="fresh detector polar angle [degrees] (default 45)"
+    )
     parser.add_argument("--electrons", type=int, default=600)
     parser.add_argument("--seed", type=int, default=1480)
     parser.add_argument("--band", type=float, nargs=2, default=(20.0, 25000.0))

@@ -566,7 +566,10 @@ intensities add over reflections and the average is linear, so
 $\sum_{j\le k}L_j$ is the roll-averaged line yield of the union, up to
 floating-point reassociation (the same additivity as §1, applied per roll
 node). The band is the outer bin edges of the case's `bin-mean` axis and
-the weights are its bin widths (§2).
+the weights are its bin widths (§2). The background log grid needs a
+positive lower edge, so an axis whose first spacing is at least twice its
+first node (lower edge clamped to 0 eV) is refused before any staging, as are
+a tolerance outside $(0,1)$ and `selection_histories` without a tolerance.
 
 **Net metric.** The paired fiber continuum is always lattice-share
 corrected, so the stop uses the v4 net form: $s_k=L_k-S_k$ with $S_k$ the
@@ -577,7 +580,10 @@ exactly the correction the selected set receives. $C$ is the uncorrected
 in-band continuum (96 log nodes per decade, trapezoid, as v4). By §3 the
 shares add to the selected set's removed share at every unclamped node; the
 production correction of the selected set sums all shells before the clamp,
-and its `clamped_nodes` count is recorded with the result.
+and its `clamped_nodes` count is recorded with the result. A selected set
+whose correction clamps at any node is reported `converged=False`
+(`share_clamped_nodes`), since there the summed shares exceed the share
+production removes.
 
 **Estimator and stop.** Unchanged: `select_reflection_cutoff` with
 `share_yield` and `background`, i.e. $\tau_k=|s_k|r_k/[(1-r_k)(\sum_{j\le k}
@@ -609,7 +615,8 @@ not estimated by the tail. The isotropic continuum share and the absence of inte
 are properties of the model, not of the selector.
 
 **Code.** `montecarlo/spectrum/cxr/fiber_selection.py::{iter_fiber_shells,
-select_fiber_reflections,_FiberShellContinuum,fiber_selection_record}`,
+check_selection_arguments,select_fiber_reflections,flag_clamped_share,
+_FiberShellContinuum,fiber_selection_record}`,
 `montecarlo/spectrum/cxr/fiber.py::FiberCXRModel.domain`,
 `montecarlo/spectrum/cxr/fiber_case.py::score_fiber_case`,
 `montecarlo/runner/lattice_share.py::removed_share_tables`.
@@ -622,7 +629,11 @@ roll-dependent scorer the stop, tail, selected set and summed spectrum
 equal an independent recomputation from exact roll-averaged net shell
 yields; set identity changes with roll count at fixed reflections; an
 unconverged cap keeps every shell; a short prefix selects on $k$ electrons
-and `score_fiber_case` rescores the selected set on all of them.
+and `score_fiber_case` rescores the selected set on all of them; the real
+`_FiberShellContinuum` scores the uncorrected background and the share-only
+tables of a shell on the prefix (stubbed BremsLib scorer, real tables); bad
+arguments are refused before staging; a clamped correction flags the
+selection unconverged.
 
 **Replay on the #1480 ladder scenes (2026-11-26, CPU FP64).** Each scene
 was transported once (seed 1480, 600 electrons, 500 nm HOPG, lab 45°, 32

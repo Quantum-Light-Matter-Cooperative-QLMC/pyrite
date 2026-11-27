@@ -4,7 +4,12 @@ import numpy as np
 
 from ...._backend import _to_cpu
 from .fiber import FiberCXRModel, _validate_scoring
-from .fiber_selection import row_scorer, select_fiber_reflections
+from .fiber_selection import (
+    check_selection_arguments,
+    flag_clamped_share,
+    row_scorer,
+    select_fiber_reflections,
+)
 
 
 def _single_radiator(case, segments):
@@ -100,6 +105,9 @@ def score_fiber_case(
     ``selection_histories``, default 4096, and the row budget). The selected
     set is scored on every history, and the result gains
     ``reflection_selection`` (domain, roll count, cutoff, tail, shells).
+    If the selected set's continuum correction clamps at any node, the record
+    reports ``converged=False`` (``share_clamped_nodes``). ``selection_histories``
+    without a tolerance is refused.
 
     Validation: cxr-fiber-intensity-average
     """
@@ -110,6 +118,10 @@ def score_fiber_case(
     if not isinstance(model, FiberCXRModel):
         model = FiberCXRModel.from_numerics(model)
     pilot, grid = _checked_pilot(model, case, tp, E_grid_eV)
+    if line_yield_tolerance is not None:
+        check_selection_arguments(grid, line_yield_tolerance, selection_histories)
+    elif selection_histories is not None:
+        raise ValueError("selection_histories requires line_yield_tolerance")
     segments = tp["segs"]
     count = int(tp["Ne_lines"])
     phi0 = float(pilot.get("azimuth_rad", 0.0))
@@ -123,11 +135,11 @@ def score_fiber_case(
         pilot["surface_hkl"] = (0, 0, 1)
     floor = float(pilot.get("E_cut_lines_keV", 5.0))
     max_energy = _max_energy(pilot, segments)
-    cxr, selection = None, None
+    cxr, selection, staged = None, None, None
     if line_yield_tolerance is None:
         domain = model.prepare()
     else:
-        domain, cxr, selection = select_fiber_reflections(
+        domain, cxr, selection, staged = select_fiber_reflections(
             model,
             pilot,
             tp,
@@ -143,9 +155,12 @@ def score_fiber_case(
         E_cut_keV=floor,
         max_energy_keV=max_energy,
     )
-    # Stage only after validation and table construction. The private pilot's
-    # callable B is never serialized, hashed or sent to a worker.
-    segments = runner._segments_on_device(segments)
+    if selection is not None:
+        selection = flag_clamped_share(selection, correction)
+    # Stage after validation and table construction; a selection whose prefix
+    # was the whole population already staged it. The private pilot's callable
+    # B is never serialized, hashed or sent to a worker.
+    segments = runner._segments_on_device(segments) if staged is None else staged
     n_hat, groove = tp["n_hat"], tp.get("groove")
     abs_layers = pilot.get("abs_layers")
     if cxr is None:
