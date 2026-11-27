@@ -123,11 +123,14 @@ pinned-data cache provisioning.
 
 Run `pixi run --locked doctor` for manifest policy checks. To diagnose a lock
 that prevents activation, run the standalone stdlib tool using an available
-Python 3.13+ interpreter, without relying on an active Pixi environment:
+system Python, without relying on an active Pixi environment:
 
 ```bash
 python3 src/pyrite/devtools/workspace_doctor.py --lock
 ```
+
+Python older than 3.11 has no TOML parser: the lock probe still runs, and the
+manifest policy checks are reported as skipped.
 
 The lock probe invokes Pixi with `--locked --no-install` and identifies
 cross-platform Conda/PyPI ownership errors. Do not bypass them with `--frozen`.
@@ -323,6 +326,8 @@ Agent and git hooks:
 - `.agents/hooks/ruff_after_edit.sh` (Claude Code `PostToolUse`) checks each
   edited Python file, applies safe fixes only outside Marimo directories,
   and formats afterward. Unused-import/variable findings remain for the agent.
+  It never installs or re-locks; when Ruff cannot format (stale lock, missing
+  environment, syntax error) it reports the skip instead of staying silent.
 - `.claude/settings.json` pins Claude Code's tool shell to bash
   (`CLAUDE_CODE_SHELL`); zsh does not word-split unquoted variables.
 

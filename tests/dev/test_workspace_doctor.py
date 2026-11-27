@@ -7,6 +7,8 @@ import tomllib
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from pyrite.devtools import suite_inventory, workspace_doctor
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -41,6 +43,16 @@ def test_lock_conflict_diagnostic(monkeypatch):
     errors = workspace_doctor.lock_errors(ROOT)
     assert len(errors) == 1
     assert "test-physics/osx-arm64: matplotlib-base" in errors[0]
+
+
+@pytest.mark.parametrize(("check_lock", "status"), [(True, 0), (False, 1)])
+def test_python_without_tomllib_still_probes_the_lock(check_lock, status, monkeypatch, capsys):
+    monkeypatch.setitem(sys.modules, "tomllib", None)  # Python < 3.11
+    monkeypatch.setattr(workspace_doctor, "lock_errors", lambda root: [])
+    assert workspace_doctor.run(ROOT, check_lock=check_lock) == status
+    output = capsys.readouterr().out
+    assert "needs Python 3.11 or newer" in output
+    assert ("doctor: lock OK" in output) is check_lock
 
 
 def test_ci_matrix_script_runs_without_project_imports(tmp_path, monkeypatch):

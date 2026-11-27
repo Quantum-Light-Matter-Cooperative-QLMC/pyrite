@@ -1,10 +1,12 @@
 """Read-only Pixi workspace diagnostics, including a pre-activation lock probe."""
 
+# Postponed annotations keep this runnable by an older system Python.
+from __future__ import annotations
+
 import argparse
 import re
 import shutil
 import subprocess
-import tomllib
 from pathlib import Path
 
 _LOCK_CONFLICT = re.compile(
@@ -62,14 +64,22 @@ def lock_errors(root: Path) -> list[str]:
 
 
 def run(root: Path, *, check_lock: bool = False) -> int:
-    manifest = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
-    errors = manifest_errors(manifest)
+    try:
+        import tomllib
+    except ModuleNotFoundError:  # Python < 3.11: only the lock probe can run
+        print("doctor: manifest policy not checked; it needs Python 3.11 or newer")
+        if not check_lock:
+            return 1
+        errors, scope = [], "lock"
+    else:
+        manifest = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+        errors = manifest_errors(manifest)
+        scope = "manifest and lock" if check_lock else "manifest policy"
     if check_lock:
         errors.extend(lock_errors(root))
     for error in errors:
         print(f"doctor: {error}")
     if not errors:
-        scope = "manifest and lock" if check_lock else "manifest policy"
         print(f"doctor: {scope} OK")
     return int(bool(errors))
 
