@@ -21,7 +21,14 @@ def test_ruff_configuration_and_tasks():
     assert config["unsafe-fixes"] is False
     assert config["lint"]["select"] == ["E", "F", "I", "UP", "B"]
     tasks = manifest["tool"]["pixi"]["feature"]["lint"]["tasks"]
-    assert set(tasks) >= {"lint-fix", "lint-diff", "lint-stats", "lint-watch", "sort-imports", "fix"}
+    assert set(tasks) >= {
+        "lint-fix",
+        "lint-diff",
+        "lint-stats",
+        "lint-watch",
+        "sort-imports",
+        "fix",
+    }
     for name in ("lint-fix", "lint-diff", "sort-imports", "fix"):
         assert "--no-unsafe-fixes" in tasks[name]["cmd"]
         assert "--config" not in tasks[name]["cmd"]
