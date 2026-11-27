@@ -873,7 +873,7 @@ def test_numerics_show_reports_effective_values_and_sources(tmp_path, monkeypatc
     assert "fidelity" not in shown.stdout
     assert_table_row(shown.stdout, "reflection families", "automatic default")
     assert_table_row(shown.stdout, "line-yield tolerance", "automatic (0.001) default")
-    assert_table_row(shown.stdout, "mosaic nodes", "5 default")
+    assert_table_row(shown.stdout, "mosaic nodes", "automatic (256 draws when sampled) default")
     assert_table_row(shown.stdout, "energy model", "midpoint default")
     assert "straggling" not in shown.stdout
 

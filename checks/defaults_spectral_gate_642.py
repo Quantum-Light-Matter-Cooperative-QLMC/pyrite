@@ -92,18 +92,20 @@ def layered_case(histories, seed):
     return case
 
 
-def mosaic_mc_case(case, nodes, sampling="quadrature", mosaic_seed=None):
+def mosaic_mc_case(case, nodes, sampling="quadrature", mosaic_seed=None, fwhm_deg=None):
     """Exact MC mosaic average at the crystal's catalog FWHM; analytic term off.
 
     The analytic route only broadens at detector convolution, so it leaves the
     intrinsic source spectrum unchanged; only this route is a source-level ladder.
     ``sampling="history"`` draws ``nodes`` crystallites per history (#1185);
     ``mosaic_seed`` replaces the scoring-time case seed, which only the
-    mosaic draws read on a replayed transport.
+    mosaic draws read on a replayed transport. ``fwhm_deg`` overrides the
+    catalog width (a low-mosaic scene on the same transport, #1207).
     """
     from pyrite.materials import CATALOG
 
-    fwhm_deg = CATALOG.crystal(case["crystal"]).mosaic_fwhm_deg
+    if fwhm_deg is None:
+        fwhm_deg = CATALOG.crystal(case["crystal"]).mosaic_fwhm_deg
     if not fwhm_deg:
         raise ValueError(f"{case['crystal']!r} has no catalog mosaic FWHM")
     out = dict(
@@ -117,6 +119,92 @@ def mosaic_mc_case(case, nodes, sampling="quadrature", mosaic_seed=None):
     if mosaic_seed is not None:
         out["seed"] = int(mosaic_seed)
     return out
+
+
+def parse_mosaic_arms(text):
+    """``perfect`` or ``K@SHIFT`` entries -> ``[(label, K or None, shift or None)]``."""
+    arms = []
+    for item in (x for x in text.split(",") if x):
+        if item == "perfect":
+            arms.append(("perfect", None, None))
+            continue
+        draws, sep, shift = item.partition("@")
+        if not sep or int(draws) <= 0:
+            raise ValueError(f"mosaic arm {item!r} is not 'perfect' or K@SHIFT")
+        arms.append((f"k{int(draws)}-m{int(shift)}", int(draws), int(shift)))
+    labels = [label for label, _, _ in arms]
+    if len(set(labels)) != len(labels):
+        raise ValueError("mosaic arms must be distinct")
+    return arms
+
+
+def analytic_mosaic(case, grid, density, fwhm_deg):
+    """The ``"analytic"`` route's mosaic-only Gaussian applied to an intrinsic spectrum.
+
+    Mirrors ``results.store_result``: one width ``min(E_pk |tan psi| eta, E_pk)``
+    at the intrinsic peak, convolved by ``convolve_detector``. EDS and aperture
+    terms are left out, so this isolates the mosaic model from detector response.
+    Returns ``(fwhm_eV or None, density)``; without a resonant reflection the
+    route adds nothing and the density is returned unchanged.
+    """
+    from pyrite.detectors.response import convolve_detector
+    from pyrite.montecarlo.detector import mosaic_fwhm_eV, mosaic_psi_rad
+
+    peak = float(grid[int(np.argmax(density))])
+    psi = mosaic_psi_rad(case, peak)
+    if psi is None:
+        return None, np.asarray(density)
+    fwhm = min(float(mosaic_fwhm_eV(peak, psi, np.deg2rad(fwhm_deg))), peak)
+    return fwhm, convolve_detector(grid, np.asarray(density), fwhm)
+
+
+def score_mosaic_arms(case, ladder, arms, fwhm_deg, spacing, repeats, sync, probe, output):
+    """Score each mosaic arm on one replayed transport at one bin-mean spacing.
+
+    ``perfect`` also records the analytic route's detector-stage mosaic form.
+    Every arm writes ``mosaic-<label>.npz`` before its record is returned.
+    """
+    grid = axis(500, 10000, spacing, "bin-mean")
+    records = []
+    for label, draws, shift in arms:
+        if draws is None:
+            arm_case = dict(case, mosaic_fwhm_rad=None, mosaic_mc_fwhm_rad=None)
+        else:
+            arm_case = mosaic_mc_case(case, draws, "history", shift, fwhm_deg)
+        arm_case["line_quadrature"] = "bin-mean"
+        sync()
+        begin = time.perf_counter()
+        scorer = _replay_ladder(arm_case, ladder.transport)
+        sync()
+        setup_s = time.perf_counter() - begin
+        density, timing = timed_calls(scorer.lines, grid, repeats, sync, probe)
+        np.savez_compressed(output / f"mosaic-{label}.npz", grid_eV=grid, density=density)
+        record = dict(
+            label=label,
+            draws_per_history=draws,
+            mosaic_seed=shift,
+            mosaic_fwhm_deg=fwhm_deg,
+            spacing_eV=spacing,
+            scorer_setup_s=setup_s,
+            **timing,
+            metrics=metrics(grid, density, "bin-mean"),
+        )
+        if draws is None:
+            fwhm, broadened = analytic_mosaic(case, grid, density, fwhm_deg)
+            np.savez_compressed(output / "mosaic-analytic.npz", grid_eV=grid, density=broadened)
+            record["analytic"] = dict(
+                mosaic_fwhm_eV=fwhm, metrics=metrics(grid, broadened, "bin-mean")
+            )
+        records.append(record)
+        print(json.dumps(dict(mosaic_arm=label, metrics=record["metrics"])), flush=True)
+    return records
+
+
+def _replay_ladder(case, transport):
+    """Scorer over a saved transport (a seam for tests)."""
+    from pyrite.energy_grid.convergence_case import CaseLadder
+
+    return CaseLadder(case, transport=transport)
 
 
 #: Production automatic line-grid policies: arm name -> profile selector table.
@@ -1311,6 +1399,21 @@ def main():
         help="scoring seed for history-sampled crystallites (replayed transport unchanged)",
     )
     parser.add_argument(
+        "--mosaic-arms",
+        type=parse_mosaic_arms,
+        default=[],
+        help="comma-separated mosaic arms scored in one process at --mosaic-spacing "
+        "bin-mean: 'perfect' (plus the analytic route's mosaic Gaussian) and K@SHIFT "
+        "(mc-sampled, K draws per history, mosaic seed SHIFT) (#1207)",
+    )
+    parser.add_argument("--mosaic-spacing", type=float, default=0.1875)
+    parser.add_argument(
+        "--mosaic-fwhm-deg",
+        type=float,
+        default=None,
+        help="mosaic FWHM for --mosaic-arms / --mosaic-mc-nodes; default the catalog value",
+    )
+    parser.add_argument(
         "--policy-arms",
         type=lambda text: [x for x in text.split(",") if x],
         default=[],
@@ -1487,7 +1590,9 @@ def main():
     np.savez_compressed(args.output / "primary.npz", **primary)
     records = []
     if args.mosaic_mc_nodes is not None:
-        case = mosaic_mc_case(case, args.mosaic_mc_nodes, args.mosaic_sampling, args.mosaic_seed)
+        case = mosaic_mc_case(
+            case, args.mosaic_mc_nodes, args.mosaic_sampling, args.mosaic_seed, args.mosaic_fwhm_deg
+        )
     arms = [("node", h) for h in args.node_spacings]
     bin_mean = args.bin_mean_spacings
     if bin_mean is None:
@@ -1560,6 +1665,26 @@ def main():
             json.dumps(report, indent=2, allow_nan=False) + "\n"
         )
         print(json.dumps(dict(arm=args.arm, spectrum=label, metrics=record["metrics"])), flush=True)
+    if args.mosaic_arms:
+        from pyrite.materials import CATALOG
+
+        fwhm_deg = args.mosaic_fwhm_deg or CATALOG.crystal(case["crystal"]).mosaic_fwhm_deg
+        report["mosaic_arms"] = score_mosaic_arms(
+            case,
+            ladder,
+            args.mosaic_arms,
+            fwhm_deg,
+            args.mosaic_spacing,
+            args.repeats,
+            sync,
+            peak_probe if args.repeats > 1 else None,
+            args.output,
+        )
+        assert segment_fingerprint(ladder.segments) == ladder.fingerprint
+        report["host_peak_rss_kib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        (args.output / "report.json").write_text(
+            json.dumps(report, indent=2, allow_nan=False) + "\n"
+        )
     if args.continuum:
         report["continuum_arms"] = score_continuum(
             case,

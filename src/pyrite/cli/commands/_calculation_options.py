@@ -28,7 +28,7 @@ _TRANSITION_RADIATION_VALUES = ("history", "bunch", "two-beam")
 _ATOMIC_ELECTRON_DEFLECTION_VALUES = ("kawrakow", "none")
 _SHELL_IONIZATION_MODEL_VALUES = ("eedl", "bote-salvat")
 _CXR_SOURCE_VALUES = ("mc", "none")
-_MOSAIC_ROUTE_VALUES = ("analytic", "mc", "mc-sampled")
+_MOSAIC_ROUTE_VALUES = ("auto", "analytic", "mc", "mc-sampled")
 
 
 class NoneOr(click.ParamType):
@@ -207,12 +207,14 @@ class ChannelingSectionCommand(click.Command):
     "--mosaic-nodes",
     type=click.IntRange(min=1),
     metavar="N",
-    help="Gauss-Hermite nodes per mosaic tilt axis.",
+    help="Gauss-Hermite nodes per mosaic tilt axis (mc), or crystallite draws per "
+    "history (mc-sampled). Default: 5 nodes, or 256 draws.",
 )
 @click.option(
     "--mosaic-route",
     type=click.Choice(_MOSAIC_ROUTE_VALUES),
-    help="Mosaic broadening route.",
+    help="Mosaic broadening route. auto (default): mc-sampled for incoherent emission, "
+    "analytic for coherent emission and full-fiber runs.",
 )
 @click.option(
     "--line-yield-tolerance",

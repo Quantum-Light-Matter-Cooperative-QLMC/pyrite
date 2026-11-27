@@ -6,6 +6,14 @@ This is the standard kinematical mosaic-crystal treatment (Darwin mosaic-block m
 
 Two implementations are available: **analytic detector broadening** and an explicit **Monte-Carlo mosaic average.**
 
+**Default route (#1207).** `mosaic_route="auto"` is the default. It resolves per run:
+- incoherent emission on a mosaic crystal uses the sampled crystallite average (`"mc-sampled"`) at 256 draws per history, unless `mosaic_nodes` is set. These cases record `mosaic_route_model = "mc-sampled-k256-v1"`.
+- coherent and `"both"` emission keep the analytic detector-stage width and warn that the source spectrum is not mosaic-broadened. A coherent sum cannot mix crystallites across histories.
+- full-fiber runs keep `"analytic"`, which they refuse with a mosaic, so their mosaic needs an explicit `"mc"`.
+- perfect crystals are unaffected and keep their historical identity.
+
+The analytic route leaves the intrinsic source spectrum unbroadened. On HOPG at the catalog 0.8°, even its detector-stage Gaussian is about 2.6 % narrow in FWHM against the sampled reference. Sampled `K = 256` meets every #1143 margin from 1024 to 16384 histories, at 1.8× the perfect-crystal scoring cost. See the [default qualification](mosaic-default-qualification-1207).
+
 ---
 
 ## Analytic broadening
@@ -58,7 +66,7 @@ Deterministic quadrature is used instead of randomly drawn orientations: it **co
 
 The **moments converge fast.** Integrated yield, mean energy and the second-moment width are converged by `mosaic_nodes ~ 5` (nodes 5 vs 9 agree to a few × 10⁻⁶ on the HOPG ZYH line integral). For a width-vs-rocking-curve comparison this is enough.
 
-The **detailed lineshape converges slowly when the mosaic spread ≫ the unbroadened source-line width.** Each node contributes a shifted copy of the narrow base line; for HOPG (00l) the energy shift is essentially 1-D in the in-plane tilt, so a handful of nodes gives a handful of discrete copies and the summed line is *lumpy* until the node spacing in energy drops below the unbroadened core width. A smooth broad lineshape needs `mosaic_nodes` scaling with (mosaic width / unbroadened source width): HOPG ZYH (3.5°) on a thin film needs ~30–40 nodes/axis for a smooth core; ZYA/ZYB (0.4/0.8°) are smooth by ~9–13. Cost is K = `mosaic_nodes²` evaluations of the line hot loop, **serial under CuPy**, so the broad-lineshape regime is genuinely expensive. The `CxrReflections` default (`mosaic_nodes=5`) targets converged moments; raise it for a publication-quality broad lineshape.
+The **detailed lineshape converges slowly when the mosaic spread ≫ the unbroadened source-line width.** Each node contributes a shifted copy of the narrow base line; for HOPG (00l) the energy shift is essentially 1-D in the in-plane tilt, so a handful of nodes gives a handful of discrete copies and the summed line is *lumpy* until the node spacing in energy drops below the unbroadened core width. A smooth broad lineshape needs `mosaic_nodes` scaling with (mosaic width / unbroadened source width): HOPG ZYH (3.5°) on a thin film needs ~30–40 nodes/axis for a smooth core; ZYA/ZYB (0.4/0.8°) are smooth by ~9–13. Cost is K = `mosaic_nodes²` evaluations of the line hot loop, **serial under CuPy**, so the broad-lineshape regime is genuinely expensive. The Gauss–Hermite default (`mosaic_nodes=None`, which resolves to 5 for `"mc"`) targets converged moments; raise it for a publication-quality broad lineshape, or use the sampled route.
 
 ### Sampled crystallites (`mosaic_route="mc-sampled"`)
 

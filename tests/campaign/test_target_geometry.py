@@ -395,8 +395,10 @@ def test_build_cases_reads_mosaic_from_the_target():
             target=Slab(MATERIAL, mosaic=True, footprint=Footprint(5.0, 5.0)), mosaic_fwhm_deg=0.8
         )
     )[0]
-    assert off["mosaic_fwhm_rad"] is None
-    assert on["mosaic_fwhm_rad"] == pytest.approx(np.deg2rad(0.8))
+    assert off["mosaic_fwhm_rad"] is None and off["mosaic_mc_fwhm_rad"] is None
+    # The default "auto" route samples the incoherent mosaic average (#1207).
+    assert on["mosaic_fwhm_rad"] is None
+    assert on["mosaic_mc_fwhm_rad"] == pytest.approx(np.deg2rad(0.8))
 
 
 def test_footprint_is_required_and_none_keeps_infinite_extent():

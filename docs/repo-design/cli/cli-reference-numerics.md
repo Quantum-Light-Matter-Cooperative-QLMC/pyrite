@@ -71,9 +71,13 @@ Options:
   --reflection-families N         Ranked reflection families to resolve.  [x>=1]
   --maximum-reflections N         Cap resolved reflections after family expansion.
                                   [x>=1]
-  --mosaic-nodes N                Gauss-Hermite nodes per mosaic tilt axis.  [x>=1]
-  --mosaic-route [analytic|mc|mc-sampled]
-                                  Mosaic broadening route.
+  --mosaic-nodes N                Gauss-Hermite nodes per mosaic tilt axis (mc), or
+                                  crystallite draws per history (mc-sampled). Default: 5
+                                  nodes, or 256 draws.  [x>=1]
+  --mosaic-route [auto|analytic|mc|mc-sampled]
+                                  Mosaic broadening route. auto (default): mc-sampled
+                                  for incoherent emission, analytic for coherent
+                                  emission and full-fiber runs.
   --line-yield-tolerance FRACTION
                                   Opt-in measured reflection cutoff: stop |g| shells
                                   once the estimated omitted incoherent line yield is at
@@ -208,9 +212,13 @@ Options:
   --reflection-families N         Ranked reflection families to resolve.  [x>=1]
   --maximum-reflections N         Cap resolved reflections after family expansion.
                                   [x>=1]
-  --mosaic-nodes N                Gauss-Hermite nodes per mosaic tilt axis.  [x>=1]
-  --mosaic-route [analytic|mc|mc-sampled]
-                                  Mosaic broadening route.
+  --mosaic-nodes N                Gauss-Hermite nodes per mosaic tilt axis (mc), or
+                                  crystallite draws per history (mc-sampled). Default: 5
+                                  nodes, or 256 draws.  [x>=1]
+  --mosaic-route [auto|analytic|mc|mc-sampled]
+                                  Mosaic broadening route. auto (default): mc-sampled
+                                  for incoherent emission, analytic for coherent
+                                  emission and full-fiber runs.
   --line-yield-tolerance FRACTION
                                   Opt-in measured reflection cutoff: stop |g| shells
                                   once the estimated omitted incoherent line yield is at

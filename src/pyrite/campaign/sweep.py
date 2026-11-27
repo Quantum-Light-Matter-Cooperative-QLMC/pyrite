@@ -124,6 +124,7 @@ from .inelastic_cases import (
     validate_explicit_shell_cases,
 )
 from .longitudinal import LongitudinalDistribution
+from .mosaic_route import mosaic_case_keys
 from .reflection_selection import fiber_case_fields, fiber_line_axis, sweep_fiber, with_sources
 
 MATERIAL_LABELS = {key: material.label for key, material in CATALOG.materials.items()}
@@ -453,7 +454,11 @@ class Sweep:
     mosaic: InitVar[bool] = retired_flat_input("mosaic")
     mosaic_fwhm_deg: float | None = None
     # how the mosaic broadening (when mosaic=True) is applied:
-    #   "analytic" (default) -> the cheap energy-shift Gaussian added in quadrature
+    #   "auto" (default)      -> "mc-sampled" (256 draws/history unless mosaic_nodes
+    #       is set) for incoherent emission; "analytic" with a warning for coherent
+    #       emission, and "analytic" for full-fiber runs (#1207,
+    #       campaign.mosaic_route.MOSAIC_ROUTE_DEFAULT_MODEL).
+    #   "analytic"            -> the cheap energy-shift Gaussian added in quadrature
     #       at detector convolution (results.store_result); the response-free source spectrum is
     #       untouched, so one record re-broadens to any grade (plot_mosaic_comparison).
     #   "mc"                  -> the EXACT per-orientation average INSIDE mc_cxr_spectrum
@@ -462,8 +467,10 @@ class Sweep:
     #       broadening is not double-counted. Costs mosaic_nodes**2 x the line hot loop
     #       (serial under CuPy). See docs/physics/materials/crystal-mosaicity.md.
     #   "mc-sampled"          -> that average from mosaic_nodes tilts drawn per history (#1185).
-    mosaic_route: str = "analytic"
-    mosaic_nodes: int = 5  # "mc": GH nodes/tilt axis (K=nodes^2); "mc-sampled": draws/history
+    mosaic_route: str = "auto"
+    # "mc": GH nodes/tilt axis (K=nodes^2); "mc-sampled": draws/history. None
+    # resolves to 5 or 256 (campaign.mosaic_route, #1207).
+    mosaic_nodes: int | None = None
     # Per-call automatic line-grid policy (issue #101). The TOP of the precedence
     # chain together with an explicit ``EnergyBins.cxr``: supplying one here
     # outranks ``PYRITE_ENERGY_GRID_*`` and any stored catalog row. Accepts
@@ -917,35 +924,6 @@ def _sweep_orientation(sweep: Sweep, cp: dict) -> ResolvedCut:
     return resolve_crystal_cut(cut, beam_uvw, surface_hkl)
 
 
-def _mosaic_case_keys(sweep: Sweep, cp: dict) -> dict[str, Any]:
-    """Case mosaic keys: the mosaic FWHM on at most one route, plus its rule.
-
-    Crystal mosaicity is None unless the run enables it AND the crystal has a
-    mosaic_fwhm_deg (or the Sweep overrides it); None is a perfect crystal, so
-    store_result adds no mosaic term (exact no-op). The exact MC routes do the
-    broadening INSIDE mc_cxr_spectrum and turn the analytic store_result term
-    OFF (mutually exclusive -- applying both double-counts). Validation: mosaic-mc-sampled
-    """
-    assert sweep.target is not None
-    mosaic_deg = None
-    if sweep.target.mosaic:
-        mosaic_deg = (
-            sweep.mosaic_fwhm_deg
-            if sweep.mosaic_fwhm_deg is not None
-            else CATALOG.crystal(cp["crystal"]).mosaic_fwhm_deg
-        )
-    mosaic_fwhm_rad = float(np.deg2rad(mosaic_deg)) if mosaic_deg else None
-    if sweep.mosaic_route not in ("analytic", "mc", "mc-sampled"):
-        raise ValueError(f"mosaic_route must be analytic, mc or mc-sampled: {sweep.mosaic_route!r}")
-    keys: dict[str, Any] = {"mosaic_mc_nodes": sweep.mosaic_nodes}
-    if mosaic_fwhm_rad is None or sweep.mosaic_route == "analytic":
-        return keys | {"mosaic_fwhm_rad": mosaic_fwhm_rad, "mosaic_mc_fwhm_rad": None}
-    keys |= {"mosaic_fwhm_rad": None, "mosaic_mc_fwhm_rad": mosaic_fwhm_rad}
-    if sweep.mosaic_route == "mc-sampled":  # Gauss-Hermite case keys stay unchanged
-        keys["mosaic_mc_sampling"] = "history"
-    return keys
-
-
 def _history_counts(grid: Any, fallback: Any, label: str) -> list[int]:
     if grid is None:
         return [int(fallback)]
@@ -1221,7 +1199,8 @@ def build_cases(
                         **model_keys,
                         beam_uvw=beam_uvw,
                         surface_hkl=surface_hkl,
-                        **_mosaic_case_keys(sweep, cp),  # FWHM on one route + rule
+                        # FWHM on one route + rule
+                        **mosaic_case_keys(sweep, cp, coherent_emission),
                         brem_file=None,
                         Ne=ne_line,
                         Ne_brem=ne_brem,

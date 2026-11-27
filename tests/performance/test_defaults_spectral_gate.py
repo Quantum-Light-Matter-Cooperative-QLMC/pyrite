@@ -559,3 +559,79 @@ def test_oversampled_sinc_arm_splits_every_resolved_step(monkeypatch):
     # Finer step moves the measured shape toward the reference, not away.
     err = [abs(r["native"]["versus_reference"]["dominant_fwhm_eV"]) for r in (base, fine)]
     assert err[1] < err[0]
+
+
+def test_mosaic_arms_parse_perfect_and_history_draws():
+    gate = _gate()
+    arms = gate["parse_mosaic_arms"]("perfect,4@11,256@12")
+    assert arms == [("perfect", None, None), ("k4-m11", 4, 11), ("k256-m12", 256, 12)]
+    for bad in ("4", "0@1", "perfect,perfect"):
+        with pytest.raises(ValueError):
+            gate["parse_mosaic_arms"](bad)
+
+
+def test_mosaic_mc_case_width_override_keeps_history_seed():
+    case = _gate()["mosaic_mc_case"]({"crystal": "silicon", "seed": 1}, 16, "history", 7, 0.1)
+    assert case["mosaic_mc_fwhm_rad"] == pytest.approx(np.deg2rad(0.1))
+    assert case["mosaic_mc_sampling"] == "history" and case["seed"] == 7
+
+
+def test_score_mosaic_arms_routes_each_arm_and_adds_the_analytic_form(monkeypatch, tmp_path):
+    gate = _gate()
+    seen = []
+
+    class Scorer:
+        def __init__(self, case):
+            self.case = case
+
+        def lines(self, grid):
+            centre, width = 5000.0, 30.0 if self.case.get("mosaic_mc_fwhm_rad") else 3.0
+            return np.exp(-0.5 * ((grid - centre) / width) ** 2)
+
+    def ladder(case, transport):
+        seen.append(dict(case))
+        return Scorer(case)
+
+    def analytic(case, grid, density, fwhm_deg):
+        return 70.0, 2 * density
+
+    monkeypatch.setitem(gate["score_mosaic_arms"].__globals__, "_replay_ladder", ladder)
+    monkeypatch.setitem(gate["score_mosaic_arms"].__globals__, "analytic_mosaic", analytic)
+    case = {"crystal": "hopg", "seed": 3, "mosaic_fwhm_rad": 0.01}
+    fake = type("L", (), {"transport": object()})()
+    records = gate["score_mosaic_arms"](
+        case,
+        fake,
+        [("perfect", None, None), ("k4-m9", 4, 9)],
+        0.8,
+        3.0,
+        1,
+        lambda: None,
+        None,
+        tmp_path,
+    )
+    assert seen[0]["mosaic_fwhm_rad"] is None and seen[0]["mosaic_mc_fwhm_rad"] is None
+    assert seen[1]["mosaic_mc_nodes"] == 4 and seen[1]["seed"] == 9
+    assert seen[1]["mosaic_mc_sampling"] == "history"
+    assert all(c["line_quadrature"] == "bin-mean" for c in seen)
+    assert records[0]["analytic"]["mosaic_fwhm_eV"] == 70.0
+    perfect, sampled = (r["metrics"]["dominant_fwhm_eV"] for r in records)
+    assert sampled > 5 * perfect
+    for name in ("perfect", "analytic", "k4-m9"):
+        assert (tmp_path / f"mosaic-{name}.npz").exists()
+
+
+def test_analytic_mosaic_matches_the_store_result_width():
+    from pyrite.energy_grid.convergence_case import build_ladder_case
+    from pyrite.montecarlo.detector import mosaic_fwhm_eV, mosaic_psi_rad
+
+    gate = _gate()
+    case = build_ladder_case("hopg", 30.0, 45, 180, thickness_ang=20000.0, n_electrons=4, seed=1)
+    grid = gate["axis"](500, 10000, 0.75, "bin-mean")
+    density = np.exp(-0.5 * ((grid - 2000.0) / 2.0) ** 2)
+    fwhm, broadened = gate["analytic_mosaic"](case, grid, density, 0.8)
+    peak = float(grid[np.argmax(density)])
+    expected = mosaic_fwhm_eV(peak, mosaic_psi_rad(case, peak), np.deg2rad(0.8))
+    assert fwhm == pytest.approx(min(expected, peak))
+    assert np.sum(broadened) == pytest.approx(np.sum(density), rel=1e-6)
+    assert broadened.max() < density.max()

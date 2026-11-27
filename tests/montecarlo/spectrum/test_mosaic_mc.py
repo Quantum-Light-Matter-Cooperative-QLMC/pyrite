@@ -82,9 +82,40 @@ def _sweep(**kw):
 
 
 def test_route_analytic_sets_analytic_term_only():
-    case = build_cases(_sweep(mosaic=True))[0]  # route defaults to "analytic"
+    case = build_cases(_sweep(mosaic=True, mosaic_route="analytic"))[0]
     assert case["mosaic_fwhm_rad"] == pytest.approx(np.deg2rad(0.8))
     assert case["mosaic_mc_fwhm_rad"] is None
+    assert case["mosaic_mc_nodes"] == 5 and "mosaic_mc_sampling" not in case
+
+
+def test_route_auto_samples_incoherent_mosaic_at_256_draws_with_marker():
+    from pyrite.campaign.mosaic_route import MOSAIC_ROUTE_DEFAULT_MODEL
+
+    case = build_cases(_sweep(mosaic=True))[0]  # route defaults to "auto" (#1207)
+    assert case["mosaic_fwhm_rad"] is None
+    assert case["mosaic_mc_fwhm_rad"] == pytest.approx(np.deg2rad(0.8))
+    assert case["mosaic_mc_sampling"] == "history" and case["mosaic_mc_nodes"] == 256
+    assert case["mosaic_route_model"] == MOSAIC_ROUTE_DEFAULT_MODEL
+    explicit = build_cases(_sweep(mosaic=True, mosaic_route="mc-sampled", mosaic_nodes=16))[0]
+    assert explicit["mosaic_mc_nodes"] == 16 and "mosaic_route_model" not in explicit
+
+
+def test_route_auto_keeps_analytic_with_a_warning_for_coherent_emission():
+    with pytest.warns(UserWarning, match="not mosaic-broadened"):
+        case = build_cases(_sweep(mosaic=True), coherent_emission=True)[0]
+    assert case["mosaic_fwhm_rad"] == pytest.approx(np.deg2rad(0.8))
+    assert case["mosaic_mc_fwhm_rad"] is None and "mosaic_route_model" not in case
+
+
+def test_route_auto_leaves_perfect_crystals_on_their_historical_keys():
+    auto = build_cases(_sweep())[0]
+    analytic = build_cases(_sweep(mosaic_route="analytic", mosaic_nodes=5))[0]
+    assert auto == analytic
+
+
+def test_explicit_sampled_route_still_refuses_coherent_emission():
+    with pytest.raises(ValueError, match="incoherent-only"):
+        build_cases(_sweep(mosaic=True, mosaic_route="mc-sampled"), coherent_emission=True)
 
 
 def test_route_mc_sets_mc_term_and_suppresses_analytic():
