@@ -32,7 +32,7 @@ def _rotation(seed):
     return q if np.linalg.det(q) > 0 else -q
 
 
-def _box(center=(0, 0, 0), axes=np.eye(3), half=(1, 2, 3), composition=CU):
+def _box(center=(0, 0, 0), axes=((1, 0, 0), (0, 1, 0), (0, 0, 1)), half=(1, 2, 3), composition=CU):
     return PhotonBox(
         tuple(map(float, center)), tuple(tuple(map(float, a)) for a in axes), half, composition
     )

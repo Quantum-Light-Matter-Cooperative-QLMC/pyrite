@@ -46,8 +46,8 @@ explicit writes (`fmt`, `cli-reference-write`, `validation-ledger-write`,
 
 ### Ruff workflow
 
-The repository's lint and formatting policy lives in `ruff.toml`, with the
-same enabled rules as before and an explicit Python 3.13 target. Use the
+The repository's lint and formatting policy lives in `ruff.toml`, with an
+explicit Python 3.13 target (see [Ruff policy](#ruff-policy)). Use the
 Pixi-locked executable for custom commands or the convenience tasks:
 
 ```bash
@@ -77,13 +77,53 @@ fixes in these directories, and disable fix-on-save/import organization for
 Marimo in editors that override project settings. Add new Marimo notebooks in
 one of these directories and run `marimo check` after reviewing edits.
 
-Rule-family audits are opt-in and report-only, e.g. `pixi run --locked ruff
-check --extend-select SIM,PERF,RUF,NPY --statistics src/pyrite`. Consider
-correctness-oriented `RUF`, `NPY`, `FURB`, and selected `SIM`/`PERF` rules
-first; review changes in JIT kernels and array semantics independently.
-`TC`, `ARG`, `PLR`, and `TRY` can be noisy for scientific APIs and generated
-cell signatures. Do not enable whole rule families or unsafe fixes globally
-without an audited, separate policy change.
+#### Ruff policy
+
+Ruff is more aggressive as a diagnostic tool than as a code transformer
+(#1517). Beyond `E`, `F`, `I`, `UP` and `B`, the policy enables `RUF`, `NPY`,
+`SIM`, `PERF`, `FURB`, `C4`, `PLE`, `LOG`, `G`, `SLOT` and `PT`, plus the
+single rules `RET501`–`RET503`, `TC004` and `TC005`. Every ignored rule has an
+inline reason in `ruff.toml`. The ones that matter most:
+
+- **Rewrites that change meaning.** `RUF005` turns `array + [x]` (NumPy
+  broadcasting) into list concatenation. `SIM118` assumes `.keys()` belongs
+  to a dict; it broke `pyrite.console.config.keys()`. `C416` turned a pandas
+  `groupby` comprehension into `dict(groupby)`. `FURB136`, `SIM109` and
+  `SIM102` reshape comparisons and branches inside Numba/CUDA kernels.
+  The `C416` rule stays on: its one unsafe site carries a `noqa` with
+  the reason.
+- **Numerical boundaries and style.** `RUF046` (explicit `int()` at backend
+  boundaries), `RUF007` (`pairwise` is unsupported in Numba), `SIM108`,
+  `SIM114`, `SIM300` (misreads `lo <= E` on physics symbols), `C408`,
+  `PERF401`/`PERF403` (performance claims need measurement) and the pytest
+  style rules `PT006`, `PT007`, `PT011`, `PT018`, `PT019`.
+- **Not enabled.** `TID` (relative imports are the convention), `ARG`
+  (callback and kernel signatures are contracts), the rest of `TC` (moves
+  runtime and annotation imports) and `RET` beyond the None-return rules.
+
+`extend-unfixable` keeps `RUF009`, `RUF012`, `RUF033`, `RUF100`, `SIM105`,
+`SIM401`, `PERF102` and `FURB192` diagnostic-only. In particular, the `RUF100`
+fixer deletes the whole comment, including the `isort: skip` markers that hold
+the runner's circular-import order. Remove stale codes by hand. `lint.external`
+keeps reviewed `noqa` codes from families that are not enabled (`S`, `BLE`,
+`PLC`, `SLF`, `PLR`, `C901`, `D`). `allowed-confusables` admits scientific
+notation and typography (`–`, `×`, `−`, Greek letters, `ℓ`, primes, curly
+quotes). Every other confusable still fails.
+
+Marimo sources and `.ipynb` captures skip `RUF100`. Their `noqa` comments
+travel between source and capture, which are analysed with different cell
+semantics. Marimo sources also skip `SIM117`, because editing them requires a
+capture regeneration. Tests keep nested `pytest.raises`/`warns` blocks
+(`SIM117`). Inside a `raises` or `warns` block, keep exactly the statement
+expected to raise: setup inside the block can satisfy the expectation by
+accident (`PT012`). Give `pytest.warns` a `match` (`PT030`).
+
+The CLI overrides configuration. `--select` re-enables ignored rules, and
+`--fixable`/`--unsafe-fixes` bypass both `extend-unfixable` and the Marimo
+directories' `unfixable = ["ALL"]`. A one-off audit fix must name exact codes,
+exclude Marimo paths, and be reviewed and tested before committing. Audits of
+rule families outside the policy stay report-only, e.g. `pixi run --locked ruff
+check --extend-select ARG --statistics src/pyrite`.
 
 Task definitions are scoped to their dependency features. For example,
 `test` and `test-suite` require the test feature, while `lint` and `verify`

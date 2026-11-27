@@ -19,7 +19,19 @@ def test_ruff_configuration_and_tasks():
     assert "ruff" not in manifest["tool"]
     assert config["target-version"] == "py313"
     assert config["unsafe-fixes"] is False
-    assert config["lint"]["select"] == ["E", "F", "I", "UP", "B"]
+    lint = config["lint"]
+    assert lint["select"][:5] == ["E", "F", "I", "UP", "B"]
+    assert {"RUF", "NPY", "SIM", "PERF", "FURB", "C4", "PLE", "PT"} <= set(lint["select"])
+    # Diagnostic-only rules (#1517): RUF100 would delete whole comments,
+    # including `isort: skip` markers; the others change evaluation, exception
+    # scope or dataclass identity.
+    assert {"RUF009", "RUF012", "RUF033", "RUF100", "SIM105", "SIM401"} <= set(
+        lint["extend-unfixable"]
+    )
+    # Rewrites that broke numerics or behaviour in the audit stay off entirely.
+    assert {"RUF005", "RUF046", "SIM118", "FURB136"} <= set(lint["ignore"])
+    assert "fixable" not in lint
+    assert "unfixable" not in lint
     tasks = manifest["tool"]["pixi"]["feature"]["lint"]["tasks"]
     assert set(tasks) >= {
         "lint-fix",

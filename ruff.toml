@@ -16,25 +16,97 @@ exclude = [
 ]
 
 [lint]
-# core useful rules without the “style noise overload”
+# Diagnostics are broader than automatic fixes: risky families below are
+# reported but never rewritten (see extend-unfixable). Policy rationale:
+# docs/repo-design/development-workspace.md#ruff-policy (#1517).
 select = [
-    "E",  # pycodestyle errors
-    "F",  # pyflakes
-    "I",  # import sorting
-    "UP", # pyupgrade (keeps Python 3.13+ modern)
-    "B",  # bugbear (real bugs, not stylistic nitpicks)
+    "E",     # pycodestyle errors
+    "F",     # pyflakes
+    "I",     # import sorting
+    "UP",    # pyupgrade (keeps Python 3.13+ modern)
+    "B",     # bugbear (real bugs, not stylistic nitpicks)
+    "RUF",   # Ruff-specific correctness and hygiene
+    "NPY",   # NumPy deprecations and legacy RNG
+    "SIM",   # simplifications
+    "PERF",  # loop and allocation anti-patterns
+    "FURB",  # modern idioms
+    "C4",    # comprehension hygiene
+    "PLE",   # pylint errors
+    "LOG",   # logging misuse
+    "G",     # logging format strings
+    "SLOT",  # __slots__ on str/tuple/namedtuple subclasses
+    "PT",    # pytest conventions (narrowed below)
+    "RET501", "RET502", "RET503",  # implicit/explicit None returns
+    "TC004", "TC005",  # runtime use of TYPE_CHECKING-only imports; empty blocks
 ]
 
 ignore = [
-    "E501", # long lines in physics formulas/comments
-    "E402", # import-not-at-top — notebook cells have docstrings before imports
-    "B008", # np.deg2rad() in default args — pure math call, not a real bug
+    "E501",    # long lines in physics formulas/comments
+    "E402",    # import-not-at-top — notebook cells have docstrings before imports
+    "RUF005",  # `arr + [x]` is NumPy broadcasting, not concatenation; shape
+               # tuples ((n,) + a.shape) are idiomatic. Fix would break numerics.
+    "RUF007",  # zip(a, a[1:]) works on arrays and in Numba; pairwise does not
+    "RUF022",  # __all__ order is curated public-surface grouping, not alphabetical
+    "RUF043",  # pytest.raises(match=) patterns are intentional regexes
+    "RUF046",  # explicit int() marks numerical/backend integer boundaries
+    "SIM102",  # nested guards keep JIT-kernel branch structure explicit
+    "SIM108",  # ternaries hide physics branches; keep explicit if/else
+    "SIM109",  # `x in (A, B)` rewrites inside JIT kernels; keep explicit compares
+    "SIM114",  # identical arms often document distinct cases (catalog vs profile)
+    "SIM118",  # assumes `.keys()` is a dict's; pyrite.console.config.keys() is a
+               # module function, and the rewrite breaks `pyrite config`
+    "SIM300",  # flags interval maths (lo <= E) on uppercase physics symbols
+    "FURB136", # min()/max() differ from explicit ternaries on NaN and ties in kernels
+    "PERF401", # comprehension rewrites are style; perf claims need measurement
+    "PERF403", # same, for filtered updates of an existing dict
+    "C408",    # dict(key=...) reads as keyword arguments; style only
+    "PT006",   # parametrize name style; churn without behavioural value
+    "PT007",   # parametrize value container style
+    "PT011",   # broad raises are deliberate where messages are not contracts
+    "PT018",   # composite asserts are idiomatic for array/shape checks
+    "PT019",   # underscore fixtures are used for side effects only
+]
+
+# Scientific notation, units and typography are intentional; other confusables
+# (Cyrillic/Greek look-alikes of Latin letters, invisible characters) still fail.
+allowed-confusables = ["–", "×", "−", "σ", "ℓ", "γ", "’", "‘", "′", "α", "ρ"]
+
+# Codes from families not enabled here whose noqa comments record a reviewed
+# exception (trusted pickle, subprocess, broad except, deferred import...).
+external = ["S", "BLE", "PLC", "SLF", "PLR", "C901", "D"]
+
+# Report, never rewrite: these touch evaluation order, eager defaults, exception
+# scope, dataclass identity or suppression comments. The RUF100 fixer deletes
+# whole comments, including `isort: skip` markers.
+extend-unfixable = [
+    "RUF009", "RUF012", "RUF033", "RUF100",
+    "SIM105", "SIM401", "PERF102", "FURB192",
+]
+
+[lint.flake8-bugbear]
+# Immutable sentinels, NamedTuples and scalar maths: safe as shared defaults
+# (B008) and dataclass defaults (RUF009).
+extend-immutable-calls = [
+    "numpy.deg2rad",
+    "pyrite.campaign.flat_geometry.retired_flat_input",
+    "pyrite.montecarlo.transport._jit_rawmodule.KernelBuild",  # NamedTuple
 ]
 
 [lint.per-file-ignores]
-"*.ipynb" = [
-    "F821",
-] # cross-cell references are always undefined to static analysis
+# cross-cell references are always undefined to static analysis. Captures
+# mirror their Marimo sources, so their noqa comments are owned there.
+"*.ipynb" = ["F821", "RUF100"]
+# Marimo cell noqa comments travel into committed .ipynb captures, where the
+# same lines are analysed with different cell semantics; edit them at source
+# together with a capture regeneration, never through RUF100.
+# Nested mo.status/mo.capture_stdout/persistent_cache wrappers mirror display
+# roles, and editing them needs a tutorial capture regeneration.
+"{src/pyrite/apps,docs/notebooks,docs/examples,docs/demo}/**" = ["RUF100", "SIM117"]
+# Tests nest pytest.raises/warns around the configured context on purpose, so
+# the expectation scope reads separately from the setup scope.
+"tests/**" = ["SIM117"]
+# A suite inventory module, not a pytest file; its test_* names are data.
+"src/pyrite/devtools/test_suites.py" = ["PT028"]
 # marimo apps display a cell's value as its bare last
 # expression (e.g. a UI element on its own line) -- that's the framework's render
 # mechanism, not a useless statement.
