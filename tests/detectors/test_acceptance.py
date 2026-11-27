@@ -51,7 +51,7 @@ def test_angular_acceptance_analytic_reference_and_small_patch():
     "kwargs", [{}, {"polar_deg": 2}, {"polar_deg": 2, "azimuthal_deg": 4, "solid_angle_sr": 0.01}]
 )
 def test_angular_acceptance_requires_exactly_two(kwargs):
-    with pytest.raises(ValueError, match="polar_deg.*azimuthal_deg.*solid_angle_sr"):
+    with pytest.raises(ValueError, match=r"polar_deg.*azimuthal_deg.*solid_angle_sr"):
         pr.detectors.AngularAcceptance(**kwargs)
 
 

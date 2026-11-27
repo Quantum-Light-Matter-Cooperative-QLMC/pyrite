@@ -144,7 +144,7 @@ def test_the_digest_ignores_files_the_programs_do_not_compile(elsepa_tree):
 
 def test_a_missing_declared_source_is_reported_not_hashed_as_absent(elsepa_tree):
     (elsepa_tree / "radial.f").unlink()
-    with pytest.raises(SourceUnavailableError, match="radial.f"):
+    with pytest.raises(SourceUnavailableError, match=r"radial\.f"):
         source_digest(resolve_source("elsepa", elsepa_tree))
 
 

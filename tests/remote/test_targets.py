@@ -272,7 +272,7 @@ def test_qos_and_sbatch_extra_render_directives(configured):
 
 
 def test_sbatch_extra_names_owning_setting():
-    with pytest.raises(ValueError, match="set remote.qos instead"):
+    with pytest.raises(ValueError, match=r"set remote\.qos instead"):
         targets.RemoteTarget(host="box", sbatch_extra="--qos=highp")
 
 

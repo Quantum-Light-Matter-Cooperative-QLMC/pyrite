@@ -68,7 +68,7 @@ def test_physics_selector_and_lowering():
     on = api.build_case(_scene("bunch"), _NUMERICS)
     assert off.to_dict().get("transition_radiation") is None
     assert on["transition_radiation"] == {"model": "planar-stack", "coherence": "bunch"}
-    with pytest.raises(ValueError, match="energy_model must be 'frozen' or 'midpoint'|midpoint"):
+    with pytest.raises(ValueError, match=r"energy_model must be 'frozen' or 'midpoint'|midpoint"):
         Settings(energy_model="frozen", transition_radiation="history")
 
 

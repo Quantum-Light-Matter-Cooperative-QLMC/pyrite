@@ -140,7 +140,7 @@ def test_scene_and_sweep_axes_use_sub_objects():
 def test_required_beam_distributions_and_removed_point_alias():
     import pyrite.campaign.beam as beam_module
 
-    with pytest.raises(TypeError, match="transverse.*longitudinal"):
+    with pytest.raises(TypeError, match=r"transverse.*longitudinal"):
         pr.Beam(energy_keV=30.0)
     with pytest.raises(TypeError, match="longitudinal"):
         pr.Beam(energy_keV=30.0, transverse=PointSpot())

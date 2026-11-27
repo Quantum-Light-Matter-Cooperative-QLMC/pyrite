@@ -180,7 +180,7 @@ def test_legacy_flat_detector_inputs_normalize_to_detector_and_cases():
 
 
 def test_conflicting_nested_and_flat_detector_inputs_fail_actionably():
-    with pytest.raises(ValueError, match="conflicting nested detector.*theta_obs_deg"):
+    with pytest.raises(ValueError, match=r"conflicting nested detector.*theta_obs_deg"):
         Sweep(
             material="mose2",
             detector=Detector(observation_angle_deg=119.0),

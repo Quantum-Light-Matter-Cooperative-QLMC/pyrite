@@ -90,7 +90,7 @@ def test_stack_loader_preserves_layer_namespace_and_order(document, tmp_path):
 )
 def test_invalid_unused_definitions_rejected(document, tmp_path, change):
     document["targets"] = {"bad": {**SLAB, **change}}
-    with pytest.raises(MaterialConfigError, match="targets.bad"):
+    with pytest.raises(MaterialConfigError, match=r"targets\.bad"):
         load(document, tmp_path)
 
 
@@ -113,7 +113,7 @@ def test_stack_layer_requires_finite_positive_scalar(document, tmp_path, thickne
 def test_invalid_references_rejected(document, tmp_path, refs):
     document["targets"] = {"film": SLAB}
     document["profiles"]["standard"]["targets"] = refs
-    with pytest.raises(MaterialConfigError, match="profiles.standard.targets"):
+    with pytest.raises(MaterialConfigError, match=r"profiles\.standard\.targets"):
         load(document, tmp_path)
 
 
@@ -344,5 +344,5 @@ def test_a_stack_has_no_cut(document, tmp_path):
             ],
         }
     }
-    with pytest.raises(MaterialConfigError, match="targets.bad"):
+    with pytest.raises(MaterialConfigError, match=r"targets\.bad"):
         load(document, tmp_path)

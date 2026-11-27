@@ -120,9 +120,9 @@ def test_acceptance_rejects_dual_names(kwargs):
     ],
 )
 def test_acceptance_rejects_invalid_semantic_angles(value, error):
-    with pytest.raises(error, match="AngularAcceptance.polar"):
+    with pytest.raises(error, match=r"AngularAcceptance\.polar"):
         AngularAcceptance(polar=value, azimuthal_deg=20)
-    with pytest.raises(error, match="AngularAcceptance.polar"):
+    with pytest.raises(error, match=r"AngularAcceptance\.polar"):
         AngularAcceptance(polar_deg=2, azimuthal_deg=20).with_polar(value)
 
 
@@ -138,7 +138,7 @@ def test_acceptance_rejects_invalid_semantic_angles(value, error):
     ],
 )
 def test_acceptance_solid_angle_requires_angular_measure(value, error):
-    with pytest.raises(error, match="AngularAcceptance.solid_angle"):
+    with pytest.raises(error, match=r"AngularAcceptance\.solid_angle"):
         AngularAcceptance(polar_deg=5, solid_angle=value)
 
 
@@ -157,9 +157,9 @@ def test_acceptance_solid_angle_requires_angular_measure(value, error):
     ],
 )
 def test_detector_rejects_invalid_semantic_angles(value, error):
-    with pytest.raises(error, match="Detector.observation_angle"):
+    with pytest.raises(error, match=r"Detector\.observation_angle"):
         Detector(observation_angle=value)
-    with pytest.raises(error, match="Detector.observation_angle"):
+    with pytest.raises(error, match=r"Detector\.observation_angle"):
         Detector().with_observation_angle(value)
 
 

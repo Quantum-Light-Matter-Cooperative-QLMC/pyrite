@@ -300,7 +300,7 @@ def test_missing_reference_and_unsupported_counting_response_refuse_early(
         pytest.fail("unsupported observation reached material preparation")
 
     monkeypatch.setattr(lowering, "build_cases", forbidden)
-    with pytest.raises(ValueError, match="no registered Scene.detector"):
+    with pytest.raises(ValueError, match=r"no registered Scene\.detector"):
         api.build_case(replace(scene, detector=None), CONTROLS, observation=Observation())
 
     class ScoreOnly:

@@ -398,7 +398,7 @@ def test_widget_decode_preserves_optional_settings_and_numeric_types():
         "straggling": False,
     }
     assert calculation_defaults("physics")["emission"] == "incoherent"
-    with pytest.raises(ValueError, match="energy_keV.values"):
+    with pytest.raises(ValueError, match=r"energy_keV\.values"):
         field_values(
             {"energy_keV.values": {"explicit": True, "value": "bad"}}, {"energy_keV.values": [30.0]}
         )

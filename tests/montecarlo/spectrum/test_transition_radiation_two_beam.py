@@ -90,7 +90,7 @@ def test_nonfinite_permittivity_refuses_before_solving(medium, eps):
         config["layers"] = [(eps, 300.0)]
     else:
         config["substrate_eps"] = eps
-    with pytest.raises(ValueError, match="permittivit.*finite"):
+    with pytest.raises(ValueError, match=r"permittivit.*finite"):
         two_beam_straight_field(**config)
 
 

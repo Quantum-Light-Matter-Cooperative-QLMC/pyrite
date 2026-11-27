@@ -182,7 +182,7 @@ def test_planar_propagation_normalizes_stopping_power_before_solver(monkeypatch)
     assert observed["stopping_eV_per_ang"] == pytest.approx(1.0)
     assert observed["step"] == 5.0
     assert not any(hasattr(v, "units") for v in observed.values())
-    with pytest.raises(ValueError, match="propagate_planar_source.depth_ang"):
+    with pytest.raises(ValueError, match=r"propagate_planar_source\.depth_ang"):
         propagate_planar_source(projection, depth_ang=1 * ureg.keV)
 
 
@@ -222,14 +222,14 @@ def test_planar_scoring_normalizes_quantity_grids_and_angles(monkeypatch):
         if not isinstance(value, tuple):
             assert not hasattr(value, "units")
 
-    with pytest.raises(ValueError, match="score_planar_source.theta_rad"):
+    with pytest.raises(ValueError, match=r"score_planar_source\.theta_rad"):
         score_planar_source(
             _projection(),
             depth_ang=40,
             photon_energy_eV=[5000, 6000],
             theta_rad=1 * ureg.dimensionless,
         )
-    with pytest.raises(ValueError, match="score_planar_source.photon_energy_eV"):
+    with pytest.raises(ValueError, match=r"score_planar_source\.photon_energy_eV"):
         score_planar_source(
             _projection(),
             depth_ang=40,

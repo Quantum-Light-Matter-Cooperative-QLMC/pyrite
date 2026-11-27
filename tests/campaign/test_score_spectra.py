@@ -203,7 +203,7 @@ def test_grooved_targets_refuse_another_observation_angle(monkeypatch):
         BEAM, GROOVED, physics=GROOVED_PHYSICS, numerics=NUMERICS, detector=Detector()
     )
     _no_spectra(monkeypatch)
-    with pytest.raises((ScoringRefusedError, ValueError), match="grooves|observation"):
+    with pytest.raises((ScoringRefusedError, ValueError), match=r"grooves|observation"):
         pyrite.score_spectra(trajectories, Detector(observation_angle_deg=60.0))
 
 

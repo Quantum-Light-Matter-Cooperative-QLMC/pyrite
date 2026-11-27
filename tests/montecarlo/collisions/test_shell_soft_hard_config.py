@@ -185,7 +185,7 @@ def test_missing_shell_reference_data_names_the_fetch_command(monkeypatch, tmp_p
 def test_uncovered_material_names_the_covered_set():
     from pyrite.montecarlo.transport.shell_rates import catalog_shell_oscillators
 
-    with pytest.raises(ValueError, match="'hfs2' has no conduction-band shell data.*silicon"):
+    with pytest.raises(ValueError, match=r"'hfs2' has no conduction-band shell data.*silicon"):
         catalog_shell_oscillators("hfs2")
 
 

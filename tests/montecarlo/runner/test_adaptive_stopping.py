@@ -994,7 +994,7 @@ def test_adaptive_host_admission_refuses_before_kept_growth(monkeypatch):
         original_admit(required, phase)
 
     monkeypatch.setattr(host_memory, "admit_host_allocation", admit)
-    with pytest.raises(host_memory.HostMemoryResourceError, match="lower max_histories.*#1280"):
+    with pytest.raises(host_memory.HostMemoryResourceError, match=r"lower max_histories.*#1280"):
         transport_case_adaptive(_case(), _SETTINGS, transport_core="per-electron")
     assert calls == [0]
 

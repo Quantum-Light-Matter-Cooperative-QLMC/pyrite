@@ -229,7 +229,7 @@ def test_composition_refuses_a_censored_incident_census():
     # This incident was observed only to 200 Å. Its fate by 300 Å is unknown;
     # counting it as retained would depress both terminal-event estimates.
     rows[-1] = replace(rows[-1], depth_ang=200.0)
-    with pytest.raises(ValueError, match="retained.*sampled maximum depth"):
+    with pytest.raises(ValueError, match=r"retained.*sampled maximum depth"):
         add_physical_fate_source_bounds(
             source(),
             rows,

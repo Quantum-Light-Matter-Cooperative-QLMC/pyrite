@@ -66,7 +66,7 @@ def test_skill_tree_requires_skill_file_in_every_top_level_directory(
     (mirror / "missing").mkdir(parents=True)
     (mirror / "missing" / "reference.txt").write_text("reference\n")
 
-    with pytest.raises(dev_module.AgentToolingError, match="missing SKILL.md"):
+    with pytest.raises(dev_module.AgentToolingError, match=r"missing SKILL\.md"):
         dev_module.check_skill_trees(canonical, mirror)
 
 

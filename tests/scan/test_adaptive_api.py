@@ -321,7 +321,7 @@ def test_unsupported_routes_fail_before_transport(scene, numerics, monkeypatch):
 
 def test_adaptive_case_rejects_count_mismatch(scene, numerics):
     case = api.build_case(scene, numerics)
-    with pytest.raises(ValueError, match="precision.max_histories"):
+    with pytest.raises(ValueError, match=r"precision\.max_histories"):
         replace(case, Ne=40)
 
 

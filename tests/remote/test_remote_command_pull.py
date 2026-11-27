@@ -116,7 +116,7 @@ def test_pull_attached_progress_unwritten_checkpoint_is_actionable(monkeypatch):
     monkeypatch.setattr(lifecycle, "pull", lambda *a, **k: pytest.fail("nothing to pull"))
 
     with pytest.raises(
-        SystemExit, match="no written checkpoints.*not yet written.*hbn@high_energy"
+        SystemExit, match=r"no written checkpoints.*not yet written.*hbn@high_energy"
     ):
         viewer._pull_attached_progress("j", _PARTIAL_SECTIONS)
 

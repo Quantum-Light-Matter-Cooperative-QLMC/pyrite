@@ -107,7 +107,7 @@ def test_disjoint_support_never_interpolates_through_a_gap():
         )
     )
     np.testing.assert_array_equal(response.epsilon([2.0, 3.0]), [2 + 1j, 3 + 2j])
-    with pytest.raises(ValueError, match="sample.*gap"):
+    with pytest.raises(ValueError, match=r"sample.*gap"):
         response.epsilon([1.5, 2.5, 3.5])
 
 

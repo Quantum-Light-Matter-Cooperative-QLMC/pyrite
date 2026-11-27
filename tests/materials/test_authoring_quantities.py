@@ -84,7 +84,7 @@ INVALID = [
 
 @pytest.mark.parametrize("value, error", INVALID)
 def test_medium_density_refuses_invalid_quantities(value, error):
-    with pytest.raises(error, match="build_medium.density"):
+    with pytest.raises(error, match=r"build_medium\.density"):
         build_medium("si", formula="Si", density=value)
 
 

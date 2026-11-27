@@ -81,7 +81,7 @@ def test_invalid_inputs_fail_before_device_selection(monkeypatch):
         scene_first_interactions_cuda([[0, 0, 0]], [[0, 0, 1]], [1e5], [[0, 0]], [(1, 0, [])])
 
     for options in ({"implementation": "auto"}, {"threads": True}, {"threads": 0}):
-        with pytest.raises(ValueError, match="implementation|threads"):
+        with pytest.raises(ValueError, match=r"implementation|threads"):
             scene_first_interactions_cuda([[0, 0, 0]], [[0, 0, 1]], [1e5], [[0, 0]], [], **options)
 
 

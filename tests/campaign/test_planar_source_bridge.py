@@ -104,7 +104,7 @@ def test_projection_configuration_accepts_quantities_at_the_diagnostic_boundary(
 
 def test_projection_rejects_wrong_dimension_before_solver_work():
     spec = pr.TransverseStateSpec.recipe("gaussian", waist_ang=0.8, dimension=1)
-    with pytest.raises(ValueError, match="project_planar_source.kinetic_energy_eV.*energy.*eV"):
+    with pytest.raises(ValueError, match=r"project_planar_source\.kinetic_energy_eV.*energy.*eV"):
         _project(spec, kinetic_energy_eV=1 * ureg.mm)
 
 
@@ -177,7 +177,7 @@ def test_refusal_before_case_creation_or_propagation():
         longitudinal=pr.beams.PointBunch(),
         state=spec,
     )
-    with pytest.raises(ValueError, match="not yet.*transport"):
+    with pytest.raises(ValueError, match=r"not yet.*transport"):
         beam.to_spec()
 
 
@@ -288,9 +288,9 @@ def test_two_dimensional_source_requires_explicit_in_plane_angular_model():
 @pytest.mark.parametrize("unit", ["delta_degC", "delta_degF"])
 def test_projection_refuses_temperature_difference_as_absolute_temperature(unit):
     spec = pr.TransverseStateSpec.recipe("gaussian", waist_ang=0.8, dimension=1)
-    with pytest.raises(ValueError, match="project_planar_source.temperature_K.*difference"):
+    with pytest.raises(ValueError, match=r"project_planar_source\.temperature_K.*difference"):
         _project(spec, temperature_K=ureg.Quantity(20, unit))
-    with pytest.raises(ValueError, match="project_planar_source.temperature_K.*difference"):
+    with pytest.raises(ValueError, match=r"project_planar_source\.temperature_K.*difference"):
         project_planar_source(
             spec,
             channeling=_channeling(),

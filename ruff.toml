@@ -46,7 +46,6 @@ ignore = [
                # tuples ((n,) + a.shape) are idiomatic. Fix would break numerics.
     "RUF007",  # zip(a, a[1:]) works on arrays and in Numba; pairwise does not
     "RUF022",  # __all__ order is curated public-surface grouping, not alphabetical
-    "RUF043",  # pytest.raises(match=) patterns are intentional regexes
     "RUF046",  # explicit int() marks numerical/backend integer boundaries
     "SIM102",  # nested guards keep JIT-kernel branch structure explicit
     "SIM108",  # ternaries hide physics branches; keep explicit if/else

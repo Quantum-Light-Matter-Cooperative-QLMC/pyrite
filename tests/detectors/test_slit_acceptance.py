@@ -163,9 +163,9 @@ def test_invalid_semantic_lengths(name, value):
 
 @pytest.mark.parametrize("value", [1, "1", Q_(1, "mm"), Q_(np.inf, "degree"), Q_([1], "degree")])
 def test_invalid_roll_quantity(value):
-    with pytest.raises((TypeError, ValueError), match="SlitAcceptance.roll"):
+    with pytest.raises((TypeError, ValueError), match=r"SlitAcceptance\.roll"):
         SlitAcceptance(1, 1, 1, roll=value)
-    with pytest.raises((TypeError, ValueError), match="SlitAcceptance.roll"):
+    with pytest.raises((TypeError, ValueError), match=r"SlitAcceptance\.roll"):
         SlitAcceptance(1, 1, 1).with_roll(value)
 
 

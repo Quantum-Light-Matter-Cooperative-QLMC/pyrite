@@ -133,7 +133,7 @@ def test_electron_budget_names_raise_naming_histories(cls, argument, replacement
 
 
 def test_public_precision_is_removed_naming_adaptive_sampling():
-    with pytest.raises(ImportError, match="use pyrite.config.AdaptiveSampling"):
+    with pytest.raises(ImportError, match=r"use pyrite\.config\.AdaptiveSampling"):
         from pyrite.config import Precision  # noqa: F401
     assert "Precision" not in dir(pr.config)
 

@@ -61,7 +61,7 @@ def test_full_band_cannot_bridge_gap_even_with_supported_endpoints():
         ),
     )
     np.testing.assert_array_equal(response.epsilon([1.0, 4.0]), [1.0, 1.0])
-    with pytest.raises(ValueError, match="fused silica.*gap"):
+    with pytest.raises(ValueError, match=r"fused silica.*gap"):
         response.require_band(1.0, 4.0)
     response.require_band(1.0, 2.0)
     response.require_band(3.0, 4.0)

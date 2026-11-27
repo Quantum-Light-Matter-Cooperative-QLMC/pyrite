@@ -119,7 +119,7 @@ def test_invalid_cif_or_density_and_symlinks(tmp_path):
         _new_cif("linked", link)
     with pytest.raises(ValueError, match="density disagrees"):
         build_crystal("bad-density", crystal="silicon", density_g_cm3=10)
-    with pytest.raises(ValueError, match="stoichiometry|elements disagree"):
+    with pytest.raises(ValueError, match=r"stoichiometry|elements disagree"):
         build_crystal(
             "bad-formula",
             cif=source,
@@ -191,7 +191,7 @@ def test_cif_traversal_rejected_before_asset_write(tmp_path, _isolate_user_catal
     built = _new_cif("safe-crystal", layout.bundled_catalog().parent / "cifs" / "silicon.cif")
     outside = tmp_path / "outside.cif"
     changed = built.record_toml.replace('cif = "cifs/', f'cif = "{tmp_path}/')
-    with pytest.raises(ValueError, match="changed since build|managed content hash"):
+    with pytest.raises(ValueError, match=r"changed since build|managed content hash"):
         save_material(replace(built, record_toml=changed))
     assert not outside.exists()
     assert not list(tmp_path.glob("*.cif"))

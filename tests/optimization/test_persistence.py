@@ -115,7 +115,7 @@ def test_rejects_unsafe_resume_before_scheduling_work(tmp_path):
         (replace(s, constraints=(Constraint("fwhm", "<=", 0.5, "eV"),)), "score-v1"),
     ]
     for altered, evaluator_id in cases:
-        with pytest.raises(ValueError, match="definition mismatch|optimizer"):
+        with pytest.raises(ValueError, match=r"definition mismatch|optimizer"):
             altered.run(
                 lambda *_: pytest.fail("should not execute"),
                 _opt(altered, tmp_path),

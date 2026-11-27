@@ -78,7 +78,7 @@ def test_reduced_energy_density_is_symmetric_and_bounded():
     np.testing.assert_array_equal(pair_reduced_energy_density(outside, E, Z), 0.0)
     with pytest.raises(ValueError, match="above 2 m_e c"):
         sample_pair_reduced_energy(PAIR_THRESHOLD_EV, Z, np.random.default_rng(0))
-    with pytest.raises(ValueError, match="Z=1..99"):
+    with pytest.raises(ValueError, match=r"Z=1\.\.99"):
         pair_reduced_energy_density(0.5, E, 100)
 
 

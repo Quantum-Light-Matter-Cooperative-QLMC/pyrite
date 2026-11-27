@@ -135,7 +135,7 @@ def test_polarization_spectrum_refuses_an_unknown_quadrature():
 )
 def test_directional_observation_is_unadmitted_and_needs_the_opt_in(detector):
     detector = _planar_detector() if detector is None else detector
-    with pytest.raises(AxialAdmissionError, match="zero-aperture.*accept-inaccurate"):
+    with pytest.raises(AxialAdmissionError, match=r"zero-aperture.*accept-inaccurate"):
         _scene(detector, admission="admitted")
     case = _scene(detector)
     assert case["channeling"]["case_key"] == "unadmitted"

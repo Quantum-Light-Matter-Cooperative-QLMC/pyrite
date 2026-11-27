@@ -130,7 +130,7 @@ def test_tampered_admission_records_refuse():
 def test_channeling_refuses_opt_in_without_a_model_and_unknown_values():
     with pytest.raises(ValueError, match="requires a channeling model"):
         channeling_from_fields({"channeling_admission": "accept-inaccurate"})
-    with pytest.raises(ValueError, match="Channeling.admission must be one of"):
+    with pytest.raises(ValueError, match=r"Channeling\.admission must be one of"):
         replace(PLANAR, admission="yes")
 
 
@@ -145,7 +145,7 @@ def test_admitted_axial_record_is_unchanged_by_the_opt_in():
 
 def test_unadmitted_axial_refuses_by_default_naming_the_opt_in():
     thin = replace(axial_case(), thickness_ang=2000.0)
-    with pytest.raises(AxialAdmissionError, match="thickness_ang.*accept-inaccurate"):
+    with pytest.raises(AxialAdmissionError, match=r"thickness_ang.*accept-inaccurate"):
         resolve_channeling([thin], axial_channeling())
 
 

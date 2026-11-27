@@ -222,7 +222,7 @@ def test_audit_accumulates_and_gates_the_upper_edge():
         + min(1.0, 1.0 / (np.pi * np.pi / 100.0 * 100.0)) * 100.0
     )
     assert float(audit["mass_above"]) == pytest.approx(expected_above)
-    with pytest.raises(CxrGridToleranceError, match="above the 0.0001 bandwidth share"):
+    with pytest.raises(CxrGridToleranceError, match=r"above the 0\.0001 bandwidth share"):
         check_cxr_truncation(case, audit)
     narrow = {"start_eV": 50.0, "stop_eV": 1000.0}
     _accumulate_edge_truncation(narrow, E_r[:1], xp.asarray([np.pi / 0.01]), weight[:1])

@@ -85,9 +85,9 @@ INVALID = [
 
 @pytest.mark.parametrize("value, error", INVALID)
 def test_repetition_rate_refuses_invalid_quantities(value, error) -> None:
-    with pytest.raises(error, match="Beam.repetition_rate"):
+    with pytest.raises(error, match=r"Beam\.repetition_rate"):
         Beam(60, repetition_rate=value, **OPTIONS)
-    with pytest.raises(error, match="Beam.repetition_rate"):
+    with pytest.raises(error, match=r"Beam\.repetition_rate"):
         Beam(60, **OPTIONS).with_repetition_rate(value)
 
 
@@ -101,7 +101,7 @@ def test_repetition_rate_refuses_invalid_quantities(value, error) -> None:
     ],
 )
 def test_bunch_charge_refuses_invalid_quantities(value, error) -> None:
-    with pytest.raises(error, match="Beam.bunch_charge"):
+    with pytest.raises(error, match=r"Beam\.bunch_charge"):
         Beam(60, bunch_charge=value, **OPTIONS)
 
 

@@ -68,7 +68,7 @@ def test_host_mismatch_is_refused_with_material_and_fix(monkeypatch, changed):
     current = copy.deepcopy(expected["inventory"])
     current["hopg/default"][changed] = "different"
     monkeypatch.setattr(parity, "resolve_inventory", lambda request: current)
-    with pytest.raises(ValueError, match="hopg/default.*sync.*resubmit"):
+    with pytest.raises(ValueError, match=r"hopg/default.*sync.*resubmit"):
         parity.verify_inventory(expected)
 
 

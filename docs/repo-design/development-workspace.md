@@ -122,7 +122,8 @@ capture regeneration, and `RUF059`, because a leading underscore makes a
 Marimo name cell-private. Tests keep nested `pytest.raises`/`warns` blocks
 (`SIM117`). Inside a `raises` or `warns` block, keep exactly the statement
 expected to raise: setup inside the block can satisfy the expectation by
-accident (`PT012`). Give `pytest.warns` a `match` (`PT030`).
+accident (`PT012`). Give `pytest.warns` a `match` (`PT030`). Write `match=`
+patterns as raw strings and escape literal dots and brackets (`RUF043`).
 
 The CLI overrides configuration. `--select` re-enables ignored rules, and
 `--fixable`/`--unsafe-fixes` bypass both `extend-unfixable` and the Marimo

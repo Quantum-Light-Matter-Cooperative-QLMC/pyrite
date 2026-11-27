@@ -319,7 +319,7 @@ def _silent_worker(tmp_path, stderr="worker said this"):
 
 def test_worker_timeout_reports_stderr(tmp_path):
     worker = _silent_worker(tmp_path)
-    with worker._stderr, pytest.raises(kt._WorkerError, match="no worker reply.*worker said this"):
+    with worker._stderr, pytest.raises(kt._WorkerError, match=r"no worker reply.*worker said this"):
         worker._next()
 
 

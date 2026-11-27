@@ -373,7 +373,7 @@ def test_centroid_partition_must_fit_the_complete_evaluation_budget(bins):
         audit_full_axis_spectrum_centroid,
     )
 
-    with pytest.raises(ValueError, match="integration bins|initialization needs"):
+    with pytest.raises(ValueError, match=r"integration bins|initialization needs"):
         audit_full_axis_spectrum_centroid(
             [_row()],
             _law(),

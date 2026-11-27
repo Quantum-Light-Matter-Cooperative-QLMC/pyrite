@@ -45,7 +45,7 @@ def _case_bytes(cases) -> list[bytes]:
 
 
 def test_scene_rejects_implicit_sweep_values() -> None:
-    with pytest.raises(ValueError, match="put multiple values in Sweep.axes"):
+    with pytest.raises(ValueError, match=r"put multiple values in Sweep\.axes"):
         Scene(
             beam=BeamSpec(energy_keV=[30.0, 60.0]),
             target=Slab("hopg", footprint=Footprint(5.0, 5.0)),

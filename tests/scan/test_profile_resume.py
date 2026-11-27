@@ -28,7 +28,7 @@ def test_legacy_checkpoint_requires_identity_before_profile_resume(tmp_path, mon
         meta.write_text(json.dumps(record))
     before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
     changed = {**case, "Ne": case["Ne"] + 1}
-    with pytest.raises(ValueError, match="identity.*cannot.*verified.*--recompute.*archive"):
+    with pytest.raises(ValueError, match=r"identity.*cannot.*verified.*--recompute.*archive"):
         run_sweep(
             [changed],
             {},

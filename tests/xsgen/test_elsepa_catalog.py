@@ -172,7 +172,7 @@ def test_missing_tables_fail_with_the_fetch_command(monkeypatch):
         "pyrite.xsgen.elsepa.catalog.muffin_tin_request",
         lambda *a, **k: (type("R", (), {"key": "muffin"})(), None),
     )
-    with pytest.raises(TableNotFoundError, match="elementary solid 'silicon'.*fetch elsepa"):
+    with pytest.raises(TableNotFoundError, match=r"elementary solid 'silicon'.*fetch elsepa"):
         resolve_layer_tables(CATALOG.crystal("silicon").info.composition)
 
 

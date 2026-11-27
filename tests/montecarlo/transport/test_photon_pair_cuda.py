@@ -90,5 +90,5 @@ def test_pair_domain_fails_before_device_probe(monkeypatch):
     )
     with pytest.raises(ValueError, match="above 2"):
         sample_pairs_cuda([PAIR_THRESHOLD_EV], [[0, 0, 1]], [[0.1]], atomic_number=74)
-    with pytest.raises(ValueError, match="Z=1..99"):
+    with pytest.raises(ValueError, match=r"Z=1\.\.99"):
         sample_pairs_cuda([3e6], [[0, 0, 1]], [[0.1]], atomic_number=100)

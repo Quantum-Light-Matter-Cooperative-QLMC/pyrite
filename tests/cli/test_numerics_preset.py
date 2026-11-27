@@ -83,7 +83,7 @@ def test_unit_bearing_physics_preset_rejects_wrong_dimensions(_isolate_user_cata
         'inelastic_cutoff_eV = "2 nm"\n',
     )
 
-    with pytest.raises(MaterialConfigError, match="physics.inelastic_cutoff_eV.*energy"):
+    with pytest.raises(MaterialConfigError, match=r"physics\.inelastic_cutoff_eV.*energy"):
         load_material_catalog()
 
 

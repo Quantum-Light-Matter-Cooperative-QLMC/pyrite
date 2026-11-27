@@ -102,7 +102,7 @@ def test_detector_size_with_pixels_and_conflicts() -> None:
         PlanarDetector(POSE, pixels=pixels, size=Q_([2, 1], "mm"))
     with pytest.raises(TypeError, match="mutually exclusive"):
         PlanarDetector(POSE, (1.0, 1.0), size=Q_([1, 1], "mm"))
-    with pytest.raises(TypeError, match="PlanarDetector.size"):
+    with pytest.raises(TypeError, match=r"PlanarDetector\.size"):
         PlanarDetector(POSE, size=(1.0, 1.0))
     with pytest.raises(ValueError, match="requires size_mm or pixels"):
         PlanarDetector(POSE)

@@ -67,7 +67,7 @@ def test_catalog_rejects_unknown_crystal_texture(tmp_path, texture):
     from pyrite.materials import MaterialConfigError, load_material_catalog
 
     text = _minimal_catalog().replace("layers_per_cell = 2", f"texture = {texture}")
-    with pytest.raises(MaterialConfigError, match="crystals.mos2.texture"):
+    with pytest.raises(MaterialConfigError, match=r"crystals\.mos2\.texture"):
         load_material_catalog(_write_catalog(tmp_path, text))
 
 
@@ -321,7 +321,7 @@ def test_profile_artifact_ref_rejects_beam_energy_the_artifact_never_covered(tmp
         "energy_keV = { values = [25.0, 30.0, 40.0] }",
     )
 
-    with pytest.raises(MaterialConfigError, match="do not include .40.0."):
+    with pytest.raises(MaterialConfigError, match=r"do not include \[40\.0\]"):
         load_material_catalog(_write_catalog(tmp_path, text))
 
 
@@ -369,7 +369,7 @@ def test_profile_artifact_ref_rejects_missing_or_wrong_material(tmp_path):
     from pyrite.materials import MaterialConfigError, load_material_catalog
 
     missing = "a" * 64
-    with pytest.raises(MaterialConfigError, match="artifact .* is missing"):
+    with pytest.raises(MaterialConfigError, match=r"artifact .* is missing"):
         load_material_catalog(_write_catalog(tmp_path, _catalog_with_artifact_ref(missing)))
 
     identity = artifacts.artifact_identity(
@@ -630,7 +630,7 @@ def test_profile_convergence_numerics_are_validated_and_exposed(tmp_path):
     }
 
     path.write_text(text.replace("n_families = 3", "n_families = 0"))
-    with pytest.raises(MaterialConfigError, match="profiles.narrowed.n_families"):
+    with pytest.raises(MaterialConfigError, match=r"profiles\.narrowed\.n_families"):
         load_material_catalog(path)
 
 
@@ -1954,7 +1954,7 @@ def test_grid_descriptor_types_are_strict_and_errors_are_wrapped(tmp_path, valid
     from pyrite.materials import MaterialConfigError, load_material_catalog
 
     text = _minimal_catalog().replace(valid, invalid)
-    with pytest.raises(MaterialConfigError, match="profiles.standard"):
+    with pytest.raises(MaterialConfigError, match=r"profiles\.standard"):
         load_material_catalog(_write_catalog(tmp_path, text))
 
 
@@ -2209,7 +2209,7 @@ display_name = "FrF"
     (tmp_path / "cifs").mkdir()
     fixture = Path(__file__).parents[1] / "data" / "materials" / "frf.cif"
     (tmp_path / "cifs" / "frf.cif").write_bytes(fixture.read_bytes())
-    with pytest.raises(MaterialConfigError, match="unsupported transport elements.*Fr"):
+    with pytest.raises(MaterialConfigError, match=r"unsupported transport elements.*Fr"):
         load_material_catalog(_write_catalog(tmp_path, text))
 
 
