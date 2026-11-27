@@ -163,6 +163,36 @@ differently per kernel call (#1492), not from the fiber route. Integrated
 yield converges by 8 rolls, but at 2 eV bins the line shape is still
 moving between 32 and 128 rolls. Cutoff convergence remains open (#1484).
 
+### Streamed scoring cost (#1490, 2026-11-27, qlmc-ace FP64 CPU)
+
+The `stream` arm of `checks/fiber_nonbasal_cxr_1480.py` scores the #1483
+scene (HOPG 30 keV, 500 nm, tilt 15°, 45° observation, 2 eV bins to
+6000 eV, 32 rolls, batch 256) with 2000 electrons (18 188 segments) on the
+retained route and on the live streamed route, one process per arm, on the
+default host Fourier bin-mean reduction. Code `f7a3f8116`, jobs 16223–16227;
+raw: `~/dev/pyrite-benches/1490-fiber-streamed/`.
+
+| Arm | Cutoff (reflections) | Blocks | Score wall | Per block mean / max | Peak RSS |
+|---|---|---|---|---|---|
+| Retained | 6 (108) | — | 48 s (+7 s transport) | — | 1.44 GiB |
+| Streamed, 250 e⁻ | 6 | 8 | 86 s total | 10.7 / 11.8 s | 1.62 GiB |
+| Streamed, 50 e⁻ | 6 | 40 | 188 s total | 4.7 / 6.9 s | 1.56 GiB |
+| Retained | 8 (242) | — | 86 s | — | 1.73 GiB |
+| Streamed, 250 e⁻ | 8 | 8 | 155 s total | 19.3 / 22.7 s | 1.76 GiB |
+
+Streamed minus retained, relative to each spectrum's peak: lines 4–5e-12
+(Fourier residual, inside its bound), characteristic 2.6e-15, continuum
+1.2e-14; `brem_lattice_share` identical in every arm.
+
+At this population peak memory is set by the fiber domain and its coupling
+tables (≈1.0–1.1 GiB after the first block), not by segments, so streaming does
+not lower it. Each block carries a fixed cost of about 3 s at cutoff 6
+(40 vs 8 blocks): `fiber_lines` scores every roll and batch with
+`table_cache=None`, so each block rebuilds the tables, as the retained route
+does once. Streaming pays off only when the segments, not the tables,
+dominate memory; use the largest block the device admits. Caching tables
+across blocks is the open lever.
+
 Streamed scoring landed in #1490. Remaining phase II work: joint roll/reciprocal adaptive convergence with a
 reported unresolved status, symmetry-reduced quadrature with verified weights,
 CLI flags (#1491), and independent physical
