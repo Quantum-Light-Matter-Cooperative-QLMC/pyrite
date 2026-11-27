@@ -1,0 +1,45 @@
+# Central lint and formatting policy. Marimo directories extend this file.
+line-length = 100
+# Match project.requires-python; explicit config use must not fall back to Ruff defaults.
+target-version = "py313"
+unsafe-fixes = false
+
+# keep this tight; avoid duplicate exclusion logic
+exclude = [
+    ".pixi",
+    ".venv",
+    "__pycache__",
+    ".ruff_cache",
+    ".pytest_cache",
+    "docs/_build",
+    "docs/_autosummary",
+]
+
+[lint]
+# core useful rules without the “style noise overload”
+select = [
+    "E",  # pycodestyle errors
+    "F",  # pyflakes
+    "I",  # import sorting
+    "UP", # pyupgrade (keeps Python 3.13+ modern)
+    "B",  # bugbear (real bugs, not stylistic nitpicks)
+]
+
+ignore = [
+    "E501", # long lines in physics formulas/comments
+    "E402", # import-not-at-top — notebook cells have docstrings before imports
+    "B008", # np.deg2rad() in default args — pure math call, not a real bug
+]
+
+[lint.per-file-ignores]
+"*.ipynb" = [
+    "F821",
+] # cross-cell references are always undefined to static analysis
+# marimo apps display a cell's value as its bare last
+# expression (e.g. a UI element on its own line) -- that's the framework's render
+# mechanism, not a useless statement.
+"src/pyrite/apps/*_app.py" = ["B018"]
+
+[format]
+quote-style = "double"
+indent-style = "space"

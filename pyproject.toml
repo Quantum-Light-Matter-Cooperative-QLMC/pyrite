@@ -566,49 +566,6 @@ source_modules = ["pyrite.devtools"]
 forbidden_modules = ["pyrite._dev"]
 allow_indirect_imports = true
 
-[tool.ruff]
-line-length = 100
-
-# keep this tight; avoid duplicate exclusion logic
-exclude = [
-    ".pixi",
-    ".venv",
-    "__pycache__",
-    ".ruff_cache",
-    ".pytest_cache",
-    "docs/_build",
-    "docs/_autosummary",
-]
-
-[tool.ruff.lint]
-# core useful rules without the “style noise overload”
-select = [
-    "E",  # pycodestyle errors
-    "F",  # pyflakes
-    "I",  # import sorting
-    "UP", # pyupgrade (keeps Python 3.12/3.13 modern)
-    "B",  # bugbear (real bugs, not stylistic nitpicks)
-]
-
-ignore = [
-    "E501", # long lines in physics formulas/comments
-    "E402", # import-not-at-top — notebook cells have docstrings before imports
-    "B008", # np.deg2rad() in default args — pure math call, not a real bug
-]
-
-[tool.ruff.lint.per-file-ignores]
-"*.ipynb" = [
-    "F821",
-] # cross-cell references are always undefined to static analysis
-# marimo apps display a cell's value as its bare last
-# expression (e.g. a UI element on its own line) -- that's the framework's render
-# mechanism, not a useless statement.
-"src/pyrite/apps/*_app.py" = ["B018"]
-
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-
 [tool.pixi.workspace]
 # Contributor, CI and lab environments (#1462). Users still install the PyPI
 # package (`pip install pyrite-mc`); pixi only manages development checkouts.
@@ -731,6 +688,15 @@ package-smoke = { cmd = "pyrite-dev package-smoke", description = "Build and smo
 
 [tool.pixi.feature.lint.tasks]
 lint = { cmd = "python -m ruff check .", description = "Check lint rules" }
+# These commands omit a default path so a forwarded file/directory scopes the run.
+# Nested Ruff configs protect Marimo sources even when users run Ruff directly.
+lint-fix = { cmd = "python -m ruff check --fix --no-unsafe-fixes", description = "Apply safe lint fixes outside Marimo directories" }
+lint-diff = { cmd = "python -m ruff check --diff --no-unsafe-fixes", description = "Preview safe lint fixes" }
+lint-stats = { cmd = "python -m ruff check --statistics", description = "Summarize lint violations" }
+lint-watch = { cmd = "python -m ruff check --watch", description = "Watch for lint violations" }
+sort-imports = { cmd = "python -m ruff check --select I --fix --no-unsafe-fixes", description = "Sort imports outside Marimo directories" }
+# Full-tree repair is explicit. Format even if non-fixable findings remain, then check.
+fix = { cmd = "python -m ruff check --fix-only --no-unsafe-fixes . && python -m ruff format . && python -m ruff check .", description = "Repair and format the repository, then report remaining lint" }
 fmt = { cmd = "python -m ruff format .", description = "Format source files" }
 fmt-check = { cmd = "python -m ruff format --check .", description = "Check formatting without editing" }
 typecheck = { cmd = "python -m ty check --exit-zero-on-warning", description = "Check Python types" }
@@ -738,6 +704,7 @@ imports = { cmd = "lint-imports --no-cache", description = "Check import boundar
 precommit = { cmd = "python -m pre_commit run --all-files", description = "Run pre-commit hooks" }
 nbqa = { cmd = "pyrite-dev nbqa", description = "Lint maintained notebooks" }
 nbstrip = { cmd = "pyrite-dev nbstrip", description = "Strip maintained notebook outputs" }
+doctor = { cmd = "pyrite-dev doctor", description = "Check workspace dependency policy" }
 check-lines = { cmd = "pyrite-dev check-lines", description = "Check source-module line budgets" }
 check-complexity = { cmd = "pyrite-dev complexity --check", description = "Check the complexity ratchet" }
 check-api = { cmd = "pyrite-dev api check", description = "Check the governed API inventory" }

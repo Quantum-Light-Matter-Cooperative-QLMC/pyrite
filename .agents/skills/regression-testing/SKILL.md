@@ -26,10 +26,10 @@ regression.
    explicit audit/release request; `verify` does not run tests.
 
 Report original symptom, pre-fix failure, seed/tolerance rationale, and focused
-command:
+command (full contributor environment unless optional requirements are known):
 
 ```bash
-pixi run pyrite-dev test \
+pixi run --locked test \
   tests/path/to/test.py -k test_name
 ```
 

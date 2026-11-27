@@ -36,12 +36,19 @@ prose keep required format.
 ## Canonical commands
 
 Use project runner; never bare `pytest`, `.venv/bin/python`, or path-hack imports.
-The equivalent Pixi task entry points are discoverable with `pixi task list`.
+Discover task entry points with `pixi task list -e <environment>`.
 Prefer `pixi run --locked verify-quick` for focused static gates (no docs or
 pytest), `pixi run --locked verify` for the full non-test gate, and
 `pixi run --locked test PATH` or `pixi run --locked test-suite SUITE` for tests.
 Existing `pyrite-dev` commands below remain supported; task wrappers preserve
 argument forwarding, suite ownership, and adaptive worker policy.
+`quality`, `test-physics`, and `packaging` are focused opt-in environments;
+use `default`/`py314` for full test coverage, not lean `runtime-*` environments.
+After manifest edits run `pixi lock` and `pixi run --locked doctor --lock`.
+If the lock blocks activation, `python3 src/pyrite/devtools/workspace_doctor.py --lock`
+is a stdlib-only diagnostic exception to the normal interpreter rule. Do not
+bypass a stale lock with `--frozen`. CI matrices come from
+`src/pyrite/devtools/suite_inventory.py`, not duplicate YAML suite lists.
 
 ```bash
 pixi run pyrite-dev test path/to/test.py -k test_name
@@ -182,8 +189,14 @@ Do not add separate tutorial provenance manifests or HTML/session exports.
   `systemd-run --user --scope -p MemoryMax=8G -p MemorySwapMax=0 ...`.
   After a squash/rebase with no content change, rerun only focused tests;
   leave domain suites to CI.
-- Format only changed paths (`pixi run ruff format <paths>`); CI formats PRs.
-  Repo-wide `pyrite-dev format` only when asked.
+- Format only changed paths (`pixi run --locked ruff format <paths>`); CI formats PRs.
+  Preview or fix ordinary Python with `pixi run --locked lint-diff <paths>` or
+  `pixi run --locked lint-fix <paths>`. Repo-wide `fix`/`fmt` only when asked.
+  Never override the nested Ruff configs in `src/pyrite/apps`, `docs/notebooks`,
+  `docs/examples`, or `docs/demo`: lint fixes are disabled there because cell
+  returns and final expressions are Marimo graph wiring. Review findings by
+  hand and run `pixi run --locked marimo check <app.py>` after edits. New Marimo
+  sources must live in a protected directory. Never enable unsafe fixes globally.
 - Kill processes by PID (`pgrep -a`, then `kill <pid>`); never `pkill`/`killall`
   patterns, which can match the agent's own shell. Never `git add .`/`-A`.
   `.agents/hooks/guard_bash.sh` blocks these and non-lease force pushes.

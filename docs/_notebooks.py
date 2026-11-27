@@ -386,7 +386,7 @@ def format_capture(path):
             "format",
             "--quiet",
             "--config",
-            str(DOCS.parent / "pyproject.toml"),
+            str(DOCS.parent / "ruff.toml"),
             str(path),
         ],
         check=True,

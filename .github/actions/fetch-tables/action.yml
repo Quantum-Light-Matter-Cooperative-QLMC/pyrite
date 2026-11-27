@@ -1,0 +1,22 @@
+name: Fetch pinned physics data
+description: Restore the reference table cache and verify all pinned data.
+inputs:
+  environment:
+    description: Previously installed Pixi environment
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Cache pinned physics tables
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.local/share/pyrite/datasets
+          ~/.local/share/pyrite/xsgen/tables
+          ~/.local/share/pyrite/xsgen/reference-data
+        key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
+    - name: Verify or fetch pinned data
+      shell: bash
+      env:
+        PYRITE_CI_ENV: ${{ inputs.environment }}
+      run: pixi run --locked -e "$PYRITE_CI_ENV" pyrite tables fetch

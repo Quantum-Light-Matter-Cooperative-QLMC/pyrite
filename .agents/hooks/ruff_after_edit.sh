@@ -5,8 +5,9 @@
 # whole-repo churn of `pyrite-dev format`.
 #
 # F401/F841 stay unfixable: AGENTS.md adds imports with first use, so an
-# import written one edit before its use must not be deleted. Remaining
-# findings return to the agent as additionalContext; the hook never blocks.
+# import written one edit before its use must not be deleted. Marimo's nested
+# config also sets fixable=[] so this CLI override cannot enable lint fixes.
+# Findings return to the agent as additionalContext; the hook never blocks.
 # Fail open: missing tools, files outside the project, and Ruff-excluded
 # paths (--force-exclude) are skipped.
 set -uo pipefail
@@ -25,10 +26,10 @@ case "$file" in
 esac
 cd "$root" || exit 0
 
-ruff=(timeout 30 pixi run --quiet --as-is ruff)
-"${ruff[@]}" format --quiet --force-exclude -- "$file" >/dev/null 2>&1 || exit 0
-findings=$("${ruff[@]}" check --fix --unfixable F401,F841 --force-exclude \
+ruff=(timeout 30 pixi run --quiet --locked --no-install -e default ruff)
+findings=$("${ruff[@]}" check --fix --no-unsafe-fixes --unfixable F401,F841 --force-exclude \
     --output-format concise --quiet -- "$file" 2>/dev/null)
+"${ruff[@]}" format --quiet --force-exclude -- "$file" >/dev/null 2>&1 || exit 0
 [ -n "$findings" ] || exit 0
 
 jq -n --arg ctx "Ruff findings after editing ${file#"$root"/}:

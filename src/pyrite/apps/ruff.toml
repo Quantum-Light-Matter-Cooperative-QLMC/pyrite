@@ -1,0 +1,12 @@
+# Marimo cell returns and final expressions are part of its reactive graph.
+# Keep diagnostics and formatting, but never apply semantic lint fixes here.
+extend = "../../../ruff.toml"
+# Preserve the root workspace's first-party import classification.
+src = ["../../..", "../../../src"]
+
+[lint]
+fixable = []
+unfixable = ["ALL"]
+
+[lint.extend-per-file-ignores]
+"*_app.py" = ["B018"]

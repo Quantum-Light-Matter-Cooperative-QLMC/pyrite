@@ -326,23 +326,31 @@ def test_domain_suites_partition_every_test_module_once(dev_module) -> None:
 def test_ci_runs_every_primary_suite_once(dev_module) -> None:
     import yaml
 
+    from pyrite.devtools.suite_inventory import ci_matrices
+
     workflow = yaml.safe_load((dev_module.ROOT / ".github/workflows/ci.yml").read_text())
-    matrix = workflow["jobs"]["focused"]["strategy"]["matrix"]
+    matrices = ci_matrices()
+    matrix = matrices["focused"]
 
     assert set(matrix["suite"]) == set(dev_module.PRIMARY_TEST_SUITE_NAMES) - {"quantum"}
     assert len(matrix["suite"]) == len(set(matrix["suite"]))
-    # Python 3.13 and 3.14 are the `default` and `py314` pixi environments.
     assert matrix["environment"] == ["default", "py314"]
-    quantum = workflow["jobs"]["quantum"]["strategy"]["matrix"]
-    assert quantum["environment"] == matrix["environment"]
+    assert matrices["quantum"]["environment"] == matrix["environment"]
+    for job in ("focused", "quantum"):
+        assert workflow["jobs"][job]["strategy"]["matrix"] == (
+            "${{ fromJSON(needs.changes.outputs." + job + "_matrix) }}"
+        )
 
 
 def test_numba_online_shards_run_every_primary_suite_once(dev_module) -> None:
     import yaml
 
+    from pyrite.devtools.suite_inventory import ci_matrices
+
     workflow = yaml.safe_load((dev_module.ROOT / ".github/workflows/ci.yml").read_text())
     job = workflow["jobs"]["numba-online"]
-    suites = [s for row in job["strategy"]["matrix"]["include"] for s in row["suites"].split()]
+    assert job["strategy"]["matrix"] == "${{ fromJSON(needs.changes.outputs.online_matrix) }}"
+    suites = [s for row in ci_matrices()["online"]["include"] for s in row["suites"].split()]
 
     assert sorted(suites) == sorted(dev_module.PRIMARY_TEST_SUITE_NAMES)
     assert job["env"]["NUMBA_DISABLE_JIT"] == "1"

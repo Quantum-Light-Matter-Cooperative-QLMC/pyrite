@@ -56,6 +56,6 @@ if timeout 240 pixi install --locked -e default "${extra_args[@]}" \
 else
     rc=$?
     echo "pyrite: session dependency sync skipped (exit $rc); see $log." \
-        "Run \`pixi install -e default ${extra_args[*]}\` manually if imports fail."
+        "Check the lock with \`python3 src/pyrite/devtools/workspace_doctor.py --lock\`, then retry the locked install."
 fi
 exit 0

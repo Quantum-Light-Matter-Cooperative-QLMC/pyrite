@@ -5,6 +5,7 @@ from pathlib import Path, PurePosixPath
 
 from pyrite.devtools import repo_root
 from pyrite.devtools.errors import AgentToolingError
+from pyrite.devtools.suite_inventory import PRIMARY_TEST_SUITE_NAMES as PRIMARY_TEST_SUITE_NAMES
 
 ROOT = repo_root()
 
@@ -92,24 +93,6 @@ INTEGRATION_TESTS = (
     "results/test_exports.py",
     "scan/test_run.py",
     "scan/test_sweep.py",
-)
-PRIMARY_TEST_SUITE_NAMES = (
-    "core",
-    "packaging",
-    "apps",
-    "cli",
-    "quantum",
-    "channeling",
-    "spectrum-coherent",
-    "spectrum-brem",
-    "spectrum",
-    "transport-cascades",
-    "transport-collisions",
-    "transport-runner",
-    "transport",
-    "energy-grid",
-    "materials",
-    "xsgen",
 )
 # Modules holding ``identity_pin`` tests (#1316); the ``identity-pins`` suite runs
 # only those tests (``-m identity_pin``). ``--update-pins`` re-mints every pin.

@@ -24,11 +24,21 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: read
     outputs:
       quantum: ${{ steps.filter.outputs.quantum || 'false' }}
       python_next: ${{ steps.filter.outputs.python_next || 'false' }}
+      focused_matrix: ${{ steps.matrix.outputs.focused }}
+      quantum_matrix: ${{ steps.matrix.outputs.quantum }}
+      online_matrix: ${{ steps.matrix.outputs.online }}
     steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Generate matrices from suite inventory
+        id: matrix
+        run: python3 src/pyrite/devtools/suite_inventory.py
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         if: github.event_name == 'pull_request'
         id: filter
@@ -74,13 +84,9 @@ jobs:
           # Format the source commit, not GitHub's synthetic merge commit.
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
+      - uses: ./.github/actions/setup-pyrite
         with:
-          pixi-version: v0.85.0
-          environments: py314
-          locked: true
-          cache: true
-          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+          environment: py314
 
       - name: Format code
         run: pixi run --locked -e py314 fmt
@@ -120,36 +126,14 @@ jobs:
     needs: changes
     strategy:
       fail-fast: false
-      matrix:
-        suite:
-          - core
-          - transport
-          - transport-collisions
-          - transport-cascades
-          - transport-runner
-          - spectrum
-          - spectrum-coherent
-          - spectrum-brem
-          - channeling
-          - energy-grid
-          - materials
-          - xsgen
-          - cli
-          - apps
-          - packaging
-        # Python 3.13 is the `default` pixi environment, 3.14 is `py314`.
-        environment: [default, py314]
+      matrix: ${{ fromJSON(needs.changes.outputs.focused_matrix) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
+      - uses: ./.github/actions/setup-pyrite
         with:
-          pixi-version: v0.85.0
-          environments: ${{ matrix.environment }}
-          locked: true
-          cache: true
-          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+          environment: ${{ matrix.environment }}
 
       # Every hash-pinned fetched dataset and table release (ADR-0014): EEDL,
       # EADL, EPDL, SBETHE sdbase/ and catalogue tables, ELSEPA, BremsLib, and
@@ -158,17 +142,9 @@ jobs:
       # cache hit needs no network. `fetch` re-verifies a cached copy and
       # exits 0. PyRITE's own archives are public release assets and can be
       # fetched without a token.
-      - name: Cache pinned data
-        uses: actions/cache@v4
+      - uses: ./.github/actions/fetch-tables
         with:
-          path: |
-            ~/.local/share/pyrite/datasets
-            ~/.local/share/pyrite/xsgen/tables
-            ~/.local/share/pyrite/xsgen/reference-data
-          key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
-
-      - name: Fetch pinned data
-        run: pixi run --locked -e ${{ matrix.environment }} fetch-tables
+          environment: ${{ matrix.environment }}
 
       - name: Test ${{ matrix.suite }} suite
         # Every PR runs the opt-in slow tier too (#381).
@@ -183,32 +159,18 @@ jobs:
       needs.changes.outputs.quantum == 'true'
     strategy:
       fail-fast: false
-      matrix:
-        # Python 3.13 is the `default` pixi environment, 3.14 is `py314`.
-        environment: [default, py314]
+      matrix: ${{ fromJSON(needs.changes.outputs.quantum_matrix) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
+      - uses: ./.github/actions/setup-pyrite
         with:
-          pixi-version: v0.85.0
-          environments: ${{ matrix.environment }}
-          locked: true
-          cache: true
-          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+          environment: ${{ matrix.environment }}
 
-      - name: Cache pinned data
-        uses: actions/cache@v4
+      - uses: ./.github/actions/fetch-tables
         with:
-          path: |
-            ~/.local/share/pyrite/datasets
-            ~/.local/share/pyrite/xsgen/tables
-            ~/.local/share/pyrite/xsgen/reference-data
-          key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
-
-      - name: Fetch pinned data
-        run: pixi run --locked -e ${{ matrix.environment }} fetch-tables
+          environment: ${{ matrix.environment }}
 
       - name: Test quantum suite
         env:
@@ -233,25 +195,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
+      - uses: ./.github/actions/setup-pyrite
         with:
-          pixi-version: v0.85.0
-          environments: py315
-          locked: true
-          cache: true
-          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+          environment: py315
 
-      - name: Cache pinned data
-        uses: actions/cache@v4
+      - uses: ./.github/actions/fetch-tables
         with:
-          path: |
-            ~/.local/share/pyrite/datasets
-            ~/.local/share/pyrite/xsgen/tables
-            ~/.local/share/pyrite/xsgen/reference-data
-          key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
-
-      - name: Fetch pinned data
-        run: pixi run --locked -e py315 pyrite tables fetch
+          environment: py315
 
       - name: Interpreter and GIL state
         run: >-
@@ -287,14 +237,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
+      - uses: ./.github/actions/setup-pyrite
         with:
-          pixi-version: v0.85.0
-          environments: py314
-          locked: true
-          cache: true
-          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+          environment: py314
 
+      - name: Diagnose workspace policy
+        run: pixi run --locked -e py314 doctor
       # Includes a non-mutating format check for fork PRs too.
       - name: Verify non-test gates
         run: pixi run --locked -e py314 verify
@@ -309,27 +257,17 @@ jobs:
       PYRITE_MC_BACKEND: cpu
     steps:
       - uses: actions/checkout@v7
-      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
+      - uses: ./.github/actions/setup-pyrite
         with:
-          pixi-version: v0.85.0
-          environments: runtime-cpu
-          locked: true
-          cache: true
-          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+          environment: runtime-cpu
       - name: Verify developer packages are absent
         run: >-
           pixi run --locked -e runtime-cpu python -c
           "from importlib.util import find_spec;
           assert all(find_spec(name) is None for name in ('pytest', 'sphinx', 'marimo', 'selenium', 'ruff'))"
-      - name: Cache pinned data
-        uses: actions/cache@v4
+      - uses: ./.github/actions/fetch-tables
         with:
-          path: |
-            ~/.local/share/pyrite/datasets
-            ~/.local/share/pyrite/xsgen/tables
-            ~/.local/share/pyrite/xsgen/reference-data
-          key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
-      - run: pixi run --locked -e runtime-cpu fetch-tables
+          environment: runtime-cpu
       - name: Run the bundled quickstart without developer dependencies
         run: pixi run --locked -e runtime-cpu quickstart
 
@@ -342,25 +280,11 @@ jobs:
   # Transport and runner each own a budget. Core runs independently of data
   # suites so a slow core cannot starve them (#1367, main run 44928520114).
   numba-online:
+    needs: changes
     if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - shard: collisions
-            suites: transport-collisions
-          - shard: transport
-            suites: transport
-          - shard: runner
-            suites: transport-runner
-          - shard: spectrum
-            suites: >-
-              transport-cascades spectrum
-              spectrum-coherent spectrum-brem channeling quantum
-          - shard: core
-            suites: core
-          - shard: data
-            suites: packaging apps cli energy-grid materials xsgen
+      matrix: ${{ fromJSON(needs.changes.outputs.online_matrix) }}
     runs-on: ubuntu-latest
     # Main pushes fit 60 min (#1367, run 44952391262: slowest shard 43 min).
     # The slow tier's transport shard holds ~95 test-minutes on two workers
@@ -375,22 +299,12 @@ jobs:
       SLOW: ${{ (github.event_name == 'schedule' || inputs.slow) && '--slow' || '' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
+      - uses: ./.github/actions/setup-pyrite
         with:
-          pixi-version: v0.85.0
-          environments: py314
-          locked: true
-          cache: true
-          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
-      - name: Cache pinned physics tables
-        uses: actions/cache@v4
+          environment: py314
+      - uses: ./.github/actions/fetch-tables
         with:
-          path: |
-            ~/.local/share/pyrite/datasets
-            ~/.local/share/pyrite/xsgen/tables
-            ~/.local/share/pyrite/xsgen/reference-data
-          key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
-      - run: pixi run --locked -e py314 pyrite tables fetch
+          environment: py314
       - name: Suites with JIT disabled and online checks enabled
         shell: bash
         run: |
@@ -424,22 +338,12 @@ jobs:
       PYRITE_MC_BACKEND: cpu
     steps:
       - uses: actions/checkout@v7
-      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
+      - uses: ./.github/actions/setup-pyrite
         with:
-          pixi-version: v0.85.0
-          environments: svml
-          locked: true
-          cache: true
-          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
-      - name: Cache pinned physics tables
-        uses: actions/cache@v4
+          environment: svml
+      - uses: ./.github/actions/fetch-tables
         with:
-          path: |
-            ~/.local/share/pyrite/datasets
-            ~/.local/share/pyrite/xsgen/tables
-            ~/.local/share/pyrite/xsgen/reference-data
-          key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
-      - run: pixi run --locked -e svml pyrite tables fetch
+          environment: svml
       - name: Require operational SVML
         run: |
           pixi run --locked -e svml numba -s | tee numba-sysinfo.txt
@@ -470,22 +374,12 @@ jobs:
       PYRITE_SLOW_TESTS: "1"
     steps:
       - uses: actions/checkout@v7
-      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
+      - uses: ./.github/actions/setup-pyrite
         with:
-          pixi-version: v0.85.0
-          environments: default
-          locked: true
-          cache: true
-          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
-      - name: Cache pinned physics tables
-        uses: actions/cache@v4
+          environment: default
+      - uses: ./.github/actions/fetch-tables
         with:
-          path: |
-            ~/.local/share/pyrite/datasets
-            ~/.local/share/pyrite/xsgen/tables
-            ~/.local/share/pyrite/xsgen/reference-data
-          key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
-      - run: pixi run --locked pyrite tables fetch
+          environment: default
       - name: Statistical-equivalence subset in fast mode
         run: >
           pixi run --locked pyrite-dev test

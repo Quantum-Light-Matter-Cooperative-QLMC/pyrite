@@ -44,6 +44,47 @@ The separate CI skill-mirror and repository-map checks are available as
 explicit writes (`fmt`, `cli-reference-write`, `validation-ledger-write`,
 `repo-map-write`, `sync-skills`); they are not verification dependencies.
 
+### Ruff workflow
+
+The repository's lint and formatting policy lives in `ruff.toml`, with the
+same enabled rules as before and an explicit Python 3.13 target. Use the
+Pixi-locked executable for custom commands or the convenience tasks:
+
+```bash
+pixi run --locked lint-diff src/pyrite/remote
+pixi run --locked lint-fix src/pyrite/remote
+pixi run --locked lint-stats
+pixi run --locked lint-watch
+pixi run --locked sort-imports src/pyrite/remote
+pixi run --locked ruff format src/pyrite/remote
+pixi run --locked fix
+```
+
+`fix` is intentionally repository-wide: apply safe fixes, format, then check
+remaining violations. Use it only when a full-tree edit is wanted. The other
+new lint tasks accept paths (no path means the workspace root). `lint-diff`
+shows available fixes, not all diagnostics; `lint` still checks all enabled
+rules. Verification is unchanged and non-mutating with respect to source.
+
+Marimo sources in `src/pyrite/apps/`, `docs/notebooks/`, `docs/examples/`, and
+`docs/demo/` inherit the root rules but disable every automatic lint fix.
+Cell returns and final expressions encode the reactive dependency graph;
+Ruff's safe-fix classification does not understand that contract. These
+conservative directory-level protections also cover ordinary helper modules
+and captures there. Diagnostics and whitespace formatting remain enabled.
+Do not pass an overriding `--config`, `--fixable`, or `--unfixable` to force
+fixes in these directories, and disable fix-on-save/import organization for
+Marimo in editors that override project settings. Add new Marimo notebooks in
+one of these directories and run `marimo check` after reviewing edits.
+
+Rule-family audits are opt-in and report-only, e.g. `pixi run --locked ruff
+check --extend-select SIM,PERF,RUF,NPY --statistics src/pyrite`. Consider
+correctness-oriented `RUF`, `NPY`, `FURB`, and selected `SIM`/`PERF` rules
+first; review changes in JIT kernels and array semantics independently.
+`TC`, `ARG`, `PLR`, and `TRY` can be noisy for scientific APIs and generated
+cell signatures. Do not enable whole rule families or unsafe fixes globally
+without an audited, separate policy change.
+
 Task definitions are scoped to their dependency features. For example,
 `test` and `test-suite` require the test feature, while `lint` and `verify`
 require lint; lean runtimes expose simulation tasks but not developer gates.
@@ -67,12 +108,34 @@ These are opt-in. The full contributor environments remain the reference
 for CI and whole-suite coverage, since some tests require app/plot, notebook,
 Sphinx or static-analysis dependencies. The package smoke installs the wheel
 and editable project in fresh pip venvs, including app extras in those venvs.
-Run `pixi lock` after adding these environments and commit the lockfile.
+Run `pixi lock` after dependency edits, check the lock, and commit it.
 
 Test ownership now lives in `pyrite.devtools.test_suites`; worker sizing and
 BLAS thread caps live in `pyrite.devtools.test_resources`. `dev_cli` retains
-its command dispatch and compatibility imports. Suite memberships, argument
-forwarding and worker selection are unchanged.
+its command dispatch and compatibility imports. CI generates its matrices from
+`src/pyrite/devtools/suite_inventory.py` before installing Pixi environments.
+It keeps the existing interpreter matrix, conditional quantum job and measured
+JIT-disabled shard groups. New unassigned primary suites join the data shard.
+The local composite actions under `.github/actions/` own locked setup and
+pinned-data cache provisioning.
+
+## Workspace diagnostics
+
+Run `pixi run --locked doctor` for manifest policy checks. To diagnose a lock
+that prevents activation, run the standalone stdlib tool using an available
+Python 3.13+ interpreter, without relying on an active Pixi environment:
+
+```bash
+python3 src/pyrite/devtools/workspace_doctor.py --lock
+```
+
+The lock probe invokes Pixi with `--locked --no-install` and identifies
+cross-platform Conda/PyPI ownership errors. Do not bypass them with `--frozen`.
+Declare shared dependencies in the base feature only when all runtimes need
+them (e.g. `packaging`); declare narrower dependencies in their owning feature
+(e.g. `matplotlib-base` in `oracle`, `docs`, and `notebooks`). Keep solve groups
+and compare their locked builds. The static doctor checks these known policy
+rules; Pixi remains the authority for arbitrary transitive dependency conflicts.
 
 ## Pixi workspace
 
@@ -249,15 +312,17 @@ pyrite-dev package-smoke
 
 Agent and git hooks:
 
-- `pixi run pre-commit install` installs both configured stages: commit-time Ruff,
-  notebook stripping and skill-mirror sync, and pre-push import-linter,
-  `check-skills` and `repo-map --check`. `pyrite-dev verify` stays the full
+- `pixi run --locked pre-commit install` installs both configured stages:
+  commit-time Pixi-managed Ruff (including native Jupyter linting) and
+  skill-mirror sync, and pre-push import-linter, `check-skills` and
+  `repo-map --check`. The separate nbQA hook environment is no longer needed;
+  the explicit legacy `nbqa` task remains. `pyrite-dev verify` stays the full
   repository gate, including tutorial capture validation and rendering.
 - `.agents/hooks/guard_bash.sh` (Claude Code and Codex `PreToolUse`) blocks
   pattern kills, bulk `git add`, non-lease force pushes, and pushes to `main`.
-- `.agents/hooks/ruff_after_edit.sh` (Claude Code `PostToolUse`) formats each
-  edited Python file and applies safe Ruff fixes, leaving unused-import
-  findings for the agent.
+- `.agents/hooks/ruff_after_edit.sh` (Claude Code `PostToolUse`) checks each
+  edited Python file, applies safe fixes only outside Marimo directories,
+  and formats afterward. Unused-import/variable findings remain for the agent.
 - `.claude/settings.json` pins Claude Code's tool shell to bash
   (`CLAUDE_CODE_SHELL`); zsh does not word-split unquoted variables.
 

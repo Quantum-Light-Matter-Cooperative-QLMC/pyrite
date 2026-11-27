@@ -25,23 +25,53 @@ from pyrite.devtools import repo_root
 from pyrite.devtools.errors import AgentToolingError as AgentToolingError
 from pyrite.devtools.test_resources import (
     BLAS_THREAD_VARS as BLAS_THREAD_VARS,
+)
+from pyrite.devtools.test_resources import (
     MAX_TEST_WORKERS as MAX_TEST_WORKERS,
+)
+from pyrite.devtools.test_resources import (
     TEST_WORKER_MEMORY_BYTES as TEST_WORKER_MEMORY_BYTES,
+)
+from pyrite.devtools.test_resources import (
     _xdist_workers as _xdist_workers,
+)
+from pyrite.devtools.test_resources import (
     blas_thread_env as blas_thread_env,
+)
+from pyrite.devtools.test_resources import (
     default_test_workers as default_test_workers,
+)
+from pyrite.devtools.test_resources import (
     parallel_pytest_args as parallel_pytest_args,
 )
 from pyrite.devtools.test_suites import (
     IDENTITY_PIN_TESTS as IDENTITY_PIN_TESTS,
+)
+from pyrite.devtools.test_suites import (
     INTEGRATION_TESTS as INTEGRATION_TESTS,
+)
+from pyrite.devtools.test_suites import (
     PRIMARY_TEST_SUITE_NAMES as PRIMARY_TEST_SUITE_NAMES,
+)
+from pyrite.devtools.test_suites import (
     SAMPLED_TEST_SUITES as SAMPLED_TEST_SUITES,
+)
+from pyrite.devtools.test_suites import (
     SUITE_MARKERS as SUITE_MARKERS,
+)
+from pyrite.devtools.test_suites import (
     TEST_SUITE_DIRECTORIES as TEST_SUITE_DIRECTORIES,
+)
+from pyrite.devtools.test_suites import (
     TEST_SUITE_NAMES as TEST_SUITE_NAMES,
+)
+from pyrite.devtools.test_suites import (
     TEST_SUITE_PATTERNS as TEST_SUITE_PATTERNS,
+)
+from pyrite.devtools.test_suites import (
     test_files_for_suite as test_files_for_suite,
+)
+from pyrite.devtools.test_suites import (
     test_suite_owner as test_suite_owner,
 )
 
@@ -710,6 +740,14 @@ def cmd_material(args: argparse.Namespace) -> None:
 _SLOW_HELP = "also run tests marked slow (sets PYRITE_SLOW_TESTS=1); must precede pytest_args"
 
 
+def cmd_doctor(args: argparse.Namespace) -> None:
+    from pyrite.devtools.workspace_doctor import run
+
+    status = run(ROOT, check_lock=args.lock)
+    if status:
+        raise SystemExit(status)
+
+
 def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog=prog_name)
     sub = ap.add_subparsers(dest="command", required=True)
@@ -730,6 +768,9 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     ]:
         sp = sub.add_parser(name)
         sp.set_defaults(func=fn)
+    doctor = sub.add_parser("doctor", help="diagnose workspace dependency and lock policy")
+    doctor.add_argument("--lock", action="store_true", help="probe Pixi lock satisfiability")
+    doctor.set_defaults(func=cmd_doctor)
     repo_map = sub.add_parser(
         "repo-map",
         help="print repository inventory or update its generated dependency graph",
