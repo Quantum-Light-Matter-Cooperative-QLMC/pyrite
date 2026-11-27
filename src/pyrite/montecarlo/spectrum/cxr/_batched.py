@@ -272,7 +272,11 @@ def _batched_reflection_tables(st):
         id(E_grid_eV),
         crystal,
         tuple(tuple(hkl) for hkl in hkl_list),
-        float(B_ang2),
+        (
+            tuple(float(B_ang2(tuple(hkl))) for hkl in hkl_list)
+            if callable(B_ang2)
+            else float(B_ang2)
+        ),
         bool(use_henke),
         None if beam_uvw is None else tuple(beam_uvw),
         None if surface_hkl is None else tuple(surface_hkl),

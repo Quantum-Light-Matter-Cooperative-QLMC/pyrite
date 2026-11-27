@@ -52,9 +52,37 @@ The same reading applies to the worst qualifying bins in the table: they are *in
 ## Assumptions and limits
 
 - The bound is Cauchy--Schwarz, so it is worst-case in relative phase and ignores the decorrelation factor entirely; the two columns must be read together, not multiplied.
-- Measured on the catalog's basal-plane families $\{(0,0,\pm2),(0,0,\pm4)\}$, whose harmonics are separated by roughly their own resonance energy. It says nothing about a hypothetical reflection set with near-degenerate resonances at the chosen observation angle, where the bound approaches unity at the peak and the approximation would fail.
+- Measured on the catalog's basal-plane families $\{(0,0,\pm2),(0,0,\pm4)\}$, whose harmonics are separated by roughly their own resonance energy. The classical bound does not cover a reflection set with near-degenerate resonances at the chosen observation angle, where it approaches unity at the peak. For unshaped electrons, [Final-state orthogonality](#final-state-orthogonality-1480) argues separately that the cross term vanishes there too.
 - Single-orientation runs. Mosaic orientations are squared per row for the same reason and are not covered here.
 - The decorrelation factor is a property of the transport's midpoint distribution, so it is a Monte Carlo quantity: it shrinks with electron count and does not certify any single realization.
+
+## Final-state orthogonality (#1480)
+
+The measurements above are classical: they bound the cross term by spectral
+separation and by the phase decorrelation of segment midpoints. For unshaped
+plane-wave electrons, a stronger argument holds, and it does not need
+spectral separation. With photon $(\mathbf k,\sigma)$ fixed, reflection
+$\mathbf g$ leaves the electron in final momentum
+$\mathbf p_f=\mathbf p_i-\hbar\mathbf g-\hbar\mathbf k$. Distinct
+reflections therefore populate different final states, and the trace over
+the unobserved electron removes $A_{\mathbf g}A_{\mathbf g'}^*$:
+
+- different $\mathbf g_\perp$: exactly, because a laterally periodic crystal
+  conserves transverse momentum modulo the lattice;
+- the same $\mathbf g_\perp$ and different $g_z$ (basal harmonics): up to the
+  overlap of the two longitudinal formation profiles, about
+  $\operatorname{sinc}(\Delta g_zL/2)$ for a coherent length $L$, which is
+  negligible once $L\gg c$.
+
+This is why non-basal and basal lines that overlap in energy (HOPG `(102)`,
+`(112)` and `(002)` at axial incidence, #1480) still add as intensities. A
+coherent field sum across distinct $\mathbf g_\perp$ would be wrong for
+unshaped electrons. Shaped electrons whose components differ by a transverse
+reciprocal vector are the exception, treated in
+[`quantum-shaped-cxr-interference`](quantum-shaped-cxr-interference.md). The
+near-degenerate case named under *Assumptions and limits* is thus outside the
+classical bound but covered by this argument for unshaped beams. The argument
+is a derivation, not a measurement, and it does not change this row's status.
 
 ## Status
 

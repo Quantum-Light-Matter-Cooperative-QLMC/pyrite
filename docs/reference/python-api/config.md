@@ -12,6 +12,7 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.config.load_physics
    pyrite.config.load_numerics
    pyrite.config.CxrReflections
+   pyrite.config.FiberAverage
    pyrite.config.AdaptiveSampling
    pyrite.config.FixedSampling
    pyrite.config.LineRoulette

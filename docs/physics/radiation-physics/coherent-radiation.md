@@ -22,7 +22,7 @@ where the right-hand side is the transverse radius at which the neglected phase 
 
 Reciprocal vectors are oriented before the sum. `beam_uvw` names the direct-lattice axis placed along $+z$; `surface_hkl` instead names the reciprocal-lattice plane normal placed along $+z$, which is the exact cleavage-plane contract for nonorthogonal cells. Either choice is applied as the minimal proper rotation, followed by `azimuth_rad` about $+z$ for the in-plane setting relative to the detector azimuth. `recip_miscut_rad` adds a further tilt to the reciprocal vectors **only**, leaving the transported slab normal untouched — useful for an asymmetric reflection where $\mathbf g$ is not parallel to $\hat{\mathbf n}$'s exit face, and not yet wired into any campaign grid. Conventions are shared with [Tilt convention](../geometry/tilt-convention.md).
 
-Reflections arrive as a pinned catalog family list expanded to **both** reciprocal directions, $\pm\mathbf g$. Distinct reflections are treated as spectrally separated and therefore summed incoherently; the kernel does not evaluate cross-$\mathbf g$ interference, and the tested scope is recorded under [Validation: `cross-reflection-coherence`](../../validation/radiation-physics/cross-reflection-coherence.md). The bound covers the catalog basal-plane families, not arbitrary near-degenerate reflections.
+Reflections arrive as a pinned catalog family list expanded to **both** reciprocal directions, $\pm\mathbf g$. Distinct reflections are summed as intensities; the kernel does not evaluate cross-$\mathbf g$ interference. For unshaped electrons this is exact even where lines overlap, because distinct $\mathbf g$ leave the electron in orthogonal final states ([final-state orthogonality](../../validation/radiation-physics/cross-reflection-coherence.md#final-state-orthogonality-1480)); the classical spectral-separation bound is recorded under [Validation: `cross-reflection-coherence`](../../validation/radiation-physics/cross-reflection-coherence.md) for the catalog basal-plane families.
 
 ## Resonance condition
 
@@ -170,7 +170,7 @@ The default `incoherent` policy sums intensities over flights and electrons unde
 
 - kinematic/Born treatment: no dynamical diffraction, no extinction, no photon multiple scattering, and no depletion of the incident wave;
 - straight, constant-velocity, constant-amplitude motion within each transport segment; the finite-time factor and the midpoint pairing both rest on this;
-- reflections and polarizations add incoherently; cross-$\mathbf g$ interference is bounded only for the reflection families tested under `cross-reflection-coherence`;
+- reflections and polarizations add incoherently; for unshaped electrons this rests on final-state orthogonality (#1480), while the measured classical bound on cross-$\mathbf g$ interference covers only the reflection families tested under `cross-reflection-coherence`;
 - couplings frozen at $\omega_{\rm res}$ across each line;
 - tabulated or CIF-derived crystal structure, form factors, Debye–Waller factors, and the selected orientation fully determine the coupling — a wrong $B$ factor or basis moves the yield directly;
 - a single fixed far-field observation direction per evaluation; the finite detector face is handled by summing directions, not by parallax within one;

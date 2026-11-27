@@ -264,13 +264,19 @@ def reflection_shell_weights(crystal, hkls, B_ang2, composition):
 
     Validation: brem-lattice-coherent-fraction
     """
+    return _reflection_shell_weights(crystal, hkls, lambda _hkl: B_ang2, composition)
+
+
+def _reflection_shell_weights(crystal, hkls, b_for_hkl, composition):
+    """Internal per-reflection thermal policy; scalar wrapper is unchanged."""
     from ...materials.crystal import CRYSTALS, U_g, reciprocal_g_vector
 
     lattice = CRYSTALS[crystal]["lattice"]
     shells: dict[float, float] = {}
     for hkl in hkls:
         g = round(float(reciprocal_g_vector(tuple(hkl), lattice)[1]), 9)
-        u = complex(np.asarray(U_g(crystal, tuple(hkl), 5000.0, B_ang2=B_ang2)).ravel()[0])
+        b = b_for_hkl(tuple(hkl))
+        u = complex(np.asarray(U_g(crystal, tuple(hkl), 5000.0, B_ang2=b)).ravel()[0])
         shells[g] = shells.get(g, 0.0) + abs(u) ** 2
     g = np.array(sorted(shells))
     total = np.array([shells[x] for x in g])

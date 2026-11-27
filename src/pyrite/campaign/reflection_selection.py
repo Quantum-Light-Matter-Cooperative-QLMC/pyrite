@@ -15,6 +15,13 @@ if TYPE_CHECKING:
 def reflection_controls(numerics: Numerics, physics: Physics, channeling: object) -> CxrReflections:
     """Fall back to four families only for an unsupported automatic selection."""
     controls = numerics.cxr_reflections
+    if controls.fiber is not None:
+        # Never fall through to basal-only scoring with fiber numerics set.
+        raise ValueError(
+            "CxrReflections.fiber is not yet scored by the campaign path (#1483); "
+            "score a transported scene with FiberCXRModel.from_numerics(...) and "
+            "pyrite.montecarlo.spectrum.cxr.fiber_case.score_fiber_case"
+        )
     # Streamed scoring selects on the electron prefix since #1281, so it no
     # longer falls back.
     if (

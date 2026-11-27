@@ -451,8 +451,17 @@ the net-metric continuum shares and the reconstructed continuum-share set all
 use that one domain; the estimator and tolerance are unchanged.
 
 **Assumptions.** Uniform random grain azimuths about $a$ (HOPG; pyrolytic,
-turbostratic h-BN by user decision 2026-11-18), so only $g\parallel aA$ remains
-a coherent line in the catalog's axial model. The scalar `B_ang2` is then the
+turbostratic h-BN by user decision 2026-11-18). Restricting candidates to
+$g\parallel aA$ is a deliberate approximation, not a consequence of the
+texture. **Correction (#1480):** the original rationale, that random azimuths
+leave only $g\parallel aA$ as a coherent line, is wrong for intensities.
+Azimuthal averaging keeps each non-basal reflection's
+$\langle\lvert A_g\rvert^2\rangle_\phi>0$, and distinct reflections add as
+intensities. The omitted yield is measured in the
+[#1480 research note](../../research/physics/fiber-nonbasal-cxr-1480.md); see
+"Fiber-domain applicability (#1480)" below. The derivation and the
+selection evidence in this subsection are unchanged: they concern the
+basal set the selector is given, not whether that set is complete. The scalar `B_ang2` is then the
 axial projection (B33 for $a=(001)$), applied only to $g\parallel c$
 (`hopg-debye-waller-00l`, `hbn-debye-waller-00l`). Mosaic FWHM is unchanged.
 
@@ -497,6 +506,32 @@ texture record and reconstructed set.
 `tests/materials/test_crystal_texture.py` pins the (00l)-only domain, the
 retired pins as the first two shells, a non-orthogonal axis, and an unchanged
 single-crystal enumeration.
+
+### Fiber-domain applicability (#1480)
+
+The v7 stop certifies convergence **within the basal set** only. It is not an
+omitted-yield bound against the full fiber sum. #1480 scored the full allowed
+domain ($\lvert g\rvert\le6$ Å⁻¹, every non-extinct family, uniform roll
+average over 32 sector nodes, uniaxial thermal tensor) on the same frozen
+transports as the basal arm. Production per-reflection model, 300 electrons
+per scene:
+
+| Scene | Basal / full fiber yield |
+|---|---:|
+| HOPG 30 keV, 500 nm, axial, 45° | 0.18 |
+| HOPG 30 keV, 500 nm, tilt 15°, 45° | 0.32 |
+| HOPG 300 keV, 500 nm, tilt 15°, 45° | 0.037 |
+| HOPG 1 MeV, 500 nm, tilt 15°, 45° | 0.020 |
+| HOPG 1 MeV, 500 nm, axial, 135° | 0.75 |
+| h-BN 30 keV, 500 nm, tilt 15°, 45° (B33 isotropic) | 0.38 |
+
+These are at $\lvert g\rvert\le6$ Å⁻¹. In the 30 keV, tilt 15° scene, raising the full-domain cutoff to 8 and 10 Å⁻¹ adds 22 % and 43 %, so they are upper bounds on the basal share. The v7 selection evidence above is therefore valid as stated: these are basal
+shell rows under a deliberate restriction. A selected set from this selector
+is not a converged fiber spectrum outside narrow $(00l)$ windows at backward,
+near-axial, high-energy geometry. The full table, the applicability envelope
+and the opt-in full-fiber model (`cxr-fiber-intensity-average`) are in the
+[#1480 research note](../../research/physics/fiber-nonbasal-cxr-1480.md#applicability-envelope).
+Selector extension to the fiber domain: #1484.
 
 ### Fiber-texture re-verification (v7, #1301, 2026-11-18)
 

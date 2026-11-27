@@ -287,6 +287,18 @@ def g_mag(d_ang):
 
 
 # ---- structure & Debye-Waller ----------------------------------------------
+def per_reflection_b(B_ang2):
+    """``hkl -> B`` [Angstrom^2]: the callable itself, or a constant scalar B.
+
+    A callable must be Friedel-even (``B(h) == B(-h)``) for emission tables.
+
+    Validation: cxr-fiber-intensity-average
+    """
+    if callable(B_ang2):
+        return B_ang2
+    return lambda _hkl: B_ang2
+
+
 def debye_waller(g_invang, B_ang2):
     """Amplitude Debye-Waller factor exp(-W), W = B (sin(theta)/lambda)^2
     = B (g/4pi)^2, for a tabulated B-factor [Angstrom^2] (B = 8 pi^2 <u_x^2>).
@@ -624,7 +636,9 @@ def reflection_coupling_tables(
     photon_E_eV
         One-dimensional photon energies in eV.
     B_ang2
-        Isotropic Debye--Waller ``B`` factor in square angstroms.
+        Isotropic Debye--Waller ``B`` factor in square angstroms, or a
+        callable mapping an integer hkl tuple to its projected factor.
+        The latter must be Friedel-even for emission coupling tables.
     use_henke
         Include anomalous corrections for every element (edge-prone elements
         always carry them).
@@ -664,10 +678,11 @@ def reflection_coupling_tables(
     c_parts = np.empty((2, n_hkl))
     a_parts = np.empty((2, n_hkl))
     w_parts = {el: np.empty((2, n_hkl)) for el in dispersive}
+    b_of = per_reflection_b(B_ang2)
     for i, hkl in enumerate(hkl_list):
         hkl = np.asarray(hkl, dtype=float)
         _, g = reciprocal_g_vector(hkl, info["lattice"])
-        dwf[i] = debye_waller(g, B_ang2)
+        dwf[i] = debye_waller(g, b_of(tuple(int(x) for x in hkl)))
         u_coef[i] = u_scale * (dwf[i] / g**2)
         weights = {}
         for el, R in basis:
@@ -945,7 +960,7 @@ def _orientation_R(
 
 
 # ---- reflection ranking -----------------------------------------------------
-def _reflection_families(crystal, E_ref_eV, B_ang2, use_henke, g_max_invang):
+def _reflection_families(crystal, E_ref_eV, B_ang2, use_henke, g_max_invang, *, full_fiber=False):
     """Reflections with ``|g| <= g_max`` grouped as symmetry families.
 
     Members share ``(|g|, |S(g)| exp(-W) / g^2)`` to rounding, the
@@ -955,8 +970,9 @@ def _reflection_families(crystal, E_ref_eV, B_ang2, use_henke, g_max_invang):
     Fiber texture retains only integer multiples of the primitive reciprocal
     surface axis, before applying thermal factors. An invertible reciprocal
     basis preserves collinearity: h B parallel a B iff h parallel a. Assumes
-    uniform grain azimuths and the catalog's axial coherent-line model; an
-    absent texture leaves the full single-crystal enumeration unchanged.
+    the historical basal-only approximation, not elimination of intensity by
+    random grain azimuth. ``full_fiber=True`` enumerates the full lattice for
+    the explicit fiber model without changing catalog state.
     Source/limits: docs/physics/materials/reflection-selection.md#fiber-texture
     (fiber candidate domain); basal axis gives (00l), either axis sign agrees.
 
@@ -964,7 +980,7 @@ def _reflection_families(crystal, E_ref_eV, B_ang2, use_henke, g_max_invang):
     """
     info = CRYSTALS[crystal]
     B = _reciprocal_basis(info["lattice"])
-    if info.get("texture") == "fiber":
+    if info.get("texture") == "fiber" and not full_fiber:
         axis = np.asarray(reduce_indices(info["texture_axis_hkl"]), dtype=float)
         count = int(np.floor(g_max_invang / np.linalg.norm(axis @ B)))
         hkl = np.arange(-count, count + 1)[:, None] * axis

@@ -1,0 +1,68 @@
+"""Numerics of the opt-in full-fiber CXR intensity average (#1480).
+
+A :class:`FiberAverage` sits beside the mosaic controls on
+:class:`pyrite.config.CxrReflections`. It selects *how* the full reciprocal
+domain of a fiber-textured crystal is truncated and roll-averaged; the
+physics (projected thermal tensor, intensity rather than amplitude average)
+belongs to ``montecarlo.spectrum.cxr.fiber``. ``None`` on ``CxrReflections``
+keeps the historical basal-only domain and adds nothing to case identity.
+
+Validation: cxr-fiber-intensity-average
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass
+from numbers import Integral
+
+
+def _positive_count(value: object, name: str) -> None:
+    if isinstance(value, bool) or not isinstance(value, Integral) or value < 1:
+        raise ValueError(f"{name} must be a positive integer")
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FiberAverage:
+    """Reciprocal cutoff and roll quadrature of the full-fiber CXR average.
+
+    Basal ``(00l)`` rows are roll invariant and are scored once. Mosaic
+    quadrature applies on top of each roll node. It comes from the scored
+    case (``mosaic_mc_fwhm_rad``, ``mosaic_mc_nodes``) or from ``spectrum()``
+    keywords, not from ``mosaic_nodes``/``mosaic_route`` beside this object
+    on ``CxrReflections``.
+
+    Parameters
+    ----------
+    cutoff_invang
+        Reciprocal-vector magnitude cutoff ``|g|`` [1/Angstrom] of the full
+        (non-basal included) reflection domain. Required: no value is a
+        converged default. In the two #1480 HOPG ladder scenes (30 and 300 keV)
+        the CXR line yield still grew 2 % from 20 to 24 1/Angstrom. The scorer
+        refuses cutoffs beyond the form-factor range (75.4 1/Angstrom).
+    azimuth_count
+        Midpoint roll nodes on one 60-degree sector about the fiber (c) axis;
+        each node is a distinct crystallite orientation. Integrated yields
+        converged to about 0.5 % by 8 nodes in the #1480 scenes. The default
+        32 is not converged for line shapes (spectral L1 1.5-3.3 % against
+        128 nodes); use at least 128 when narrow lines matter.
+    reflection_batch_size
+        Reflections scored per coupling-table batch. Bounds memory only; it
+        is not a physics truncation and changes float summation order only.
+    """
+
+    cutoff_invang: float
+    azimuth_count: int = 32
+    reflection_batch_size: int = 256
+
+    def __post_init__(self) -> None:
+        cutoff = self.cutoff_invang
+        if (
+            isinstance(cutoff, bool)
+            or not isinstance(cutoff, int | float)
+            or not math.isfinite(cutoff)
+            or cutoff <= 0
+        ):
+            raise ValueError("cutoff_invang must be positive and finite")
+        _positive_count(self.azimuth_count, "azimuth_count")
+        _positive_count(self.reflection_batch_size, "reflection_batch_size")

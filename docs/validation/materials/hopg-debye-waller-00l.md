@@ -6,6 +6,7 @@
 - Code: `data/catalog/crystals/hopg.toml::B_ang2`.
 - Source: Trucano & Chen, "Structure of graphite by neutron diffraction", *Nature* **258**, 136--137 (1975), doi:10.1038/258136a0; COD 9011577.
 - Intended quantity and units: one amplitude Debye--Waller coefficient in square angstroms for the reciprocal `c*` direction.
+- Scope (#1480): `B_ang2 = 8 pi^2 U33` is valid **only for g parallel to c**. For any other g the factor is $W=\tfrac12(U_{11}g_\perp^2+U_{33}g_z^2)$ with $U_{11}=0.0031$ Å² (the uniaxial tensor packaged for channeling in `channeling_thermal.toml`, #535). Applying 1.30 Å² isotropically to `(112)` or `(110)` lowers $e^{-2W}$ from 0.87 to 0.62 and from 0.92 to 0.65.
 
 This replaces the legacy `0.8 Ang^2`, which carried no value-level provenance. COD 9011577 is the record `crystals.hopg.cod_id` already cites for the structure, so the entry now takes its displacement data from the same primary refinement as its lattice and basis instead of from an unsourced scalar.
 

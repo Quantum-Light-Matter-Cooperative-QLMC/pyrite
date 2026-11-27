@@ -41,7 +41,7 @@ from this production line path: its absolute phase relative to the Feranchuk
 PXR/CBS amplitude has not been reconciled. Adding its intensity to this path
 would discard the required cross term and is unsupported.
 
-Polarizations, reciprocal vectors, and mosaic orientations still add as intensities. The phased sum runs within one (reflection, orientation, polarization) row. The cross-reflection approximation is bounded for the tested basal-plane families under `cross-reflection-coherence` (`filtered`); near-degenerate reflection sets are outside that validation scope.
+Polarizations, reciprocal vectors, and mosaic orientations still add as intensities. The phased sum runs within one (reflection, orientation, polarization) row. The cross-reflection approximation is bounded for the tested basal-plane families under `cross-reflection-coherence` (`filtered`). For unshaped electrons, final-state orthogonality also covers near-degenerate sets such as HOPG `(102)`/`(112)`/`(002)` (#1480).
 
 `components=True` is rejected under the coherent policy: once the $A_{\rm PXR}A_{\rm CBS}^{*}$ cross term survives the sum, no uniquely additive PXR/CBS split exists.
 
@@ -87,7 +87,7 @@ The `coherent-emission` and `coherent-segment-midpoint-time` rows are `rederived
 
 **Human sign-off is still pending on all of them**, and the following remain open before scientific use:
 
-1. cross-reflection ($\mathbf g\neq\mathbf g'$) coherence is dropped. It is bounded (`cross-reflection-coherence`, `filtered`) below ~1.6% of the integrated yield over the catalog's basal-plane families, but only `filtered`: the bound is worst-case in relative phase, and a reflection set with near-degenerate resonances at the observation angle is not covered;
+1. cross-reflection ($\mathbf g\neq\mathbf g'$) coherence is dropped. It is bounded (`cross-reflection-coherence`, `filtered`) below ~1.6% of the integrated yield over the catalog's basal-plane families, but only `filtered`: the bound is worst-case in relative phase and does not cover a reflection set with near-degenerate resonances at the observation angle, where only the final-state-orthogonality derivation for unshaped electrons (#1480) applies;
 2. physical bunch charge weights the production cross-electron excess; the stored spectrum stays per incident electron. The distinct-pair estimator has limiting-case regressions but still needs independent verification and a production sampling-error certificate;
 3. CUDA blend regression tests cover the fast paths, but do not establish validation across all materials, geometries, and precision settings;
 4. the harmonic sign that places each line is resolved under `line-energy-dispersion`. The Bijvoet-sensitive coupling pairing {eq}`eq-coherent-radiation-friedel-pairing` is anchored for the incoherent path. The coherent phase sum reuses the same tables;

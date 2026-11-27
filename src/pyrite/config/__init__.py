@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from pyrite._config_presets import (
         load_physics as load_physics,
     )
+    from pyrite._fiber_average import FiberAverage as FiberAverage
     from pyrite._line_roulette import LineRoulette as LineRoulette
     from pyrite._numerics import (
         CxrReflections as CxrReflections,
@@ -62,6 +63,7 @@ _EXPORTS = {
     "ConeSplitting": ("pyrite._cone_splitting", "ConeSplitting"),
     "CxrReflections": ("pyrite._numerics", "CxrReflections"),
     "ExecutionConfig": ("pyrite._numerics_groups", "ExecutionConfig"),
+    "FiberAverage": ("pyrite._fiber_average", "FiberAverage"),
     "KernelTuning": ("pyrite._numerics_groups", "KernelTuning"),
     "FixedSampling": ("pyrite._sampling", "FixedSampling"),
     "Numerics": ("pyrite.campaign.model", "Numerics"),
@@ -83,6 +85,7 @@ __all__ = [
     "ConeSplitting",
     "CxrReflections",
     "ExecutionConfig",
+    "FiberAverage",
     "KernelTuning",
     "FixedSampling",
     "LineRoulette",

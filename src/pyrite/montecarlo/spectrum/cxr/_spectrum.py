@@ -117,7 +117,8 @@ def mc_cxr_spectrum(
     theta_obs_rad, n_hat
         Polar observation angle [rad], or a sample-frame direction overriding it.
     B_ang2, use_henke
-        Required isotropic Debye--Waller ``B`` factor in square angstroms, and
+        Required Debye--Waller ``B`` factor in square angstroms (scalar, or
+        a Friedel-even callable mapping integer hkl tuples to projected B), and
         whether to include anomalous energy-dependent atomic form factors.
     absorber_element, composition
         Elemental or compound self-absorption description.
