@@ -412,7 +412,7 @@ def _(mo):
 def _(energy_eV, line_eV, np, run_all, tables_ready):
     assert tables_ready
     fine_eV = np.union1d(energy_eV, line_eV + np.linspace(-0.6, 0.6, 441))
-    samples, _elapsed = run_all(fine_eV, "Scoring coherent CXR (refined grid)")
+    samples, elapsed = run_all(fine_eV, "Scoring coherent CXR (refined grid)")
     return fine_eV, samples
 
 

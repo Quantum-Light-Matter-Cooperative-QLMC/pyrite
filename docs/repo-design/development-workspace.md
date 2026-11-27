@@ -113,7 +113,8 @@ quotes). Every other confusable still fails.
 Marimo sources and `.ipynb` captures skip `RUF100`. Their `noqa` comments
 travel between source and capture, which are analysed with different cell
 semantics. Marimo sources also skip `SIM117`, because editing them requires a
-capture regeneration. Tests keep nested `pytest.raises`/`warns` blocks
+capture regeneration, and `RUF059`, because a leading underscore makes a
+Marimo name cell-private. Tests keep nested `pytest.raises`/`warns` blocks
 (`SIM117`). Inside a `raises` or `warns` block, keep exactly the statement
 expected to raise: setup inside the block can satisfy the expectation by
 accident (`PT012`). Give `pytest.warns` a `match` (`PT030`).

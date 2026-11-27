@@ -100,8 +100,10 @@ extend-immutable-calls = [
 # same lines are analysed with different cell semantics; edit them at source
 # together with a capture regeneration, never through RUF100.
 # Nested mo.status/mo.capture_stdout/persistent_cache wrappers mirror display
-# roles, and editing them needs a tutorial capture regeneration.
-"{src/pyrite/apps,docs/notebooks,docs/examples,docs/demo}/**" = ["RUF100", "SIM117"]
+# roles, and editing them needs a tutorial capture regeneration. A leading
+# underscore makes a Marimo name cell-private, so RUF059 renames are graph
+# decisions, not lint.
+"{src/pyrite/apps,docs/notebooks,docs/examples,docs/demo}/**" = ["RUF059", "RUF100", "SIM117"]
 # Tests nest pytest.raises/warns around the configured context on purpose, so
 # the expectation scope reads separately from the setup scope.
 "tests/**" = ["SIM117"]
