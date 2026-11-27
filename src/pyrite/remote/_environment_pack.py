@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -11,6 +12,7 @@ import tempfile
 import time
 import uuid
 from dataclasses import dataclass
+from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit
 
@@ -89,6 +91,11 @@ def _local_cache(*parts: str) -> Path:
 
 
 def _build_dependencies(identity: PackIdentity, output: Path) -> None:
+    if shutil.which("pixi-pack") is None:
+        raise SystemExit(
+            "pack mode requires pixi-pack on the submitter's PATH; "
+            "install it with `pixi global install pixi-pack`"
+        )
     downloads = _local_cache("downloads")
     downloads.mkdir(parents=True, exist_ok=True)
     subprocess.run(
@@ -113,6 +120,13 @@ def _build_dependencies(identity: PackIdentity, output: Path) -> None:
 
 
 def _build_wheel(identity: PackIdentity, output: Path) -> None:
+    # Check the distribution: a checkout's build/ directory also imports as `build`.
+    try:
+        distribution("build")
+    except PackageNotFoundError as exc:
+        raise SystemExit(
+            "pack mode requires the `build` package on the submitter; use the Pixi default env"
+        ) from exc
     with tempfile.TemporaryDirectory(prefix="pyrite-wheel-") as temp:
         subprocess.run(
             [sys.executable, "-m", "build", "--wheel", "--outdir", temp],

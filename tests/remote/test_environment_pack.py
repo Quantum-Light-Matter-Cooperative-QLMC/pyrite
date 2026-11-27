@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from pyrite.energy_grid import convergence_job
 from pyrite.remote import _environment_pack as pack
 from pyrite.remote import config, queue, scripts, targets
 
@@ -103,6 +104,41 @@ def test_remote_cache_hit_does_not_build_or_upload(monkeypatch, tmp_path):
     with config.use_target(target):
         pack._stage_artifact(tmp_path / "pack.tar", "/shared/pack.tar", unexpected)
     assert calls == [('if test -s "/shared/pack.tar"; then echo present; fi', "dtn")]
+
+
+@pytest.mark.parametrize(
+    "command", ["start", "start-windows", "start-precision", "start-bandwidth"]
+)
+def test_convergence_jobs_run_in_the_unpacked_environment(command, monkeypatch, capsys):
+    target = config.RemoteTarget(
+        host="box", remote_dir="/shared/pyrite", pixi="pixi", env_transfer="pack"
+    )
+    identity = pack.PackIdentity("a" * 64, "nvidia", "linux-64-cuda", "b" * 64)
+    monkeypatch.setattr(pack, "pack_identity", lambda: identity)
+    with config.use_target(target):
+        convergence_job.main([command, "--dry-run", "--json-out", "report.json"])
+    script = capsys.readouterr().out
+    assert "PYRITE_PACK_PREFIX=" in script
+    assert "env python -m pyrite.energy_grid." in script
+    assert "run --as-is" not in script
+    assert "install --locked" not in script
+
+
+def test_missing_pixi_pack_is_a_clear_error(monkeypatch, tmp_path):
+    identity = pack.PackIdentity("a" * 64, "default", "linux-64", "b" * 64)
+    monkeypatch.setattr(pack.shutil, "which", lambda name: None)
+    with pytest.raises(SystemExit, match="pixi global install pixi-pack"):
+        pack._build_dependencies(identity, tmp_path / "dependencies.tar")
+
+
+def test_missing_build_package_is_a_clear_error(monkeypatch, tmp_path):
+    def missing(name):
+        raise pack.PackageNotFoundError(name)
+
+    identity = pack.PackIdentity("a" * 64, "default", "linux-64", "b" * 64)
+    monkeypatch.setattr(pack, "distribution", missing)
+    with pytest.raises(SystemExit, match="Pixi default env"):
+        pack._build_wheel(identity, tmp_path / "project-wheel.tar")
 
 
 def test_local_cache_reuses_completed_archive(tmp_path):
