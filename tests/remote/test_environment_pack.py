@@ -10,7 +10,7 @@ import pytest
 
 from pyrite.energy_grid import convergence_job
 from pyrite.remote import _environment_pack as pack
-from pyrite.remote import config, queue, scripts, targets
+from pyrite.remote import config, queue, scripts, targets, transport
 
 LOCK = b"""environments:
   default:
@@ -139,6 +139,27 @@ def test_missing_build_package_is_a_clear_error(monkeypatch, tmp_path):
     monkeypatch.setattr(pack, "distribution", missing)
     with pytest.raises(SystemExit, match="Pixi default env"):
         pack._build_wheel(identity, tmp_path / "project-wheel.tar")
+
+
+@pytest.mark.parametrize(
+    ("mode", "tool", "unwanted"),
+    [("install", '"pixi"', "pixi-unpack"), ("pack", "pixi-unpack", '"pixi"')],
+)
+def test_sync_requires_only_the_tool_the_job_runs(mode, tool, unwanted, monkeypatch):
+    commands = []
+
+    def capture(command, *, host=None):
+        commands.append(command)
+        return transport._PIXI_MISSING_MARK + "\n"
+
+    monkeypatch.setattr(transport, "_ssh_capture", capture)
+    target = config.RemoteTarget(host="box", pixi="pixi", remote_dir="/r", env_transfer=mode)
+    with config.use_target(target):
+        with pytest.raises(SystemExit, match=rf"{tool.strip(chr(34))} not found on box"):
+            transport._remote_inventories(artifacts=False, tables=True)
+    probe = commands[0].split(transport._PIXI_MISSING_MARK)[0]
+    assert f"command -v {tool} " in probe
+    assert unwanted not in probe
 
 
 def test_local_cache_reuses_completed_archive(tmp_path):

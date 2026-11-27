@@ -192,6 +192,31 @@ def _stage_artifact(local: Path, remote: str, build) -> None:
             pass
 
 
+def job_tool_probe(missing_mark: str) -> tuple[str, str]:
+    """Login-host probe for the tool a queued job runs, and the refusal without it.
+
+    Install-mode jobs run ``pixi``. Pack-mode jobs only run ``pixi-unpack``,
+    found on ``PATH`` or in ``~/.pixi/bin`` as the job script looks it up. The
+    probe echoes ``missing_mark`` when the tool is absent.
+    """
+    host = config.remote_host()
+    if config.remote_env_transfer() == "pack":
+        probe = 'command -v pixi-unpack >/dev/null 2>&1 || test -x "$HOME/.pixi/bin/pixi-unpack"'
+        refusal = (
+            f"refusing to sync: pixi-unpack not found on {host} (PATH or ~/.pixi/bin).\n"
+            "  fix: install it there with `pixi global install pixi-unpack`, "
+            "or copy a pixi-unpack binary to ~/.pixi/bin/"
+        )
+    else:
+        probe = f"command -v {config.shell_remote_pixi()} >/dev/null 2>&1"
+        refusal = (
+            f"refusing to sync: pixi not found on {host} at {config.remote_pixi()}.\n"
+            "  fix: ssh to the host and run: curl -fsSL https://pixi.sh/install.sh | bash\n"
+            "  or point the target at an existing pixi: pyrite remote target edit NAME --pixi PATH"
+        )
+    return f"{probe} || echo {missing_mark}", refusal
+
+
 def stage_pack() -> None:
     """Stage immutable dependency and checkout artifacts before reserving a job."""
     identity = pack_identity()

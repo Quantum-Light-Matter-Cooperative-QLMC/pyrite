@@ -341,22 +341,19 @@ def _remote_inventories(
         commands.append("command -v rsync >/dev/null 2>&1 && echo rsync")
     if not commands:
         return frozenset(), {}, {}, {}, False
-    # Rides this round trip: jobs need pixi, and on a busy queue a job would only
-    # discover its absence after waiting for an allocation. With a transfer
-    # node the digests run there and the probe stays with the login host.
-    pixi = config.shell_remote_pixi()
-    probe = f"command -v {pixi} >/dev/null 2>&1 || echo {_PIXI_MISSING_MARK}"
+    # Rides this round trip: on a busy queue a job would only discover a missing
+    # tool after waiting for an allocation. With a transfer node the digests run
+    # there and the probe stays with the login host.
+    from ._environment_pack import job_tool_probe
+
+    probe, refusal = job_tool_probe(_PIXI_MISSING_MARK)
     data_host = config.transfer_host()
     if data_host == config.remote_host():
         output = _ssh_capture("; ".join([probe, *commands]))
     else:
         output = _ssh_capture(probe) + _ssh_capture("; ".join(commands), host=data_host)
     if _PIXI_MISSING_MARK in output:
-        raise SystemExit(
-            f"refusing to sync: pixi not found on {config.remote_host()} at {config.remote_pixi()}.\n"
-            "  fix: ssh to the host and run: curl -fsSL https://pixi.sh/install.sh | bash\n"
-            "  or point the target at an existing pixi: pyrite remote target edit NAME --pixi PATH"
-        )
+        raise SystemExit(refusal)
     output, _, probe_part = output.partition(_RSYNC_PROBE_MARK + "\n")
     remote_rsync = rsync and probe_part.strip() == "rsync"
     if sdbase and _SDBASE_SECTION_MARK not in output:

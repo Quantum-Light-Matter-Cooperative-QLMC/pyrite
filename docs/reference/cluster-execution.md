@@ -62,7 +62,10 @@ pyrite remote target edit hoffman2 --env-transfer pack --environment runtime-nvi
 The submitter needs `pixi-pack` on PATH and the contributor environment's
 `build` and PyYAML packages. Install `pixi global install pixi-pack` on the
 submitter and `pixi global install pixi-unpack` on the cluster login host
-(with its user-local installation visible from compute nodes).
+(with its user-local installation visible from compute nodes). A
+`pixi-unpack` binary copied to `~/.pixi/bin/` also works. Sync and submission
+check the login host for `pixi-unpack`, not `pixi`: the host needs `pixi` only
+for the login-host helpers noted below.
 Use the contributor environment to submit; choose `runtime-cpu` or
 `runtime-nvidia` on the target to omit developer dependencies. For online
 install-mode jobs, `runtime-amd` and `runtime-intel` are also available where
