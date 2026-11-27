@@ -9,6 +9,7 @@ over a detector solid angle.
 import numpy as np
 
 from ...._backend import REAL, _to_cpu, xp
+from .._deferred_mass import settle_electron_mass
 from ..coherent_population import require_resolved_power
 from . import _policy
 from ._batched import _accumulate_batched
@@ -377,10 +378,16 @@ def _mc_spectrum(request):
             "transport without max_dE_frac."
         )
     coverage = line_data_coverage(st) if line_data_coverage_enabled() else None
-    if _needs_per_hkl_route(st):
-        _accumulate_per_hkl(st)
-    else:
-        _accumulate_batched(st)
+    try:
+        if _needs_per_hkl_route(st):
+            _accumulate_per_hkl(st)
+        else:
+            _accumulate_batched(st)
+    except BaseException:
+        settle_electron_mass(request.truncation_audit, failed=True)
+        raise
+    # Deferred per-electron line mass (#1481) lands before the call returns.
+    settle_electron_mass(request.truncation_audit)
     if st.node_tail is not None:
         # Far tails of every windowed line, one convolution per call.
         # Validation: node-support-window-tail

@@ -24,6 +24,11 @@ that resolution too, under any bandwidth; the joined resolver then builds the
 same axis from them.
 
 Windowed policies read whole-population seed providers and are refused.
+
+Under CuPy each block's sinc samples come from the device route the joined
+sizing uses (:func:`..spectrum._device_sizing.device_sinc_samples`), so only
+the two sample arrays cross to the host and the streamed samples equal the
+joined ones bit for bit there too (#1481).
 """
 
 from typing import TYPE_CHECKING, Any
@@ -45,6 +50,20 @@ def policy_streaming_refusal(case) -> str | None:
     if payload is not None and payload.get("windows") is not None:
         return WINDOWED_POLICY_REFUSAL
     return None
+
+
+def _block_sinc_samples(segs, n_hat, electron_limit):
+    """Host ``(width, weight)`` of one block, by the route the joined sizing takes."""
+    from ..._backend import _to_cpu
+    from ..spectrum._device_sizing import device_sinc_samples, sizing_module
+    from ..spectrum.diagnostics import sinc_feature_samples
+
+    module = sizing_module(segs["L_ang"])
+    if module is not None:
+        resident = device_sinc_samples(segs, n_hat, electron_limit=electron_limit, module=module)
+        if resident is not None:
+            return tuple(np.asarray(_to_cpu(a)) for a in resident)
+    return sinc_feature_samples(segs, n_hat, electron_limit=electron_limit)
 
 
 class BlockGridEvidence:
@@ -93,10 +112,9 @@ class BlockGridEvidence:
 
     def add(self, segs) -> None:
         """Record one block; commits only after every block quantity succeeded."""
-        from ..spectrum.diagnostics import sinc_feature_samples
         from .cxr_grid import _direction_populations
 
-        width, weight = sinc_feature_samples(segs, self.n_hat, electron_limit=self.Ne)
+        width, weight = _block_sinc_samples(segs, self.n_hat, self.Ne)
         populations = []
         if self.keeps_lines and int(segs["L_ang"].shape[0]):
             populations = _direction_populations(

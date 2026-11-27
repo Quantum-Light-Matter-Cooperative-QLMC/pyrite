@@ -14,8 +14,11 @@ CUDA block schedules ``[stop, stop + GROWTH * Ne)`` with the same arguments
 only known after the current block). A request starting exactly at the
 prefetched start, with an identical seed and arguments (identical objects,
 equal scalars or equal frozen dataclasses), takes the rows it needs and
-samples any remainder serially. A retry of the block just served (the
-step-budget retry) samples serially and keeps the prefetch. Anything else samples serially as before: a miss costs time, never bits.
+samples any remainder serially. Rows it prefetched but did not need are kept
+as the head of the next look-ahead, so the worker samples each row at most
+once (#1481). A retry of the block just served (the step-budget retry)
+samples serially and keeps the prefetch. Anything else samples serially as
+before: a miss costs time, never bits.
 
 Concurrency (#1423): one worker, one pending future, caller ContextVars copied
 into it, and only pure NumPy / ``nogil`` Numba work runs there. Served arrays
@@ -99,8 +102,11 @@ class BeamEntryPrefetch:
         self.hits = 0  # served entirely from the prefetch
         self.partial = 0  # prefetch prefix plus a serial remainder
         self.misses = 0  # sampled serially although prefetching applied
+        self.prefetched_rows = 0  # rows the worker sampled
         self._pool: ThreadPoolExecutor | None = None
-        self._pending = None  # (sample, seed, kwargs without start, lo, hi, future)
+        # (sample, seed, kwargs without start, lo, hi, head, future): rows
+        # [lo, hi) are ``head`` (already sampled, or None) then ``future``'s.
+        self._pending = None
 
     def __enter__(self):
         self._pool = ThreadPoolExecutor(1, thread_name_prefix="pyrite-beam-entry")
@@ -127,35 +133,49 @@ class BeamEntryPrefetch:
             return sample(p.seed, p.Ne, **kwargs)
         seed, Ne = p.seed, int(p.Ne)
         start = int(kwargs.get("start", 0))
-        result = self._serve(sample, seed, Ne, start, kwargs)
+        if self._is_retry(sample, seed, Ne, start, kwargs):
+            self.misses += 1
+            return sample(seed, Ne, **kwargs)
+        result, carry = self._serve(sample, seed, Ne, start, kwargs)
         if result is None:
             self.misses += 1
             result = sample(seed, Ne, **kwargs)
         pool = self._pool
-        if pool is not None and self._pending is None:
-            self._schedule(pool, sample, seed, Ne, kwargs)
+        if pool is not None:
+            self._schedule(pool, sample, seed, Ne, kwargs, carry)
         return result
 
+    def _is_retry(self, sample, seed, Ne, start, kwargs) -> bool:
+        """A retry of the block just served: keep the prefetch."""
+        pending = self._pending
+        if pending is None:
+            return False
+        return start + Ne == pending[3] and self._matches(pending, sample, seed, kwargs)
+
     def _serve(self, sample, seed, Ne, start, kwargs):
-        """The prefetched rows for ``[start, start + Ne)``, completed serially; or None."""
+        """``(rows [start, start + Ne) or None, unused prefetched rows or None)``.
+
+        Prefetched rows short of the block are completed serially.
+        """
         pending = self._pending
         if pending is None or not self._matches(pending, sample, seed, kwargs):
             self._drop_pending()
-            return None
-        lo, hi, future = pending[3:]
-        if start + Ne == lo:
-            return None  # a retry of the block just served: keep the prefetch
+            return None, None
+        lo, hi, head, future = pending[3:]
         if start != lo:
             self._drop_pending()  # a replay from 0 or a skipped range
-            return None
+            return None, None
         self._pending = None
-        got = future.result()
+        got = head if future is None else future.result()
+        if head is not None and future is not None:
+            got = _join(head, got)
         if Ne <= hi - lo:
             self.hits += 1
-            return _rows(got, 0, Ne)
+            carry = _rows(got, Ne, hi - lo) if Ne < hi - lo else None
+            return _rows(got, 0, Ne), carry
         self.partial += 1
         tail = sample(seed, Ne - (hi - lo), **dict(kwargs, start=hi))
-        return _join(got, tail)
+        return _join(got, tail), None
 
     @staticmethod
     def _matches(pending, sample, seed, kwargs) -> bool:
@@ -168,17 +188,24 @@ class BeamEntryPrefetch:
             and all(_same(p_kwargs[k], rest[k]) for k in rest)
         )
 
-    def _schedule(self, pool, sample, seed, Ne, kwargs):
-        lo = int(kwargs.get("start", 0)) + Ne
-        n = min(GROWTH * max(Ne, 1), self.limit - lo)
-        if n <= 0:
+    def _schedule(self, pool, sample, seed, Ne, kwargs, carry):
+        """Look ahead to ``GROWTH * Ne`` rows past the block, after any carried rows."""
+        if self._pending is not None:
             return
-        context = contextvars.copy_context()
-        future = pool.submit(context.run, sample, seed, n, **dict(kwargs, start=lo))
+        lo = int(kwargs.get("start", 0)) + Ne
+        mid = lo if carry is None else lo + int(carry[0].shape[0])
+        n = min(lo + GROWTH * max(Ne, 1), self.limit) - mid
+        future = None
+        if n > 0:
+            context = contextvars.copy_context()
+            future = pool.submit(context.run, sample, seed, n, **dict(kwargs, start=mid))
+            self.prefetched_rows += n
+        if future is None and carry is None:
+            return
         rest = {k: v for k, v in kwargs.items() if k != "start"}
-        self._pending = (sample, seed, rest, lo, lo + n, future)
+        self._pending = (sample, seed, rest, lo, max(mid, mid + n), carry, future)
 
     def _drop_pending(self):
         pending, self._pending = self._pending, None
-        if pending is not None:
+        if pending is not None and pending[-1] is not None:
             pending[-1].cancel()

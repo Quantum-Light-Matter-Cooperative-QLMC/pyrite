@@ -19,17 +19,33 @@ def cutoff_rectangle_array(sorted_last_mode, *, xp=np):
     bit is one vectorized pass; no line-by-mode mask or duplicated line
     indices are allocated. ``xp`` is the array module (NumPy or CuPy).
 
+    On a device module the groups are found by :func:`_odd_prefix_rectangles`
+    (same rows, same order) with one host readback for validation and one
+    for the row count, instead of two per bit (#1481).
+
     Validation: cxr-line-fourier-reduction
     """
     counts = xp.asarray(sorted_last_mode)
     if counts.ndim != 1 or not np.issubdtype(counts.dtype, np.integer):
         raise ValueError("last modes must be a one-dimensional integer array")
-    if bool(xp.any(counts < 0)) or bool(xp.any(counts[1:] < counts[:-1])):
-        raise ValueError("last modes must be nonnegative and sorted")
     counts = counts.astype(xp.int64)
+    if counts.size == 0:
+        return xp.empty((0, 4), dtype=xp.int64)
+    # One readback: (invalid, largest last mode).
+    head = xp.stack(
+        (
+            (xp.any(counts < 0) | xp.any(counts[1:] < counts[:-1])).astype(xp.int64),
+            counts[-1],
+        )
+    )
+    get = getattr(head, "get", None)
+    invalid, top = (int(v) for v in (get() if callable(get) else head))
+    if invalid:
+        raise ValueError("last modes must be nonnegative and sorted")
+    if xp is not np and _odd_prefix_count(top) <= 4 * counts.size:
+        return _odd_prefix_rectangles(counts, top, xp)
     parts = [xp.empty((0, 4), dtype=xp.int64)]
-    top = int(counts[-1]).bit_length() if counts.size else 0
-    for b in range(top - 1, -1, -1):
+    for b in range(top.bit_length() - 1, -1, -1):
         idx = xp.flatnonzero((counts >> b) & 1)
         if idx.size == 0:
             continue
@@ -40,6 +56,34 @@ def cutoff_rectangle_array(sorted_last_mode, *, xp=np):
         j0 = start[first] + 1
         parts.append(xp.stack((j0, j0 + (1 << b), idx[first], idx[last] + 1), axis=1))
     return xp.concatenate(parts)
+
+
+def _odd_prefix_count(top):
+    """Candidate ``(b, v)`` pairs of :func:`_odd_prefix_rectangles` for largest mode ``top``."""
+    return sum(((top >> b) + 1) // 2 for b in range(top.bit_length()))
+
+
+def _odd_prefix_rectangles(counts, top, xp=np):
+    """:func:`cutoff_rectangle_array` rows from odd prefixes; one host readback.
+
+    The bit-``b`` group with ``s_b = (v - 1) 2^b`` holds the lines with
+    ``c >> b == v`` for odd ``v``: sorted lines ``searchsorted(c, v 2^b)`` to
+    ``searchsorted(c, (v + 1) 2^b)``. Every odd ``v <= top >> b`` is a
+    candidate; the nonempty ones, bits descending and ``v`` ascending, are
+    exactly the per-bit rows in their order. ``counts`` is sorted,
+    nonnegative int64 with last value ``top``.
+    """
+    parts = []
+    for b in range(top.bit_length() - 1, -1, -1):
+        v = xp.arange(1, (top >> b) + 1, 2, dtype=xp.int64)
+        j0 = ((v - 1) << b) + 1
+        lo = xp.searchsorted(counts, v << b, side="left")
+        hi = xp.searchsorted(counts, (v + 1) << b, side="left")
+        parts.append(xp.stack((j0, j0 + (1 << b), lo, hi), axis=1))
+    if not parts:
+        return xp.empty((0, 4), dtype=xp.int64)
+    rows = xp.concatenate(parts).astype(xp.int64)
+    return rows[xp.flatnonzero(rows[:, 3] > rows[:, 2])]
 
 
 def cutoff_rectangles(sorted_last_mode):

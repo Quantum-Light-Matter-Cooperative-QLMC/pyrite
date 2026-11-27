@@ -133,3 +133,20 @@ def test_first_prism_exit_on_and_past_the_exit_face():
     )
     np.testing.assert_array_equal(distance, [0.0, -1.0, 0.0])
     assert face.tolist() == [X_MAX, X_MAX, Z_MIN]
+
+
+def test_project_beam_entry_rows_equal_the_numpy_expression_bitwise():
+    """#1481: the fused row kernel is the NumPy projection bit for bit."""
+    from pyrite.montecarlo.geometry import beam_entry_basis
+
+    rng = np.random.default_rng(1481)
+    offsets = rng.normal(size=(4097, 2)) * 10.0 ** rng.uniform(-3, 8, size=(4097, 1))
+    offsets[:3] = [[np.nan, 1.0], [np.inf, 0.0], [0.0, -0.0]]
+    for tilt, azim in ((0.3, 0.0), (np.deg2rad(85.0), 0.7), (np.deg2rad(5.0), -2.1)):
+        e_x, e_y, b = beam_entry_basis(tilt, azim)
+        o = offsets[:, 0:1] * e_x + offsets[:, 1:2] * e_y
+        expected = (o + (-o[:, 2] / b[2])[:, None] * b)[:, :2]
+        got = project_beam_entry(offsets, tilt, azim)
+        np.testing.assert_array_equal(got.view(np.uint64), expected.view(np.uint64))
+        strided = project_beam_entry(np.asfortranarray(offsets), tilt, azim)
+        np.testing.assert_array_equal(strided.view(np.uint64), expected.view(np.uint64))

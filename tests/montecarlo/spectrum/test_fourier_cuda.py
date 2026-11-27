@@ -524,3 +524,46 @@ def test_device_shared_mode_runs_match_the_host_and_exact_bin_means(cp):
         part = cp.asnumpy(part)
         assert np.abs(part - ref).max() <= 1e-8 * mass
         assert np.abs(part - exact).max() <= 1e-6 * np.abs(exact).max()
+
+
+def test_fused_moment_combine_is_bitwise_the_cupy_combine(cp):
+    """#1481: one-launch combine = ``out[j0:j1] += m[0] - t m[1]`` on the same spectra.
+
+    The gather itself sums atomically (not reproducible run to run), so both
+    combines consume the same yielded spectra; overlapping mode ranges check
+    the accumulation order into ``out``.
+    """
+    from pyrite.montecarlo.spectrum.cxr import _fourier_spread
+
+    rng = np.random.default_rng(1481)
+    phase = cp.asarray(rng.uniform(-40.0, 40.0, 6000))
+    rows = cp.asarray(rng.normal(size=(2, phase.size)))
+    rects = [(1, 64, 0, 6000), (64, 96, 100, 3000), (1, 33, 2000, 5999), (33, 545, 0, 4000)]
+    dt = 2.0 * np.pi / 1234.5
+    fused = cp.zeros(546, dtype=cp.complex128)
+    ref = cp.zeros_like(fused)
+    plans = {}
+    spectra = _fourier_spread._gather_spectra(phase, rows, rects, eps=1e-9, plans=plans)
+    for j0, j1, spectrum, deconv in spectra:
+        m = j1 - j0
+        centred = cp.arange(-(m // 2), m - m // 2) % spectrum.shape[1]
+        moments = spectrum[:, centred] * deconv
+        t = dt * cp.arange(j0, j1, dtype=cp.float64)
+        ref[j0:j1] += moments[0] - t * moments[1]
+        _fourier_spread.combine_moments(fused, j0, j1, spectrum, deconv, dt)
+    np.testing.assert_array_equal(cp.asnumpy(fused), cp.asnumpy(ref))
+    assert cp.asnumpy(fused[1:545]).all()  # every rectangle-covered mode
+
+
+@pytest.mark.parametrize("top", [0, 1, 7, 64, 700, 5000])
+def test_device_cutoff_plan_equals_host_plan(cp, top):
+    """#1481: the device odd-prefix plan returns the host per-bit rows, in order."""
+    from pyrite.montecarlo.spectrum.cxr._fourier_cutoffs import cutoff_rectangle_array
+
+    rng = np.random.default_rng(top + 1481)
+    counts = np.sort(rng.integers(0, top + 1, 3000))
+    counts[-1] = top
+    got = cp.asnumpy(cutoff_rectangle_array(cp.asarray(counts), xp=cp))
+    np.testing.assert_array_equal(got, cutoff_rectangle_array(counts))
+    with pytest.raises(ValueError, match="sorted"):
+        cutoff_rectangle_array(cp.asarray([2, 1]), xp=cp)

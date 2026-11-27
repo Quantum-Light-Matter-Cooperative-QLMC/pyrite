@@ -137,6 +137,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     # Selected-set line-mass concentration and predicted roulette gain (#1295).
     "checks/line_roulette_selection_1295.py": (),
     # Device Fourier bin-mean reduction phase split (#1296): engineering evidence.
+    "checks/fourier_driver_1481.py": (),
     "checks/fourier_mode_cap_1320.py": (),
     "checks/fourier_reduction_phases_1296.py": (),
     "checks/adaptive_decision_cadence_1253.py": ("adaptive-sample-size-stopping",),

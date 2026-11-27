@@ -388,10 +388,27 @@ def share_only_tables(case, layer, composition, tables, hkls):
     ):
         return None
     composition = [(str(el), float(n)) for el, n in composition]
-    corrected, _, _ = _corrected_tables(
-        _radiator(case, layer), hkls, composition, tables, _line_cutoff_keV(case)
+    radiator, floor = _radiator(case, layer), _line_cutoff_keV(case)
+    # Same identity as ``layer_emission_tables``: tilts of one material and
+    # energy reselect the same shells (#1481).
+    key = (
+        "share-only",
+        radiator["crystal"],
+        float(radiator["B_ang2"]),
+        tuple(sorted(tuple(int(i) for i in h) for h in hkls)),
+        tuple(composition),
+        tuple(sorted((el, t.key, t.digest) for el, t in tables.items())),
+        floor,
     )
-    return removed_share_tables(tables, corrected, composition)
+    cached = _CACHE.get(key)
+    if cached is not None:
+        return dict(cached[0])
+    corrected, _, _ = _corrected_tables(radiator, hkls, composition, tables, floor)
+    out = removed_share_tables(tables, corrected, composition)
+    if len(_CACHE) >= _CACHE_LIMIT:
+        _CACHE.clear()
+    _CACHE[key] = (out, None)
+    return dict(out)
 
 
 def removed_share_tables(tables, corrected, composition):
