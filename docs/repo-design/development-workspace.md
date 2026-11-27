@@ -18,6 +18,62 @@ pixi run pyrite-dev --help
 the `dask` and `optimization` extras and the interactive apps. Run commands
 through `pixi run`, or open an activated shell with `pixi shell`.
 
+## Pixi tasks
+
+The manifest owns the common workflow entry points and their dependencies.
+`pyrite-dev` remains the implementation of repository-aware operations and
+can still be invoked directly inside an activated environment. Discover
+available tasks with `pixi task list -e default` or `pixi task list -e nvidia`.
+
+```bash
+pixi run --locked lint
+pixi run --locked fmt
+pixi run --locked verify-quick
+pixi run --locked verify
+pixi run --locked test tests/remote/test_environment_pack.py
+pixi run --locked -e nvidia test-suite transport --slow
+pixi run --locked -e docs docs
+pixi run --locked -e runtime-cpu fetch-tables
+pixi run --locked -e runtime-cpu quickstart
+```
+
+`verify` runs the same ordered, non-mutating gates as `pyrite-dev verify`;
+`verify-quick` omits only the documentation build. Neither runs pytest.
+The separate CI skill-mirror and repository-map checks are available as
+`check-skills` and `repo-map-check`. Generation and formatting tasks are
+explicit writes (`fmt`, `cli-reference-write`, `validation-ledger-write`,
+`repo-map-write`, `sync-skills`); they are not verification dependencies.
+
+Task definitions are scoped to their dependency features. For example,
+`test` and `test-suite` require the test feature, while `lint` and `verify`
+require lint; lean runtimes expose simulation tasks but not developer gates.
+The `test-cpu` task explicitly selects CPU; `test` and `test-suite` preserve
+normal backend selection and forward arguments to `pyrite-dev`. The
+experimental `py315` environment has no default feature; use the direct
+`pyrite tables fetch` and `pyrite run quickstart` commands there. No task
+caching is enabled: scientific execution, checks, and generation must not
+silently skip work due to an incomplete input fingerprint.
+
+For focused development, the following environments omit unrelated contributor
+features while sharing the corresponding interpreter solve group:
+
+| Environment | Scope | Example |
+|---|---|---|
+| `quality` | Python 3.14; lint, docs and runtime imports for type checking, including apps and oracles; no test, notebook-conversion or browser group | `pixi run --locked -e quality verify` |
+| `test-physics` | Python 3.13; tests, oracles, Dask and optimization; no app, docs or lint tooling | `pixi run --locked -e test-physics test-cpu tests/montecarlo/transport/` |
+| `packaging` | Python 3.13; test/build tooling, no optional app stack in the outer environment | `pixi run --locked -e packaging package-smoke` |
+
+These are opt-in. The full contributor environments remain the reference
+for CI and whole-suite coverage, since some tests require app/plot, notebook,
+Sphinx or static-analysis dependencies. The package smoke installs the wheel
+and editable project in fresh pip venvs, including app extras in those venvs.
+Run `pixi lock` after adding these environments and commit the lockfile.
+
+Test ownership now lives in `pyrite.devtools.test_suites`; worker sizing and
+BLAS thread caps live in `pyrite.devtools.test_resources`. `dev_cli` retains
+its command dispatch and compatibility imports. Suite memberships, argument
+forwarding and worker selection are unchanged.
+
 ## Pixi workspace
 
 `[tool.pixi]` in `pyproject.toml` defines the environments; `pixi.lock`

@@ -36,6 +36,12 @@ prose keep required format.
 ## Canonical commands
 
 Use project runner; never bare `pytest`, `.venv/bin/python`, or path-hack imports.
+The equivalent Pixi task entry points are discoverable with `pixi task list`.
+Prefer `pixi run --locked verify-quick` for focused static gates (no docs or
+pytest), `pixi run --locked verify` for the full non-test gate, and
+`pixi run --locked test PATH` or `pixi run --locked test-suite SUITE` for tests.
+Existing `pyrite-dev` commands below remain supported; task wrappers preserve
+argument forwarding, suite ownership, and adaptive worker policy.
 
 ```bash
 pixi run pyrite-dev test path/to/test.py -k test_name

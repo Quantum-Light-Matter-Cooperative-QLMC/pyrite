@@ -640,6 +640,9 @@ psutil = ">=7.2.2"
 gemmi = ">=0.7.5,<0.8"
 
 # nbconvert's Markdown/LaTeX exporters shell out to the pandoc binary.
+[tool.pixi.feature.oracle.dependencies]
+matplotlib-base = ">=3.11.0"
+
 [tool.pixi.feature.notebooks.dependencies]
 matplotlib-base = ">=3.11.0"
 pandoc = "*"
@@ -713,6 +716,48 @@ UV_TOOL_DIR = "$PIXI_PROJECT_ROOT/.pixi/uv-tools"
 UV_TOOL_BIN_DIR = "$PIXI_PROJECT_ROOT/.pixi/uv-tools/bin"
 UV_CACHE_DIR = "$PIXI_PROJECT_ROOT/.pixi/uv-cache"
 
+# Workflow entry points, scoped to the features that supply their tools.
+# Keep the commands usable directly in an activated environment as well.
+# No inputs/outputs on gates or scientific tasks: they must run on invocation.
+[tool.pixi.tasks]
+fetch-tables = { cmd = "pyrite tables fetch", description = "Fetch and verify pinned reference data" }
+quickstart = { cmd = "pyrite run quickstart", description = "Run the bundled simulation example" }
+
+[tool.pixi.feature.test.tasks]
+test = { cmd = "pyrite-dev test", description = "Run focused tests with the project runner" }
+test-cpu = { cmd = "pyrite-dev test", env = { PYRITE_MC_BACKEND = "cpu" }, description = "Run focused tests on CPU" }
+test-suite = { cmd = "pyrite-dev test-suite", description = "Run a named domain suite" }
+package-smoke = { cmd = "pyrite-dev package-smoke", description = "Build and smoke-test the distribution" }
+
+[tool.pixi.feature.lint.tasks]
+lint = { cmd = "python -m ruff check .", description = "Check lint rules" }
+fmt = { cmd = "python -m ruff format .", description = "Format source files" }
+fmt-check = { cmd = "python -m ruff format --check .", description = "Check formatting without editing" }
+typecheck = { cmd = "python -m ty check --exit-zero-on-warning", description = "Check Python types" }
+imports = { cmd = "lint-imports --no-cache", description = "Check import boundaries" }
+precommit = { cmd = "python -m pre_commit run --all-files", description = "Run pre-commit hooks" }
+nbqa = { cmd = "pyrite-dev nbqa", description = "Lint maintained notebooks" }
+nbstrip = { cmd = "pyrite-dev nbstrip", description = "Strip maintained notebook outputs" }
+check-lines = { cmd = "pyrite-dev check-lines", description = "Check source-module line budgets" }
+check-complexity = { cmd = "pyrite-dev complexity --check", description = "Check the complexity ratchet" }
+check-api = { cmd = "pyrite-dev api check", description = "Check the governed API inventory" }
+check-skills = { cmd = "pyrite-dev check-skills", description = "Check agent skill mirrors" }
+repo-map-check = { cmd = "pyrite-dev repo-map --check", description = "Check the generated repository map" }
+repo-map-write = { cmd = "pyrite-dev repo-map --write", description = "Regenerate the repository map" }
+sync-skills = { cmd = "pyrite-dev sync-skills", description = "Synchronize agent skill mirrors" }
+# All current lint environments also contain docs. Keep the full gate order
+# identical to pyrite-dev verify; verify-quick omits only the docs build.
+verify-quick = { depends-on = ["typecheck", "lint", "fmt-check", "check-lines", "check-complexity", "check-api", "imports"] }
+verify = { depends-on = ["typecheck", "lint", "fmt-check", "check-lines", "check-complexity", "check-api", "docs", "imports"] }
+
+[tool.pixi.feature.docs.tasks]
+docs = { cmd = "pyrite-dev docs", description = "Build clean warnings-as-errors documentation" }
+docs-linkcheck = { cmd = "pyrite-dev docs --linkcheck", description = "Check documentation links" }
+cli-reference-check = { cmd = "pyrite-dev cli-reference --check", description = "Check generated CLI reference" }
+cli-reference-write = { cmd = "pyrite-dev cli-reference --write", description = "Regenerate CLI reference" }
+validation-ledger-check = { cmd = "pyrite-dev validation-ledger --check", description = "Check generated validation ledger" }
+validation-ledger-write = { cmd = "pyrite-dev validation-ledger --write", description = "Regenerate validation ledger" }
+
 # One-off research scripts (trajectory scene viewers, PDF figure digitizing)
 # that need packages nothing else uses: `pixi run -e viz python checks/...`.
 [tool.pixi.feature.viz]
@@ -778,6 +823,13 @@ intel-cmplr-lib-rt = "*"
 default = { features = ["cpu", "py313", "test", "lint", "docs", "notebooks", "oracle", "browser", "dask", "optimization"], solve-group = "py313" }
 py314 = { features = ["cpu", "py314", "test", "lint", "docs", "notebooks", "oracle", "browser", "dask", "optimization"], solve-group = "py314" }
 docs = { features = ["cpu", "py313", "docs"], solve-group = "py313" }
+# Focused developer environments: full default/py314 remain the CI reference.
+# Quality retains runtime app/oracle imports for type checking and docs.
+quality = { features = ["cpu", "py314", "lint", "docs", "apps", "oracle", "dask", "optimization"], solve-group = "py314" }
+# Focused numerical tests; do not use for full-suite coverage or app tests.
+test-physics = { features = ["cpu", "py313", "test", "oracle", "dask", "optimization"], solve-group = "py313" }
+# The package smoke creates its own plain pip venvs; the outer env needs build.
+packaging = { features = ["cpu", "py313", "test"], solve-group = "py313" }
 # Every default group except `oracle` (abtem needs pyFFTW, no cp315 build).
 py315 = { features = ["py315", "test", "lint", "docs", "notebooks", "browser", "dask", "optimization"], no-default-feature = true }
 # Developer GPU environments retain their existing capabilities. Each shares

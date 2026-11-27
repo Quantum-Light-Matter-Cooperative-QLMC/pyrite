@@ -9,7 +9,6 @@ Use ``pyrite-dev --help`` for the maintained command inventory.
 """
 
 import argparse
-import fnmatch
 import importlib.util
 import os
 import re
@@ -17,140 +16,40 @@ import shutil
 import subprocess
 import sys
 import time
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 import yaml
 
 from pyrite._acp import ACP_SERVERS, start_acp_servers, stop_acp_servers
 from pyrite.devtools import repo_root
+from pyrite.devtools.errors import AgentToolingError as AgentToolingError
+from pyrite.devtools.test_resources import (
+    BLAS_THREAD_VARS as BLAS_THREAD_VARS,
+    MAX_TEST_WORKERS as MAX_TEST_WORKERS,
+    TEST_WORKER_MEMORY_BYTES as TEST_WORKER_MEMORY_BYTES,
+    _xdist_workers as _xdist_workers,
+    blas_thread_env as blas_thread_env,
+    default_test_workers as default_test_workers,
+    parallel_pytest_args as parallel_pytest_args,
+)
+from pyrite.devtools.test_suites import (
+    IDENTITY_PIN_TESTS as IDENTITY_PIN_TESTS,
+    INTEGRATION_TESTS as INTEGRATION_TESTS,
+    PRIMARY_TEST_SUITE_NAMES as PRIMARY_TEST_SUITE_NAMES,
+    SAMPLED_TEST_SUITES as SAMPLED_TEST_SUITES,
+    SUITE_MARKERS as SUITE_MARKERS,
+    TEST_SUITE_DIRECTORIES as TEST_SUITE_DIRECTORIES,
+    TEST_SUITE_NAMES as TEST_SUITE_NAMES,
+    TEST_SUITE_PATTERNS as TEST_SUITE_PATTERNS,
+    test_files_for_suite as test_files_for_suite,
+    test_suite_owner as test_suite_owner,
+)
 
 ROOT = repo_root()
 AGENT_SKILLS_DIR = ROOT / ".agents" / "skills"
 CLAUDE_SKILLS_DIR = ROOT / ".claude" / "skills"
 LEGACY_NOTEBOOK = ROOT / "checks" / "feranchuk_analysis.ipynb"
 SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-
-TEST_SUITE_PATTERNS = {
-    "packaging": (
-        "dev/test_agent_tooling.py",
-        "cli/test_contract.py",
-        "cli/test_reference.py",
-        "detectors/test_package.py",
-        "dev/test_dev.py",
-        "dev/test_doc_blocks.py",
-        "materials/test_materials_package.py",
-        "montecarlo/test_exports.py",
-        "plots/test_exports.py",
-        "results/test_exports.py",
-    ),
-    "apps": (
-        "notebooks/analysis_app/test_app.py",
-        "notebooks/analysis_app/test_analyze.py",
-        "notebooks/analysis_app/test_export.py",
-        "check/test_app.py",
-        "plots/test_material_comparison.py",
-        "plots/test_penetration_views.py",
-        "plots/test_plotly_detectors.py",
-        "plots/test_plotly_material_comparison.py",
-        "plots/test_plotly_spectra.py",
-        "plots/test_plotly_spectra_compare.py",
-        "plots/test_plotly_sweeps.py",
-        "notebooks/test_design.py",
-        "plots/test_plotly_trajectories.py",
-        "plots/test_render_*.py",
-        "notebooks/test_scan_app.py",
-        "notebooks/test_split_apps.py",
-        "notebooks/test_trace_app.py",
-        "plots/test_trajectories.py",
-        "materials/test_validation_background.py",
-        "notebooks/test_viewer.py",
-    ),
-    "cli": (
-        "checkpoint/test_archive.py",
-        "cli/test_blaze.py",
-        "materials/test_catalog_startup_errors.py",
-        "check/test_config.py",
-        "checkpoint/test_cli.py",
-        "checkpoint/test_gc.py",
-        "cli/test_*.py",
-        "energy-grid/test_cli.py",
-        "scan/test_local_dashboard.py",
-        "montecarlo/test_output_noise.py",
-        "remote/test_remote_command_*.py",
-        "remote/test_click.py",
-        "scan/test_scan_*.py",
-        "checkpoint/test_slim.py",
-    ),
-    # Genuine cross-directory exceptions to TEST_SUITE_DIRECTORIES.
-    "transport": ("montecarlo/test_cone_split.py", "montecarlo/test_cone_split_weights.py"),
-    "quantum": ("montecarlo/channeling/test_channeling_bloch.py",),
-    "channeling": ("materials/test_channeling_*.py",),
-}
-
-# Directory-owned suites (#854): every module below one of these directories
-# belongs to its suite, so a new module needs no edit here. TEST_SUITE_PATTERNS
-# entries (first match) win over directories; ``core`` owns the rest.
-TEST_SUITE_DIRECTORIES = {
-    "montecarlo/transport": "transport",
-    "montecarlo/collisions": "transport-collisions",
-    "montecarlo/cascades": "transport-cascades",
-    "montecarlo/runner": "transport-runner",
-    "montecarlo/spectrum": "spectrum",
-    "montecarlo/coherent": "spectrum-coherent",
-    "montecarlo/brem": "spectrum-brem",
-    "montecarlo/channeling": "channeling",
-    "montecarlo/quantum": "quantum",
-    "energy-grid": "energy-grid",
-    "materials": "materials",
-    "xsgen": "xsgen",
-}
-
-INTEGRATION_TESTS = (
-    "notebooks/analysis_app/test_app.py",
-    "cli/test_contract.py",
-    "materials/test_materials_package.py",
-    "montecarlo/test_exports.py",
-    "remote/test_remote_command_successful.py",
-    "results/test_exports.py",
-    "scan/test_run.py",
-    "scan/test_sweep.py",
-)
-PRIMARY_TEST_SUITE_NAMES = (
-    "core",
-    "packaging",
-    "apps",
-    "cli",
-    "quantum",
-    "channeling",
-    "spectrum-coherent",
-    "spectrum-brem",
-    "spectrum",
-    "transport-cascades",
-    "transport-collisions",
-    "transport-runner",
-    "transport",
-    "energy-grid",
-    "materials",
-    "xsgen",
-)
-# Modules holding ``identity_pin`` tests (#1316); the ``identity-pins`` suite runs
-# only those tests (``-m identity_pin``). ``--update-pins`` re-mints every pin.
-IDENTITY_PIN_TESTS = (
-    "campaign/test_channeling_section.py",
-    "detectors/test_acceptance.py",
-    "materials/test_profiles.py",
-    "montecarlo/runner/test_case.py",
-    "scan/test_adaptive_api.py",
-)
-#: Cross-domain samples: they overlap the primary partition.
-SAMPLED_TEST_SUITES = {"integration": INTEGRATION_TESTS, "identity-pins": IDENTITY_PIN_TESTS}
-#: Marker expressions that narrow a sampled suite to its owned tests.
-SUITE_MARKERS = {"identity-pins": "identity_pin"}
-TEST_SUITE_NAMES = (*PRIMARY_TEST_SUITE_NAMES, *SAMPLED_TEST_SUITES)
-
-
-class AgentToolingError(RuntimeError):
-    """Raised when the portable skill tree is malformed or out of sync."""
 
 
 def run(*args: str, cwd: Path = ROOT, extra_env: dict[str, str] | None = None) -> None:
@@ -308,56 +207,6 @@ def cmd_nbstrip(_: argparse.Namespace) -> None:
     run("-m", "nbstripout", *[str(p) for p in notebooks])
 
 
-# Measured per-worker peak RSS over the full suite is ~1.2-1.8 GiB; budget 2 GiB
-# so a laptop with other work running does not swap or OOM.
-TEST_WORKER_MEMORY_BYTES = 2 * 1024**3
-MAX_TEST_WORKERS = 6
-
-
-def default_test_workers() -> int:
-    """xdist worker count for an untargeted run: ``PYRITE_TEST_WORKERS`` or a
-    CPU- and available-memory-bounded default (1 means serial)."""
-    override = os.environ.get("PYRITE_TEST_WORKERS")
-    if override:
-        return max(1, int(override))
-    import psutil
-
-    by_memory = psutil.virtual_memory().available // TEST_WORKER_MEMORY_BYTES
-    return max(1, min(os.cpu_count() or 1, by_memory, MAX_TEST_WORKERS))
-
-
-def _selects_test_paths(pytest_args: list[str]) -> bool:
-    return any(
-        not arg.startswith("-") and ("::" in arg or (ROOT / arg).exists() or Path(arg).exists())
-        for arg in pytest_args
-    )
-
-
-def parallel_pytest_args(pytest_args: list[str]) -> list[str]:
-    """Prepend xdist workers unless the caller supplies a targeted selection.
-
-    Call with forwarded arguments only; ``test-suite`` adds its owned paths
-    afterwards. Runs that name test paths, choose ``-n``/``--numprocesses``,
-    or disable xdist are forwarded unchanged.
-    """
-    explicit = any(
-        arg in {"-n", "--numprocesses", "no:xdist"}
-        or arg.startswith(("-n=", "--numprocesses="))
-        or (arg.startswith("-n") and arg[2:].isdigit())
-        for arg in pytest_args
-    )
-    if explicit or _selects_test_paths(pytest_args):
-        return pytest_args
-    workers = default_test_workers()
-    if workers < 2:
-        return pytest_args
-    print(
-        f"pyrite-dev: {workers} xdist workers (PYRITE_TEST_WORKERS=1 for serial)",
-        file=sys.stderr,
-    )
-    return ["-n", str(workers), "--dist", "worksteal", *pytest_args]
-
-
 def _pytest_env(args: argparse.Namespace) -> dict[str, str]:
     """Environment overrides selected by ``test``/``test-suite`` flags."""
     env = {}
@@ -365,42 +214,6 @@ def _pytest_env(args: argparse.Namespace) -> dict[str, str]:
         env["NUMBA_DISABLE_JIT"] = "1"
     if getattr(args, "slow", False):
         env["PYRITE_SLOW_TESTS"] = "1"
-    return env
-
-
-#: Native thread pools capped per xdist worker (#1021). numpy and scipy each
-#: load their own OpenBLAS, so N workers x default pools oversubscribe cores.
-BLAS_THREAD_VARS = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")
-
-
-def _xdist_workers(pytest_args: tuple[str, ...]) -> int:
-    """Worker count requested by ``-n``/``--numprocesses`` (``auto`` = CPUs)."""
-    for i, arg in enumerate(pytest_args):
-        if arg in {"-n", "--numprocesses"} and i + 1 < len(pytest_args):
-            value = pytest_args[i + 1]
-        elif arg.startswith(("-n=", "--numprocesses=")):
-            value = arg.split("=", 1)[1]
-        elif arg.startswith("-n") and arg[2:].isdigit():
-            value = arg[2:]
-        else:
-            continue
-        if value in {"auto", "logical"}:
-            return os.cpu_count() or 1
-        return int(value) if value.isdigit() else 1
-    return 1
-
-
-def blas_thread_env(pytest_args: tuple[str, ...]) -> dict[str, str]:
-    """Single-threaded BLAS/OpenMP for parallel runs; caller-set values win."""
-    if _xdist_workers(pytest_args) < 2:
-        return {}
-    env = {name: "1" for name in BLAS_THREAD_VARS if name not in os.environ}
-    if env:
-        print(
-            "pyrite-dev: 1 BLAS/OpenMP thread per xdist worker "
-            "(set OPENBLAS_NUM_THREADS/OMP_NUM_THREADS to override)",
-            file=sys.stderr,
-        )
     return env
 
 
@@ -414,45 +227,6 @@ def _run_pytest(args: argparse.Namespace, *pytest_args: str) -> None:
 
 def cmd_test(args: argparse.Namespace) -> None:
     _run_pytest(args, *parallel_pytest_args(getattr(args, "pytest_args", [])))
-
-
-def test_files_for_suite(name: str, root: Path = ROOT) -> list[Path]:
-    """Return deterministic repository test paths for one documented suite.
-
-    Primary domain suites partition every ``tests/**/test_*.py`` module once.
-    ``core`` owns shared infrastructure and modules outside the named domains.
-    ``integration`` intentionally samples public boundaries across domains, and
-    ``identity-pins`` the modules holding identity pins; the full
-    ``pyrite-dev test`` gate remains unchanged.
-    """
-    tests_dir = root / "tests"
-    files = sorted(tests_dir.rglob("test_*.py"))
-    if name in SAMPLED_TEST_SUITES:
-        selected = [tests_dir / filename for filename in SAMPLED_TEST_SUITES[name]]
-        missing = [path.name for path in selected if not path.is_file()]
-        if missing:
-            raise AgentToolingError(f"missing {name} tests: " + ", ".join(missing))
-        return selected
-    if name not in PRIMARY_TEST_SUITE_NAMES:
-        raise AgentToolingError(f"unknown test suite {name!r}")
-
-    return [path for path in files if test_suite_owner(path.relative_to(tests_dir)) == name]
-
-
-def test_suite_owner(relative: str | Path) -> str:
-    """Return the primary suite owning one ``tests/``-relative module path.
-
-    Explicit patterns win (first match), then the deepest owning directory,
-    then ``core``.
-    """
-    posix = Path(relative).as_posix()
-    for candidate, patterns in TEST_SUITE_PATTERNS.items():
-        if any(fnmatch.fnmatchcase(posix, pattern) for pattern in patterns):
-            return candidate
-    for parent in PurePosixPath(posix).parents:
-        if (owner := TEST_SUITE_DIRECTORIES.get(parent.as_posix())) is not None:
-            return owner
-    return "core"
 
 
 def cmd_test_suite(args: argparse.Namespace) -> None:

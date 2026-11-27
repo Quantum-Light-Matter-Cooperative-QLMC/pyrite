@@ -1,6 +1,7 @@
 """Tests for the repository developer command runner."""
 
 import fnmatch
+import tomllib
 from argparse import Namespace
 from types import SimpleNamespace
 
@@ -382,7 +383,7 @@ def test_formatter_regenerates_and_commits_cli_reference(dev_module) -> None:
         if step.get("name") == "Commit formatting and generated-reference fixes"
     )
 
-    assert reference["run"] == "pixi run --locked -e py314 pyrite-dev cli-reference --write"
+    assert reference["run"] == "pixi run --locked -e py314 cli-reference-write"
     assert "'docs/repo-design/cli/cli-reference*.md'" in commit["run"]
     assert "style: apply Ruff formatting and regenerate CLI reference" in commit["run"]
 
@@ -675,6 +676,47 @@ def test_verify_checks_without_separate_notebook_regeneration(
         "cmd_docs",
         "cmd_imports",
     ]
+    # The compatibility command and the Pixi graph must enforce the same gates.
+    pixi = tomllib.loads((dev_module.ROOT / "pyproject.toml").read_text())["tool"]["pixi"]
+    tasks = {**pixi["feature"]["lint"]["tasks"], **pixi["feature"]["docs"]["tasks"]}
+    commands = {
+        "cmd_typecheck": "python -m ty check --exit-zero-on-warning",
+        "cmd_lint": "python -m ruff check .",
+        ("-m", "ruff", "format", "--check", "."): "python -m ruff format --check .",
+        "cmd_check_lines": "pyrite-dev check-lines",
+        "cmd_complexity": "pyrite-dev complexity --check",
+        "cmd_api": "pyrite-dev api check",
+        "cmd_docs": "pyrite-dev docs",
+        "cmd_imports": "lint-imports --no-cache",
+    }
+    full = tasks["verify"]["depends-on"]
+    quick = tasks["verify-quick"]["depends-on"]
+    assert [tasks[name]["cmd"] for name in full] == [commands[call] for call in calls]
+    assert quick == [name for name in full if name != "docs"]
+    for name in (*full, "verify", "verify-quick"):
+        assert not {"inputs", "outputs"} & tasks[name].keys()
+
+
+def test_pixi_task_feature_scopes(dev_module) -> None:
+    pixi = tomllib.loads((dev_module.ROOT / "pyproject.toml").read_text())["tool"]["pixi"]
+    features = pixi["feature"]
+    for name, environment in pixi["environments"].items():
+        active = set(environment["features"])
+        tasks = {} if environment.get("no-default-feature") else dict(pixi["tasks"])
+        for feature in active:
+            additions = features.get(feature, {}).get("tasks", {})
+            assert not tasks.keys() & additions.keys(), name
+            tasks.update(additions)
+        assert ("test" in tasks) == ("test" in active), name
+        assert ("verify" in tasks) == ("lint" in active), name
+        assert ("docs" in tasks) == ("docs" in active), name
+        if name.startswith("runtime-"):
+            assert set(tasks) == {"fetch-tables", "quickstart"}, name
+        for task in tasks.values():
+            assert set(task.get("depends-on", ())) <= tasks.keys(), name
+    assert features["test"]["tasks"]["test-cpu"]["env"] == {"PYRITE_MC_BACKEND": "cpu"}
+    assert "env" not in features["test"]["tasks"]["test-suite"]
+    assert "env" not in features["test"]["tasks"]["test"]
 
 
 @pytest.mark.parametrize("imports", [False, True])

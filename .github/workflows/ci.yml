@@ -83,10 +83,10 @@ jobs:
           cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
 
       - name: Format code
-        run: pixi run --locked -e py314 pyrite-dev format
+        run: pixi run --locked -e py314 fmt
 
       - name: Regenerate CLI reference
-        run: pixi run --locked -e py314 pyrite-dev cli-reference --write
+        run: pixi run --locked -e py314 cli-reference-write
 
       - name: Commit formatting and generated-reference fixes
         id: commit
@@ -168,13 +168,13 @@ jobs:
           key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
 
       - name: Fetch pinned data
-        run: pixi run --locked -e ${{ matrix.environment }} pyrite tables fetch
+        run: pixi run --locked -e ${{ matrix.environment }} fetch-tables
 
       - name: Test ${{ matrix.suite }} suite
         # Every PR runs the opt-in slow tier too (#381).
         env:
           PYRITE_SLOW_TESTS: "1"
-        run: pixi run --locked -e ${{ matrix.environment }} pyrite-dev test-suite "${{ matrix.suite }}" --durations=30 --durations-min=0.5
+        run: pixi run --locked -e ${{ matrix.environment }} test-suite "${{ matrix.suite }}" --durations=30 --durations-min=0.5
 
   quantum:
     needs: changes
@@ -208,12 +208,12 @@ jobs:
           key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
 
       - name: Fetch pinned data
-        run: pixi run --locked -e ${{ matrix.environment }} pyrite tables fetch
+        run: pixi run --locked -e ${{ matrix.environment }} fetch-tables
 
       - name: Test quantum suite
         env:
           PYRITE_SLOW_TESTS: "1"
-        run: pixi run --locked -e ${{ matrix.environment }} pyrite-dev test-suite quantum --durations=30 --durations-min=0.5
+        run: pixi run --locked -e ${{ matrix.environment }} test-suite quantum --durations=30 --durations-min=0.5
 
   # Provisional Python 3.15 probe (#1421). Nonblocking: 3.15 is not a
   # supported version until pyproject classifiers and docs say so. The `py315`
@@ -260,12 +260,12 @@ jobs:
 
       - name: Packaging and identity pins
         run: |
-          pixi run --locked -e py315 pyrite-dev test-suite packaging
-          pixi run --locked -e py315 pyrite-dev test-suite identity-pins
+          pixi run --locked -e py315 test-suite packaging
+          pixi run --locked -e py315 test-suite identity-pins
 
       - name: RNG, baseline, checkpoint and bounded transport/radiation
         run: >-
-          pixi run --locked -e py315 pyrite-dev test
+          pixi run --locked -e py315 test
           tests/montecarlo/runner/test_physics_baseline.py
           tests/montecarlo/runner/test_block_transport.py
           tests/montecarlo/collisions/test_straggling_rng_plumbing.py
@@ -281,7 +281,7 @@ jobs:
           tests/test_paths.py
 
       - name: Wheel and editable install smoke
-        run: pixi run --locked -e py315 pyrite-dev package-smoke
+        run: pixi run --locked -e py315 package-smoke
 
   full:
     runs-on: ubuntu-latest
@@ -297,11 +297,11 @@ jobs:
 
       # Includes a non-mutating format check for fork PRs too.
       - name: Verify non-test gates
-        run: pixi run --locked -e py314 pyrite-dev verify
+        run: pixi run --locked -e py314 verify
       - name: Check agent skills
-        run: pixi run --locked -e py314 pyrite-dev check-skills
+        run: pixi run --locked -e py314 check-skills
       - name: Check generated repository map
-        run: pixi run --locked -e py314 pyrite-dev repo-map --check
+        run: pixi run --locked -e py314 repo-map-check
 
   runtime-smoke:
     runs-on: ubuntu-latest
@@ -329,9 +329,9 @@ jobs:
             ~/.local/share/pyrite/xsgen/tables
             ~/.local/share/pyrite/xsgen/reference-data
           key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
-      - run: pixi run --locked -e runtime-cpu pyrite tables fetch
+      - run: pixi run --locked -e runtime-cpu fetch-tables
       - name: Run the bundled quickstart without developer dependencies
-        run: pixi run --locked -e runtime-cpu pyrite run quickstart
+        run: pixi run --locked -e runtime-cpu quickstart
 
   # Keep the existing JIT-compiled suite above. Here --numba intentionally
   # disables JIT to exercise Python-level Numba bodies; it does NOT test

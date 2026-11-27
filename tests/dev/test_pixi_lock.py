@@ -95,3 +95,21 @@ def test_runtime_lock_is_strict_subset_of_developer_peer(runtime, peer):
         runtime_packages = {tuple(sorted(entry.items())) for entry in entries}
         peer_packages = {tuple(sorted(entry.items())) for entry in peer_rows[platform]}
         assert runtime_packages < peer_packages, f"{runtime}/{platform} differs from {peer}"
+
+
+@pytest.mark.parametrize(
+    ("name", "peer", "required", "excluded"),
+    [
+        ("quality", "py314", {"lint", "docs", "apps"}, {"test", "notebooks", "browser"}),
+        ("test-physics", "default", {"test", "oracle"}, {"lint", "docs", "notebooks", "apps"}),
+        ("packaging", "default", {"test"}, {"lint", "docs", "notebooks", "oracle", "apps"}),
+    ],
+)
+def test_focused_developer_environment_features(name, peer, required, excluded):
+    manifest = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    environments = manifest["tool"]["pixi"]["environments"]
+    spec = environments[name]
+    assert required <= set(spec["features"])
+    assert not excluded.intersection(spec["features"])
+    assert spec["solve-group"] == environments[peer]["solve-group"]
+    assert not spec.get("no-default-feature")
