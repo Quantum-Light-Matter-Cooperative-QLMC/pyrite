@@ -204,7 +204,10 @@ lines in one sink, at quadrature weight / Ne, and reduces them together
 (`_bin_queue.shared_bin_lines`). That is one flush per `fiber_lines` call (per
 block, or per retained case) up to the existing `HOST_FOURIER_FLUSH_LINES`.
 Streamed scorers also keep the tables within a 512 MiB insertion budget
-(`FiberTableCache`). The retained route keeps none because it never reuses them.
+(`FiberTableCache`). On a CUDA or ROCm device they take at most 1/8 of the pool
+headroom, and a recognized device OOM drops them for the rest of the run, so its
+retries run without them. The timings below are CPU; the device cache is not
+benchmarked. The retained route keeps no tables because it never reuses them.
 
 Same scene and arms, DESKTOP-QNIHO3D CPU (FP64, 16 CPUs), one process per arm,
 serial. `f7a3f8116` (#1490) vs `95d5948ca`, jobs 16245–16251; raw:

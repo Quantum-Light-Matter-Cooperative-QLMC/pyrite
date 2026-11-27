@@ -21,6 +21,9 @@ import json
 from collections.abc import Mapping
 from typing import Any
 
+from . import electron_blocks
+from .oom import _register_evictable
+
 #: Case key of the resolved fiber model record (scientific identity).
 FIBER_CASE_KEY = "cxr_fiber"
 #: Execution-only case key: reflections per coupling-table batch.
@@ -165,24 +168,47 @@ class FiberTableCache(dict):
     ``budget`` bytes are held: every block visits the rolls in the same order,
     so least-recently-used eviction would miss on every call of a cyclic scan
     larger than the budget, while keeping the first sets hits each one.
+
+    On a CUDA or ROCm device the sets are also held to
+    :data:`FIBER_TABLE_DEVICE_SHARE` of the pool headroom, and a recognized
+    device OOM drops them all for the rest of the run (:meth:`evict`).
     """
 
     def __init__(self, budget: int) -> None:
         super().__init__()
         self.budget = int(budget)
         self.nbytes = 0
+        _register_evictable(self)
 
     def __setitem__(self, key, tables) -> None:
         size = sum(int(getattr(table, "nbytes", 0)) for table in tables)
-        if key in self or self.nbytes + size > self.budget:
+        if key in self or self.nbytes + size > self._limit(size):
             return
         super().__setitem__(key, tables)
         self.nbytes += size
+
+    def _limit(self, size: int) -> int:
+        """Bytes the cache may hold now that a ``size``-byte set has been built."""
+        headroom = electron_blocks.device_headroom_bytes()
+        if headroom is None:
+            return self.budget
+        # Headroom already excludes the held sets and the one just built.
+        share = FIBER_TABLE_DEVICE_SHARE * (headroom + self.nbytes + size)
+        return min(self.budget, int(share))
+
+    def evict(self) -> None:
+        """Drop every set and keep none from now on: the device needs the memory."""
+        self.budget = 0
+        self.clear()
+        self.nbytes = 0
 
 
 #: Coupling-table bytes one fiber case keeps across streamed blocks (#1509).
 #: The #1490 scene holds about 14 MiB per (roll, batch) at cutoff 6 and 32 rolls.
 FIBER_TABLE_CACHE_BYTES = 512 * 2**20
+#: Most of the device pool headroom those tables may take; block rows and
+#: scoring scratch need the rest.
+FIBER_TABLE_DEVICE_SHARE = 0.125
 _TABLES_KEY = "fiber-tables"
 
 
@@ -190,7 +216,9 @@ def streamed_table_cache(case: Mapping[str, Any]) -> dict:
     """A streamed scorer's table cache: fiber cases opt into :class:`FiberTableCache`.
 
     Only a cache that outlives one :func:`fiber_lines` call is reused, so the
-    retained route (one call per case) keeps none and its peak memory.
+    retained route (one call per case) keeps none. Its host peak memory still
+    rose with #1509: the shared bin-mean line queue holds up to
+    ``HOST_FOURIER_FLUSH_LINES`` lines before it reduces them.
     """
     return {_TABLES_KEY: FiberTableCache(FIBER_TABLE_CACHE_BYTES)} if is_fiber_case(case) else {}
 

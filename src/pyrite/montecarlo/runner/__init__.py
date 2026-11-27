@@ -239,6 +239,9 @@ from .oom import (
     _ensure_transport_pool_limit as _ensure_transport_pool_limit,
 )
 from .oom import (
+    _evict_caches as _evict_caches,
+)
+from .oom import (
     _maybe_free_pool as _maybe_free_pool,
 )
 from .oom import _should_free as _should_free
@@ -256,7 +259,14 @@ from .timing import _TimingAgg as _TimingAgg
 
 
 def _is_gpu_oom(error):
-    return isinstance(error, _RESOURCE_POLICY.gpu_oom) or BACKEND.is_oom_error(error)
+    """Whether ``error`` is an allocator OOM; every retry path asks here.
+
+    An OOM also empties the registered device caches, so no retry runs with them.
+    """
+    oom = isinstance(error, _RESOURCE_POLICY.gpu_oom) or BACKEND.is_oom_error(error)
+    if oom:
+        _evict_caches()
+    return oom
 
 
 from .recovery import _spectrum_case_retry as _spectrum_case_retry

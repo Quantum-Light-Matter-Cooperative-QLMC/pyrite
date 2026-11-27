@@ -13,7 +13,8 @@ from pyrite.campaign.resolution import resolve_simulation
 from pyrite.config import CxrReflections, FiberAverage, FixedSampling, Numerics, Physics
 from pyrite.detectors import Detector, EnergyBins
 from pyrite.geometry import Footprint, Slab
-from pyrite.montecarlo.runner import fiber_emission
+from pyrite.montecarlo import runner
+from pyrite.montecarlo.runner import electron_blocks, fiber_emission
 from pyrite.montecarlo.runner.fiber_emission import FiberTableCache
 from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed
 from pyrite.montecarlo.spectrum.cxr import _batched, _fourier_host
@@ -91,6 +92,37 @@ def test_table_cache_keeps_first_sets_within_its_budget():
     assert list(cache) == ["a", "b"] and cache.nbytes == 160
     cache["a"] = (np.zeros(1),)
     assert cache["a"][0] is table and cache.nbytes == 160
+
+
+def test_device_headroom_caps_the_cached_share(monkeypatch):
+    """On a device the sets take at most their share of the headroom without them."""
+    table = np.zeros(10)  # 80 bytes
+    cache = FiberTableCache(budget=10_000)
+    # Headroom as a pool of 1600 bytes would report it after each build.
+    monkeypatch.setattr(
+        electron_blocks, "device_headroom_bytes", lambda: 1600 - cache.nbytes - table.nbytes
+    )
+    for key in "abc":
+        cache[key] = (table,)
+    assert fiber_emission.FIBER_TABLE_DEVICE_SHARE * 1600 == 200
+    assert list(cache) == ["a", "b"] and cache.nbytes == 160
+
+
+def test_recognized_oom_drops_the_tables_for_the_rest_of_the_run(monkeypatch):
+    """Retry paths classify through ``_is_gpu_oom``; only an OOM empties the cache."""
+
+    class AllocatorOOM(Exception):
+        pass
+
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu_oom", (AllocatorOOM,))
+    cache = FiberTableCache(budget=200)
+    cache["a"] = (np.zeros(10),)
+    assert not runner._is_gpu_oom(ValueError("unrelated"))
+    assert list(cache) == ["a"]
+    assert runner._is_gpu_oom(AllocatorOOM())
+    assert not cache and cache.nbytes == 0
+    cache["a"] = (np.zeros(10),)
+    assert not cache
 
 
 def test_shared_sink_matches_separate_reductions_within_the_fourier_residual():
