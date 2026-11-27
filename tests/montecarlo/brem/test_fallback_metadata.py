@@ -97,7 +97,7 @@ def test_chained_fallback_counts_and_spans_ignore_photon_blocks(monkeypatch, tab
 
 def test_covered_batches_contribute_to_chained_fallback_denominator(monkeypatch, table):
     monkeypatch.setattr(brem, "load_bremsstrahlung_cross_sections", missing_eedl)
-    with pytest.warns(PhysicsFallbackWarning), collect_physics_fallbacks(allow=True) as audit:
+    with pytest.warns(PhysicsFallbackWarning), collect_physics_fallbacks(allow=True) as audit:  # noqa: PT031 - the warning summarizes the whole scored scenario
         score([table.minimum_incident_energy_keV, 20.0, table.maximum_incident_energy_keV], table)
         score([5.0, 400.0], table)
     assert all(event["segments_total"] == 5 for event in audit.events())

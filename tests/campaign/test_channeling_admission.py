@@ -168,7 +168,7 @@ def test_unadmitted_axial_runs_marked_without_budget():
 def test_admitted_axial_case_cannot_run_as_unadmitted():
     thin = replace(axial_case(), thickness_ang=2000.0)
     opted = replace(axial_channeling(), **OPT_IN)
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="outside the measured admission table"):
         (out,) = resolve_channeling([thin], opted)
     with pytest.raises(AxialAdmissionError, match="admitted as si-fibre/A"):
         replace(out, thickness_ang=3000.0)

@@ -548,9 +548,9 @@ def test_history_order_must_be_a_permutation():
 
 def test_segment_overflow_raises():
     cont = TransportContinuationConfig(rows_per_round=2)
+    launches = []
+    out = tuple(np.empty((1,) + a.shape[1:], a.dtype) if a.shape[0] else a for a in _alloc(1))
     with pytest.raises(RuntimeError, match="segment buffer exhausted"):
-        launches = []
-        out = tuple(np.empty((1,) + a.shape[1:], a.dtype) if a.shape[0] else a for a in _alloc(1))
         _drive_continuation_rounds(
             _fake_core(LENGTHS, launches),
             (),

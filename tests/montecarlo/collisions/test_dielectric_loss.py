@@ -93,9 +93,9 @@ def test_bulk_dielectric_recoil_quadrature_matches_direct_k_integral():
 def test_bulk_dielectric_rejects_nonphysical_inputs():
     with pytest.raises(ValueError, match="within"):
         bulk_dielectric_diimfp(1000.0, np.array([1001.0]), _SI_OSCILLATORS, _SI_GAP_EV)
+    invalid = _SI_OSCILLATORS.copy()
+    invalid[0, 1] = -1.0
     with pytest.raises(ValueError, match="physical"):
-        invalid = _SI_OSCILLATORS.copy()
-        invalid[0, 1] = -1.0
         bulk_dielectric_diimfp(1000.0, np.array([16.0]), invalid, _SI_GAP_EV)
 
 

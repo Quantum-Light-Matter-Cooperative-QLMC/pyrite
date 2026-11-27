@@ -252,9 +252,9 @@ def test_preprojected_cr_input_validates_population_and_exclusivity():
         )
     with pytest.raises(ValueError, match="shape"):
         channeling_spectrum(solver, 20.0, grid, 0.0, entry_initial=(np.ones((2, 2)), 0.0), **kwargs)
+    rho = proj.initial[0]
+    rho[0, 0, 1] += 0.25j
     with pytest.raises(ValueError, match="Hermitian"):
-        rho = proj.initial[0]
-        rho[0, 0, 1] += 0.25j
         channeling_spectrum(
             solver, 20.0, grid, 0.0, entry_initial=(rho, proj.entry_population), **kwargs
         )
@@ -264,8 +264,8 @@ def test_preprojected_cr_input_validates_population_and_exclusivity():
         score_planar_source(
             proj, depth_ang=20.0, photon_energy_eV=grid, theta_rad=0.0, aperture_rad=-0.1
         )
+    capped = replace(proj, channeling=_channeling(zone_max_ang=10.0))
     with pytest.raises(ValueError, match="zone_max_ang"):
-        capped = replace(proj, channeling=_channeling(zone_max_ang=10.0))
         score_planar_source(capped, depth_ang=20.0, photon_energy_eV=grid, theta_rad=0.0)
 
 

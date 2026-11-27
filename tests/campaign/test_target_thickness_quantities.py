@@ -128,7 +128,7 @@ def test_semantic_thickness_requires_pint_and_refuses_alias_collision(owner: str
     ],
 )
 def test_bad_thickness_is_rejected(owner: str, quantity: object, error: type[Exception]) -> None:
-    with pytest.raises(error, match="thickness"):
+    with pytest.raises(error, match="thickness"):  # noqa: PT012 - one call, chosen by the parametrized branch
         if owner == "slab":
             Slab("mose2", footprint=Footprint(5, 5), thickness=quantity)
         else:
@@ -142,7 +142,7 @@ def test_thickness_rejects_stored_float_overflow_underflow(owner: str, source: s
         pytest.skip("longdouble exponent range is not extended")
     magnitude = np.longdouble(source)
     assert np.isfinite(magnitude) and magnitude > 0
-    with pytest.raises(ValueError, match="representable"):
+    with pytest.raises(ValueError, match="representable"):  # noqa: PT012 - one call, chosen by the parametrized branch
         if owner == "slab":
             Slab("mose2", thickness=Q_(magnitude, "angstrom"), footprint=Footprint(5, 5))
         else:

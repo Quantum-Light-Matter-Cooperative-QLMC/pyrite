@@ -338,7 +338,7 @@ def test_inheritance_carries_the_cxr_minimum_capped_at_the_brem_maximum():
     )
     assert legacy.to_dict() == explicit.to_dict()
     # A smaller explicit brem maximum caps the inherited minimum.
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(DeprecationWarning, match="brem stopping without brem_target_rse"):
         capped = Precision(**kw, brem_max_histories=2000)
     assert capped.brem_min_histories == 2000
 
@@ -355,12 +355,12 @@ def test_inheritance_warning_names_the_source_and_the_missing_keys():
     """From a catalog the warning's own frame is not the user's: it must say where to look."""
     payload = {"target_rse": 0.1, "min_electrons": 40, "max_electrons": 200}
     payload["observables"] = ["line", "brem"]
-    with pytest.warns(DeprecationWarning) as caught:
+    with pytest.warns(DeprecationWarning, match="brem stopping without brem_target_rse") as caught:
         Precision.from_dict(payload, source="profile 'cleo_sub'")
     message = str(caught[0].message)
     assert "profile 'cleo_sub'" in message
     assert "missing brem_target_rse and brem_max_histories" in message
-    with pytest.warns(DeprecationWarning) as caught:
+    with pytest.warns(DeprecationWarning, match="brem stopping without brem_target_rse") as caught:
         Precision.from_dict(payload)
     assert "profile" not in str(caught[0].message)
 

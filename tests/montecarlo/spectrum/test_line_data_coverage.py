@@ -135,9 +135,9 @@ def test_supported_spectrum_is_bitwise_unchanged_and_does_not_warn():
 
 
 def test_failed_nested_attempt_does_not_publish_counts_or_warnings():
-    with pytest.warns(LineOpticalDataWarning, match="1/2") as emitted:
+    with pytest.warns(LineOpticalDataWarning, match="1/2") as emitted:  # noqa: PT031 - the warning summarizes the whole scored scenario
         with collect_line_data_coverage() as records:
-            with pytest.raises(MemoryError), collect_line_data_coverage():
+            with pytest.raises(MemoryError), collect_line_data_coverage():  # noqa: PT012 - the raise exercises the context manager's exit path
                 _spectrum()
                 raise MemoryError("simulated later electron-block OOM")
             _spectrum()

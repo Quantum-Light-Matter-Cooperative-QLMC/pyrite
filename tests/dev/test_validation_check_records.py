@@ -160,7 +160,7 @@ def test_validation_records_command_writes_mapped_result(tmp_path, monkeypatch) 
     try:
         args.func(args)
     except SystemExit as exc:
-        assert exc.code == 2
+        assert exc.code == 2  # noqa: PT017 - exiting is optional; only its code is pinned
 
     records = read_records(tmp_path / "records")
     assert [(record.ledger_id, record.verdict) for record in records] == [

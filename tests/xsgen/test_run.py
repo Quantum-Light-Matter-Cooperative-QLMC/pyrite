@@ -57,7 +57,7 @@ def test_scratch_dir_removes_itself_on_success():
 
 
 def test_scratch_dir_removes_itself_on_failure_by_default():
-    with pytest.raises(RuntimeError), scratch_dir() as workdir:
+    with pytest.raises(RuntimeError), scratch_dir() as workdir:  # noqa: PT012 - the raise exercises the context manager's exit path
         held = workdir
         raise RuntimeError("the program blew up")
     assert not held.exists()
@@ -68,7 +68,7 @@ def test_scratch_dir_keeps_the_directory_only_when_the_body_fails():
         pass
     assert not succeeded.exists(), "a successful run must still clean up"
 
-    with pytest.raises(RuntimeError), scratch_dir(keep_on_failure=True) as failed:
+    with pytest.raises(RuntimeError), scratch_dir(keep_on_failure=True) as failed:  # noqa: PT012 - the raise exercises the context manager's exit path
         held = failed
         raise RuntimeError("the program blew up")
     assert held.is_dir(), "a failed run is kept for inspection"

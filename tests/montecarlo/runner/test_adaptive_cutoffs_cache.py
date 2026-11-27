@@ -161,7 +161,7 @@ def test_shell_tables_build_once_for_a_multi_block_case(monkeypatch):
     settings = AdaptiveSettings(
         target_rse=1e-4, min_histories=20, max_histories=60, block_histories=10
     )
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="without converging"):
         run_case_adaptive(case, settings, transport_core="per-electron")
     assert len(requests) >= 3  # one request per transport block
     assert len(builds) == 1  # one table build

@@ -1094,7 +1094,7 @@ def test_catalog_detector_bounds_match_the_detector_dataclass(tmp_path, field, v
     from pyrite.detectors import Detector
     from pyrite.materials import MaterialConfigError, load_material_catalog
 
-    with pytest.raises((TypeError, ValueError)) as dataclass_error:
+    with pytest.raises((TypeError, ValueError)) as dataclass_error:  # noqa: PT012 - one call, chosen by the parametrized branch
         if field == "observation_angle_deg":
             Detector(observation_angle_deg=value)
         else:
