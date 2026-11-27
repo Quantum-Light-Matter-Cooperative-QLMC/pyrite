@@ -42,9 +42,9 @@ class Observation:
     """
 
     detector: str | Detector | PlanarDetector = "detector"
-    response: DetectorResponse | None | _Unset = UNSET
-    acquisition: Acquisition | NativeAcquisition | None | _Unset = UNSET
-    sampling: PixelScorer | None | _Unset = UNSET
+    response: DetectorResponse | _Unset | None = UNSET
+    acquisition: Acquisition | NativeAcquisition | _Unset | None = UNSET
+    sampling: PixelScorer | _Unset | None = UNSET
     name: str | None = None
 
     def __post_init__(self) -> None:

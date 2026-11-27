@@ -263,7 +263,7 @@ def test_grid_composes_with_downcast_and_drop_wide_brem():
     res, keep = _grid_plus_stale()
     slim = slim_results(res, case_names=keep, drop_wide_brem=True, downcast=True)
     assert set(slim) == keep
-    rec = slim[sorted(keep)[0]][25.0]
+    rec = slim[min(keep)][25.0]
     assert "brem_wide" not in rec and rec["spec"].dtype == np.float32
 
 

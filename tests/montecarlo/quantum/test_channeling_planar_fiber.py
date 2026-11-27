@@ -102,7 +102,7 @@ def test_tds_jump_momentum_law_matches_overflow_spectrum():
         channel = engine.strings[rng.choice(len(string_rates), p=string_rates / string_rates.sum())]
         q_rel, _ = channel.sample(chi, rng)
         drawn.append(int(np.rint(q_rel[0] / width)))
-    counts = {b: c for b, c in zip(*np.unique(drawn, return_counts=True), strict=True)}
+    counts = dict(zip(*np.unique(drawn, return_counts=True), strict=True))
     expected = {b: n * r / full_loss for b, r in rates_by_bin.items()}
     keys = [b for b, e in expected.items() if e >= 20.0]
     observed = np.array([counts.get(b, 0) for b in keys], dtype=float)

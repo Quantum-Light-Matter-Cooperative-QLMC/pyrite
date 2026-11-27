@@ -132,8 +132,8 @@ def test_material_curvature_covers_high_precision_stored_law(material):
                             atom.energies.size - 2,
                         )
                     )
-                    a, b = map(lambda x: mp.mpf(float(x)), atom.energies[k : k + 2])
-                    ya, yb = map(lambda x: mp.mpf(float(x)), atom.f2[k : k + 2])
+                    a, b = (mp.mpf(float(x)) for x in atom.energies[k : k + 2])
+                    ya, yb = (mp.mpf(float(x)) for x in atom.f2[k : k + 2])
                     imaginary = ya * (E / a) ** (mp.log(yb / ya) / mp.log(b / a))
                     f += atom.count * mp.mpc(real, imaginary)
                 return (

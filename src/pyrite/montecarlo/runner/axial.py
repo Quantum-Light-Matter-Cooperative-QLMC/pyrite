@@ -387,7 +387,7 @@ def transport_axial_case(
     for counter in _COUNTERS:
         out[counter] = int(native.get(counter, 0)) if launched else 0
     out["n_transmitted"] += int(plan.exit_ids.size)
-    weights = {fate: 0.0 for fate in _FATES}
+    weights = dict.fromkeys(_FATES, 0.0)
     for item in records:
         weights[item.fate] += 1.0 / lines
     out["channeling"] = {

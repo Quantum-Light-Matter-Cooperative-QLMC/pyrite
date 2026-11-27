@@ -395,17 +395,17 @@ class Physics:
         brem_source: Literal["mc", "external", "none"] | None = "mc",
         straggling: bool | None = None,
         inelastic_model: Literal["auto", "continuous", "shell-soft-hard"] = "shell-soft-hard",
-        inelastic_cutoff_eV: float | None | _Unset = UNSET,
-        secondary_threshold_eV: float | None | _Unset = UNSET,
+        inelastic_cutoff_eV: float | _Unset | None = UNSET,
+        secondary_threshold_eV: float | _Unset | None = UNSET,
         elastic_model: Literal["mott", "elsepa"] = "elsepa",
         bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "bremslib",
         radiative_model: Literal["auto", "uncoupled", "bremslib-soft-hard"] = "bremslib-soft-hard",
-        radiative_cutoff_eV: float | None | _Unset = UNSET,
+        radiative_cutoff_eV: float | _Unset | None = UNSET,
         pair_production_model: Literal["penelope-2024"] | None = None,
         positron_transport: bool = False,
         atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow",
         transition_radiation: Literal["none", "history", "bunch", "two-beam"] = "none",
-        transition_lattice_origin_ang: tuple[float, float, float] | None | _Unset = UNSET,
+        transition_lattice_origin_ang: tuple[float, float, float] | _Unset | None = UNSET,
         shell_ionization_model: Literal["eedl", "bote-salvat"] = "eedl",
         photon_transport: PhotonTransport | None = None,
         transport_mode: Literal["single-scattering", "mixed"] = "single-scattering",
@@ -1154,7 +1154,7 @@ def validate_profile_numerics(values: Mapping[str, object]) -> None:
     """Validate explicit profile numerics through the public typed objects."""
     unknown = set(values) - set(PROFILE_NUMERICS_KEYS)
     if unknown:
-        raise ValueError(f"unknown numerics field: {sorted(unknown)[0]}")
+        raise ValueError(f"unknown numerics field: {min(unknown)}")
     for key in SAMPLING_KEYS:
         if key in values:
             try:

@@ -104,7 +104,7 @@ class ChannelingNumerics:
         basis_size: int = 16,
         bloch_cells: int = 16,
         step_ang: float | _Unset = UNSET,
-        zone_max_ang: float | None | _Unset = UNSET,
+        zone_max_ang: float | _Unset | None = UNSET,
         *,
         step_length: object = UNSET,
         zone_max_length: object = UNSET,

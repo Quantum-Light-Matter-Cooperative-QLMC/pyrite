@@ -193,7 +193,7 @@ def simulate_photon_continuum(
     charged_feedback: bool = False,
     physics: Physics | None = None,
     numerics: Numerics | None = None,
-    channeling: Channeling | None | _Unset = UNSET,
+    channeling: Channeling | _Unset | None = UNSET,
     observation: Observation | None = None,
 ) -> PhotonContinuumObservation:
     """Run existing primary electron transport once, then score tracked brem hits.

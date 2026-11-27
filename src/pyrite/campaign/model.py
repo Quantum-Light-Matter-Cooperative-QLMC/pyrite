@@ -487,7 +487,7 @@ class Sweep:
         numerics: Numerics | None = None,
         *,
         physics: Physics | None = None,
-        channeling: Channeling | None | _Unset = UNSET,
+        channeling: Channeling | _Unset | None = UNSET,
         observation: Observation | None = None,
     ) -> list[Any]:
         """Lower every expanded scene without executing or persisting it.

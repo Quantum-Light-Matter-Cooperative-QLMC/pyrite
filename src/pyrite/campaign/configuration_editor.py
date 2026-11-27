@@ -177,7 +177,7 @@ class ConfigurationEditor:
     def named_detector(self, name: str, values: Mapping[str, Any]) -> ConfigurationEditor:
         """Create a reusable detector through the shared domain edit service."""
         result = deepcopy(self)
-        scalar = {key: value for key, value in values.items() if key not in {"label"}}
+        scalar = {key: value for key, value in values.items() if key != "label"}
         if "distance_mm" in scalar:
             sections = [scalar.pop(key, {}) for key in ("scorer", "response", "acquisition")]
             create_detector(result.draft.document, name, pixel=(scalar, *sections))

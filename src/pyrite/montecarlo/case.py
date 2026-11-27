@@ -376,7 +376,7 @@ class Case(Mapping[str, Any]):
     # serialization; explicit None remains a real legacy payload value.
     bunch_charge_pc: float | _Absent = _ABSENT
     rep_rate_hz: float | _Absent = _ABSENT
-    beam_fwhm_y_mm: float | None | _Absent = _ABSENT
+    beam_fwhm_y_mm: float | _Absent | None = _ABSENT
     energy_spread_frac: float | _Absent = _ABSENT
     long_shape: str | _Absent = _ABSENT
     bunch_length_fs: float | _Absent = _ABSENT
@@ -425,10 +425,10 @@ class Case(Mapping[str, Any]):
 
     # Legacy/manual-only controls accepted during the Mapping support window.
     azimuth_rad: float | _Absent = _ABSENT
-    recip_miscut_rad: tuple[float, float] | None | _Absent = _ABSENT
+    recip_miscut_rad: tuple[float, float] | _Absent | None = _ABSENT
     E_cut_lines_keV: float | _Absent = _ABSENT
     E_cut_brem_keV: float | _Absent = _ABSENT
-    sinc_cutoff: float | None | _Absent = _ABSENT
+    sinc_cutoff: float | _Absent | None = _ABSENT
     brem_step_eV: float | _Absent = _ABSENT
     # Append slots to preserve the positional state of older Case pickles.
     adaptive_precision: dict[str, object] | _Absent = _ABSENT
@@ -446,7 +446,7 @@ class Case(Mapping[str, Any]):
     # Opt-in line-scoring roulette, appended to retain historical pickle offsets.
     line_roulette: dict[str, object] | _Absent = _ABSENT
     # Append: frozen-scene pickles retain all historical positional offsets.
-    node_support_cutoff: float | Literal["auto"] | None | _Absent = _ABSENT
+    node_support_cutoff: float | Literal["auto"] | _Absent | None = _ABSENT
     # Opt-in measured reflection selection (#1173), appended for pickle offsets.
     reflection_selection: dict[str, object] | _Absent = _ABSENT
     # Opt-out of line scoring (#1327), appended for pickle offsets.

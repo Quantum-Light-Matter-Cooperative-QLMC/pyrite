@@ -99,14 +99,13 @@ def test_forward_high_energy_miss_survives_a_low_explicit_axis(coherent, route, 
 
 
 def test_electron_limit_and_mosaic_population_are_explicit():
-    with pytest.warns(LineOpticalDataWarning):
-        with collect_line_data_coverage() as records:
-            _spectrum(
-                (50_000.0, 50_000.0),
-                electron_limit=1,
-                mosaic_fwhm_rad=0.001,
-                mosaic_nodes=3,
-            )
+    with pytest.warns(LineOpticalDataWarning), collect_line_data_coverage() as records:
+        _spectrum(
+            (50_000.0, 50_000.0),
+            electron_limit=1,
+            mosaic_fwhm_rad=0.001,
+            mosaic_nodes=3,
+        )
     # One selected electron, two reflections, nine quadrature orientations.
     assert records[0]["counts"]["pairs"] == 18
     assert records[0]["counts"]["vacuum_seed_outside_optical_data"] == 9
@@ -138,10 +137,9 @@ def test_supported_spectrum_is_bitwise_unchanged_and_does_not_warn():
 def test_failed_nested_attempt_does_not_publish_counts_or_warnings():
     with pytest.warns(LineOpticalDataWarning, match="1/2") as emitted:
         with collect_line_data_coverage() as records:
-            with pytest.raises(MemoryError):
-                with collect_line_data_coverage():
-                    _spectrum()
-                    raise MemoryError("simulated later electron-block OOM")
+            with pytest.raises(MemoryError), collect_line_data_coverage():
+                _spectrum()
+                raise MemoryError("simulated later electron-block OOM")
             _spectrum()
     assert len(records) == 1
     assert len(emitted) == 1

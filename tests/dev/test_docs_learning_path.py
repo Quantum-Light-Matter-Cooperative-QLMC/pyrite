@@ -9,7 +9,7 @@ DOCS = Path(__file__).resolve().parents[2] / "docs"
 def _toctree_targets(page: Path) -> set[Path]:
     """Resolve explicit MyST toctree entries (including titled entries)."""
     targets = set()
-    for block in re.findall(r"```\{toctree\}\n(.*?)```", page.read_text(), re.S):
+    for block in re.findall(r"```\{toctree\}\n(.*?)```", page.read_text(), re.DOTALL):
         for entry in block.splitlines():
             entry = entry.strip()
             if not entry or entry.startswith(":"):

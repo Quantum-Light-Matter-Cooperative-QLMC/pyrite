@@ -859,7 +859,7 @@ def test_energy_range_replay_rechecks_statistics_before_accepting_stop(monkeypat
         case={"seed": 1, "E0_keV": 30.0},
         E_cut_by_electrons=np.ones(80),
         block_electrons=AdaptiveChunkPlan(20),
-        beam_kw={key: None for key in block_transport.BUNCH_KWARGS},
+        beam_kw=dict.fromkeys(block_transport.BUNCH_KWARGS),
         monitor=monitor,
     )
     grow = _grid(40, 80)[1]

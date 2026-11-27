@@ -119,7 +119,7 @@ BODY_MATH = ("log10", "log", "exp", "sqrt", "sin", "cos", "pow")
 _FLOAT_LITERAL = re.compile(
     r"(?<![\w.])((?:\d+\.\d*|\.\d+)(?:[eE][+-]?\d+)?|\d+[eE][+-]?\d+)(?![\w.])"
 )
-_DEVICE_FUNCTION = re.compile(r"^__device__ [\w:<>, ]+? (\w+)\(", re.M)
+_DEVICE_FUNCTION = re.compile(r"^__device__ [\w:<>, ]+? (\w+)\(", re.MULTILINE)
 
 
 def _to_float(text):
@@ -145,7 +145,7 @@ def _split_top(text):
     """Split at commas outside ``<>``/``()``."""
     parts, depth, last = [], 0, 0
     for i, c in enumerate(text):
-        depth += c in "<(" and 1 or (c in ">)" and -1) or 0
+        depth += (c in "<(" and 1) or (c in ">)" and -1) or 0
         if c == "," and depth == 0:
             parts.append(text[last:i])
             last = i + 1

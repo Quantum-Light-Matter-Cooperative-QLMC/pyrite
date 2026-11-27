@@ -33,25 +33,69 @@ requires_cupy = pytest.mark.skipif(importlib.util.find_spec("cupy") is None, rea
 # Kernel parameter types as `run_transport_kernel` passes them; every array
 # not listed is float64. Only the transpiler sees these, so no device is used.
 _SCALARS = {
-    np.int32: (
-        "e_start e_count cap max_steps n_layers elastic_model_code_arg energy_model_code_arg "
-        "finite_footprint_arg sbethe_on_arg sbethe_width max_el el_n_mu el_guide_cells "
-        "straggle_on_arg inelastic_on_arg il_width il_max_ch sec_on_arg rad_on_arg rad_max_el "
-        "rad_max_t rad_n_red cont_on_arg mixed_on_arg"
-    ).split(),
-    np.float64: (
-        "max_dE_frac z_total width_ang height_ang il_cutoff_eV rad_cutoff_eV mix_c2"
-    ).split(),
+    np.int32: [
+        "e_start",
+        "e_count",
+        "cap",
+        "max_steps",
+        "n_layers",
+        "elastic_model_code_arg",
+        "energy_model_code_arg",
+        "finite_footprint_arg",
+        "sbethe_on_arg",
+        "sbethe_width",
+        "max_el",
+        "el_n_mu",
+        "el_guide_cells",
+        "straggle_on_arg",
+        "inelastic_on_arg",
+        "il_width",
+        "il_max_ch",
+        "sec_on_arg",
+        "rad_on_arg",
+        "rad_max_el",
+        "rad_max_t",
+        "rad_n_red",
+        "cont_on_arg",
+        "mixed_on_arg",
+    ],
+    np.float64: [
+        "max_dE_frac",
+        "z_total",
+        "width_ang",
+        "height_ang",
+        "il_cutoff_eV",
+        "rad_cutoff_eV",
+        "mix_c2",
+    ],
 }
 _ARRAYS = {
-    np.uint64: "stream_key il_keys rad_keys cont_u64".split(),
-    np.uint8: "alive mott_has_table".split(),
-    np.int32: (
-        "L_sbethe_n L_nel mott_start mott_len el_start el_len el_guide seg_id seg_lay seg_flight "
-        "seg_substep seg_count il_n il_nch il_ch_branch rad_nel rad_nt rad_z cont_slots cont_i32"
-    ).split(),
-    np.int16: "il_ch_code seg_hard_ch seg_rad_Z".split(),
-    np.int8: "seg_event exit_code".split(),
+    np.uint64: ["stream_key", "il_keys", "rad_keys", "cont_u64"],
+    np.uint8: ["alive", "mott_has_table"],
+    np.int32: [
+        "L_sbethe_n",
+        "L_nel",
+        "mott_start",
+        "mott_len",
+        "el_start",
+        "el_len",
+        "el_guide",
+        "seg_id",
+        "seg_lay",
+        "seg_flight",
+        "seg_substep",
+        "seg_count",
+        "il_n",
+        "il_nch",
+        "il_ch_branch",
+        "rad_nel",
+        "rad_nt",
+        "rad_z",
+        "cont_slots",
+        "cont_i32",
+    ],
+    np.int16: ["il_ch_code", "seg_hard_ch", "seg_rad_Z"],
+    np.int8: ["seg_event", "exit_code"],
 }
 # ELSEPA, midpoint, SBETHE, straggling, shell, coupled radiative, continuation;
 # the same with mixed elastic transport; and Mott, midpoint, straggling.
@@ -91,7 +135,7 @@ def _transpile(switches, precision):
 def _device_functions(code):
     """``{base name: (signature, body)}`` of every generated device function."""
     out = {}
-    for match in re.finditer(r"^__device__ [^(]*? (\w+)\((.*?)\) \{", code, re.M):
+    for match in re.finditer(r"^__device__ [^(]*? (\w+)\((.*?)\) \{", code, re.MULTILINE):
         depth, end = 1, match.end()
         while depth:
             depth += {"{": 1, "}": -1}.get(code[end], 0)

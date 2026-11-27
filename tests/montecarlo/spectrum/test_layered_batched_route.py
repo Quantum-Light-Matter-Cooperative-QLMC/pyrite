@@ -212,7 +212,7 @@ def test_exact_mu_table_selects_the_host_interval_between_float_adjacent_knots(m
     step = (np.array([b, 1.0e11]), np.array([5.0, 5.0]))
     zero = (np.array([1.0, 1.0e11]), np.array([0.0, 0.0]))
     mts = list(PHOTON_CHANNELS.values())
-    fake = {Z_TABLE["C"]: {mts[0]: flat, mts[1]: step, **{mt: zero for mt in mts[2:]}}}
+    fake = {Z_TABLE["C"]: {mts[0]: flat, mts[1]: step, **dict.fromkeys(mts[2:], zero)}}
     monkeypatch.setattr(escape_mu_module, "_table", lambda: fake)
     monkeypatch.setattr(escape_mu_module, "REAL", np.float64)
 

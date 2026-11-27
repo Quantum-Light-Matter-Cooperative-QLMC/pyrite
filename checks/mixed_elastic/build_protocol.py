@@ -147,7 +147,7 @@ def main():
                 histories_per_seed=per_seed,
                 predicted_hours=per_seed * args.seeds * p["cost_per_history_s"] / 3600,
                 pilot_rows_per_history=p["rows"],
-                observables={k: v for k, v in p["obs"].items()},
+                observables=dict(p["obs"].items()),
             )
         protocol["families"][name] = dict(
             reference=design["reference"],

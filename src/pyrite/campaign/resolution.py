@@ -125,7 +125,7 @@ def resolve_simulation(
     *,
     physics: Physics | None = None,
     numerics: Numerics | None = None,
-    channeling: Channeling | None | _Unset = UNSET,
+    channeling: Channeling | _Unset | None = UNSET,
     filters: tuple[FilterPlate | Filter, ...] | None = None,
     acquisition: Acquisition | NativeAcquisition | None = None,
     observation: Observation | None = None,

@@ -175,7 +175,7 @@ def main(argv=None):
         pk_inc = np.array(pk_inc)
         ensemble[spot] = (pk_coh.mean(), pk_inc.mean())
         print(
-            f"    spot={str(spot):>6s} mm: coherent std/mean={pk_coh.std() / pk_coh.mean():.3f} "
+            f"    spot={spot!s:>6s} mm: coherent std/mean={pk_coh.std() / pk_coh.mean():.3f} "
             f"min/max={pk_coh.min() / pk_coh.max():.3f}   |   "
             f"incoherent std/mean={pk_inc.std() / pk_inc.mean():.3f}"
         )
@@ -208,7 +208,7 @@ def main(argv=None):
         coh_mean, inc_mean = ensemble[spot]
         tag = "  <- degenerate point source, not a physical bunch" if spot is None else ""
         print(
-            f"    spot={str(spot):>6s} mm: <coherent peak>/<incoherent peak> = "
+            f"    spot={spot!s:>6s} mm: <coherent peak>/<incoherent peak> = "
             f"{coh_mean / inc_mean:8.2f}{tag}"
         )
     finite = [ensemble[s][0] / ensemble[s][1] for s in SPOTS_MM if s is not None]

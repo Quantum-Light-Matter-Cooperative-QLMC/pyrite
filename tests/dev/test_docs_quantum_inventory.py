@@ -24,13 +24,13 @@ def test_quantum_exports_are_experimental_and_documented():
         "## Experimental solvers and planar projection", maxsplit=1
     )
     pattern = r"^   pyrite\.quantum\.([A-Za-z_]\w*)$"
-    all_listed = re.findall(pattern, content, re.M)
+    all_listed = re.findall(pattern, content, re.MULTILINE)
     assert len(all_listed) == len(set(all_listed)), "duplicate canonical quantum API page"
-    listed = re.findall(pattern, portable_content, re.M)
+    listed = re.findall(pattern, portable_content, re.MULTILINE)
     assert set(listed) == portable, (
         f"missing: {sorted(portable - set(listed))}; unexpected: {sorted(set(listed) - portable)}"
     )
-    experimental = set(re.findall(pattern, experimental_content, re.M))
+    experimental = set(re.findall(pattern, experimental_content, re.MULTILINE))
     helpers = {
         "planar_profile",
         "axial_profile",

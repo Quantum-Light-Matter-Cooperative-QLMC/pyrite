@@ -353,10 +353,10 @@ def test_ge_ka1_kossel_line_on_its_cone(germanium):
     assert np.all(np.isfinite(kossel))
     # The standing-wave term is active (Ge on its own sites) and dispersive.
     reflections = db.bragg_reflections(case, n, grid, detail=True)
-    phases = dict(
-        (tuple(hkl), dc.emitter_phases(case["crystal"], hkl, chi, case.get("B_ang2", 0.0)))
+    phases = {
+        tuple(hkl): dc.emitter_phases(case["crystal"], hkl, chi, case.get("B_ang2", 0.0))
         for *_, (hkl, chi) in reflections
-    )
+    }
     assert phases[(-4, 0, 0)]["Ge"].real == pytest.approx(-0.927, abs=0.01)
     intensity_only = dc.diffracted_characteristic_spectrum(
         transport["segs"], grid, [r[:3] for r in reflections], n, case["composition"],

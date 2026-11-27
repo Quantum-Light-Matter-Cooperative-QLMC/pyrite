@@ -814,7 +814,7 @@ def _parse_layer(
         return None
     errors.keys(row, path, {"material", "thickness_ang", "beam_uvw", "azimuth_deg"})
     material = row.get("material")
-    if not isinstance(material, str) or material not in crystals and material not in media:
+    if not isinstance(material, str) or (material not in crystals and material not in media):
         errors.add(f"{path}.material", "must reference a crystal or medium")
         material = ""
     thickness = _number(row.get("thickness_ang"))
@@ -1012,7 +1012,7 @@ def _parse_materials(
                 )
         substrate = row.get("substrate")
         if substrate is not None and (
-            not isinstance(substrate, str) or substrate not in crystals and substrate not in media
+            not isinstance(substrate, str) or (substrate not in crystals and substrate not in media)
         ):
             errors.add(f"{path}.substrate", "must reference a crystal or medium")
             substrate = None

@@ -168,7 +168,7 @@ def cmd_profile(args):
     )
     for r in rows:
         print(
-            f"{r['crystal']:7} {str(r['hk']):6} {r['p']:6.3f} {r['mean']:8.5f} {r['peak_over_c0']:8.2f}"
+            f"{r['crystal']:7} {r['hk']!s:6} {r['p']:6.3f} {r['mean']:8.5f} {r['peak_over_c0']:8.2f}"
             f" {r['even']:8.3f} {r['bernal_even']:8.3f} {r['odd']:8.3f} {r['bernal_odd']:8.3f}"
         )
     print("profile: Parseval, p=1 rod and p->0 Bernal limits hold")

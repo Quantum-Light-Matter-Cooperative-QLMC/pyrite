@@ -57,10 +57,9 @@ def test_scratch_dir_removes_itself_on_success():
 
 
 def test_scratch_dir_removes_itself_on_failure_by_default():
-    with pytest.raises(RuntimeError):
-        with scratch_dir() as workdir:
-            held = workdir
-            raise RuntimeError("the program blew up")
+    with pytest.raises(RuntimeError), scratch_dir() as workdir:
+        held = workdir
+        raise RuntimeError("the program blew up")
     assert not held.exists()
 
 
@@ -69,18 +68,16 @@ def test_scratch_dir_keeps_the_directory_only_when_the_body_fails():
         pass
     assert not succeeded.exists(), "a successful run must still clean up"
 
-    with pytest.raises(RuntimeError):
-        with scratch_dir(keep_on_failure=True) as failed:
-            held = failed
-            raise RuntimeError("the program blew up")
+    with pytest.raises(RuntimeError), scratch_dir(keep_on_failure=True) as failed:
+        held = failed
+        raise RuntimeError("the program blew up")
     assert held.is_dir(), "a failed run is kept for inspection"
 
 
 def test_missing_data_directory_fails_before_the_program_starts(tmp_path):
     absent = tmp_path / "tree" / "sdbase"
-    with pytest.raises(RunError) as excinfo:
-        with scratch_dir({"sdbase": absent}):
-            pytest.fail("the context body must not run")
+    with pytest.raises(RunError) as excinfo, scratch_dir({"sdbase": absent}):
+        pytest.fail("the context body must not run")
     message = str(excinfo.value)
     assert "sdbase" in message
     assert str(absent) in message

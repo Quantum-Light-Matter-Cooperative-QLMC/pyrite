@@ -23,9 +23,8 @@ def test_running_acp_stops_bridges_after_notebook_error(monkeypatch) -> None:
     monkeypatch.setattr(_acp, "start_acp_servers", lambda: events.append("start"))
     monkeypatch.setattr(_acp, "stop_acp_servers", lambda: events.append("stop"))
 
-    with pytest.raises(RuntimeError, match="notebook failed"):
-        with _acp.running_acp():
-            raise RuntimeError("notebook failed")
+    with pytest.raises(RuntimeError, match="notebook failed"), _acp.running_acp():
+        raise RuntimeError("notebook failed")
 
     assert events == ["start", "stop"]
 

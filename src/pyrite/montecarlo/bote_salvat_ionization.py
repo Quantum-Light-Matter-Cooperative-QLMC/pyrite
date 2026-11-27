@@ -113,7 +113,7 @@ def parse_bote_salvat(text: str) -> dict[int, BoteSalvatElement]:
     start = text.index("const BoteSalvatElectron")
     body = text[start : text.index('"""', start)]
     elements = {}
-    for match in re.finditer(r"BoteSalvatElementDatum\((\d+),(.*?)\)\s*[,\n]", body, re.S):
+    for match in re.finditer(r"BoteSalvatElementDatum\((\d+),(.*?)\)\s*[,\n]", body, re.DOTALL):
         groups = re.findall(r"\[([^\]]*)\]", match.group(2))
         if len(groups) != 5:
             raise ValueError(f"Bote-Salvat datum {match.group(1)} has {len(groups)} fields")

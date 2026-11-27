@@ -119,18 +119,13 @@ def test_inference_saved_roundtrip_and_missing_band_refusal(tmp_path):
 @pytest.mark.slow
 def test_optical_convergence_reports_independent_errors():
     report = collection_convergence()
-    assert (
-        set(
-            (
-                "pitch_relative_change",
-                "window_relative_change",
-                "hemisphere_fft_bias",
-                "green_relative_difference",
-                "converged",
-            )
-        )
-        <= report.keys()
-    )
+    assert {
+        "pitch_relative_change",
+        "window_relative_change",
+        "hemisphere_fft_bias",
+        "green_relative_difference",
+        "converged",
+    } <= report.keys()
     assert np.isfinite(report["green_relative_difference"])
 
 

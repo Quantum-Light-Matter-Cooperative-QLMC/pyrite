@@ -87,17 +87,15 @@ def main():
             table.scaled_sdcs_mb,
         )
         grid = sorted(
-            set(
-                [
-                    10000.0,
-                    19999.999,
-                    20000.0,
-                    100000.0,
-                    300000.0,
-                    800000.0,
-                    *[float(e * 1000) for e in incident if 10 <= e <= 800],
-                ]
-            )
+            {
+                10000.0,
+                19999.999,
+                20000.0,
+                100000.0,
+                300000.0,
+                800000.0,
+                *[float(e * 1000) for e in incident if 10 <= e <= 800],
+            }
         )
         cases = [
             (e, c, u)

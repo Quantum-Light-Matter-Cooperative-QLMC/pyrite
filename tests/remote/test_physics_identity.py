@@ -124,7 +124,7 @@ def test_staged_table_digest_change_is_detected_by_real_scan_resolution(monkeypa
 
     def changed(tables):
         markers = identity_markers(tables)
-        return {key: "f" * 64 for key in markers}
+        return dict.fromkeys(markers, "f" * 64)
 
     monkeypatch.setattr(store, "identity_markers", changed)
     with pytest.raises(ValueError, match="hopg/"):

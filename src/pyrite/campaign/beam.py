@@ -106,7 +106,7 @@ class TransverseSpot:
     def __init__(
         self,
         fwhm_x_mm: float | _Unset = _UNSET,
-        fwhm_y_mm: float | None | _Unset = _UNSET,
+        fwhm_y_mm: float | _Unset | None = _UNSET,
         *,
         fwhm_x: object = _UNSET,
         fwhm_y: object = _UNSET,

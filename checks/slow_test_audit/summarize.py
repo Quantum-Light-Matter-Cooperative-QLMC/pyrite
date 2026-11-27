@@ -18,7 +18,7 @@ rows = [
 ]
 phases = defaultdict(dict)
 for duration, phase, node in re.findall(
-    r"^\s*([\d.]+)s (setup|call|teardown)\s+(.+)$", (root / "pytest.log").read_text(), re.M
+    r"^\s*([\d.]+)s (setup|call|teardown)\s+(.+)$", (root / "pytest.log").read_text(), re.MULTILINE
 ):
     phases[node][phase] = float(duration)
 workers = defaultdict(list)

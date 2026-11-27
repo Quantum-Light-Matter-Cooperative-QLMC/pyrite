@@ -303,8 +303,7 @@ def export_segments_vtp(
 
                 def _emit(size, blocks):
                     stream.write(np.uint64(size).astype("<u8").tobytes())
-                    for block in blocks:
-                        stream.write(np.ascontiguousarray(block).tobytes())
+                    stream.writelines(np.ascontiguousarray(block).tobytes() for block in blocks)
 
                 def _cell_ranges():
                     cell = 0

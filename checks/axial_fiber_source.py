@@ -189,7 +189,7 @@ def chunk(options: dict, start: int, count: int) -> dict:
         kinds[event.kind] = kinds.get(event.kind, 0.0) + event.weight
     return {
         "status": "research-only; fibred absorbing model, on-axis, retained subspace only",
-        "settings": {k: v for k, v in o.items()},
+        "settings": dict(o.items()),
         "info": {k: v for k, v in info.items() if k != "events"},
         "start": start,
         "count": n,
@@ -248,7 +248,7 @@ def _thickness_chunk(o, channels, entry, hbar_v, info, depths, energies, start, 
     full = spectra[:, -1]
     return {
         "status": "research-only; fibred absorbing model, on-axis, retained subspace only",
-        "settings": {k: v for k, v in o.items()},
+        "settings": dict(o.items()),
         "info": {k: v for k, v in info.items() if k != "events"},
         "start": start,
         "count": int(spectra.shape[0]),

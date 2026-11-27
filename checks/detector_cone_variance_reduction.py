@@ -136,7 +136,7 @@ def baseline(args):
             row["line_grid_nodes"] = int(np.asarray(out["E_grid"]).size)
             row["line_grid_stop_eV"] = float(np.asarray(out["E_grid"])[-1])
             row["line_grid_resolved"] = out.get("line_grid_resolved")
-        report[label] = {k: v for k, v in row.items()}
+        report[label] = dict(row.items())
         print(
             json.dumps({k: v for k, v in row.items() if k != "line_values"}, default=str),
             flush=True,
@@ -203,7 +203,7 @@ def brute(args):
             out.with_suffix(".npz"), **{k: np.concatenate(v) for k, v in values.items()}
         )
         out.write_text(json.dumps(report, indent=2, default=str))
-        print(json.dumps({k: v for k, v in row.items()}, default=str), flush=True)
+        print(json.dumps(dict(row.items()), default=str), flush=True)
         block += 1
 
 

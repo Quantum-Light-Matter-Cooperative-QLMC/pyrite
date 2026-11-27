@@ -125,7 +125,7 @@ def _quantile(values: list[float], fraction: float) -> float | None:
 def _timestamp(value: Any) -> datetime:
     if not isinstance(value, str):
         raise ValueError("timestamp must be an RFC 3339 string")
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return datetime.fromisoformat(value)
 
 
 def _job_name(profile_root: Path, source: Path) -> str:

@@ -18,11 +18,11 @@ def test_api_object_page_ownership_and_navigation():
             continue
         assert f"({page.name})" in index or f"\n{page.stem}\n" in index
         content = page.read_text(encoding="utf-8")
-        for block in re.findall(r"```\{eval-rst\}\n(.*?)```", content, re.S):
+        for block in re.findall(r"```\{eval-rst\}\n(.*?)```", content, re.DOTALL):
             if ".. autosummary::" not in block:
                 continue
             assert ":toctree: ../../_autosummary" in block
-            for obj in re.findall(r"^\s{3}(pyrite\.[A-Za-z_][\w.]*)$", block, re.M):
+            for obj in re.findall(r"^\s{3}(pyrite\.[A-Za-z_][\w.]*)$", block, re.MULTILINE):
                 assert obj not in owners, (obj, owners.get(obj), page.name)
                 owners[obj] = page.name
 
@@ -78,7 +78,7 @@ def test_legacy_api_sections_link_to_namespace_contracts():
     assert len(pointers) == 19
     for owner, anchor in pointers:
         content = (REFERENCE / f"{owner}.md").read_text(encoding="utf-8")
-        headings = re.findall(r"^#{1,3} (.+)$", content, re.M)
+        headings = re.findall(r"^#{1,3} (.+)$", content, re.MULTILINE)
         assert anchor in [heading.lower().replace(" ", "-") for heading in headings]
 
     assert "(simulation-kernels)=\n## Advanced transport and radiation" in legacy
@@ -99,7 +99,7 @@ def test_storage_reference_covers_supported_inventory():
     manifest = tomllib.loads((DOCS.parent / "api-surface.toml").read_text())
     supported = manifest["package_exports"]["pyrite.storage"]
     page = (REFERENCE / "storage.md").read_text(encoding="utf-8")
-    documented = set(re.findall(r"^   pyrite\.storage\.(\w+)$", page, re.M))
+    documented = set(re.findall(r"^   pyrite\.storage\.(\w+)$", page, re.MULTILINE))
     assert documented == set(supported)
 
 
@@ -121,7 +121,7 @@ def test_api_reference_covers_every_governed_target():
     documented = {
         name
         for page in REFERENCE.glob("*.md")
-        for name in re.findall(r"^   (pyrite\.[\w.]+)$", page.read_text(), re.M)
+        for name in re.findall(r"^   (pyrite\.[\w.]+)$", page.read_text(), re.MULTILINE)
     }
     covered = {exports[name]["target"] for name in documented}
     missing = {name: row["target"] for name, row in exports.items() if row["target"] not in covered}

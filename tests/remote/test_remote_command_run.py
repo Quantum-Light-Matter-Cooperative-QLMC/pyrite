@@ -297,7 +297,7 @@ def test_run_pulls_partial_checkpoint_of_failed_material(monkeypatch, capsys):
     monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
     monkeypatch.setattr(state, "_completed_materials", lambda _jobid, _mats: [])
     monkeypatch.setattr(
-        state, "_partial_materials", lambda _jobid, mats: {m: (6, 15) for m in mats}
+        state, "_partial_materials", lambda _jobid, mats: dict.fromkeys(mats, (6, 15))
     )
     monkeypatch.setattr(
         state, "_materials_needing_pull", lambda *_args: pytest.fail("no completed materials")

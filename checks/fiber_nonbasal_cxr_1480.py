@@ -150,7 +150,7 @@ def cmd_structure(args):
         if r["l"] < 0:
             continue
         print(
-            f"{str(r['rep']):>12} {r['multiplicity']:>3} {r['g']:7.3f} {r['g_z']:7.3f}"
+            f"{r['rep']!s:>12} {r['multiplicity']:>3} {r['g']:7.3f} {r['g_z']:7.3f}"
             f" {r['g_perp']:7.3f} {r['s2_geo']:9.4f} {r['s2_f0']:9.4f}"
             f" {r['dw2_tensor']:9.4f} {r['dw2_scalar']:9.4f} {r['b_eff']:6.3f}"
         )
@@ -606,7 +606,7 @@ def cmd_frozen(args):
         raise ValueError("full-circle-reference must be nonnegative")
     if args.full_circle_reference and math.gcd(args.full_circle_reference, 6) > 1:
         raise ValueError("full-circle-reference must be coprime with 6, or its nodes alias")
-    cuts = sorted(set([*args.g_cuts, args.g_max]))
+    cuts = sorted({*args.g_cuts, args.g_max})
     if any(g <= 0 or g > args.g_max for g in cuts):
         raise ValueError("g-cuts must be positive and no greater than g-max")
     cat = load_material_catalog().crystal(args.crystal)
@@ -760,7 +760,7 @@ def cmd_frozen(args):
         run_arm(f"S{k}", fams, [[p] for p in phis])
     # Unlike S, Q evaluates every history at every node: this measures
     # quadrature convergence separately from the stochastic texture estimator.
-    for k in sorted(set([*args.quadratures, args.reference])):
+    for k in sorted({*args.quadratures, args.reference}):
         run_arm(f"Q{k}", fams, [list(_quadrature(k))])
     if args.full_circle_reference:
         k = args.full_circle_reference

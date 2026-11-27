@@ -44,7 +44,7 @@ def produce_observation(
     store: ObservationStore,
     *,
     physics: Physics | None = None,
-    channeling: Channeling | None | _Unset = UNSET,
+    channeling: Channeling | _Unset | None = UNSET,
     observation: Observation | None = None,
 ) -> ObservationRun:
     """Return the stored observation for ``scene``, transporting only if needed.

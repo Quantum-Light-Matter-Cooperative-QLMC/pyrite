@@ -676,7 +676,7 @@ def _parse_filter_rows(
                 expected="angle",
                 kind="angle",
             )
-            if value is None or key == "polar_deg" and not 0 <= value <= 180:
+            if value is None or (key == "polar_deg" and not 0 <= value <= 180):
                 if not errors.has(f"{row_path}.{key}"):
                     errors.add(
                         f"{row_path}.{key}",
@@ -1037,7 +1037,7 @@ def _parse_physical_detector(
             expected="angle",
             kind="angle",
         )
-        if value is None or key == "polar_deg" and not 0 <= value <= 180:
+        if value is None or (key == "polar_deg" and not 0 <= value <= 180):
             if not errors.has(f"{path}.{key}"):
                 errors.add(
                     f"{path}.{key}",
