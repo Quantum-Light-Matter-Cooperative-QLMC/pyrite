@@ -29,8 +29,9 @@ class FiberAverage:
     Basal ``(00l)`` rows are roll invariant and are scored once. Mosaic
     quadrature applies on top of each roll node. It comes from the scored
     case (``mosaic_mc_fwhm_rad``, ``mosaic_mc_nodes``) or from ``spectrum()``
-    keywords, not from ``mosaic_nodes``/``mosaic_route`` beside this object
-    on ``CxrReflections``.
+    keywords. Campaign runs lower those case keys from
+    ``mosaic_nodes``/``mosaic_route`` beside this object on
+    ``CxrReflections``; the direct scorer does not read them.
 
     Parameters
     ----------

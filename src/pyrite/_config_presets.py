@@ -25,7 +25,6 @@ from ._numerics import (
     PHYSICS_FIELDS,
     PROFILE_NUMERICS_KEYS,
     SAMPLING_KEYS,
-    CxrReflections,
     Numerics,
     Physics,
     _emission_selection,
@@ -222,9 +221,12 @@ def numerics_from_values(values: Mapping[str, Any]) -> Numerics:
     ``line_grid_policy`` is a catalog campaign policy with no field on
     :class:`Numerics`; it applies only through profiles.
     """
+    from ._cxr_reflections import reflection_controls_from_values
     from ._sampling import AdaptiveSampling, FixedSampling, SamplingPolicy
 
-    reflections = CxrReflections(**{key: values[key] for key in CONVERGENCE_KEYS if key in values})
+    reflections = reflection_controls_from_values(
+        {key: values[key] for key in CONVERGENCE_KEYS if key in values}
+    )
     fields = {
         key: value
         for key, value in values.items()

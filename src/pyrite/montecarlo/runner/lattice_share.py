@@ -88,6 +88,10 @@ def scored_reflections(case: Mapping[str, Any], layer: int | None) -> list:
     radiator = _radiator(case, layer)
     if radiator is None:
         return []
+    if case.get("cxr_fiber") is not None:  # the full-fiber domain (#1483)
+        from .fiber_emission import fiber_domain
+
+        return list(fiber_domain(case).hkls)
     cutoffs = case.get(SCORED_CUTOFFS_CASE_KEY)
     if cutoffs is None:
         # Without a selection record the line route scores ``hkl_list``: the
@@ -275,6 +279,8 @@ def layer_isotropic_share(case, layer, composition):
     Validation: brem-lattice-share-isotropic
     """
     reason = skip_reason(case, layer)
+    if reason is None and case.get("cxr_fiber") is not None:
+        raise ValueError("full-fiber CXR requires the BremsLib continuum (#1483)")
     if reason is None and composition is None:
         reason = "no composition"  # nothing to score the continuum with
     if reason is not None:
@@ -323,6 +329,10 @@ def layer_emission_tables(case, layer, composition, tables):
     Validation: brem-lattice-coherent-fraction
     """
     reason = skip_reason(case, layer)
+    if reason is None and case.get("cxr_fiber") is not None:
+        from .fiber_emission import fiber_emission_tables
+
+        return fiber_emission_tables(case, layer, composition, tables)
     if reason is not None or tables is None:
         return tables, dict(layer=layer, corrected=False, reason=reason or "no tables")
     radiator = _radiator(case, layer)

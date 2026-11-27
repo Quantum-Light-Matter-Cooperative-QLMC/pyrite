@@ -157,6 +157,8 @@ _CASE_KEY_ORDER = (
     "transport_realization",
     "cone_split",
     "math",
+    "cxr_fiber",
+    "cxr_fiber_batch_size",
 )
 
 
@@ -212,6 +214,13 @@ class Case(Mapping[str, Any]):
     characteristic_chunk
         Optional characteristic-line segment chunk (#1455); absent selects the
         automatic size. Execution-only, like the other chunks.
+    cxr_fiber, cxr_fiber_batch_size
+        Opt-in full-fiber CXR domain (#1483): the resolved
+        :meth:`~pyrite.montecarlo.spectrum.cxr.fiber.FiberCXRModel.case_record`
+        and its execution-only reflection batch size. Absent is the catalog's
+        basal-only domain. HOPG, incoherent, single slab, BremsLib, bin-mean
+        lines on an explicit or automatic (#1489) line grid.
+        Validation: cxr-fiber-intensity-average
     math
         ``"fast"`` when the case was lowered under the fast math mode (#1468);
         absent is ``"reproducible"``. Unlike the chunks it stays in content
@@ -443,13 +452,17 @@ class Case(Mapping[str, Any]):
     # Floating-point math mode (#1468), appended for pickle offsets; absent is
     # "reproducible", so existing case keys stay valid.
     math: Literal["fast"] | _Absent = _ABSENT
+    # Opt-in full-fiber CXR domain (#1483), appended for pickle offsets; absent
+    # is the catalog's basal-only domain, so existing case keys stay valid.
+    cxr_fiber: dict[str, object] | _Absent = _ABSENT
+    cxr_fiber_batch_size: int | _Absent = _ABSENT
 
     def __getstate__(self) -> list[Any]:
         """Keep the historical frozen-slot pickle: drop trailing absent appended fields."""
         state = [getattr(self, field.name) for field in fields(self)]
-        # Only math, characteristic_chunk, cone_split and transport_realization
-        # postdate the legacy layout.
-        for _ in range(4):
+        # Only cxr_fiber(_batch_size), math, characteristic_chunk, cone_split and
+        # transport_realization postdate the legacy layout.
+        for _ in range(6):
             if state[-1] is not _ABSENT:
                 break
             state.pop()
@@ -602,6 +615,7 @@ class Case(Mapping[str, Any]):
                 "coherent_flat_omission_limit", self.coherent_flat_omission_limit, allow_zero=True
             )
         self._validate_mosaic_sampling()
+        self._validate_cxr_fiber()
         if self.line_quadrature is not _ABSENT:
             if self.line_quadrature != "bin-mean":
                 raise ValueError("line_quadrature must be absent or 'bin-mean'")
@@ -836,6 +850,15 @@ class Case(Mapping[str, Any]):
         from .runner.reflection_cutoff import validate_reflection_selection
 
         validate_reflection_selection(self.reflection_selection, self)
+
+    def _validate_cxr_fiber(self) -> None:
+        if self.cxr_fiber is _ABSENT and self.cxr_fiber_batch_size is _ABSENT:
+            return
+        if self.cxr_fiber_batch_size is not _ABSENT:
+            _positive_int("cxr_fiber_batch_size", self.cxr_fiber_batch_size)
+        from .runner.fiber_emission import validate_fiber_case
+
+        validate_fiber_case(self)
 
     def _validate_cone_split(self) -> None:
         if isinstance(self.cone_split, _Absent):

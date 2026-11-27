@@ -83,6 +83,19 @@ Under the production per-reflection model, the omitted non-basal families
 comparable to the basal set in most measured geometries. The measured
 envelope is in the
 [#1480 research note](../../research/physics/fiber-nonbasal-cxr-1480.md).
+The full fiber domain is an opt-in alternative:
+`CxrReflections(fiber=FiberAverage(cutoff_invang=..., azimuth_count=...))`
+scores every allowed reflection below the cutoff with the projected thermal
+tensor, averages non-basal intensities over crystallite rolls, and removes
+the matched lattice share from the BremsLib continuum. Texture stays a
+catalog fact; the domain is a numerics choice
+([ADR-0024](../../adr/0024-texture-versus-reflection-domain.md)). The option
+is HOPG only and replaces measured selection. Without an explicit line
+grid it resolves the automatic one over its roll-averaged lines (#1489);
+stored catalog rows, derived for the basal lines, are skipped.
+Profiles select it with a `cxr_fiber` table
+(`cutoff_invang`, `azimuth_count`, `reflection_batch_size`).
+
 At the default 2 Å⁻¹ shell width the retired `(002)/(004)` pins are the first
 two shells, rather than a hard limit. Fixed-count routes rank the same domain:
 `n_families=4` gives `(002)`–`(008)` for HOPG/h-BN. The existing tolerance determines the last shell.

@@ -56,14 +56,18 @@ def _plain(rows: Iterable[Row]) -> list[tuple[str, object, object]]:
 def reflection_rows(rows: list[Row]) -> list[tuple[str, object, object]]:
     """Describe omitted reflection controls as their requested automatic policy."""
     values = {row["key"]: row["effective"] for row in rows}
-    if values.get("n_families") is not None:
+    if values.get("cxr_fiber") is not None:  # the fiber domain owns the reflections
+        owned = ("n_families", "max_reflections", "line_yield_tolerance")
+        display = dict.fromkeys(owned, "unused (full-fiber)")
+    elif values.get("n_families") is not None:
         return _plain(rows)
-    automatic = values.get("max_reflections") is None
-    display = {
-        "n_families": "automatic" if automatic or values.get("line_yield_tolerance") else 4,
-    }
-    if automatic and values.get("line_yield_tolerance") is None:
-        display["line_yield_tolerance"] = "automatic (0.001)"
+    else:
+        automatic = values.get("max_reflections") is None
+        display = {
+            "n_families": "automatic" if automatic or values.get("line_yield_tolerance") else 4,
+        }
+        if automatic and values.get("line_yield_tolerance") is None:
+            display["line_yield_tolerance"] = "automatic (0.001)"
     return [
         (row["label"], display.get(row["key"], row["effective"]), row["source"]) for row in rows
     ]

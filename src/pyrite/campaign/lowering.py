@@ -82,6 +82,7 @@ def lower_simulation(request: ResolvedSimulation) -> Case:
         n_families=convergence.n_families,
         max_reflections=convergence.max_reflections,
         line_yield_tolerance=convergence.line_yield_tolerance,
+        cxr_fiber=numerics.cxr_reflections.fiber,
         spec_chunk=numerics.cxr_chunk,
         brem_chunk=numerics.brem_chunk,
         mosaic_route=convergence.mosaic_route,
@@ -216,23 +217,24 @@ def build_sweep_cases(
                 ),
             )
         convergence = reflection_controls(resolved_numerics, physics, request.scene.channeling)
-        old_sweep = replace(old_sweep, n_families=convergence.n_families)
+        changes: dict[str, Any] = {"n_families": convergence.n_families}
         if numerics is not None:
             energy_bins = resolved_numerics.energy_bins or EnergyBins()
-            old_sweep = replace(
-                old_sweep,
+            changes.update(
                 energy_bins=energy_bins,
                 # A replacement brem grid is explicit; only the catalog's own
                 # band keeps stopping at each case's beam energy (#815).
                 brem_band=_kept_brem_band(old_sweep, energy_bins),
-                n_families=convergence.n_families,
                 max_reflections=convergence.max_reflections,
                 line_yield_tolerance=convergence.line_yield_tolerance,
+                cxr_fiber=resolved_numerics.cxr_reflections.fiber,
                 mosaic_nodes=convergence.mosaic_nodes,
                 mosaic_route=convergence.mosaic_route,
                 spec_chunk=resolved_numerics.cxr_chunk,
                 brem_chunk=resolved_numerics.brem_chunk,
             )
+        # One replace: Sweep checks the family count against the fiber domain.
+        old_sweep = replace(old_sweep, **changes)
         old_sweep = replace(
             old_sweep,
             cxr_grid_policy=_with_line_resolution(old_sweep.cxr_grid_policy, resolved_numerics),

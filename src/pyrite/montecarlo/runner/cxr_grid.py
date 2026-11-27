@@ -157,8 +157,9 @@ _WINDOW_INPUT_KEYS = (
     "layer_radiators",
 )
 # The measured stop also reads the DBR claim (``diffracted_brem._in_claim``):
-# a mosaic spread drops the Bragg-window coverage (#1243).
-_WEIGHT_INPUT_KEYS = ("B_ang2", "mosaic_fwhm_rad")
+# a mosaic spread drops the Bragg-window coverage (#1243). A full-fiber case
+# measures its domain's roll-averaged population, not ``hkl_list`` (#1489).
+_WEIGHT_INPUT_KEYS = ("B_ang2", "mosaic_fwhm_rad", "cxr_fiber")
 
 
 #: Bumped whenever the same inputs would give a different measured stop; it

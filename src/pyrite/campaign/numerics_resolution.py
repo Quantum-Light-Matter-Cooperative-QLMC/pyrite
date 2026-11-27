@@ -21,6 +21,7 @@ NUMERICS_GROUPS = (
             ("mosaic_nodes", "mosaic nodes"),
             ("mosaic_route", "mosaic route"),
             ("line_yield_tolerance", "line-yield tolerance"),
+            ("cxr_fiber", "full-fiber domain"),
         ),
     ),
     (

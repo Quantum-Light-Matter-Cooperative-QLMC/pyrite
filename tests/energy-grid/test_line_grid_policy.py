@@ -274,6 +274,7 @@ def _automatic_policy(
     target = SimpleNamespace(_below_film=lambda: None)
     sweep = SimpleNamespace(
         cxr_grid_policy=per_call,
+        cxr_fiber=None,
         beam=beam,
         target=target,
         n_families=n_families,

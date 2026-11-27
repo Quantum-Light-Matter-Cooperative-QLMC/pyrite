@@ -76,6 +76,7 @@ from .identity_options import (
 )
 from .numerics_resolution import NUMERICS_GROUPS as NUMERICS_GROUPS
 from .numerics_resolution import NumericsResolution
+from .reflection_selection import project_fiber_identity
 from .sweep import (
     TIMEPIX3_DOMEGA_SR,
     TIMEPIX3_DTHETA_OBS_DEG,
@@ -137,6 +138,7 @@ def resolve_numerics(
         "n_families": convergence.n_families,
         "max_reflections": None,
         "line_yield_tolerance": None,
+        "cxr_fiber": None,
         "mosaic_nodes": convergence.mosaic_nodes,
         "mosaic_route": convergence.mosaic_route,
         "straggling": physics.straggling,
@@ -586,6 +588,7 @@ def _identity_v1(
     for key in ("n_electrons", "n_electrons_brem", "line_grid_policy", "line_yield_tolerance"):
         if sweep_payload.get(key) is None:
             sweep_payload.pop(key, None)
+    project_fiber_identity(sweep_payload, sweep)
     # Same compatibility rule for catalog_profile (Phase 3 decision 2): only
     # join the hashed payload when it diverges from "standard", so every
     # pre-existing standard-profile identity keeps its historical digest.

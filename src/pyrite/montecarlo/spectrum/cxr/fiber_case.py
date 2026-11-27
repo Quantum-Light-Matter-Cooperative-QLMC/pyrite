@@ -18,9 +18,11 @@ def _single_radiator(case, segments):
         raise ValueError("fiber scoring requires a single slab without cone splitting")
     if case.get("bremsstrahlung_model") != "bremslib":
         raise ValueError("fiber scoring requires BremsLib, without isotropic fallback")
+    # A lowered campaign fiber case (#1483) names the model this scorer applies.
+    case = {k: v for k, v in case.items() if k not in ("cxr_fiber", "cxr_fiber_batch_size")}
     radiators = case.get("layer_radiators")
     if radiators is None:
-        return dict(case)
+        return case
     if len(radiators) != 1 or radiators[0] is None:
         raise ValueError("fiber scoring requires exactly one crystalline radiator")
     return {**case, **radiators[0], "layer_radiators": None}

@@ -29,11 +29,19 @@ result = score_fiber_case(model, case, tp, grid)
 cxr, brem, total = result["cxr"], result["brem"], result["total"]
 ```
 
-`simulate()` and campaign lowering refuse `CxrReflections.fiber` until #1483
-wires it through the runner, so a fiber setting never silently falls back to
-the basal-only domain. `cutoff_invang` has no default. The case's
-`mosaic_mc_fwhm_rad` and `mosaic_mc_nodes` set the mosaic quadrature;
-`mosaic_route` and `mosaic_nodes` beside `fiber=` are not read.
+Since #1483, `simulate()` and campaign runs score `CxrReflections.fiber`
+directly; the case then carries the model record as `cxr_fiber`. Since
+#1489 an explicit `EnergyBins.cxr` grid is optional: the default automatic
+line grid seeds from every domain row at every roll node at weight `1/N`,
+and its truncation audit bounds the roll-averaged spectrum. Its ceiling
+is the kinematic bound over the domain's |g|, and stored basal rows are skipped
+([ADR-0024](../../adr/0024-texture-versus-reflection-domain.md)). Routes
+outside the qualified envelope refuse instead of falling back to the
+basal-only domain. `cutoff_invang` has no default. The case's
+`mosaic_mc_fwhm_rad` and `mosaic_mc_nodes` set the mosaic quadrature.
+Campaign runs lower them from `mosaic_route` and `mosaic_nodes`, and a mosaic
+target needs `mosaic_route="mc"`; the direct
+scorer above does not read those two beside `fiber=`.
 These cutoff and azimuth values are starting points, **not converged defaults**.
 `model.prepare()` also exposes a low-level `spectrum()` for independent line
 studies, and `corrected_bremslib_tables()` for use with the same prepared domain.
@@ -125,9 +133,31 @@ yields and at least 128 when narrow line shapes matter.
 
 Raw: `~/dev/pyrite-benches/1480-fiber-nonbasal/{ladder,gpu-parity}/`.
 
+### Campaign route qualification (#1483, 2026-11-26, qlmc-queen FP64 CPU)
+
+The lowered `CxrReflections(fiber=...)` Scene, scored by the campaign line
+seam and spectrum phase, against the Q arm of
+`checks/fiber_nonbasal_cxr_1480.py` (projected basal B) on the same campaign
+transport (`campaign` subcommand). HOPG 30 keV, 500 nm, tilt 15°, 45°
+observation, 150 electrons, 2 eV bins to 6000 eV. Code `b09fa1c6a`, jobs
+16148–16155; raw: `~/dev/pyrite-benches/1483-fiber-campaign/`.
+
+| Comparison | Result |
+|---|---|
+| Campaign vs Q arm, cutoff 6 / 8 Å⁻¹ (108 / 242 reflections) | peak 2.8e-11 / 2.8e-11, L1 7.6e-11 / 6.3e-11 |
+| Campaign vs Q arm, 300 keV, cutoff 6 | peak 1.1e-11, L1 1.2e-10 |
+| Batch 64 / 512 vs 256 | L1 7.4e-12 / 0 |
+| 8 / 128 rolls vs 32 | yield +3.4e-4 / +1.9e-4; spectral L1 13 % / 5.1 %, peak 42 % / 11 % |
+| Cutoff 8 / 10 vs 6 | yield +20.5 % / +43.4 % |
+| Line seam wall time, cutoff 6 / 8 / 10 (32 rolls) | 10 / 15 / 29 s; Q-arm loop 36 / 75 s; peak RSS ≈ 1.4 GB |
+
+The residual campaign-vs-Q difference comes from grouping reflections
+differently per kernel call (#1492), not from the fiber route. Integrated
+yield converges by 8 rolls, but at 2 eV bins the line shape is still
+moving between 32 and 128 rolls. Cutoff convergence remains open (#1484).
+
 Remaining phase II work: joint roll/reciprocal adaptive convergence with a
 reported unresolved status, symmetry-reduced quadrature with verified weights,
-line-grid seeding/audits that know the orientation population, campaign/profile
-serialization and hashing for the new model, full runner/CLI integration, and
-independent physical validation. No production default, schema, shared table
-identity, or existing golden is changed by this slice.
+streamed scoring (#1490), CLI flags (#1491), and independent physical
+validation of the campaign route. No production default, shared table identity,
+or existing golden is changed.

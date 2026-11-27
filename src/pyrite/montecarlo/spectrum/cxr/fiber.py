@@ -20,6 +20,9 @@ from ..brem_lattice_share import _lattice_share_tables, _reflection_shell_weight
 from ._spectrum import mc_cxr_spectrum
 
 FIBER_CXR_MODEL = "hopg-fiber-intensity-tensor-isotropic-share-v1"
+_CASE_RECORD_KEYS = frozenset(
+    {"model", "crystal", "cutoff_invang", "azimuth_count", "temperature_K", "thermal_source"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +66,42 @@ class FiberCXRModel:
                 raise ValueError("a measured uniaxial carbon tensor is required")
             temperature_K = site.temperature_K
         return cls(source, float(temperature_K), crystal)
+
+    def case_record(self) -> dict:
+        """Scientific identity carried by a campaign case (``Case.cxr_fiber``).
+
+        The batch size is execution-only and travels separately
+        (``Case.cxr_fiber_batch_size``), like the spectrum chunks.
+        """
+        return dict(
+            model=FIBER_CXR_MODEL,
+            crystal=self.crystal,
+            cutoff_invang=self.cutoff_invang,
+            azimuth_count=self.azimuth_count,
+            temperature_K=float(self.temperature_K),
+            thermal_source=self._site().source,
+        )
+
+    @classmethod
+    def from_case_record(cls, record, *, reflection_batch_size: int | None = None) -> FiberCXRModel:
+        """Rebuild the model a case record names; refuse a foreign or stale record."""
+        if not isinstance(record, dict) or set(record) != _CASE_RECORD_KEYS:
+            raise ValueError(f"cxr_fiber must hold exactly {sorted(_CASE_RECORD_KEYS)}")
+        if record["model"] != FIBER_CXR_MODEL:
+            raise ValueError(f"cxr_fiber model {record['model']!r} is not {FIBER_CXR_MODEL!r}")
+        numerics = FiberAverage(
+            cutoff_invang=record["cutoff_invang"],
+            azimuth_count=record["azimuth_count"],
+            **(
+                {}
+                if reflection_batch_size is None
+                else {"reflection_batch_size": reflection_batch_size}
+            ),
+        )
+        model = cls(numerics, float(record["temperature_K"]), str(record["crystal"]))
+        if record["thermal_source"] != model._site().source:
+            raise ValueError("cxr_fiber thermal source no longer matches the packaged tensor")
+        return model
 
     @property
     def cutoff_invang(self) -> float:
@@ -218,7 +257,7 @@ class FiberReflectionSet:
         total = self._average(score, shape, azimuth_rad)
         return tuple(total) if options.get("components") else total
 
-    def _average(self, score, shape, azimuth_rad):
+    def _average(self, score, shape, azimuth_rad, *, weighted=False):
         """Uniform roll average: midpoint nodes on one 60-degree sector.
 
         The full-circle average of a sixfold-closed set equals its average over
@@ -227,6 +266,8 @@ class FiberReflectionSet:
         full-circle nodes alias whenever ``gcd(N, 6) > 1`` (``N = 6`` is one
         orientation). Closure is verified in ``__post_init__``. Basal rows are
         roll invariant and scored once. Batches bound table allocations only.
+        ``weighted`` passes each call's quadrature weight (1 for basal rows,
+        ``1/N`` otherwise) as a third argument, for roll-weighted audits.
 
         Validation: cxr-fiber-intensity-average
         """
@@ -243,7 +284,9 @@ class FiberReflectionSet:
                     else azimuth_rad
                 )
                 for start in range(0, len(rows), batch):
-                    value = np.asarray(score(rows[start : start + batch], phi), dtype=np.float64)
+                    hkls = rows[start : start + batch]
+                    value = score(hkls, phi, 1.0 / rolls) if weighted else score(hkls, phi)
+                    value = np.asarray(value, dtype=np.float64)
                     if value.shape != total.shape or not np.isfinite(value).all():
                         raise RuntimeError("invalid fiber spectrum from CXR scorer")
                     total += value / rolls

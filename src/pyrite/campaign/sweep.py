@@ -124,6 +124,7 @@ from .inelastic_cases import (
     validate_explicit_shell_cases,
 )
 from .longitudinal import LongitudinalDistribution
+from .reflection_selection import fiber_case_fields, fiber_line_axis, sweep_fiber, with_sources
 
 MATERIAL_LABELS = {key: material.label for key, material in CATALOG.materials.items()}
 
@@ -424,6 +425,9 @@ class Sweep:
     # |g| shells up to the f0 cap until the estimated in-band tail is at most
     # this fraction of the kept line yield. Both knobs omitted selects 1e-3.
     line_yield_tolerance: float | None = None
+    # Full-fiber FiberAverage (#1483, ADR-0024); None: basal. Keyword-only, so
+    # legacy positional construction keeps its argument order.
+    cxr_fiber: Any = field(default=None, kw_only=True)
     dtheta_obs_deg: InitVar[float | None] = None
     domega_sr: InitVar[float | None] = None
     beam_uvw: tuple | None = None  # None -> per-material default
@@ -531,6 +535,7 @@ class Sweep:
         ``target`` here so an invalid target fails in the user's script instead of
         after profile resolution.
         """
+        self.cxr_fiber = sweep_fiber(self)  # FiberAverage or None (#1483)
         lower = getattr(self.beam, "to_spec", None)
         if not isinstance(self.energy_bins, EnergyBins):
             raise TypeError("energy_bins must be an EnergyBins")
@@ -678,7 +683,8 @@ def _automatic_cxr_grid_policy(
     from ..montecarlo.runner.reflection_cutoff import F0_RANGE_INVANG
     from ..montecarlo.transport.beam_entry import upper_beam_energy_keV
 
-    radiators = [(cp["crystal"], cp["hkl_list"]), *_stack_line_radiators(sweep)]
+    fiber_hkls, per_call, fiber_sources = fiber_line_axis(sweep)  # #1489
+    radiators = [(cp["crystal"], fiber_hkls or cp["hkl_list"]), *_stack_line_radiators(sweep)]
     # A measured selection's lines reach |g| up to its cap, which bounds the
     # axis before the spectrum phase knows the selected set (#1173).
     magnitudes = (
@@ -699,8 +705,9 @@ def _automatic_cxr_grid_policy(
         start_eV=start,
         stop_eV=stop,
         bandwidth_policy=bandwidth_policy,
-        per_call=sweep.cxr_grid_policy,
+        per_call=per_call,
     )
+    policy = with_sources(policy, fiber_sources)
     if len(radiators) > 1:
         sources = {**dict(policy.sources), "bandwidth_radiators": STACK_LINE_BANDWIDTH_MODEL}
         policy = replace(policy, sources=tuple(sorted(sources.items())))
@@ -813,8 +820,9 @@ def _cxr_grid_for_energy(
         resolve_crystal_cut(sweep.target._crystal_cut(), cp["beam_uvw"], cp["surface_hkl"]).label
     )
     # Stored rows were derived for the family-truncated set, so a measured
-    # selection, whose lines reach its |g| cap, resolves automatically.
-    if not override and not reoriented and sweep.line_yield_tolerance is None:
+    # selection (lines reach its |g| cap) or fiber domain (#1489) resolves automatically.
+    basal_rows = sweep.line_yield_tolerance is None and sweep.cxr_fiber is None
+    if not override and not reoriented and basal_rows:
         stored = (bins.cxr_by_energy or {}).get(float(energy_keV))
         if stored is not None:
             return np.asarray(stored, dtype=float), None
@@ -836,12 +844,7 @@ def _cxr_grid_for_energy(
         )
     grid = np.linspace(policy.start_eV, policy.stop_eV, num)
     payload = policy.payload()
-    if (
-        bins.cxr_by_energy is None
-        and not override
-        and not reoriented
-        and sweep.line_yield_tolerance is None
-    ):
+    if bins.cxr_by_energy is None and not override and not reoriented and basal_rows:
         payload["grid_model"] = BARE_SWEEP_GRID_MODEL
     return grid, payload
 
@@ -1182,7 +1185,7 @@ def build_cases(
         bremsstrahlung_model=bremsstrahlung_model,
         radiative=radiative,
     )
-    selection_keys = {}
+    selection_keys = fiber_case_fields(sweep, cp["composition"], bremsstrahlung_model)
     if sweep.line_yield_tolerance is not None:
         from ..montecarlo.runner.reflection_cutoff import reflection_selection_record
 

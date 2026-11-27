@@ -119,7 +119,14 @@ def test_case_old_slot_pickle_and_marked_io_round_trips(tmp_path, monkeypatch):
                 getattr(self, f.name)
                 for f in fields(self)
                 if f.name
-                not in ("transport_realization", "cone_split", "characteristic_chunk", "math")
+                not in (
+                    "transport_realization",
+                    "cone_split",
+                    "characteristic_chunk",
+                    "math",
+                    "cxr_fiber",
+                    "cxr_fiber_batch_size",
+                )
             ],
         )
         assert pickle.dumps(plain, protocol=5) == before
@@ -140,8 +147,9 @@ def test_cone_split_case_pickles_with_and_without_a_realization():
     split = ConeSplitting(cone_factor=1.0).to_dict()  # 8/gamma0 is too wide at 30 keV
     plain = Case(**_legacy_case(), cone_split=split)
     # A split case keeps an absent realization slot before its own field; the
-    # later absent characteristic chunk (#1455) and math mode (#1468) are dropped.
-    assert len(plain.__getstate__()) == len(fields(Case)) - 2
+    # later absent characteristic chunk (#1455), math mode (#1468) and fiber
+    # domain fields (#1483) are dropped.
+    assert len(plain.__getstate__()) == len(fields(Case)) - 4
     assert pickle.loads(pickle.dumps(plain)) == plain
     marked = bind_realization(plain, MARKER)
     restored = pickle.loads(pickle.dumps(marked))

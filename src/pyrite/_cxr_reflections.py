@@ -4,12 +4,31 @@ Split from ``_numerics`` (which re-exports both names) so the reflection
 controls own one module; ``pyrite._numerics.CxrReflections`` stays valid.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
 from ._fiber_average import FiberAverage
 
 MosaicRoute = Literal["analytic", "mc", "mc-sampled"]
+
+
+def fiber_average(value: object) -> FiberAverage | None:
+    """A :class:`FiberAverage` from itself, a profile/preset table, or ``None``."""
+    if value is None or isinstance(value, FiberAverage):
+        return value
+    if not isinstance(value, Mapping):
+        raise TypeError("cxr_fiber must be a table of FiberAverage fields")
+    return FiberAverage(**dict(value))
+
+
+def reflection_controls_from_values(values: Mapping[str, object]) -> "CxrReflections":
+    """``CxrReflections`` from flat profile ``CONVERGENCE_KEYS`` values.
+
+    The profile spelling of ``fiber`` is the ``cxr_fiber`` table (#1483).
+    """
+    kwargs: dict = {key: value for key, value in values.items() if key != "cxr_fiber"}
+    return CxrReflections(**kwargs, fiber=fiber_average(values.get("cxr_fiber")))
 
 
 @dataclass(frozen=True)
@@ -47,11 +66,17 @@ class CxrReflections:
         Experimental (#1480): a :class:`FiberAverage` (reciprocal cutoff, roll
         nodes, batch size) for the full non-basal domain of a fiber-textured
         crystal. ``None`` (default) keeps the catalog's basal-only ``(00l)``
-        domain. The campaign path does not score it yet (#1483) and refuses a
-        non-``None`` value; use
-        ``pyrite.montecarlo.spectrum.cxr.fiber.FiberCXRModel.from_numerics``,
-        which reads this field only: the other controls here, mosaic ones
-        included, do not reach the fiber scorer.
+        domain. Campaign runs (#1483) score it for HOPG with incoherent
+        emission, a single slab and BremsLib, on an explicit
+        (``EnergyBins.cxr``) or automatic (#1489) line grid; other routes
+        refuse it. They lower ``mosaic_route`` and
+        ``mosaic_nodes`` into the case as basal runs do. A mosaic target needs
+        ``mosaic_route="mc"``: ``"analytic"`` (its width reads the basal
+        geometry) and ``"mc-sampled"`` are refused. Excludes ``n_families``,
+        ``max_reflections`` and ``line_yield_tolerance``. The direct
+        ``pyrite.montecarlo.spectrum.cxr.fiber.FiberCXRModel.from_numerics``
+        reads this field only: the other controls here, mosaic ones included,
+        do not reach that scorer.
     """
 
     n_families: int | None = None
@@ -64,6 +89,15 @@ class CxrReflections:
     def __post_init__(self) -> None:
         if self.fiber is not None and not isinstance(self.fiber, FiberAverage):
             raise TypeError("fiber must be a FiberAverage or None")
+        if self.fiber is not None and (
+            self.n_families is not None
+            or self.max_reflections is not None
+            or self.line_yield_tolerance is not None
+        ):
+            raise ValueError(
+                "fiber owns the reflection domain; n_families, max_reflections and "
+                "line_yield_tolerance must be None"
+            )
         if self.n_families is not None and (
             type(self.n_families) is not int or self.n_families <= 0
         ):
