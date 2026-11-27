@@ -61,13 +61,14 @@ def remote_check(
         emit_diagnostic(
             "Zhai job is still running or its viewer disconnected; skipping automatic cache pull"
         )
-        return
+        return None
     if not state._job_succeeded(jobid):
         job_state = state._job_state(jobid) or "no terminal state recorded"
         raise SystemExit(
             f"Zhai SLURM job {jobid} did not complete successfully ({job_state}); cache not pulled"
         )
     lifecycle.pull_zhai_cache()
+    return None
 
 
 def _ensure_utf8_stdio():

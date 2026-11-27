@@ -169,7 +169,7 @@ def test_detector_mosaic_geometry_uses_case_surface_hkl(monkeypatch):
 
     def orientation(*args, **kwargs):
         captured.update(kwargs)
-        return None
+        return
 
     monkeypatch.setattr(detector, "_orientation_R", orientation)
     case = build_cases(

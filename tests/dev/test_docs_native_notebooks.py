@@ -486,6 +486,7 @@ def test_regenerated_capture_is_ruff_format_clean(tmp_path, monkeypatch):
                 ),
                 command[command.index("-o") + 1],
             )
+        return None
 
     monkeypatch.setattr(module.subprocess, "run", mock_run)
     module.regenerate(["first"])
