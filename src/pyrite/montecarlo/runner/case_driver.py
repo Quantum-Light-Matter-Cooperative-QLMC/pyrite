@@ -539,11 +539,8 @@ def _cxr_for_segments(
     from ..._mixed_elastic_policy import refuse_mixed_cxr
 
     refuse_mixed_cxr(case)
-    extras = (coherent, truncation_audit, temporal, coefficient_capture)
-    whole = _whole_case_lines(
-        segs, E_grid, case, n_hat, abs_layers, groove, Ne, extras, table_cache
-    )
-    if whole:
+    extras = (coherent, truncation_audit, temporal, coefficient_capture, table_cache)
+    if whole := _whole_case_lines(segs, E_grid, case, n_hat, abs_layers, groove, Ne, extras):
         return whole[0]
     from .axial import axial_zone_line_parts
 
@@ -612,18 +609,17 @@ def _cxr_for_segments(
             n_blocks = min(MAX_ELECTRON_BLOCKS, 2 * n_blocks)
 
 
-def _whole_case_lines(segs, E_grid, case, n_hat, abs_layers, groove, Ne, extras, table_cache):
+def _whole_case_lines(segs, E_grid, case, n_hat, abs_layers, groove, Ne, extras):
     """``(spectrum,)`` of a route that owns every line of ``case``, else ``()``.
 
-    The full-fiber domain (#1483) and two-beam CXR replace the reflection sum;
-    the fiber route keeps its coupling tables in ``table_cache`` (#1509).
+    The full-fiber domain (#1483) and two-beam CXR replace the reflection sum.
+    ``extras[4]`` is the caller's table cache, which fiber tables share (#1509).
     """
-    coherent, _, temporal, capture = extras
+    coherent, _, temporal, capture, tables = extras
     if case.get("cxr_fiber") is not None:
         from .fiber_emission import fiber_lines
 
-        lines = fiber_lines(segs, E_grid, case, n_hat, abs_layers, groove, Ne, extras, table_cache)
-        return (lines,)
+        return (fiber_lines(segs, E_grid, case, n_hat, abs_layers, groove, Ne, extras[:4], tables),)
     if (case.get("transition_radiation") or {}).get("model") != "two-beam":
         return ()
     from .dtr_emission import case_dtr_spectrum
