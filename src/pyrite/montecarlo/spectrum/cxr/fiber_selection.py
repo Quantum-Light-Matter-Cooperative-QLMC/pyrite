@@ -33,7 +33,7 @@ from ...runner.reflection_cutoff import (
     axis_yield_weights,
     select_reflection_cutoff,
 )
-from .fiber import FIBER_CXR_MODEL, FiberCXRModel, FiberReflectionSet
+from .fiber import FIBER_CXR_MODEL, FiberCXRModel, FiberReflectionSet, check_correction_inputs
 
 #: Candidate domain recorded with a fiber selection and hashed into its set identity.
 FIBER_SELECTION_DOMAIN = "full-fiber"
@@ -190,14 +190,23 @@ def select_fiber_reflections(
     prefix is the whole population (else ``None``: rescore on every
     history), the selection record, and the staged population segments when
     the prefix is the whole population (else ``None``), so the caller stages
-    them once. The arguments are checked by :func:`check_selection_arguments`
-    before anything is staged.
+    them once. The arguments (:func:`check_selection_arguments`) and the
+    continuum correction's carbon table and energy interval
+    (:func:`~pyrite.montecarlo.spectrum.cxr.fiber.check_correction_inputs`)
+    are checked before anything is staged.
 
     Validation: reflection-yield-tolerance-selector
     """
     from ... import runner
+    from ...runner.case_tables import _case_bremslib_tables
 
     check_selection_arguments(grid, tolerance, histories)
+    check_correction_inputs(
+        _case_bremslib_tables(pilot),
+        pilot["composition"],
+        E_cut_keV=float(floor_keV),
+        max_energy_keV=float(max_keV),
+    )
     count = int(tp["Ne_lines"])
     k, prefix_rows, segments = selection_prefix(tp["segs"], count, histories, rows)
     staged = runner._segments_on_device(segments)

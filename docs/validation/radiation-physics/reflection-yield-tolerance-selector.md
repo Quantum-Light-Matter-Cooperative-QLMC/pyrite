@@ -570,6 +570,8 @@ the weights are its bin widths (§2). The background log grid needs a
 positive lower edge, so an axis whose first spacing is at least twice its
 first node (lower edge clamped to 0 eV) is refused before any staging, as are
 a tolerance outside $(0,1)$ and `selection_histories` without a tolerance.
+The correction's carbon table and line-active energy interval (inside the
+released subtraction kernel) are also checked before staging.
 
 **Net metric.** The paired fiber continuum is always lattice-share
 corrected, so the stop uses the v4 net form: $s_k=L_k-S_k$ with $S_k$ the
@@ -604,7 +606,12 @@ fiber model marker, the roll count `azimuth_count`, the temperature, cap,
 shell width, cutoff, tail and the shell table (`metric="net"`, per-shell
 `share`, `background_yield`). `selected_set_sha256` hashes the domain,
 crystal, texture axis, roll count and sorted reflection list, so equal sets
-at different roll counts are distinct identities. The result's model record
+at different roll counts are distinct identities. Like the basal digest, it
+identifies the selected reflection set, not the scored spectrum: temperature
+(which sets each reflection's projected tensor $B$), cap, tolerance and
+geometry are separate record fields, and two selections that keep the same
+set at different temperatures share a digest. Compare spectra by the full
+record, not by the digest alone. The result's model record
 names the selected cutoff. No default output, catalog or
 `CXR_REFLECTION_SELECTION_MODEL` changes: the basal path is untouched.
 
