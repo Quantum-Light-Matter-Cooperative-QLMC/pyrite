@@ -15,8 +15,6 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.colors import qualitative
 
-_COLORS = qualitative.Plotly
-
 from ...results import records
 from .._common import _COMPARISON_SELECTION_TITLES, _comparison_drop_message
 from .._decimation import DEFAULT_PLOT_RESOLUTION, resolve_plot_resolution
@@ -40,6 +38,7 @@ from .._spectrum_frames import (
     spectrum_frame,
 )
 
+_COLORS = qualitative.Plotly
 _INTENSITY_TITLE = "Intensity (Phs/s/eV/uA)"  # plain: detector figures
 # Per-trace point count above which a line uses WebGL. Measured in Firefox and
 # Chrome (#622, checks/plotly_browser_bench_622.py): SVG renders faster at every

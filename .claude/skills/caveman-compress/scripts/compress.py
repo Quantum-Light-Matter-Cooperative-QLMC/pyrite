@@ -6,12 +6,16 @@ Usage:
     python scripts/compress.py <filepath>
 """
 
+import contextlib
 import os
 import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+from .detect import should_compress
+from .validate import validate
 
 OUTER_FENCE_REGEX = re.compile(r"\A\s*(`{3,}|~{3,})[^\n]*\n(.*)\n\1\s*\Z", re.DOTALL)
 
@@ -112,11 +116,6 @@ def strip_llm_wrapper(text: str) -> str:
         return m.group(2)
     return text
 
-
-import contextlib
-
-from .detect import should_compress
-from .validate import validate
 
 MAX_RETRIES = 2
 

@@ -110,6 +110,11 @@ keeps reviewed `noqa` codes from families that are not enabled (`S`, `BLE`,
 notation and typography (`–`, `×`, `−`, Greek letters, `ℓ`, primes, curly
 quotes). Every other confusable still fails.
 
+`E402` applies everywhere except the runner facade, whose interleaved
+imports are read back by its submodules, and `.ipynb` captures. Other late
+imports (environment set before import, `sys.path` bootstraps, module-level
+skips) carry a `noqa`; move accidental ones to the top instead.
+
 Marimo sources and `.ipynb` captures skip `RUF100`. Their `noqa` comments
 travel between source and capture, which are analysed with different cell
 semantics. Marimo sources also skip `SIM117`, because editing them requires a

@@ -16,23 +16,24 @@ try:
 except cupy.cuda.runtime.CUDARuntimeError:
     pytest.skip("CUDA runtime unavailable", allow_module_level=True)
 
-from cupyx import jit
+# Device imports follow the module-level CUDA skip above.
+from cupyx import jit  # noqa: E402
 
-from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
-from pyrite.montecarlo.transport._jit_radiative import (
+from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table  # noqa: E402
+from pyrite.montecarlo.transport._jit_radiative import (  # noqa: E402
     radiative_layer_moments_scalar,
     radiative_moments_scalar,
     sample_hard_photon_energy_scalar,
 )
-from pyrite.montecarlo.transport._jit_radiative_device import (
+from pyrite.montecarlo.transport._jit_radiative_device import (  # noqa: E402
     RAD_HARD_RATE,
     RAD_SOFT,
     _rad_layer_moment,
     _rad_moment,
     _rad_sample_photon_eV,
 )
-from pyrite.montecarlo.transport.hard_radiative import pack_radiative_layer_tables
-from tests.helpers.bremslib import synthetic_bremslib_arrays
+from pyrite.montecarlo.transport.hard_radiative import pack_radiative_layer_tables  # noqa: E402
+from tests.helpers.bremslib import synthetic_bremslib_arrays  # noqa: E402
 
 
 @jit.rawkernel()

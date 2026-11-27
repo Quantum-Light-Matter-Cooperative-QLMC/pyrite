@@ -26,13 +26,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from pyrite import __version__
+from pyrite import __version__  # noqa: E402
 
 # Catalog schema classes keep their historical public ``__module__`` for
 # pickle compatibility. During this documentation process only, point Sphinx's
 # source analyzer at the module that owns their definitions and annotated
 # dataclass fields. The public autosummary entries remain ``pyrite.materials.*``.
-from pyrite.materials import _schema as _materials_schema
+from pyrite.materials import _schema as _materials_schema  # noqa: E402
 
 for _name in (
     "MaterialConfigError",
@@ -72,7 +72,7 @@ extensions = [
     "sphinxcontrib.bibtex",  # one references.bib for every external source
 ]
 
-from _source_refs import build_revision
+from _source_refs import build_revision  # noqa: E402
 
 source_repository = "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite"
 source_revision = build_revision(ROOT, f"v{release}")

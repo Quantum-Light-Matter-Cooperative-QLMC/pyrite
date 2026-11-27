@@ -34,6 +34,7 @@ Run (CPU-force on a box with the cupy wheel but no CUDA device):
   pixi run python -c "import sys;sys.modules['cupy']=None;from pyrite.validation.anchor_figures import main;main()"
 """
 
+import contextlib  # noqa: I001 -- isort would split the `X as X` re-exports one per statement
 import hashlib
 import json
 import os
@@ -45,9 +46,7 @@ from tabulate import tabulate
 
 from pyrite.paths import cache_dir
 
-_HERE = Path(__file__).resolve().parent
-_PACKAGE_ROOT = _HERE.parent
-from pyrite.detectors import Detector, LegacyEDS  # noqa: I001
+from pyrite.detectors import Detector, LegacyEDS
 from pyrite.materials.crystal import crystal_absorption_length_ang
 from pyrite.montecarlo import (
     aperture_fwhm_eV,
@@ -93,7 +92,9 @@ from pyrite.validation.validation_background import (
     compare_external_background,
     subtract_external_background,
 )
-import contextlib
+
+_HERE = Path(__file__).resolve().parent
+_PACKAGE_ROOT = _HERE.parent
 
 _EXTERNAL_BREM_V1 = _HERE / "reference_data" / "external_brem" / "v1"
 _ZHAI_FIG3B_BREM = _EXTERNAL_BREM_V1 / "zhai_fig3b_25kev_1mm_brem.csv"

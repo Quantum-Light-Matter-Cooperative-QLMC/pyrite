@@ -42,7 +42,6 @@ select = [
 
 ignore = [
     "E501",    # long lines in physics formulas/comments
-    "E402",    # import-not-at-top — notebook cells have docstrings before imports
     "RUF005",  # `arr + [x]` is NumPy broadcasting, not concatenation; shape
                # tuples ((n,) + a.shape) are idiomatic. Fix would break numerics.
     "RUF007",  # zip(a, a[1:]) works on arrays and in Numba; pairwise does not
@@ -94,8 +93,9 @@ extend-immutable-calls = [
 
 [lint.per-file-ignores]
 # cross-cell references are always undefined to static analysis. Captures
-# mirror their Marimo sources, so their noqa comments are owned there.
-"*.ipynb" = ["F821", "RUF100"]
+# mirror their Marimo sources, so their noqa comments are owned there; captured
+# cells keep the source cell's leading prose/statements before imports (E402).
+"*.ipynb" = ["E402", "F821", "RUF100"]
 # Marimo cell noqa comments travel into committed .ipynb captures, where the
 # same lines are analysed with different cell semantics; edit them at source
 # together with a capture regeneration, never through RUF100.
@@ -104,6 +104,10 @@ extend-immutable-calls = [
 # underscore makes a Marimo name cell-private, so RUF059 renames are graph
 # decisions, not lint.
 "{src/pyrite/apps,docs/notebooks,docs/examples,docs/demo}/**" = ["RUF059", "RUF100", "SIM117"]
+# The runner facade interleaves submodule imports with the package globals
+# they read back through ``from .. import runner`` (case_driver, recovery), so
+# the late-import order is load-bearing; elsewhere E402 sites carry a noqa.
+"src/pyrite/montecarlo/runner/__init__.py" = ["E402"]
 # Tests nest pytest.raises/warns around the configured context on purpose, so
 # the expectation scope reads separately from the setup scope.
 "tests/**" = ["SIM117"]

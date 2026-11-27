@@ -13,7 +13,7 @@ from pyrite.montecarlo.groove import (
     in_material,
     surface_depth_ang,
 )
-from pyrite.montecarlo.spectrum import _brem_dsigma_dk, mc_brem_spectrum
+from pyrite.montecarlo.spectrum import _brem_dsigma_dk, mc_brem_spectrum, mc_cxr_spectrum
 from pyrite.montecarlo.transport import (
     TRANSPORT_ELEMENTS,
     _element_crossover_keV,
@@ -898,9 +898,6 @@ def test_finite_side_exit_before_reentry_records_no_vacuum_leg():
     assert out["n_side_exited"] == 1
     assert out["n_backscattered"] == out["n_transmitted"] == 0
     assert out["vacuum_start_ang"].shape == (0, 3)
-
-
-from pyrite.montecarlo.spectrum import mc_cxr_spectrum
 
 
 def _hopg_spectrum(groove=None, thickness_ang=2.0e5):

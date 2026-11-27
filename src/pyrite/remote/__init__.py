@@ -81,6 +81,17 @@ from . import (
     viewer,
 )
 
+# Governed experimental client. The historical orchestration aliases below remain internal.
+from .client import (  # noqa: F401
+    PullResult,
+    RemoteError,
+    RemoteJob,
+    RemoteStatus,
+    submit,
+)
+from .config import RemoteTarget  # noqa: F401
+from .targets import resolve_target  # noqa: F401
+
 # --- from config ------------------------------------------------------
 # Compatibility snapshot only; subsystem calls resolve the effective host
 # dynamically through ``config.remote_host()``.
@@ -188,15 +199,3 @@ render_frame = viewer.render_frame
 _attach_header = viewer._attach_header
 _live_status = viewer._live_status
 attach = viewer.attach
-
-
-# Governed experimental client. Historical orchestration aliases above remain internal.
-from .client import (  # noqa: F401
-    PullResult,
-    RemoteError,
-    RemoteJob,
-    RemoteStatus,
-    submit,
-)
-from .config import RemoteTarget  # noqa: F401
-from .targets import resolve_target  # noqa: F401

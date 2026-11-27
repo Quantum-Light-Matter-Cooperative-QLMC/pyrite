@@ -10,6 +10,8 @@ from pathlib import Path
 
 import numpy as np
 
+from pyrite.montecarlo.spectrum.cxr import _node_window as nw
+
 case, outdir = sys.argv[1], Path(sys.argv[2])
 outdir.mkdir(parents=True, exist_ok=True)
 spec = importlib.util.spec_from_file_location(
@@ -17,7 +19,6 @@ spec = importlib.util.spec_from_file_location(
 )
 audit = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(audit)
-from pyrite.montecarlo.spectrum.cxr import _node_window as nw
 
 orig = nw._sincsq_window_reduce
 calls = []

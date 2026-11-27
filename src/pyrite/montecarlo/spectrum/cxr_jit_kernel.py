@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import cupy as xp
 import numpy as np
 
@@ -12,8 +14,6 @@ U32_ONE = np.uint32(1)
 U32_TWO = np.uint32(2)
 U32_THREE = np.uint32(3)
 U32_FOUR = np.uint32(4)
-
-from dataclasses import dataclass
 
 
 @dataclass(frozen=True)

@@ -19,7 +19,9 @@ from ...remote import config, lifecycle, transport
 from .. import _completion as _cli_completion
 from .._deprecations import DeprecatingGroup, canonical_option, removed_option
 from .._groups import LazyGroup
+from .._options import target_commands
 from .._unit_params import unit_float
+from . import remote_trajectories
 from ._remote_actions import (
     _cli_check,
     _cli_clear,
@@ -1193,12 +1195,8 @@ def check_command(ctx, ne, ne_brem, ne_supp, tmd_azimuth, refresh, no_sync, deta
     )
 
 
-from . import remote_trajectories
-
 command.add_command(remote_trajectories.command)
 
-
-from .._options import target_commands
 
 target_commands(command)
 
