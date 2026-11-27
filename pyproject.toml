@@ -86,7 +86,19 @@ plots = [
     "plotly>=6.8.0",
 ]
 # Runtime of the shipped marimo apps (``pyrite app ... launch|export``).
-apps = ["pyrite-mc[plots]", "anywidget>=0.11.0", "marimo[recommended]>=0.26.0"]
+# ``marimo-lens`` declares Python <3.15, so from 3.15 the extra spells out
+# marimo 0.26's ``recommended`` set without it (#1421).
+apps = [
+    "pyrite-mc[plots]",
+    "anywidget>=0.11.0",
+    "marimo[recommended]>=0.26.0; python_version < '3.15'",
+    "marimo[sql,sandbox]>=0.26.0; python_version >= '3.15'",
+    "altair>=5.4.0; python_version >= '3.15'",
+    "cryptography>=42.0.0; python_version >= '3.15'",
+    "nbformat>=5.7.0; python_version >= '3.15'",
+    "pydantic-ai-slim[openai]>=2.34.0,<3; python_version >= '3.15'",
+    "ruff; python_version >= '3.15'",
+]
 
 [project.scripts]
 pyrite = "pyrite.cli:main"
@@ -646,6 +658,45 @@ python = "3.13.*"
 [tool.pixi.feature.py314.dependencies]
 python = "3.14.*"
 
+# Nonblocking Python 3.15 probe (#1421), not a supported version. It stands
+# apart from the default feature, whose python ceiling and conda gemmi do not
+# cover 3.15: conda-forge supplies the compiled stack and pixi builds gemmi
+# (no cp315 wheel or conda build) from source against the tools listed here;
+# nanobind 3 breaks gemmi 0.7.5 (gemmi#442).
+[tool.pixi.feature.py315]
+platforms = ["linux-64"]
+
+[tool.pixi.feature.py315.dependencies]
+python = "3.15.*"
+numpy = ">=2.2"
+scipy = ">=1.17.1"
+numba = ">=0.61"
+h5py = ">=3.16.0"
+endf-parserpy = ">=0.17.0"
+pandas = ">=3.0.3"
+polars = ">=1.44.2"
+psutil = ">=7.2.2"
+scikit-build-core = "*"
+nanobind = "<3"
+cmake = "*"
+ninja = "*"
+cxx-compiler = "*"
+
+# `pyrite-dev package-smoke` installs from PyPI into plain pip venvs, which
+# build h5py, gemmi and endf-parserpy from source: h5py links the environment's
+# HDF5, gemmi takes the nanobind bound above, and endf-parserpy's default of
+# one compile job per core exhausts CI runner memory.
+[tool.pixi.feature.py315.activation.env]
+HDF5_DIR = "$CONDA_PREFIX"
+PIP_BUILD_CONSTRAINT = "$PIXI_PROJECT_ROOT/.github/py315-build-constraints.txt"
+INSTALL_ENDF_PARSERPY_NUM_BUILD_JOBS = "1"
+
+[tool.pixi.feature.py315.pypi-dependencies]
+pyrite-mc = { path = ".", editable = true }
+
+[tool.pixi.feature.py315.pypi-options]
+no-build-isolation = ["gemmi"]
+
 # marimo's HTML-WASM export (the docs results demo) shells out to the `uv`
 # binary to run Ruff's import graph. It is a tool marimo calls, not how this
 # workspace manages environments; its tool/cache dirs stay inside `.pixi/` so
@@ -724,6 +775,8 @@ intel-cmplr-lib-rt = "*"
 default = { features = ["cpu", "py313", "test", "lint", "docs", "notebooks", "oracle", "browser", "dask", "optimization"], solve-group = "py313" }
 py314 = { features = ["cpu", "py314", "test", "lint", "docs", "notebooks", "oracle", "browser", "dask", "optimization"], solve-group = "py314" }
 docs = { features = ["cpu", "py313", "docs"], solve-group = "py313" }
+# Every default group except `oracle` (abtem needs pyFFTW, no cp315 build).
+py315 = { features = ["py315", "test", "lint", "docs", "notebooks", "browser", "dask", "optimization"], no-default-feature = true }
 # Lab/GPU environments carry the test group and the cluster extras jobs use;
 # nvidia also carries docs, to regenerate the CUDA tutorial captures.
 nvidia = { features = ["py313", "gpu-stack", "cuda", "test", "docs", "notebooks", "dask", "optimization"] }

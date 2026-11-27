@@ -28,6 +28,7 @@ install with `--locked`, so a manifest edit without `pixi lock` fails fast.
 |---|---|---|
 | `default` | linux-64, osx-arm64, win-64 | Python 3.13; groups `test`, `lint`, `docs`, `notebooks`, `oracle`, `browser`; extras `dask`, `optimization` |
 | `py314` | linux-64, osx-arm64, win-64 | `default` on Python 3.14 (CI's second interpreter) |
+| `py315` | linux-64 | Nonblocking Python 3.15 probe: every `default` group except `oracle` |
 | `docs` | linux-64, osx-arm64, win-64 | Python 3.13 with the `docs` group only (documentation workflow, release notes) |
 | `nvidia` | linux-64 (CUDA 13 driver) | conda-forge `cupy`, `cufinufft` and `cuda-version 13.*`; `test`, `docs`, `notebooks`, `dask`, `optimization` |
 | `amd` | linux-64 | PyPI `amd` extra: CuPy sdist built on the node against the host's ROCm for its GPU (`CUPY_INSTALL_USE_HIP=1`, `HCC_AMDGPU_TARGET` from `rocminfo`); same groups as `nvidia` without `docs` |
@@ -79,10 +80,10 @@ Design decisions (#1462):
   fails if any locked environment installs one distribution from both
   sources.
 - **Platforms.** Every environment on linux-64. The CPU-only `default`,
-  `py314` and `docs` environments also lock osx-arm64 and win-64. GPU, `svml`
-  and `viz` are Linux-only.
-- **Python.** 3.13 (`py313` feature) everywhere except `py314`. CI runs each
-  primary test domain in `default` and `py314`.
+  `py314` and `docs` environments also lock osx-arm64 and win-64. `py315`, GPU,
+  `svml` and `viz` are Linux-only.
+- **Python.** 3.13 (`py313` feature) everywhere except `py314` and the `py315`
+  probe. CI runs each primary test domain in `default` and `py314`.
 - **Floors.** `numpy>=2.2` and `numba>=0.61` are the oldest releases the code
   supports, which lets `svml` keep its conda builds. The other environments
   still resolve the latest releases.
@@ -250,6 +251,24 @@ The suites read hash-pinned fetched data rather than packaged data (ADR-0014): t
 `pyrite-dev test` and `test-suite` use `pytest-xdist` workers by default: `min(CPUs, available memory / 2 GiB, 6)`. This is a sizing heuristic, not a hard memory bound; individual heavy tests can exceed it. Set `PYRITE_TEST_WORKERS=N` to choose the count (`1` runs serially). `test` runs that name test paths remain serial by default; both commands honor explicit `-n`/`--numprocesses` or `-p no:xdist`. Whenever a run uses two or more xdist workers (default or explicit `-n`), the pytest processes default to `OPENBLAS_NUM_THREADS`, `OMP_NUM_THREADS` and `MKL_NUM_THREADS` of `1`; numpy and scipy each load their own OpenBLAS, and default pools per worker oversubscribe the cores and slow small dense linear algebra by more than an order of magnitude (#1021). Values already set in the environment win; serial and targeted runs are not capped. Pytest keeps `tmp_path` directories only for failed tests. Run full slow audits remotely, starting with `OPENBLAS_NUM_THREADS=1` for parallel CPU work; see the [measured memory and axial-tail audit](compute/slow-test-audit.md) before choosing more threads or running a high-memory node locally.
 
 Tests marked `slow` are skipped by default. The marker covers tests that take more than 5 s wall time or have a large peak RSS, plus rarely-needed exhaustive cases. The skip reason and a closing summary line say how to enable them. Pass `--slow` to `test` or `test-suite` (before forwarded pytest arguments), or set `PYRITE_SLOW_TESTS=1`. A slow test named by node id (`path::test_name`), or selected by any `-m` expression that names `slow`, runs without the flag. CI sets `PYRITE_SLOW_TESTS=1` on every PR, so physics anchors may carry the marker. Tag a whole heavy module with `pytestmark = pytest.mark.slow`.
+
+The `python-next` CI job is a nonblocking Python 3.15 probe, not a support
+claim. It runs on main pushes, the weekly schedule, dispatches, and PRs that
+touch `pyproject.toml`, `pixi.lock`, the CI workflow, the build constraints or
+the package smoke. It uses the `py315` environment, which stands apart from the
+default feature: conda-forge supplies the compiled stack and pixi builds `gemmi`
+from source with `nanobind<3`. The job runs the packaging and identity-pin
+suites, focused RNG, baseline, checkpoint and bounded transport/radiation
+modules, and `pyrite-dev package-smoke`, whose plain pip venvs build `h5py`,
+`gemmi` and `endf-parserpy` from source because none publishes cp315 wheels.
+Those builds inherit the environment's compilers, `HDF5_DIR` and `nanobind<3`
+build constraint, so a passing smoke does not show that an unconfigured
+`pip install` works on 3.15. On 3.15 the `apps` extra leaves out `marimo-lens`,
+which declares Python <3.15, and lists the rest of `marimo[recommended]` itself;
+`tests/dev/test_apps_extra.py` compares that list with the installed marimo. The
+`oracle` group is skipped (no cp315 pyFFTW), and the NVIDIA and Intel extras
+have no cp315 builds. Classifiers and install docs change only with an explicit
+support decision (#1421).
 
 ## Coverage
 
