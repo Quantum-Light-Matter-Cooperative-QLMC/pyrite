@@ -157,12 +157,52 @@ def _fold_roll_audit(caller, audit, weight):
         caller["collect"].append((energy, width, weight * coefficient))
 
 
-def fiber_lines(segs, E_grid, case, n_hat, abs_layers, groove, Ne=None, extras=()):
+class FiberTableCache(dict):
+    """Coupling tables of one fiber case's (roll, batch) calls, within a byte budget (#1509).
+
+    The batched route keys each table set on the roll azimuth and the batch's
+    reflections, so entries never mix orientations. Insertion stops once
+    ``budget`` bytes are held: every block visits the rolls in the same order,
+    so least-recently-used eviction would miss on every call of a cyclic scan
+    larger than the budget, while keeping the first sets hits each one.
+    """
+
+    def __init__(self, budget: int) -> None:
+        super().__init__()
+        self.budget = int(budget)
+        self.nbytes = 0
+
+    def __setitem__(self, key, tables) -> None:
+        size = sum(int(getattr(table, "nbytes", 0)) for table in tables)
+        if key in self or self.nbytes + size > self.budget:
+            return
+        super().__setitem__(key, tables)
+        self.nbytes += size
+
+
+#: Coupling-table bytes one fiber case keeps across streamed blocks (#1509).
+#: The #1490 scene holds about 14 MiB per (roll, batch) at cutoff 6 and 32 rolls.
+FIBER_TABLE_CACHE_BYTES = 512 * 2**20
+
+
+def _fiber_tables(table_cache):
+    """This fiber case's budgeted table cache inside the caller's, or ``None``."""
+    if table_cache is None:
+        return None
+    return table_cache.setdefault("fiber-tables", FiberTableCache(FIBER_TABLE_CACHE_BYTES))
+
+
+def fiber_lines(
+    segs, E_grid, case, n_hat, abs_layers, groove, Ne=None, extras=(), table_cache=None
+):
     """Roll-averaged incoherent line density of a fiber ``case`` on ``E_grid``.
 
     Each roll node and reflection batch is one ordinary basal-route call with
-    the domain's rows and per-reflection projected B; no table cache spans
-    rolls (orientation enters the cached tables). ``extras`` are the caller's
+    the domain's rows and per-reflection projected B. Their coupling tables
+    persist in the caller's ``table_cache`` within :data:`FIBER_TABLE_CACHE_BYTES`
+    (:class:`FiberTableCache`), so streamed blocks reuse them. On the host their
+    bin-mean lines are reduced once per call of this function, not once per
+    roll and batch (:meth:`.FiberReflectionSet._average`, #1509). ``extras`` are the caller's
     ``(coherent, truncation_audit, temporal, coefficient_capture)``. A
     truncation audit (line-grid resolution's collected population, or the
     spectrum phase's edge sums) is accumulated over every roll node and batch
@@ -193,6 +233,7 @@ def fiber_lines(segs, E_grid, case, n_hat, abs_layers, groove, Ne=None, extras=(
     if base.get("beam_uvw") is None and base.get("surface_hkl") is None:
         base["surface_hkl"] = (0, 0, 1)
     grid = np.asarray(E_grid, dtype=float)
+    tables = _fiber_tables(table_cache)
 
     def score(hkls, phi, weight):
         part = _roll_audit(audit)
@@ -205,7 +246,7 @@ def fiber_lines(segs, E_grid, case, n_hat, abs_layers, groove, Ne=None, extras=(
             groove,
             coherent=False,
             Ne=Ne,
-            table_cache=None,
+            table_cache=tables,
             truncation_audit=part,
         )
         if part is not None:
