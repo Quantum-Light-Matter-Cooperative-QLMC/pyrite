@@ -43,12 +43,12 @@ from pathlib import Path
 import numpy as np
 from tabulate import tabulate
 
-from pyrite.paths import cache_dir  # noqa: E402
+from pyrite.paths import cache_dir
 
 _HERE = Path(__file__).resolve().parent
 _PACKAGE_ROOT = _HERE.parent
-from pyrite.detectors import Detector, LegacyEDS  # noqa: E402, I001
-from pyrite.materials.crystal import crystal_absorption_length_ang  # noqa: E402
+from pyrite.detectors import Detector, LegacyEDS  # noqa: I001
+from pyrite.materials.crystal import crystal_absorption_length_ang
 from pyrite.montecarlo import (
     aperture_fwhm_eV,
     beta_from_keV,
@@ -57,9 +57,9 @@ from pyrite.montecarlo import (
     mc_cxr_spectrum,
 )
 from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
-from pyrite.montecarlo.geometry import tilted_geometry  # noqa: E402
-from pyrite.console.outputs import output_dir  # noqa: E402
-from pyrite.validation._anchor_conditions import (  # noqa: E402, F401, I001
+from pyrite.montecarlo.geometry import tilted_geometry
+from pyrite.console.outputs import output_dir
+from pyrite.validation._anchor_conditions import (
     GRAPHITE_B_002 as GRAPHITE_B_002,
     ZHAI_SUPPLEMENTARY_STUDIES as ZHAI_SUPPLEMENTARY_STUDIES,
     SupplementaryCoherentStudy as SupplementaryCoherentStudy,
@@ -80,16 +80,16 @@ from pyrite.validation._anchor_conditions import (  # noqa: E402, F401, I001
     single_segment_anchor as single_segment_anchor,
     theory_line_energies as theory_line_energies,
 )
-from pyrite.validation.feranchuk_spence import (  # noqa: E402
+from pyrite.validation.feranchuk_spence import (
     escape_limited_length_ang,
 )
-from pyrite.validation._zhai import (  # noqa: E402
+from pyrite.validation._zhai import (
     ZHAI_CACHE_FORMAT as ZHAI_CACHE_FORMAT,
     ZHAI_CACHE_SCHEMA,
     ZHAI_DETECTOR as ZHAI_DETECTOR,
     detector_metadata as detector_metadata,
 )
-from pyrite.validation.validation_background import (  # noqa: E402
+from pyrite.validation.validation_background import (
     compare_external_background,
     subtract_external_background,
 )

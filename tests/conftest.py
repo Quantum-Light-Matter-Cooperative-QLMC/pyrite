@@ -56,20 +56,20 @@ except ImportError:
 # Likewise the developer's config store (``workspace.root``, ``catalog.path``,
 # ...): point it at an absent file before any module resolves import-time
 # defaults. ``_isolate_config_store`` then gives each test its own empty store.
-from pyrite.console import config as _config  # noqa: E402
+from pyrite.console import config as _config
 
 _config.CONFIG_PATH = Path(tempfile.gettempdir()) / "pyrite-tests-absent-store" / "config.toml"
 
 # Pytest finds hooks and fixtures by name in this namespace: the opt-in ``slow``
 # tier (#381) and the identity-pin registry (#1316: ``--update-pins`` and the
 # ``identity_pin`` fixture).
-from tests.helpers import slow_marker as _slow_marker  # noqa: E402
-from tests.helpers.identity_pins import (  # noqa: E402, F401
+from tests.helpers import slow_marker as _slow_marker
+from tests.helpers.identity_pins import (  # noqa: F401
     identity_pin,
     mark_identity_pin_tests,
     pytest_addoption,
 )
-from tests.helpers.slow_marker import pytest_terminal_summary  # noqa: E402, F401
+from tests.helpers.slow_marker import pytest_terminal_summary  # noqa: F401
 
 
 @pytest.hookimpl(tryfirst=True)

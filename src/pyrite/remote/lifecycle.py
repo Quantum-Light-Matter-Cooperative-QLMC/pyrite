@@ -1,9 +1,9 @@
 """Compatibility facade for the split remote job lifecycle."""
 
 from . import cleanup, jobs, performance, queue, recompute
-from . import config as config  # noqa: F401 - compatibility module attribute
+from . import config as config  # compatibility module attribute
 from . import pull as pulling
-from . import transport as transport  # noqa: F401 - compatibility module attribute
+from . import transport as transport  # compatibility module attribute
 
 archive = pulling.archive
 

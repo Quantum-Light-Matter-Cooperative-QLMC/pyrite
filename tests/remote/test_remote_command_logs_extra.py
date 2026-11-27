@@ -56,7 +56,7 @@ def test_follow_logs_status_propagates_through_remote_cli(monkeypatch, status):
 
 
 def test_stack_dump_signals_only_handler_registered_scans():
-    from pyrite.remote import viewer  # noqa: F811
+    from pyrite.remote import viewer
 
     command = viewer._stack_dump_command("j", 2)
     assert 'srun --jobid="$SID" --overlap --ntasks=1' in command
@@ -75,7 +75,7 @@ def test_stack_dump_signals_only_handler_registered_scans():
 def test_stack_dump_reports_signalled_and_legacy_jobs(
     monkeypatch, capsys, returncode, stdout, expected, message
 ):
-    from pyrite.remote import viewer  # noqa: F811
+    from pyrite.remote import viewer
 
     stderr = f"CXR_STACK_SIGNALLED {1 if returncode == 0 else 0} {0 if returncode == 0 else 1}\n"
     monkeypatch.setattr(

@@ -273,7 +273,7 @@ from .recovery import _spectrum_case_retry as _spectrum_case_retry
 from .recovery import _spectrum_with_recovery as _spectrum_with_recovery
 from .recovery import transport_with_recovery as transport_with_recovery
 
-from .case_driver import (  # noqa: E402  isort: skip
+from .case_driver import (  # isort: skip
     _cxr_for_case as _cxr_for_case,
     _cxr_for_segments as _cxr_for_segments,
     _cxr_for_segments_once as _cxr_for_segments_once,

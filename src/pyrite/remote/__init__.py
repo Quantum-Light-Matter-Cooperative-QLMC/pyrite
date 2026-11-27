@@ -191,12 +191,12 @@ attach = viewer.attach
 
 
 # Governed experimental client. Historical orchestration aliases above remain internal.
-from .client import (  # noqa: E402, F401
+from .client import (  # noqa: F401
     PullResult,
     RemoteError,
     RemoteJob,
     RemoteStatus,
     submit,
 )
-from .config import RemoteTarget  # noqa: E402, F401
-from .targets import resolve_target  # noqa: E402, F401
+from .config import RemoteTarget  # noqa: F401
+from .targets import resolve_target  # noqa: F401

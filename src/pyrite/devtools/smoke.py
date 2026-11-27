@@ -6,11 +6,11 @@ from pathlib import Path
 
 os.environ.setdefault("MPLBACKEND", "Agg")
 
-from pyrite.campaign.config import default_settings  # noqa: E402
-from pyrite.plots import plot_best_spectra  # noqa: E402
-from pyrite.plots.plotly.spectra import spectrum_chart  # noqa: E402
-from pyrite.results import filter_results, records, top_geometries  # noqa: E402
-from pyrite.runs.run import cases_from_results, load_checkpoint  # noqa: E402
+from pyrite.campaign.config import default_settings
+from pyrite.plots import plot_best_spectra
+from pyrite.plots.plotly.spectra import spectrum_chart
+from pyrite.results import filter_results, records, top_geometries
+from pyrite.runs.run import cases_from_results, load_checkpoint
 
 
 def build_parser() -> argparse.ArgumentParser:

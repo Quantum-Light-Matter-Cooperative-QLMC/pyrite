@@ -5,17 +5,17 @@ import pytest
 
 pytest.importorskip("xraydb")
 
-from pyrite.materials.channeling.axial import axial_profile  # noqa: E402
-from pyrite.montecarlo.channeling import (  # noqa: E402
+from pyrite.materials.channeling.axial import axial_profile
+from pyrite.montecarlo.channeling import (
     AxialEnergyMCWFOptions,
     IncidentEnergyEnsemble,
     axial_energy_mcwf,
 )
-from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator  # noqa: E402
-from pyrite.montecarlo.channeling.axial_mcwf import AxialMCWF  # noqa: E402
-from pyrite.montecarlo.channeling.axial_propagation import AxialPropagationConfig  # noqa: E402
-from pyrite.montecarlo.channeling.mcwf import mcwf_stream_key  # noqa: E402
-from pyrite.montecarlo.channeling.states import gaussian  # noqa: E402
+from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator
+from pyrite.montecarlo.channeling.axial_mcwf import AxialMCWF
+from pyrite.montecarlo.channeling.axial_propagation import AxialPropagationConfig
+from pyrite.montecarlo.channeling.mcwf import mcwf_stream_key
+from pyrite.montecarlo.channeling.states import gaussian
 
 
 def test_each_mono_reference_has_energy_dependent_dissipator_and_matching_stream():

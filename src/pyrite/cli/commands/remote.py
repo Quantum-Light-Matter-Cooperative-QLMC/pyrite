@@ -1193,12 +1193,12 @@ def check_command(ctx, ne, ne_brem, ne_supp, tmd_azimuth, refresh, no_sync, deta
     )
 
 
-from . import remote_trajectories  # noqa: E402
+from . import remote_trajectories
 
 command.add_command(remote_trajectories.command)
 
 
-from .._options import target_commands  # noqa: E402
+from .._options import target_commands
 
 target_commands(command)
 

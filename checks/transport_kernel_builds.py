@@ -46,7 +46,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
-from transport_kernel_variants import (  # noqa: E402
+from transport_kernel_variants import (
     _configurations,
     _digest,
     _max_threads_per_sm,

@@ -35,7 +35,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import streamed_scoring_memory as harness  # noqa: E402
+import streamed_scoring_memory as harness
 
 CHAR_TIMERS = ("total", "clip", "escape", "accumulate", "interp")
 

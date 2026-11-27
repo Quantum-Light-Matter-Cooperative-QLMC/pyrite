@@ -5,21 +5,21 @@ import pytest
 
 pytest.importorskip("xraydb")
 
-from pyrite.materials.channeling.axial import axial_profile  # noqa: E402
-from pyrite.montecarlo.channeling import (  # noqa: E402
+from pyrite.materials.channeling.axial import axial_profile
+from pyrite.montecarlo.channeling import (
     AxialEnergyMCWFOptions,
     IncidentPhaseSpace,
     axial_phase_space_mcwf,
     axial_temporal_slices,
 )
-from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator  # noqa: E402
-from pyrite.montecarlo.channeling.axial_mcwf import AxialMCWF  # noqa: E402
-from pyrite.montecarlo.channeling.axial_propagation import (  # noqa: E402
+from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator
+from pyrite.montecarlo.channeling.axial_mcwf import AxialMCWF
+from pyrite.montecarlo.channeling.axial_propagation import (
     AxialPropagationConfig,
     propagate_axial,
 )
-from pyrite.montecarlo.channeling.mcwf import mcwf_stream_key  # noqa: E402
-from pyrite.montecarlo.channeling.states import gaussian, translate  # noqa: E402
+from pyrite.montecarlo.channeling.mcwf import mcwf_stream_key
+from pyrite.montecarlo.channeling.states import gaussian, translate
 
 
 def _space(t, energy, position=None, slope=None, weights=None):

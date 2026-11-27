@@ -84,7 +84,7 @@ from .transport_options import (
 )
 
 # Late-bound owner of process-wide state shared with sibling runner modules.
-from .. import runner as _pkg  # noqa: E402  isort: skip
+from .. import runner as _pkg  # isort: skip
 
 
 def _spectrum_stage_done(stage):
