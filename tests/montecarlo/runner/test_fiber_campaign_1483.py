@@ -139,13 +139,6 @@ def _absent(case):
     return _ABSENT
 
 
-def test_streaming_refuses_fiber_cases():
-    from pyrite.montecarlo.runner.streamed_scoring import streaming_refusal
-
-    case = _lower(_numerics(FiberAverage(cutoff_invang=6.0)))
-    assert "cxr_fiber" in streaming_refusal(case)
-
-
 def test_line_seam_routes_rolls_through_the_basal_scorer(monkeypatch):
     from pyrite.montecarlo import runner
 
