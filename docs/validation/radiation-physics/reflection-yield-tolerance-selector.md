@@ -670,8 +670,8 @@ default, and the stop is an extrapolation, not a bound.
 enumeration with the exact extinction rule ($h-k\equiv0 \bmod 3$, odd $l$)
 reproduced the closure of every shell and the union with `prepare()` for
 $G=2\ldots40$ Å⁻¹. A table-level probe on the carbon BremsLib table found the
-per-shell share tables summing to the union's to $7.5	imes10^{-20}$ of the
-maximum DDCS. The stop, $	au$ and cutoffs were recomputed from the raw shell
+per-shell share tables summing to the union's to $7.5\times10^{-20}$ of the
+maximum DDCS. The stop, $\tau$ and cutoffs were recomputed from the raw shell
 tables of both scenes and the prefix run. The review found no code defects.
 Its wording corrections (pair-of-shells ratios, clamp scope, quadrature
 limit) are applied above, and its anchor gap (the scene tests stub the
