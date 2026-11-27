@@ -18,6 +18,7 @@ point a store at a directory other users can write.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -197,7 +198,7 @@ class _temporary:
 
 
 def _link_once(source: Path, target: Path) -> None:
-    try:
-        os.link(source, target)  # atomic create-if-absent
-    except FileExistsError:
-        pass  # another worker won; its file is validated by the caller
+    # Atomic create-if-absent. FileExistsError: another worker won; its file is
+    # validated by the caller.
+    with contextlib.suppress(FileExistsError):
+        os.link(source, target)

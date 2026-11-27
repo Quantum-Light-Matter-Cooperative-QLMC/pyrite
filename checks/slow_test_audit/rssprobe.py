@@ -5,6 +5,7 @@ test to ``$RSSPROBE_DIR/<worker>.jsonl``: RSS at test start, sampled peak
 process RSS and process-tree RSS (children included), wall time, ru_maxrss.
 """
 
+import contextlib
 import json
 import os
 import resource
@@ -43,10 +44,8 @@ class _Sampler(threading.Thread):
                 tree = rss
                 try:
                     for child in self.proc.children(recursive=True):
-                        try:
+                        with contextlib.suppress(psutil.Error):
                             tree += child.memory_info().rss
-                        except psutil.Error:
-                            pass
                 except psutil.Error:
                     pass
                 self.tree_peak = max(self.tree_peak, tree)

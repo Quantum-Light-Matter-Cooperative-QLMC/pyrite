@@ -371,9 +371,12 @@ def _verify_staged(dataset: Dataset, staged: Path, origin: str) -> str | None:
 def _extract_member(dataset: Dataset, bundle: Path, staged: Path, origin: str) -> str | None:
     """Extract ``dataset`` from a verified bundle into ``staged``; return a failure."""
     try:
-        with zipfile.ZipFile(bundle) as zipped, zipped.open(bundle_member(dataset)) as member:
-            with staged.open("wb") as stream:
-                shutil.copyfileobj(member, stream)
+        with (
+            zipfile.ZipFile(bundle) as zipped,
+            zipped.open(bundle_member(dataset)) as member,
+            staged.open("wb") as stream,
+        ):
+            shutil.copyfileobj(member, stream)
     except (OSError, KeyError, zipfile.BadZipFile) as exc:
         return f"could not extract {dataset.name} from {origin}: {exc}"
     return _verify_staged(dataset, staged, origin)

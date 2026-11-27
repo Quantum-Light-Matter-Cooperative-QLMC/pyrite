@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import os
 import shutil
@@ -185,11 +186,9 @@ def _stage_artifact(local: Path, remote: str, build) -> None:
             host=host,
         )
     finally:
-        try:
+        # Best-effort cleanup must not hide the original upload failure.
+        with contextlib.suppress(OSError, SystemExit):
             transport._ssh_capture(f"rm -f -- {temp_word}", host=host)
-        except (OSError, SystemExit):
-            # Best-effort cleanup must not hide the original upload failure.
-            pass
 
 
 def job_tool_probe(missing_mark: str) -> tuple[str, str]:

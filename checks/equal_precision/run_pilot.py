@@ -1,6 +1,7 @@
 """Interleave fresh-process adapters within one bounded SLURM allocation."""
 
 import argparse
+import contextlib
 import hashlib
 import json
 import os
@@ -19,10 +20,8 @@ def run_command(cmd, env, log, timeout):
         try:
             returncode = process.wait(timeout=timeout)
         except (subprocess.TimeoutExpired, KeyboardInterrupt):
-            try:
+            with contextlib.suppress(ProcessLookupError):
                 os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
             process.wait()
             raise
     if returncode:

@@ -4,6 +4,7 @@ pandas-backed plotting tests then hard-crash (native fault in DataFrame
 construction). Loading pyarrow here, before any test module imports pyrite,
 fixes the order. Harmless when pyarrow is absent."""
 
+import contextlib
 import os
 import sys
 import tempfile
@@ -48,10 +49,8 @@ os.environ["PYRITE_MOTT_TABLES_DIR"] = str(MOTT_SYNTHETIC_DIR)
 # for the statistical-equivalence CI job; tests of resolution set their own.
 os.environ["PYRITE_MATH"] = os.environ.get("PYRITE_TEST_MATH") or "reproducible"
 
-try:
+with contextlib.suppress(ImportError):
     import pyarrow  # noqa: F401
-except ImportError:
-    pass
 
 # Likewise the developer's config store (``workspace.root``, ``catalog.path``,
 # ...): point it at an absent file before any module resolves import-time

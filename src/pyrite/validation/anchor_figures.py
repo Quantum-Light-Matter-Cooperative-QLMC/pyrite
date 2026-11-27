@@ -93,6 +93,7 @@ from pyrite.validation.validation_background import (
     compare_external_background,
     subtract_external_background,
 )
+import contextlib
 
 _EXTERNAL_BREM_V1 = _HERE / "reference_data" / "external_brem" / "v1"
 _ZHAI_FIG3B_BREM = _EXTERNAL_BREM_V1 / "zhai_fig3b_25kev_1mm_brem.csv"
@@ -1045,10 +1046,8 @@ def export_all_figures(
     """
     import matplotlib
 
-    try:
+    with contextlib.suppress(Exception):
         matplotlib.use("Agg")
-    except Exception:
-        pass
 
     outpath = output_dir("figures") if outdir is None else Path(outdir)
     outpath.mkdir(parents=True, exist_ok=True)
@@ -1128,10 +1127,8 @@ def validation_table(anchor: ZhaiAnchor, model: dict) -> list[list]:
 def main(outdir: str | None = None, ne: int = 500, ne_brem: int = 200) -> None:
     import matplotlib
 
-    try:
+    with contextlib.suppress(Exception):
         matplotlib.use("Agg")
-    except Exception:
-        pass
 
     anchor = ZhaiAnchor()
     print(f"Running MC model spectra (ne={ne}, ne_brem={ne_brem}); slow on CPU...")

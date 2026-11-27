@@ -7,6 +7,7 @@ Used for sticky-manual protection in `apply` and for `show`. Absent file == no
 provenance (everything "derived").
 """
 
+import contextlib
 import json
 import os
 import tempfile
@@ -150,8 +151,6 @@ def _write(data: dict):
             f.write(text)
         os.replace(tmp, PROVENANCE_PATH)
     except BaseException:
-        try:
+        with contextlib.suppress(OSError):
             os.remove(tmp)
-        except OSError:
-            pass
         raise

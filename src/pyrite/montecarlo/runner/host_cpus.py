@@ -3,6 +3,7 @@
 Split from ``runner/__init__.py`` to keep that module under the line budget.
 """
 
+import contextlib
 import os
 from pathlib import Path
 
@@ -48,13 +49,9 @@ def _usable_cpus():
     ``SLURM_CPUS_PER_TASK``, and the cgroup quota. Read once at import, like the
     rest of the host probe; workers inherit the value on spawn."""
     limits = [os.cpu_count(), _cgroup_cpu_quota()]
-    try:
+    with contextlib.suppress(AttributeError):  # sched_getaffinity is Linux-only
         limits.append(len(os.sched_getaffinity(0)))
-    except AttributeError:  # not Linux
-        pass
-    try:
+    with contextlib.suppress(KeyError, ValueError):
         limits.append(int(os.environ["SLURM_CPUS_PER_TASK"]))
-    except (KeyError, ValueError):
-        pass
     known = [limit for limit in limits if limit]
     return min(known) if known else None

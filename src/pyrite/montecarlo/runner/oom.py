@@ -1,5 +1,6 @@
 """Accelerator OOM tagging, pool release cadence, and pool limits."""
 
+import contextlib
 from typing import Any
 from weakref import WeakValueDictionary
 
@@ -66,14 +67,10 @@ def _drop_traceback_locals(exc):
                 if inspect.isgenerator(value) and str(
                     value.gi_frame.f_globals.get("__name__", "") if value.gi_frame else ""
                 ).startswith("pyrite"):
-                    try:
+                    with contextlib.suppress(RuntimeError, ValueError):
                         value.close()
-                    except (RuntimeError, ValueError):
-                        pass
-            try:
+            with contextlib.suppress(RuntimeError):
                 frame.clear()
-            except RuntimeError:
-                pass
             tb = tb.tb_next
 
 

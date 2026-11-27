@@ -14,6 +14,7 @@ manual/derived tracking (brem bounds aren't governed by decision 3).
 Candidate catalogs are fully validated before replacement.
 """
 
+import contextlib
 import difflib
 import json
 import math
@@ -844,10 +845,8 @@ def _validate_catalog_text(path, text, *, profile: str | None = None):
         else:
             loader(Path(tmp), profile=profile)
     finally:
-        try:
+        with contextlib.suppress(OSError):
             os.remove(tmp)
-        except OSError:
-            pass
 
 
 def _snapshot(path):

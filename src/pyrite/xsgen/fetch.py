@@ -162,11 +162,13 @@ def _stream(request: Request, destination: Path, label: str, hint: str = "") -> 
     """Stream ``request`` to ``destination`` and return its SHA-256."""
     digest = hashlib.sha256()
     try:
-        with urlopen(request, timeout=60) as response:  # noqa: S310 - pinned HTTPS URL
-            with destination.open("wb") as stream:
-                while chunk := response.read(_CHUNK):
-                    stream.write(chunk)
-                    digest.update(chunk)
+        with (
+            urlopen(request, timeout=60) as response,  # noqa: S310 - pinned HTTPS URL
+            destination.open("wb") as stream,
+        ):
+            while chunk := response.read(_CHUNK):
+                stream.write(chunk)
+                digest.update(chunk)
     except (OSError, URLError) as exc:
         raise DataFetchError(f"could not download {label}: {exc}{hint}") from exc
     return digest.hexdigest()

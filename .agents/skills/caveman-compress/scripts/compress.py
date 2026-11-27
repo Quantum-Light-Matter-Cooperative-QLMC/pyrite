@@ -113,6 +113,8 @@ def strip_llm_wrapper(text: str) -> str:
     return text
 
 
+import contextlib
+
 from .detect import should_compress
 from .validate import validate
 
@@ -312,10 +314,8 @@ def compress_file(filepath: Path) -> bool:
         print(
             "   In-memory original differs from on-disk backup. Aborting before touching the input file."
         )
-        try:
+        with contextlib.suppress(OSError):
             backup_path.unlink()
-        except OSError:
-            pass
         return False
     filepath.write_text(compressed)
 

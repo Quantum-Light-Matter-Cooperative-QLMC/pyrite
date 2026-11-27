@@ -3,7 +3,7 @@
 import io
 import sys
 import time
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout, suppress
 
 import click
 
@@ -82,10 +82,8 @@ def _ensure_utf8_stdio():
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is None:
             continue
-        try:
+        with suppress(ValueError):
             reconfigure(encoding="utf-8", errors="replace")
-        except ValueError:
-            pass
 
 
 # ---- CLI wiring ----------------------------------------------------------------
