@@ -12,13 +12,14 @@
 #   sbatch checks/fiber_nonbasal_cxr_1480.sbatch OUT_DIR frozen CRYSTAL E0 THICK TILT [opts]
 #   sbatch checks/fiber_nonbasal_cxr_1480.sbatch OUT_DIR paired [fiber_paired_1480.py opts]
 #   sbatch checks/fiber_nonbasal_cxr_1480.sbatch OUT_DIR campaign E0 THICK TILT [opts]
+#   sbatch checks/fiber_nonbasal_cxr_1480.sbatch OUT_DIR stream E0 THICK TILT --route R [opts]
 #   sbatch checks/fiber_nonbasal_cxr_1480.sbatch OUT_DIR selector [fiber_selector_1484.py opts]
-# `frozen` and `campaign` (#1483) write OUT_DIR/result.{json,npz}; `paired`/`selector`
+# `frozen`, `campaign` (#1483) and `stream` (#1490) write OUT_DIR/result.{json,npz}; `paired`/`selector`
 # get --output OUT_DIR/{paired,selector}.
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 if (( $# < 2 )); then
-    echo "usage: $0 OUT_DIR {frozen|paired|campaign|selector} [options]" >&2
+    echo "usage: $0 OUT_DIR {frozen|paired|campaign|stream|selector} [options]" >&2
     exit 2
 fi
 OUT=$(mkdir -p "$1" && cd "$1" && pwd)
@@ -43,7 +44,7 @@ printf '\n' >> "$OUT/arguments.txt"
 echo "code $SHA host $(hostname) job $SLURM_JOB_ID mode $MODE backend $PYRITE_MC_BACKEND fp64=${PYRITE_FP64:-0}"
 pixi install --locked -e "$ENV"
 case "$MODE" in
-    frozen|campaign)
+    frozen|campaign|stream)
         /usr/bin/time -v pixi run --as-is -e "$ENV" python -u \
             checks/fiber_nonbasal_cxr_1480.py "$MODE" "$@" --json "$OUT/result.json" \
             > "$OUT/run.log" 2>&1

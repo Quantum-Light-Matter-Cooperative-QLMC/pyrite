@@ -51,7 +51,7 @@ campaign path refused it.
    counts, bin-mean lines. The line grid is explicit (`EnergyBins.cxr`) or
    automatic, resolved and audited over the roll-averaged lines (#1489).
    Stored catalog rows, derived for the basal lines, are skipped. Measured
-   selection, feature windows, line attribution, streaming, line roulette,
+   selection, feature windows, line attribution, line roulette,
    cone splitting, channeling, transition radiation, photon transport and
    temporal profiles refuse a fiber case, at lowering or in `Case`
    validation, never by falling back to basal-only.
@@ -66,7 +66,12 @@ campaign path refused it.
   (`fiber_case.score_fiber_case`) on the same transport to 1e-12.
 - Automatic line grids and truncation audits (#1489) sum every roll node at
   its quadrature weight, so a grid resolution costs one population pass per
-  roll. Streamed scoring is follow-up work (#1490).
+  roll.
+- Fiber cases stream in whole-electron blocks, live and from artifacts
+  (#1490). Under an exact bin mean the streamed spectrum and
+  `brem_lattice_share` record equal the retained ones to summation order;
+  the default host Fourier bin-mean reduction (#1192) sets its image period
+  per flush, so lines agree within its declared residual.
 - Cutoff convergence is the user's responsibility: #1480 measured +22 % /
   +43 % yield going from 6 to 8 / 10 Å⁻¹ at 30 keV, so no cutoff default
   exists.

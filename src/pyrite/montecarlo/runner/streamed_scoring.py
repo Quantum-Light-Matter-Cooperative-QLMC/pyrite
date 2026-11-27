@@ -33,13 +33,15 @@ from .fallbacks import measure_block_fallbacks
 
 #: Case keys whose spectra need every segment at once. A measured reflection
 #: selection (#1173) measures shell yields over every segment before it stops.
-#: Full-fiber CXR (#1483) is not yet qualified on electron blocks.
+#: Full-fiber CXR (#1483) streams (#1490): its roll-averaged lines
+#: (:func:`.fiber_emission.fiber_lines`) and matched continuum
+#: (:func:`.fiber_emission.fiber_emission_tables`) are linear in electrons and
+#: reached through the same line and continuum seams as the retained route.
 STREAM_REFUSED_KEYS = (
     "coherent_emission",
     "temporal_profile",
     "photon_transport",
     "reflection_selection",
-    "cxr_fiber",
 )
 
 #: Further case keys live streaming refuses (#611): the diagnostic line-grid

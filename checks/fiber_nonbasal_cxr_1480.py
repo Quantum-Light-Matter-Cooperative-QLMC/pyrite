@@ -16,6 +16,8 @@ Subcommands::
                               arms A-E on one frozen local transport
   campaign E0_KEV THICK_NM TILT_DEG --energy-max EV [--json OUT]
                               #1483 campaign fiber route vs the Q arm
+  stream E0_KEV THICK_NM TILT_DEG --route {retained,streamed} --energy-max EV
+                              #1490 retained or streamed fiber spectrum and cost
 
 Conventions (production): sample +z is the reciprocal ``surface_hkl = (001)``
 axis (``_orientation_R``); a crystallite at azimuth ``phi`` is rolled by
@@ -779,16 +781,8 @@ def cmd_frozen(args):
 
 
 # ---- campaign route parity (#1483) --------------------------------------------
-def cmd_campaign(args):
-    """Campaign fiber route versus the Q arm on one campaign transport (#1483).
-
-    Lowers a HOPG Scene with ``CxrReflections(fiber=...)`` on this script's
-    explicit photon axis, transports it once, then scores (a) the campaign
-    line seam, (b) the full campaign spectrum phase and (c) the Q arm's
-    per-family loop on the same segments. With ``--basal-b tensor`` the Q
-    arm uses the model's projected basal B instead of catalog B33, so (a) and
-    (c) differ only by summation order.
-    """
+def _campaign_case(args):
+    """``(E, case)``: the lowered HOPG fiber Scene on this script's photon axis."""
     from pyrite import Scene
     from pyrite.beams import Beam, PointBunch, Spot
     from pyrite.campaign.lowering import lower_simulation
@@ -796,8 +790,6 @@ def cmd_campaign(args):
     from pyrite.config import CxrReflections, FiberAverage, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector, EnergyBins
     from pyrite.geometry import Footprint, Slab
-    from pyrite.montecarlo import runner
-    from pyrite.montecarlo.runner.fiber_emission import fiber_domain
 
     E = np.arange(args.step, args.energy_max, args.step)
     average = FiberAverage(
@@ -815,7 +807,23 @@ def cmd_campaign(args):
         seed=args.seed,
     )
     physics = Physics(bremsstrahlung_model="bremslib", radiative_model="uncoupled")
-    case = lower_simulation(resolve_simulation(scene, physics=physics, numerics=numerics))
+    return E, lower_simulation(resolve_simulation(scene, physics=physics, numerics=numerics))
+
+
+def cmd_campaign(args):
+    """Campaign fiber route versus the Q arm on one campaign transport (#1483).
+
+    Lowers a HOPG Scene with ``CxrReflections(fiber=...)`` on this script's
+    explicit photon axis, transports it once, then scores (a) the campaign
+    line seam, (b) the full campaign spectrum phase and (c) the Q arm's
+    per-family loop on the same segments. With ``--basal-b tensor`` the Q
+    arm uses the model's projected basal B instead of catalog B33, so (a) and
+    (c) differ only by summation order.
+    """
+    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.runner.fiber_emission import fiber_domain
+
+    E, case = _campaign_case(args)
     t0 = time.time()
     tp = runner._transport_case(case, transport_core=args.transport_core)
     t_transport = time.time() - t0
@@ -894,6 +902,94 @@ def cmd_campaign(args):
         )
 
 
+# ---- streamed scoring cost (#1490) --------------------------------------------
+def _rss_mib():
+    import resource
+
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+
+
+def cmd_stream(args):
+    """Retained or streamed spectrum of the lowered fiber case, with cost (#1490).
+
+    ``--route retained`` transports the whole population then scores it;
+    ``--route streamed`` runs :func:`run_case_streamed` in blocks of
+    ``--block`` electrons and records each block's scoring wall time and the
+    process peak RSS after it. Run each route as its own process so the peak
+    RSS is that route's. Spectra go to the NPZ for offline comparison.
+    """
+    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.runner import streamed_scoring
+    from pyrite.montecarlo.runner.fiber_emission import fiber_domain
+
+    E, case = _campaign_case(args)
+    blocks: dict[int, dict] = {}  # keyed by first electron id: a replayed block overwrites
+    t0 = time.time()
+    if args.route == "retained":
+        tp = runner._transport_case(case, transport_core=args.transport_core)
+        t_transport = time.time() - t0
+        rss_transport = _rss_mib()
+        out = runner._spectrum_case(case, tp)
+    else:
+        from pyrite._backend import _to_cpu
+
+        original = streamed_scoring.BlockSpectrumScorer.add
+
+        def timed(self, segs):
+            start = time.time()
+            original(self, segs)
+            rows = int(segs["L_ang"].shape[0])
+            if rows == 0:
+                return
+            first = int(np.min(np.asarray(_to_cpu(segs["elec_id"]))))
+            attempts = blocks.get(first, {}).get("attempts", 0) + 1
+            blocks[first] = dict(
+                first_electron=first,
+                rows=rows,
+                seconds=time.time() - start,
+                peak_rss_mib=_rss_mib(),
+                attempts=attempts,
+            )
+
+        streamed_scoring.BlockSpectrumScorer.add = timed
+        out = streamed_scoring.run_case_streamed(
+            case, args.block, transport_core=args.transport_core
+        )
+        t_transport = rss_transport = None
+    wall = time.time() - t0
+    record = dict(
+        route=args.route,
+        block_electrons=args.block if args.route == "streamed" else None,
+        E0_keV=args.E0,
+        thick_nm=args.thick_nm,
+        tilt_deg=args.tilt,
+        theta_deg=args.theta,
+        electrons=args.electrons,
+        seed=args.seed,
+        g_max=args.g_max,
+        rolls=args.reference,
+        batch=args.batch,
+        reflections=len(fiber_domain(case).hkls),
+        n_segments=int(out["n_segments"]),
+        seconds=dict(total=wall, transport=t_transport),
+        peak_rss_mib=_rss_mib(),
+        rss_after_transport_mib=rss_transport,
+        blocks=[blocks[key] for key in sorted(blocks)],
+        brem_lattice_share=out.get("brem_lattice_share"),
+    )
+    print(json.dumps({k: record[k] for k in ("route", "n_segments", "seconds", "peak_rss_mib")}))
+    if args.json:
+        with open(args.json, "w") as handle:
+            json.dump(record, handle, indent=1, default=str)
+        np.savez_compressed(
+            args.json.removesuffix(".json") + ".npz",
+            **{
+                key: np.asarray(out[key])
+                for key in ("E_grid", "spec", "spec_characteristic", "brem_wide", "brem")
+            },
+        )
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -953,6 +1049,22 @@ def main():
     p.add_argument("--transport-core", default="auto")
     p.add_argument("--no-q-arm", action="store_true", help="campaign cost only")
     p.add_argument("--json")
+    p = sub.add_parser("stream")
+    p.add_argument("E0", type=float, help="beam kinetic energy [keV]")
+    p.add_argument("thick_nm", type=float)
+    p.add_argument("tilt", type=float, help="target tilt [deg]")
+    p.add_argument("--route", choices=("retained", "streamed"), required=True)
+    p.add_argument("--block", type=int, default=100, help="electrons per streamed block")
+    p.add_argument("--theta", type=float, default=45.0, help="lab observation angle [deg]")
+    p.add_argument("--electrons", type=int, default=400)
+    p.add_argument("--seed", type=int, default=1)
+    p.add_argument("--g-max", type=float, default=6.0)
+    p.add_argument("--reference", type=int, default=32, help="roll nodes")
+    p.add_argument("--batch", type=int, default=256)
+    p.add_argument("--step", type=float, default=2.0)
+    p.add_argument("--energy-max", type=float, required=True, help="photon band ceiling [eV]")
+    p.add_argument("--transport-core", default="per-electron")
+    p.add_argument("--json")
     args = parser.parse_args()
     {
         "frozen": cmd_frozen,
@@ -960,6 +1072,7 @@ def main():
         "kinematics": cmd_kinematics,
         "single-flight": cmd_single_flight,
         "campaign": cmd_campaign,
+        "stream": cmd_stream,
     }[args.cmd](args)
 
 
