@@ -257,7 +257,7 @@ class FiberReflectionSet:
         total = self._average(score, shape, azimuth_rad)
         return tuple(total) if options.get("components") else total
 
-    def _average(self, score, shape, azimuth_rad):
+    def _average(self, score, shape, azimuth_rad, *, weighted=False):
         """Uniform roll average: midpoint nodes on one 60-degree sector.
 
         The full-circle average of a sixfold-closed set equals its average over
@@ -266,6 +266,8 @@ class FiberReflectionSet:
         full-circle nodes alias whenever ``gcd(N, 6) > 1`` (``N = 6`` is one
         orientation). Closure is verified in ``__post_init__``. Basal rows are
         roll invariant and scored once. Batches bound table allocations only.
+        ``weighted`` passes each call's quadrature weight (1 for basal rows,
+        ``1/N`` otherwise) as a third argument, for roll-weighted audits.
 
         Validation: cxr-fiber-intensity-average
         """
@@ -282,7 +284,9 @@ class FiberReflectionSet:
                     else azimuth_rad
                 )
                 for start in range(0, len(rows), batch):
-                    value = np.asarray(score(rows[start : start + batch], phi), dtype=np.float64)
+                    hkls = rows[start : start + batch]
+                    value = score(hkls, phi, 1.0 / rolls) if weighted else score(hkls, phi)
+                    value = np.asarray(value, dtype=np.float64)
                     if value.shape != total.shape or not np.isfinite(value).all():
                         raise RuntimeError("invalid fiber spectrum from CXR scorer")
                     total += value / rolls

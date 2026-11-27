@@ -124,7 +124,7 @@ from .inelastic_cases import (
     validate_explicit_shell_cases,
 )
 from .longitudinal import LongitudinalDistribution
-from .reflection_selection import fiber_case_fields, sweep_fiber
+from .reflection_selection import fiber_case_fields, fiber_line_axis, sweep_fiber, with_sources
 
 MATERIAL_LABELS = {key: material.label for key, material in CATALOG.materials.items()}
 
@@ -681,7 +681,8 @@ def _automatic_cxr_grid_policy(
     from ..montecarlo.runner.reflection_cutoff import F0_RANGE_INVANG
     from ..montecarlo.transport.beam_entry import upper_beam_energy_keV
 
-    radiators = [(cp["crystal"], cp["hkl_list"]), *_stack_line_radiators(sweep)]
+    fiber_hkls, per_call, fiber_sources = fiber_line_axis(sweep)  # #1489
+    radiators = [(cp["crystal"], fiber_hkls or cp["hkl_list"]), *_stack_line_radiators(sweep)]
     # A measured selection's lines reach |g| up to its cap, which bounds the
     # axis before the spectrum phase knows the selected set (#1173).
     magnitudes = (
@@ -702,8 +703,9 @@ def _automatic_cxr_grid_policy(
         start_eV=start,
         stop_eV=stop,
         bandwidth_policy=bandwidth_policy,
-        per_call=sweep.cxr_grid_policy,
+        per_call=per_call,
     )
+    policy = with_sources(policy, fiber_sources)
     if len(radiators) > 1:
         sources = {**dict(policy.sources), "bandwidth_radiators": STACK_LINE_BANDWIDTH_MODEL}
         policy = replace(policy, sources=tuple(sorted(sources.items())))
@@ -816,8 +818,9 @@ def _cxr_grid_for_energy(
         resolve_crystal_cut(sweep.target._crystal_cut(), cp["beam_uvw"], cp["surface_hkl"]).label
     )
     # Stored rows were derived for the family-truncated set, so a measured
-    # selection, whose lines reach its |g| cap, resolves automatically.
-    if not override and not reoriented and sweep.line_yield_tolerance is None:
+    # selection (lines reach its |g| cap) or fiber domain (#1489) resolves automatically.
+    basal_rows = sweep.line_yield_tolerance is None and sweep.cxr_fiber is None
+    if not override and not reoriented and basal_rows:
         stored = (bins.cxr_by_energy or {}).get(float(energy_keV))
         if stored is not None:
             return np.asarray(stored, dtype=float), None
@@ -839,12 +842,7 @@ def _cxr_grid_for_energy(
         )
     grid = np.linspace(policy.start_eV, policy.stop_eV, num)
     payload = policy.payload()
-    if (
-        bins.cxr_by_energy is None
-        and not override
-        and not reoriented
-        and sweep.line_yield_tolerance is None
-    ):
+    if bins.cxr_by_energy is None and not override and not reoriented and basal_rows:
         payload["grid_model"] = BARE_SWEEP_GRID_MODEL
     return grid, payload
 

@@ -30,8 +30,11 @@ cxr, brem, total = result["cxr"], result["brem"], result["total"]
 ```
 
 Since #1483, `simulate()` and campaign runs score `CxrReflections.fiber`
-directly when `Numerics.energy_bins` carries an explicit `EnergyBins.cxr`
-grid; the case then carries the model record as `cxr_fiber`
+directly; the case then carries the model record as `cxr_fiber`. Since
+#1489 an explicit `EnergyBins.cxr` grid is optional: the default automatic
+line grid seeds from every domain row at every roll node at weight `1/N`,
+and its truncation audit bounds the roll-averaged spectrum. Its ceiling
+is the kinematic bound over the domain's |g|, and stored basal rows are skipped
 ([ADR-0024](../../adr/0024-texture-versus-reflection-domain.md)). Routes
 outside the qualified envelope refuse instead of falling back to the
 basal-only domain. `cutoff_invang` has no default. The case's

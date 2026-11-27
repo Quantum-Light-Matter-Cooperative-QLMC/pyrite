@@ -99,19 +99,12 @@ def test_fiber_owns_the_reflection_domain():
     assert case.get("reflection_selection") is None
 
 
-def test_fiber_requires_an_explicit_line_grid():
-    average = FiberAverage(cutoff_invang=6.0)
-    with pytest.raises(ValueError, match="explicit line grid"):
-        _lower(_numerics(average, grid=None))
-
-
 @pytest.mark.parametrize(
     ("change", "reason"),
     [
         (dict(bremsstrahlung_model=None), "BremsLib"),
         (dict(coherent_emission=True), "incoherent"),
         (dict(temporal_profile=True), "temporal"),
-        (dict(line_grid_policy={"x": 1}), "explicit line grid"),
         (dict(mosaic_mc_sampling="history"), "mosaic"),
         (dict(cxr_source="none"), "CXR lines"),
         (dict(line_quadrature=None), "bin-mean"),
@@ -175,8 +168,8 @@ def test_line_seam_routes_rolls_through_the_basal_scorer(monkeypatch):
     # Basal rows once; every other row once per roll, averaged over the rolls.
     np.testing.assert_allclose(out, len(domain.hkls))
     assert sum(len(h) for h, _ in calls) == basal + 3 * (len(domain.hkls) - basal)
-    with pytest.raises(ValueError, match="audits"):
-        runner._cxr_for_segments({}, grid, case, None, None, None, truncation_audit={})
+    with pytest.raises(ValueError, match="temporal"):
+        runner._cxr_for_segments({}, grid, case, None, None, None, temporal={})
 
 
 def test_continuum_seam_uses_the_fiber_domain(monkeypatch):
@@ -274,10 +267,12 @@ def test_profile_selects_the_fiber_domain_and_forks_dataset_identity(monkeypatch
     cases = build_cases(sweep, n_electrons=1, n_electrons_brem=1)
     assert cases and all(c["cxr_fiber"]["cutoff_invang"] == 6.0 for c in cases)
     assert all(c.get("reflection_selection") is None for c in cases)
-    # Without an explicit line grid a profile refuses before transport.
-    stored = config.material_sweep("hopg")
-    with pytest.raises(ValueError, match="explicit line grid"):
-        build_cases(stored, n_electrons=1, n_electrons_brem=1)
+    # Without an explicit line grid the stored basal rows are skipped: the
+    # case resolves automatically over the fiber domain (#1489).
+    stored = config.material_sweep("hopg", energy_bins=EnergyBins(cxr_by_energy={30.0: grid}))
+    assert stored.energy_bins.cxr_by_energy
+    automatic = build_cases(stored, n_electrons=1, n_electrons_brem=1)
+    assert automatic and all(c.get("line_grid_policy") is not None for c in automatic)
 
 
 def json_payload(sweep, settings):

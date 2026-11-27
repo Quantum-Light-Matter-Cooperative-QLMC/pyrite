@@ -218,8 +218,9 @@ class Case(Mapping[str, Any]):
         Opt-in full-fiber CXR domain (#1483): the resolved
         :meth:`~pyrite.montecarlo.spectrum.cxr.fiber.FiberCXRModel.case_record`
         and its execution-only reflection batch size. Absent is the catalog's
-        basal-only domain. HOPG, incoherent, single slab, BremsLib, explicit
-        line grid. Validation: cxr-fiber-intensity-average
+        basal-only domain. HOPG, incoherent, single slab, BremsLib, bin-mean
+        lines on an explicit or automatic (#1489) line grid.
+        Validation: cxr-fiber-intensity-average
     math
         ``"fast"`` when the case was lowered under the fast math mode (#1468);
         absent is ``"reproducible"``. Unlike the chunks it stays in content

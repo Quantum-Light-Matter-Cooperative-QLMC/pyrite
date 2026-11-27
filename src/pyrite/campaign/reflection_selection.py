@@ -90,31 +90,63 @@ def sweep_fiber(sweep: Sweep):
 def fiber_case_fields(sweep: Sweep) -> dict[str, object]:
     """Case keys of the opt-in full-fiber domain (#1483); ``{}`` when basal-only.
 
-    The fiber domain has no qualified automatic or stored line grid: stored
-    catalog rows and automatic seeding know only the basal ``(00l)`` lines,
-    so an explicit ``EnergyBins.cxr`` grid without a per-call line-grid
-    policy is required. Lines are scored as bin means
-    (``line_quadrature="bin-mean"``), as the paired scorer and the #1480 arms
-    integrate them.
+    Lines are scored as bin means (``line_quadrature="bin-mean"``), as the
+    paired scorer and the #1480 arms integrate them. An explicit
+    ``EnergyBins.cxr`` grid is final and carries that key here; otherwise the
+    automatic line-grid policy resolves over the fiber domain's roll-averaged
+    population and its bin-mean payload carries it (#1489). Stored catalog
+    rows know only the basal ``(00l)`` lines and are never used.
 
     Validation: cxr-fiber-intensity-average
     """
     fiber = sweep.cxr_fiber
     if fiber is None:
         return {}
-    if sweep.energy_bins.cxr is None or sweep.cxr_grid_policy:
-        raise ValueError(
-            "full-fiber CXR requires an explicit line grid (EnergyBins.cxr, no "
-            "line_resolution or line_grid_policy): stored and automatic line grids "
-            "know only the basal (00l) lines (#1483)"
-        )
     from .._fiber_average import FiberAverage
     from ..montecarlo.spectrum.cxr.fiber import FiberCXRModel
 
-    fields: dict[str, object] = {
-        "cxr_fiber": FiberCXRModel.from_numerics(fiber).case_record(),
-        "line_quadrature": "bin-mean",
-    }
+    fields: dict[str, object] = {"cxr_fiber": FiberCXRModel.from_numerics(fiber).case_record()}
+    if sweep.energy_bins.cxr is not None and not sweep.cxr_grid_policy:
+        fields["line_quadrature"] = "bin-mean"
     if fiber.reflection_batch_size != FiberAverage(cutoff_invang=1.0).reflection_batch_size:
         fields["cxr_fiber_batch_size"] = fiber.reflection_batch_size
     return fields
+
+
+#: Provenance of a full-fiber case's automatic line axis: bandwidth bounded by
+#: the fiber domain's reflections, lines scored as bin means (#1489).
+FIBER_DOMAIN_BANDWIDTH_MODEL = "full-fiber-domain-v1"
+
+
+def fiber_line_axis(sweep: Sweep) -> tuple[list | None, dict | None, dict[str, str]]:
+    """``(domain rows, per-call policy, provenance)`` of a sweep's line axis (#1489).
+
+    A basal sweep returns ``(None, sweep.cxr_grid_policy, {})``. A full-fiber
+    sweep's domain rows, not its catalog ``hkl_list``, bound the automatic
+    bandwidth (``kinematic_cxr_stop_eV``); |g| is roll invariant, so the bound
+    holds at every roll node. Fiber lines are scored as bin means and the
+    resolution step and point budget follow the quadrature, so an unset
+    quadrature becomes ``bin-mean``.
+
+    Validation: cxr-fiber-intensity-average
+    Validation: line-grid-kinematic-bandwidth
+    """
+    per_call = sweep.cxr_grid_policy
+    if sweep.cxr_fiber is None:
+        return None, per_call, {}
+    from ..montecarlo.spectrum.cxr.fiber import FiberCXRModel
+
+    hkls = list(FiberCXRModel.from_numerics(sweep.cxr_fiber).prepare().hkls)
+    sources = {"bandwidth_reflections": FIBER_DOMAIN_BANDWIDTH_MODEL}
+    if not (per_call or {}).get("quadrature"):
+        per_call = {**(per_call or {}), "quadrature": "bin-mean"}
+        sources["quadrature"] = FIBER_DOMAIN_BANDWIDTH_MODEL
+    return hkls, per_call, sources
+
+
+def with_sources(policy, sources: dict[str, str]):
+    """``policy`` with ``sources`` merged into its provenance; unchanged when empty."""
+    if not sources:
+        return policy
+    merged = {**dict(policy.sources), **sources}
+    return replace(policy, sources=tuple(sorted(merged.items())))

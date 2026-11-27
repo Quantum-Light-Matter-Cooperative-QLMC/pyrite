@@ -90,7 +90,9 @@ tensor, averages non-basal intensities over crystallite rolls, and removes
 the matched lattice share from the BremsLib continuum. Texture stays a
 catalog fact; the domain is a numerics choice
 ([ADR-0024](../../adr/0024-texture-versus-reflection-domain.md)). The option
-is HOPG only, needs an explicit line grid, and replaces measured selection.
+is HOPG only and replaces measured selection. Without an explicit line
+grid it resolves the automatic one over its roll-averaged lines (#1489);
+stored catalog rows, derived for the basal lines, are skipped.
 Profiles select it with a `cxr_fiber` table
 (`cutoff_invang`, `azimuth_count`, `reflection_batch_size`).
 

@@ -59,7 +59,6 @@ def _refusal(case: Mapping[str, Any]) -> str | None:
         (case.get("coherent_emission"), "supports incoherent emission only"),
         (case.get("temporal_profile"), "does not support temporal profiles"),
         (case.get("reflection_selection") is not None, "owns its reflection domain"),
-        (case.get("line_grid_policy") is not None, "requires an explicit line grid"),
         (case.get("line_quadrature") != "bin-mean", "scores bin-mean lines"),
         (case.get("line_roulette") is not None, "does not support line roulette"),
         (case.get("cone_split") is not None, "does not support cone splitting"),
@@ -103,27 +102,85 @@ def validate_fiber_case(case: Mapping[str, Any]) -> None:
     FiberCXRModel.from_case_record(case[FIBER_CASE_KEY], reflection_batch_size=batch)
 
 
+#: Caller audit settings each roll call's own audit shares.
+_AUDIT_SETTINGS = (
+    "start_eV",
+    "stop_eV",
+    "band_eV",
+    "ceiling_eV",
+    "extension_stops_eV",
+    "n_electrons",
+    "mass_only",
+)
+#: Un-normalized audit sums, linear in line weight; folded at the roll weight.
+_AUDIT_SUMS = (
+    "line_mass",
+    "mass_above",
+    "mass_below",
+    "band_mass",
+    "mass_above_extension",
+    "electron_mass",
+)
+
+
+def _roll_audit(caller):
+    """A fresh audit for one roll call, sharing the caller's settings."""
+    if caller is None:
+        return None
+    if caller.get("attribute") is not None:
+        raise ValueError("full-fiber CXR does not support line attribution")
+    audit = {key: caller[key] for key in _AUDIT_SETTINGS if key in caller}
+    if "collect" in caller:
+        # Host collection: the caller's chunks and every roll's stay on one side.
+        caller["device_bytes"] = None
+        audit["collect"] = []
+    return audit
+
+
+def _fold_roll_audit(caller, audit, weight):
+    """Add one roll call's audit to ``caller`` at its quadrature ``weight``.
+
+    Every sum, the per-electron masses and each collected line's coefficient
+    are linear in the line weight, so the folded audit is that of the
+    roll-averaged spectrum the same calls score (#1489).
+
+    Validation: cxr-fiber-intensity-average
+    """
+    for key in _AUDIT_SUMS:
+        if key in audit:
+            existing = caller.get(key)
+            value = weight * audit[key]
+            caller[key] = value if existing is None else existing + value
+    for energy, width, coefficient in audit.get("collect", ()):
+        caller["collect"].append((energy, width, weight * coefficient))
+
+
 def fiber_lines(segs, E_grid, case, n_hat, abs_layers, groove, Ne=None, extras=()):
     """Roll-averaged incoherent line density of a fiber ``case`` on ``E_grid``.
 
     Each roll node and reflection batch is one ordinary basal-route call with
     the domain's rows and per-reflection projected B; no table cache spans
     rolls (orientation enters the cached tables). ``extras`` are the caller's
-    ``(coherent, truncation_audit, temporal, coefficient_capture)``; any set
-    one is refused.
+    ``(coherent, truncation_audit, temporal, coefficient_capture)``. A
+    truncation audit (line-grid resolution's collected population, or the
+    spectrum phase's edge sums) is accumulated over every roll node and batch
+    at the roll weight (1 basal, ``1/N`` otherwise), so it describes the
+    roll-averaged spectrum (#1489). Temporal profiles and coefficient capture
+    are refused.
 
     Validation: cxr-fiber-intensity-average
+    Validation: line-grid-resonance-bandwidth
     """
     import numpy as np
 
     from .. import runner
     from ..spectrum.cxr.fiber import _validate_scoring
 
-    coherent, *unsupported = (*extras, None, None, None, None)[:4]
+    coherent, audit, *unsupported = (*extras, None, None, None, None)[:4]
     if coherent or (coherent is None and case.get("coherent_emission")):
         raise ValueError("full-fiber CXR supports incoherent emission only")
     if any(value is not None for value in unsupported):
-        raise ValueError("full-fiber CXR does not support audits, temporal or capture")
+        raise ValueError("full-fiber CXR does not support temporal profiles or capture")
     phi0 = float(case.get("azimuth_rad", 0.0))
     _validate_scoring(
         phi0, dict(beam_uvw=case.get("beam_uvw"), surface_hkl=case.get("surface_hkl"))
@@ -135,8 +192,9 @@ def fiber_lines(segs, E_grid, case, n_hat, abs_layers, groove, Ne=None, extras=(
         base["surface_hkl"] = (0, 0, 1)
     grid = np.asarray(E_grid, dtype=float)
 
-    def score(hkls, phi):
-        return runner._cxr_for_segments(
+    def score(hkls, phi, weight):
+        part = _roll_audit(audit)
+        value = runner._cxr_for_segments(
             segs,
             grid,
             dict(base, hkl_list=list(hkls), B_ang2=lookup.__getitem__, azimuth_rad=phi),
@@ -146,9 +204,13 @@ def fiber_lines(segs, E_grid, case, n_hat, abs_layers, groove, Ne=None, extras=(
             coherent=False,
             Ne=Ne,
             table_cache=None,
+            truncation_audit=part,
         )
+        if part is not None:
+            _fold_roll_audit(audit, part, weight)
+        return value
 
-    return domain._average(score, grid.shape, phi0)
+    return domain._average(score, grid.shape, phi0, weighted=True)
 
 
 def fiber_emission_tables(case, layer, composition, tables):
