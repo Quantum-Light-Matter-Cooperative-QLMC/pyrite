@@ -309,7 +309,7 @@ class PlanarDetector:
             _scorer_origin=self._scorer_origin,
         )
 
-    def __post_init__(self, response, scorer, _scorer_origin=None) -> None:
+    def __post_init__(self, response, scorer, _scorer_origin) -> None:
         if not isinstance(self.pose, PlanarPose):
             raise TypeError("PlanarDetector.pose must be a PlanarPose")
         size = (

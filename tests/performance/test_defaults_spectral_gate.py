@@ -229,7 +229,7 @@ def test_reflection_chunks_partition_every_radiator_without_touching_the_rest():
     single = {"crystal": "silicon", "hkl_list": hkl, "Ne": 8}
     parts = gate["reflection_chunks"](single, 4)
     assert [len(p["hkl_list"]) for p in parts] == [4, 4, 2]
-    assert sum((p["hkl_list"] for p in parts), []) == hkl
+    assert [h for p in parts for h in p["hkl_list"]] == hkl
     assert all(
         {k: v for k, v in p.items() if k != "hkl_list"} == {"crystal": "silicon", "Ne": 8}
         for p in parts
@@ -240,9 +240,9 @@ def test_reflection_chunks_partition_every_radiator_without_touching_the_rest():
     layered = {"crystal": "mos2", "hkl_list": hkl[:3], "layer_radiators": [film, sub, None]}
     parts = gate["reflection_chunks"](layered, 4)
     films = [p["layer_radiators"][0] for p in parts]
-    assert sum((f["hkl_list"] for f in films if f is not None), []) == film["hkl_list"]
+    assert [h for f in films if f is not None for h in f["hkl_list"]] == film["hkl_list"]
     assert films[1:] == [None, None]
-    assert sum((p["layer_radiators"][1]["hkl_list"] for p in parts), []) == hkl
+    assert [h for p in parts for h in p["layer_radiators"][1]["hkl_list"]] == hkl
     assert all(p["layer_radiators"][2] is None for p in parts)
 
 

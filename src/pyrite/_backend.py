@@ -235,22 +235,24 @@ class CuPyBackend(ArrayBackend):
 class _SyclNamespace:
     """dpnp namespace wrapper pinning array creation to one SYCL queue."""
 
-    _CREATORS = {
-        "array",
-        "arange",
-        "asarray",
-        "empty",
-        "empty_like",
-        "eye",
-        "full",
-        "full_like",
-        "linspace",
-        "logspace",
-        "ones",
-        "ones_like",
-        "zeros",
-        "zeros_like",
-    }
+    _CREATORS = frozenset(
+        {
+            "array",
+            "arange",
+            "asarray",
+            "empty",
+            "empty_like",
+            "eye",
+            "full",
+            "full_like",
+            "linspace",
+            "logspace",
+            "ones",
+            "ones_like",
+            "zeros",
+            "zeros_like",
+        }
+    )
 
     def __init__(self, module: ModuleType, queue: Any):
         self._module = module

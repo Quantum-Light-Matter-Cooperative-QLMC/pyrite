@@ -1,5 +1,6 @@
 import json
 from types import SimpleNamespace
+from typing import ClassVar
 
 import numpy as np
 import pytest
@@ -35,8 +36,8 @@ def test_geometry_plan_is_full_curated_tilt_azimuth_product():
 
 def test_geometry_plan_defaults_to_profile_angles_single_thickness():
     class Scan:
-        tilt_deg = [5.0, 45.0]
-        tilt_azim_deg = [100.0, 180.0]
+        tilt_deg: ClassVar[list] = [5.0, 45.0]
+        tilt_azim_deg: ClassVar[list] = [100.0, 180.0]
 
     coarse, _ = analyze._geometry_plan(["hopg"], Scan())
     # 2 tilts x 2 azimuths x 1 default thickness, all 4-tuples ending in 1e7
@@ -47,8 +48,8 @@ def test_geometry_plan_defaults_to_profile_angles_single_thickness():
 
 def test_geometry_plan_overrides_expand_thickness_axis():
     class Scan:
-        tilt_deg = [5.0]
-        tilt_azim_deg = [180.0]
+        tilt_deg: ClassVar[list] = [5.0]
+        tilt_azim_deg: ClassVar[list] = [180.0]
 
     coarse, _ = analyze._geometry_plan(
         ["hopg"], Scan(), tilts=[5.0], azimuths=[180.0], thicknesses=[1.0e6, 1.0e7]

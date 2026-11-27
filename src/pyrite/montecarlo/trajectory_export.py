@@ -175,7 +175,7 @@ def export_segments_vtp(
         # runs, then vacuum runs; ``vacuum`` marks which source a piece reads.
         pieces = [(False, a, b) for a, b in _pieces(material, _BLOCK_ROWS)]
         pieces += [(True, a, b) for a, b in _pieces(vacuum, _BLOCK_ROWS)]
-        order = handle["transport_order"] if "transport_order" in handle else None
+        order = handle.get("transport_order")
 
         def _rows(name, start, stop):
             return transport[name][start:stop]

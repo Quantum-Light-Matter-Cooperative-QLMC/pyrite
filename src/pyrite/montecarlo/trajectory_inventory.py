@@ -192,7 +192,7 @@ def describe_artifact(path: str | os.PathLike[str], *, counts: bool = True) -> d
     with h5py.File(path, "r") as handle:
         group = transport_view(handle)
         ids_name = "electron_id" if "electron_id" in group else "elec_id"
-        ids = group[ids_name] if ids_name in group else None
+        ids = group.get(ids_name)
         n_rows = int(ids.shape[0]) if ids is not None else int(header.get("segment_count", 0))
         n_electrons = _electron_count(group)
         fields = [

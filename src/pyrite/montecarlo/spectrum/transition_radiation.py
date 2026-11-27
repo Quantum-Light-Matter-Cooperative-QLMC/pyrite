@@ -337,7 +337,7 @@ def _free_system(omega, k_perp, media, z_if, xp):
     lam = [_outgoing_root(eps * omega**2 - k_perp2, xp) for eps in media]
     unit = np.eye(2)
     free = {}
-    for (j, wave), _ in columns.items():
+    for j, wave in columns:
         kz = wave * lam[j]
         wavevector = xp.concatenate([k_perp, kz[:, None]], axis=-1)
         fields = []

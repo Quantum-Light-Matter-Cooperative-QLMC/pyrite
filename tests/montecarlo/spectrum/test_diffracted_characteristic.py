@@ -376,7 +376,7 @@ def test_ge_ka1_kossel_line_on_its_cone(germanium):
             case["thickness_ang"],
             Ne=transport["Ne_brem"],
             E_cut_keV=case.get("E_cut_brem_keV", 1.0),
-        )  # fmt: skip
+        )
         > 1e-12 * kossel.max()
     )
 

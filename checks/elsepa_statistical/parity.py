@@ -13,7 +13,10 @@ from pyrite.montecarlo._cupy_jit import jit
 from pyrite.montecarlo.transport.scattering import elsepa_guide_table
 
 if TYPE_CHECKING:
-    from pyrite.montecarlo.transport._jit_device import _elsepa_quantile_mu as _sample
+    # Name only: sample_kernel is rebuilt with `_sample` injected into its globals.
+    from pyrite.montecarlo.transport._jit_device import (  # noqa: TC004
+        _elsepa_quantile_mu as _sample,
+    )
 
 
 def sample_kernel(xi, cdf, pdf, mu, guide, fraction, output):

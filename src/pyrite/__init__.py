@@ -321,7 +321,7 @@ def __getattr__(name: str) -> Any:
 
 # __all__ stays unchanged: star imports retain the curated 0.22.0 root object
 # surface. Domain-module dot access does not reintroduce deprecated aliases.
-__all__ = ["DATA_DIR", "__version__", *_PUBLIC_OBJECTS]
+__all__ = ["DATA_DIR", "__version__", *_PUBLIC_OBJECTS]  # noqa: PLE0604 - dict of str keys
 
 
 # Forward-looking domain contract for the curated root object surface.

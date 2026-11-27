@@ -5,6 +5,7 @@ import runpy
 import sys
 import types
 from pathlib import Path
+from typing import ClassVar
 
 import numpy as np
 import pytest
@@ -89,7 +90,7 @@ def test_scenes_resolve_from_manifest_and_matrix(adapter):
 class _Table:
     key, digest, manifest = "k", "d", {"arrays_sha256": "a"}
     tables = ()
-    arrays = {}
+    arrays: ClassVar[dict] = {}
 
 
 def test_transport_arm_writes_comparison_record_without_emission_work(

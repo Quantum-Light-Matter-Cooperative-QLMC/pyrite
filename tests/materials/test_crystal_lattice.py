@@ -4,6 +4,8 @@ Structural geometry only -- these assert atom counts, cell tiling, and figure
 assembly, not any scattering physics.
 """
 
+from typing import ClassVar
+
 import numpy as np
 import plotly.graph_objects as go
 import pytest
@@ -114,7 +116,7 @@ def test_layer_coloring_uses_single_marker_trace(spec):
 
 def test_empty_basis_yields_no_atoms():
     class _FakeSpec:
-        lattice = {"system": "cubic", "a": 4.0}
+        lattice: ClassVar[dict] = {"system": "cubic", "a": 4.0}
         basis = ()
         label = "empty"
 

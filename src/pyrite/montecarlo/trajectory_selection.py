@@ -313,7 +313,7 @@ def read_selection(
             for key in fields
         }
         rows = np.empty(selection.segments, dtype=np.int64)
-        order = handle["transport_order"] if "transport_order" in handle else None
+        order = handle.get("transport_order")
         offset = 0
         for a, b in selection.ranges:
             for key in fields:

@@ -4,6 +4,7 @@ import queue
 import warnings
 from pathlib import Path
 from types import SimpleNamespace
+from typing import ClassVar
 from unittest.mock import Mock
 
 import numpy as np
@@ -47,7 +48,7 @@ class FakeWorker:
     spectrum, so both must be rejected.
     """
 
-    runs: list = []
+    runs: ClassVar[list] = []
 
     def __init__(self, payload, workdir, timeout, on_event):
         self.workdir, self.on_event, self.environment = workdir, on_event, ENV

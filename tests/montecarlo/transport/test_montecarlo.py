@@ -8,6 +8,7 @@ full sweep is run (that lives in checks/)."""
 
 import pathlib
 import warnings
+from typing import ClassVar
 
 import numpy as np
 import pytest
@@ -494,7 +495,7 @@ class _SyncProcessPoolExecutor:
     constructor args on the class so a test can assert which initializer/
     initargs run_cases chose without touching a real worker process."""
 
-    captured: dict = {}
+    captured: ClassVar[dict] = {}
 
     def __init__(self, max_workers=None, initializer=None, initargs=(), mp_context=None):
         type(self).captured = dict(

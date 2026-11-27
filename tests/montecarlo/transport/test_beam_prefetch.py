@@ -77,7 +77,7 @@ def _run_blocks(n, block, kw, core="cuda"):
             parts.append(
                 prefetch.run(
                     sample_beam_positions, initial_beam_positions, p, core, start=start, **kw
-                )  # fmt: skip
+                )
             )
     return parts, prefetch
 

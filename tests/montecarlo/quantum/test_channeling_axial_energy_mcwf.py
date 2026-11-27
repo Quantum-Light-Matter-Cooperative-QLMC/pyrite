@@ -7,6 +7,7 @@ import sys
 import types
 from pathlib import Path
 from types import SimpleNamespace
+from typing import ClassVar
 
 import numpy as np
 import pytest
@@ -64,7 +65,7 @@ def lib(monkeypatch):
 
     class Profile:
         period_ang = (2.0, 2.0)
-        strings = [SimpleNamespace(position_ang=(0.0, 0.0))]
+        strings: ClassVar[list] = [SimpleNamespace(position_ang=(0.0, 0.0))]
 
         def on_grid(self, cells, shape):
             return np.zeros(shape)

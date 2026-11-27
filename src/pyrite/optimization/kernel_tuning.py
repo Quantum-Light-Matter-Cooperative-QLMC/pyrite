@@ -541,7 +541,7 @@ def tune_kernels(
                     storage=storage,
                     study_name=f"{study_name}:{phase}",
                     protocol=protocol,
-                )  # fmt: skip
+                )
                 for phase in phases
             )
         finally:
