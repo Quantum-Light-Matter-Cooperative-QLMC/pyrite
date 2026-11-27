@@ -95,6 +95,9 @@ grid it resolves the automatic one over its roll-averaged lines (#1489);
 stored catalog rows, derived for the basal lines, are skipped.
 Profiles select it with a `cxr_fiber` table
 (`cutoff_invang`, `azimuth_count`, `reflection_batch_size`).
+Fiber cases take adaptive electron counts (#1503) with the Gauss–Hermite
+mosaic route (`mosaic_route="mc"`). They refuse the analytic and sampled
+mosaic routes.
 
 At the default 2 Å⁻¹ shell width the retired `(002)/(004)` pins are the first
 two shells, rather than a hard limit. Fixed-count routes rank the same domain:

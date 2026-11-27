@@ -74,7 +74,6 @@ def _refusal(case: Mapping[str, Any]) -> str | None:
         # The analytic width takes psi from the basal ``hkl_list`` (store_result).
         (case.get("mosaic_fwhm_rad") is not None, "requires mosaic_route='mc' for mosaicity"),
         (case.get("cxr_source") == "none", "needs CXR lines"),
-        (case.get("adaptive_precision") is not None, "requires fixed electron counts"),
         (case.get("sinc_cutoff") is not None, "does not support a sinc cutoff"),
         (case.get("_brem_lattice_share", True) is False, "keeps the matched continuum"),
     )
