@@ -474,6 +474,8 @@ Options:
   --environment TEXT    pixi environment every job installs (pixi install --locked) and
                         runs in, e.g. svml; empty uses the GPU vendor's (nvidia, amd or
                         intel).
+  --env-transfer TEXT   Environment provisioning: install (default) or pack (offline
+                        compute nodes).
   --description TEXT    Free-text note shown by list.
   -h, --help            Show this message and exit.
 ```
@@ -517,6 +519,8 @@ Options:
   --environment TEXT    pixi environment every job installs (pixi install --locked) and
                         runs in, e.g. svml; empty uses the GPU vendor's (nvidia, amd or
                         intel).
+  --env-transfer TEXT   Environment provisioning: install (default) or pack (offline
+                        compute nodes).
   --description TEXT    Free-text note shown by list.
   -h, --help            Show this message and exit.
 ```

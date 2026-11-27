@@ -25,6 +25,9 @@ Run before every submission; most failed remote runs were stale state.
    field `pixi`); jobs run `pixi install --locked -e <env>` from the synced
    `pixi.lock`, where `<env>` is the target's `environment` or its GPU
    vendor's (`nvidia`/`amd`). CPU-only jobs (qlmc-queen) use `default`.
+   For opt-in `env_transfer=pack` targets, check `pixi-pack` on the submitter,
+   `pixi-unpack` on compute-node PATH, shared cache space, and transfer host.
+   The queue unpacks offline and logs the lock hash; do not install on-node.
 5. Ad-hoc `sbatch` scripts (not `pyrite run --remote`) must
    `export PATH=$HOME/.pixi/bin:$PATH` (SLURM batch env lacks `pixi`), run
    Python through `pixi run --as-is -e <env>` after one

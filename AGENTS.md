@@ -72,7 +72,11 @@ group). Others: `-e py314`, `-e docs`, GPU `-e nvidia|amd|intel`, `-e svml`
 (Intel SVML Numba; restrictive terms in `LICENSE-SVML.md`), `-e viz`. Layout
 and channel policy: `docs/repo-design/development-workspace.md`. Never use
 `uv`, `pip install` into `.pixi/`, or another interpreter. If the package cache
-is not writable, set `PIXI_CACHE_DIR=/tmp/pyrite-pixi-cache`. The docs
+is not writable, set `PIXI_CACHE_DIR=/tmp/pyrite-pixi-cache`. Remote targets
+with `env_transfer=pack` are an explicit exception to editable checkout
+installation: build a project wheel on the submitter, then let `pixi-unpack`
+install it into a content-keyed prefix outside `.pixi/` without network access.
+The docs
 feature keeps marimo's internal uv tool/cache dirs under `.pixi/`, so sandboxed
 docs builds need no extra setup.
 

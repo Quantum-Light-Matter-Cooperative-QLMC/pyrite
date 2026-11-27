@@ -382,7 +382,7 @@ def test_formatter_regenerates_and_commits_cli_reference(dev_module) -> None:
         if step.get("name") == "Commit formatting and generated-reference fixes"
     )
 
-    assert reference["run"] == "pixi run --locked pyrite-dev cli-reference --write"
+    assert reference["run"] == "pixi run --locked -e py314 pyrite-dev cli-reference --write"
     assert "'docs/repo-design/cli/cli-reference*.md'" in commit["run"]
     assert "style: apply Ruff formatting and regenerate CLI reference" in commit["run"]
 

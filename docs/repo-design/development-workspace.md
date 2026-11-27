@@ -35,6 +35,19 @@ install with `--locked`, so a manifest edit without `pixi lock` fails fast.
 | `intel` | linux-64 | PyPI `intel` extra (`dpnp`, `dpctl`); same groups as `amd` |
 | `svml` | linux-64 | Intel SVML Numba from Anaconda `pkgs/main`; `test` only. Separate terms: [`LICENSE-SVML.md`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/LICENSE-SVML.md) |
 | `viz` | linux-64 | One-off research viewers and digitizers (conda-forge `vtk-base`, `pyvista`, `pymupdf`, `scikit-image`; PyPI `trame`) |
+| `runtime-cpu` | linux-64, osx-arm64, win-64 | Core, Dask, optimization; shares the `py313` solve |
+| `runtime-nvidia` | linux-64 (CUDA 13 driver) | Core, Dask, optimization, conda-forge CUDA stack; shares the `nvidia` solve |
+| `runtime-amd` | linux-64 | Core, Dask, optimization, ROCm CuPy source build; shares the `amd` solve |
+| `runtime-intel` | linux-64 | Core, Dask, optimization, Intel SYCL; shares the `intel` solve |
+
+Production environments omit test, lint, documentation, notebook, browser and
+oracle groups and the app/plot extras. A shared solve-group keeps common
+packages pinned to the same builds as the corresponding developer environment.
+For tests, plotting, tutorials, and validation, continue using the existing
+developer environments. Select a runtime explicitly on named remote targets
+(e.g. `--environment runtime-nvidia`); omitted fields still select the vendor's
+original environment. Submit pack-mode jobs from the contributor environment,
+not from the lean environment; only the destination needs the runtime.
 
 Design decisions (#1462):
 
@@ -68,10 +81,10 @@ Design decisions (#1462):
   C++, and detects the GPU architecture, so `pixi install --locked -e amd`
   builds CuPy for that GPU. On qlmc-ace (Ubuntu 26.04 ROCm 7.1 under `/usr`)
   the first build takes about 11 minutes; the built wheel is cached.
-- **GPU versions.** GPU environments cannot share a solve-group with
-  `default` (different platforms), so the `gpu-stack` feature pins numpy and
-  numba to `default`'s minor releases. SciPy stays free: conda-forge CuPy
-  14.2 constrains `scipy<1.18`, so `nvidia` locks 1.17.
+- **GPU versions.** Each GPU family has its own solve-group shared by its
+  runtime and developer environments, separate from `default`. The
+  `gpu-stack` feature pins numpy and numba to `default`'s minor releases.
+  SciPy stays free: conda-forge CuPy 14.2 constrains `scipy<1.18`.
 - **No double installs.** pixi skips a PyPI requirement only when its
   conda-to-PyPI map names the conda package. conda-forge ships that map;
   `pkgs/main` does not, so `[tool.pixi.workspace.conda-pypi-map]` maps every
@@ -120,8 +133,9 @@ Commands below assume `pyrite` and `pyrite-dev` are on your `PATH`: run them ins
 # Normal contributor setup: the default environment (every dependency group).
 pixi install --locked
 
-# A lab GPU environment, as remote jobs install it.
+# A lab GPU development environment, or a lean production environment.
 pixi install --locked -e nvidia
+pixi install --locked -e runtime-nvidia
 
 # Start with the changed behavior's test node or owning module.
 pyrite-dev test path/to/test.py -k test_name

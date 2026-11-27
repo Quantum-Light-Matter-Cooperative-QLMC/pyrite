@@ -33,6 +33,7 @@ _FIELDS = (
     "nice",
     "transfer_host",
     "environment",
+    "env_transfer",
     "description",
 )
 
