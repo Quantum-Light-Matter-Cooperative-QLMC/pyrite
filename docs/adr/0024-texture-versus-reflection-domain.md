@@ -46,11 +46,13 @@ campaign path refused it.
    then cannot bypass the domain silently.
 5. **Refuse outside the qualified envelope.** HOPG only, incoherent, single
    flat slab, BremsLib, deterministic mosaic quadrature, fixed electron
-   counts, explicit line grid (`EnergyBins.cxr`), bin-mean lines. Stored and
-   automatic line grids, measured selection, truncation audits, streaming,
-   line roulette, cone splitting, channeling, transition radiation, photon
-   transport and temporal profiles refuse a fiber case, at lowering or in
-   `Case` validation, never by falling back to basal-only.
+   counts, bin-mean lines. The line grid is explicit (`EnergyBins.cxr`) or
+   automatic, resolved and audited over the roll-averaged lines (#1489).
+   Stored catalog rows, derived for the basal lines, are skipped. Measured
+   selection, feature windows, line attribution, streaming, line roulette,
+   cone splitting, channeling, transition radiation, photon transport and
+   temporal profiles refuse a fiber case, at lowering or in `Case`
+   validation, never by falling back to basal-only.
 6. **Diffracted bremsstrahlung and Kossel terms keep the catalog basal
    families** (`n_families = 4`), as explicit-count basal cases already do.
    Their non-basal extension is separate physics.
@@ -60,10 +62,9 @@ campaign path refused it.
 - No default, golden or basal identity changes; the option is opt-in.
 - Fiber spectra equal the paired scorer
   (`fiber_case.score_fiber_case`) on the same transport to 1e-12.
-- Automatic line grids, truncation audits and streamed scoring need
-  roll-population-aware seeding and are follow-up work. Until then a fiber
-  run needs an explicit grid that covers its non-basal lines; at 300 keV and
-  above the strongest line can be odd-`l` `(101)` at half the `(002)` energy.
+- Automatic line grids and truncation audits (#1489) sum every roll node at
+  its quadrature weight, so a grid resolution costs one population pass per
+  roll. Streamed scoring is follow-up work (#1490).
 - Cutoff convergence is the user's responsibility: #1480 measured +22 % /
   +43 % yield going from 6 to 8 / 10 Å⁻¹ at 30 keV, so no cutoff default
   exists.

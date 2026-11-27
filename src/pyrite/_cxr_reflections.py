@@ -66,9 +66,10 @@ class CxrReflections:
         Experimental (#1480): a :class:`FiberAverage` (reciprocal cutoff, roll
         nodes, batch size) for the full non-basal domain of a fiber-textured
         crystal. ``None`` (default) keeps the catalog's basal-only ``(00l)``
-        domain. Campaign runs (#1483) score it for HOPG on an explicit line
-        grid (``EnergyBins.cxr``) with incoherent emission, a single slab and
-        BremsLib; other routes refuse it. They lower ``mosaic_route`` and
+        domain. Campaign runs (#1483) score it for HOPG with incoherent
+        emission, a single slab and BremsLib, on an explicit
+        (``EnergyBins.cxr``) or automatic (#1489) line grid; other routes
+        refuse it. They lower ``mosaic_route`` and
         ``mosaic_nodes`` into the case as basal runs do, and refuse
         ``"mc-sampled"`` mosaicity. Excludes ``n_families``,
         ``max_reflections`` and ``line_yield_tolerance``. The direct

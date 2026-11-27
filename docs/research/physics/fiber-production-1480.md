@@ -157,7 +157,6 @@ moving between 32 and 128 rolls. Cutoff convergence remains open (#1484).
 
 Remaining phase II work: joint roll/reciprocal adaptive convergence with a
 reported unresolved status, symmetry-reduced quadrature with verified weights,
-line-grid seeding/audits that know the orientation population, campaign/profile
-serialization and hashing for the new model, full runner/CLI integration, and
-independent physical validation. No production default, schema, shared table
-identity, or existing golden is changed by this slice.
+streamed scoring (#1490), CLI flags (#1491), and independent physical
+validation of the campaign route. No production default, shared table identity,
+or existing golden is changed.
