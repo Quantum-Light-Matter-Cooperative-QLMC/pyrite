@@ -71,6 +71,8 @@ def _refusal(case: Mapping[str, Any]) -> str | None:
         (case.get("abs_layers") is not None, "requires a single slab"),
         (case.get("groove_spacing_ang") is not None, "requires a flat slab"),
         (case.get("mosaic_mc_sampling") is not None, "requires deterministic mosaic quadrature"),
+        # The analytic width takes psi from the basal ``hkl_list`` (store_result).
+        (case.get("mosaic_fwhm_rad") is not None, "requires mosaic_route='mc' for mosaicity"),
         (case.get("cxr_source") == "none", "needs CXR lines"),
         (case.get("adaptive_precision") is not None, "requires fixed electron counts"),
         (case.get("sinc_cutoff") is not None, "does not support a sinc cutoff"),
@@ -226,16 +228,36 @@ def fiber_emission_tables(case, layer, composition, tables):
         raise ValueError("full-fiber CXR requires BremsLib continuum tables")
     if layer not in (None, 0):
         raise ValueError("full-fiber CXR requires a single slab")
-    domain = fiber_domain(case)
+    from .lattice_share import _CACHE, _CACHE_LIMIT
+
     floor = float(case.get("E_cut_lines_keV", 5.0))
-    out, correction = domain.corrected_bremslib_tables(
-        tables, composition, E_cut_keV=floor, max_energy_keV=float(case["E0_keV"])
+    ceiling = float(case["E0_keV"])  # range-checked against the kernel, so keyed
+    key = (
+        "fiber",
+        json.dumps(case[FIBER_CASE_KEY], sort_keys=True),
+        layer,
+        tuple((str(el), float(n)) for el, n in composition),
+        tuple(sorted((el, t.key, t.digest) for el, t in tables.items())),
+        floor,
+        ceiling,
     )
-    return out, dict(
-        layer=layer,
-        corrected=True,
-        crystal=case["crystal"],
-        reflections=len(domain.hkls),
-        line_cutoff_keV=floor,
-        **correction,
-    )
+    cached = _CACHE.get(key)
+    if cached is None:
+        domain = fiber_domain(case)
+        out, correction = domain.corrected_bremslib_tables(
+            tables, composition, E_cut_keV=floor, max_energy_keV=ceiling
+        )
+        if len(_CACHE) >= _CACHE_LIMIT:
+            _CACHE.clear()
+        cached = _CACHE[key] = (
+            out,
+            dict(
+                layer=layer,
+                corrected=True,
+                crystal=case["crystal"],
+                reflections=len(domain.hkls),
+                line_cutoff_keV=floor,
+                **correction,
+            ),
+        )
+    return cached

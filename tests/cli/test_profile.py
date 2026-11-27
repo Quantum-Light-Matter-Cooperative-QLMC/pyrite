@@ -1679,6 +1679,24 @@ def test_numerics_set_shell_inelastic_mode_validates_and_resets(tmp_path, monkey
     assert "inelastic_model" not in catalog.read_text()
 
 
+def test_show_reports_a_full_fiber_profile_as_owning_the_reflections(tmp_path, monkeypatch):
+    text = _CATALOG.replace(
+        "[profiles.sub_100keV]",
+        "[profiles.sub_100keV]\ncxr_fiber = { cutoff_invang = 8.0 }",
+    )
+    _catalog(tmp_path, monkeypatch, text)
+
+    shown = invoke(root_command, ["profile", "numerics", "show", "sub_100keV"])
+    assert_clean_result(shown)
+    assert_table_row(shown.stdout, "full-fiber domain", "cutoff_invang=8 profile")
+    assert_table_row(shown.stdout, "reflection families", "unused (full-fiber) default")
+    assert_table_row(shown.stdout, "line-yield tolerance", "unused (full-fiber) default")
+
+    full = invoke(profile.command, ["show", "sub_100keV"])
+    assert_clean_result(full)
+    assert_table_row(full.stdout, "cxr-fiber", "cutoff_invang=8 profile")
+
+
 def test_show_groups_trial_grids_and_complete_numerics_in_aligned_columns(tmp_path, monkeypatch):
     import re
 

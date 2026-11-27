@@ -151,7 +151,8 @@ def _numerics_group_rows(group, numerics_names, adaptive_active):
         fields = [row for row in fields if row["key"] == "channeling_model"]
     return [
         (
-            numerics_names[row["key"]],
+            # A table-only field (cxr_fiber) has no setter option.
+            numerics_names.get(row["key"], row["key"].replace("_", "-")),
             "unused (adaptive)"
             if group["name"] == "sampling" and adaptive_active
             else _display(row["effective"]),

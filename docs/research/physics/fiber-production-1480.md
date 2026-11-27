@@ -39,7 +39,8 @@ is the kinematic bound over the domain's |g|, and stored basal rows are skipped
 outside the qualified envelope refuse instead of falling back to the
 basal-only domain. `cutoff_invang` has no default. The case's
 `mosaic_mc_fwhm_rad` and `mosaic_mc_nodes` set the mosaic quadrature.
-Campaign runs lower them from `mosaic_route` and `mosaic_nodes`; the direct
+Campaign runs lower them from `mosaic_route` and `mosaic_nodes`, and a mosaic
+target needs `mosaic_route="mc"`; the direct
 scorer above does not read those two beside `fiber=`.
 These cutoff and azimuth values are starting points, **not converged defaults**.
 `model.prepare()` also exposes a low-level `spectrum()` for independent line

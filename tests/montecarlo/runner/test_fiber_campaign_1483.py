@@ -5,6 +5,7 @@ Validation: cxr-fiber-intensity-average
 
 import json
 from dataclasses import replace
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -106,6 +107,7 @@ def test_fiber_owns_the_reflection_domain():
         (dict(coherent_emission=True), "incoherent"),
         (dict(temporal_profile=True), "temporal"),
         (dict(mosaic_mc_sampling="history"), "mosaic"),
+        (dict(mosaic_fwhm_rad=0.014), "mosaic_route='mc'"),
         (dict(cxr_source="none"), "CXR lines"),
         (dict(line_quadrature=None), "bin-mean"),
         (dict(line_grid_policy={"windows": {"providers": ["kinematic"]}}), "feature windows"),
@@ -174,19 +176,25 @@ def test_line_seam_routes_rolls_through_the_basal_scorer(monkeypatch):
 
 
 def test_continuum_seam_uses_the_fiber_domain(monkeypatch):
+    monkeypatch.setattr(ls, "_CACHE", {})
+    base = {"C": SimpleNamespace(key="base", digest="0")}
     case = dict(_lower(_numerics(FiberAverage(cutoff_invang=4.0))))
     domain = fiber_emission.fiber_domain(case)
     assert ls.scored_reflections(case, None) == list(domain.hkls)
     assert ls.lattice_share_applies(case)
     seen = {}
+    calls = []
 
     def corrected(self, tables, composition, **options):
+        calls.append(options)
         seen.update(options, hkls=self.hkls)
         return {"C": "corrected"}, {"model": fiber.FIBER_CXR_MODEL, "shells": 1}
 
     monkeypatch.setattr(fiber.FiberReflectionSet, "corrected_bremslib_tables", corrected)
-    tables, record = ls.layer_emission_tables(case, None, [("C", 0.1)], {"C": "base"})
+    tables, record = ls.layer_emission_tables(case, None, [("C", 0.1)], base)
     assert tables == {"C": "corrected"} and record["corrected"] is True
+    assert ls.layer_emission_tables(case, None, [("C", 0.1)], base)[1] == record
+    assert len(calls) == 1  # one table build per domain, composition, tables and energy
     assert record["reflections"] == len(domain.hkls)
     assert seen == dict(
         E_cut_keV=float(case.get("E_cut_lines_keV", 5.0)),
@@ -274,6 +282,79 @@ def test_profile_selects_the_fiber_domain_and_forks_dataset_identity(monkeypatch
     assert stored.energy_bins.cxr_by_energy
     automatic = build_cases(stored, n_electrons=1, n_electrons_brem=1)
     assert automatic and all(c.get("line_grid_policy") is not None for c in automatic)
+
+
+def test_dataset_identity_hashes_the_case_record_not_the_execution_batch(monkeypatch):
+    from pyrite.campaign.config import default_settings, material_sweep
+    from pyrite.campaign.profiles import dataset_identity
+
+    grid = EnergyBins(cxr=np.arange(200.0, 3000.0, 40.0))
+    base = material_sweep("hopg", energy_bins=grid)
+    settings = default_settings()
+
+    def identity(average):
+        return dataset_identity("hopg", settings, replace(base, n_families=4, cxr_fiber=average))
+
+    first = identity(FiberAverage(cutoff_invang=6.0))
+    same = identity(FiberAverage(cutoff_invang=6, reflection_batch_size=32))
+    assert first["parameter_sha256"] == same["parameter_sha256"]
+    record = first["resolved_parameters"]["sweep"]["cxr_fiber"]
+    assert record == fiber.FiberCXRModel.from_numerics(base_average()).case_record()
+    monkeypatch.setattr(fiber, "FIBER_CXR_MODEL", "hopg-fiber-next")
+    assert (
+        identity(FiberAverage(cutoff_invang=6.0))["parameter_sha256"] != first["parameter_sha256"]
+    )
+
+
+def base_average():
+    return FiberAverage(cutoff_invang=6.0)
+
+
+def test_auto_bremsstrahlung_resolves_before_the_fiber_case_is_built(monkeypatch):
+    from pyrite.xsgen.bremslib import tables
+
+    monkeypatch.setattr(tables, "load_bremsstrahlung_tables", lambda elements: {})
+    physics = Physics(bremsstrahlung_model="auto", radiative_model="uncoupled")
+    average = FiberAverage(cutoff_invang=6.0)
+    assert _lower(_numerics(average), physics) == _lower(_numerics(average))
+
+
+def test_converted_fiber_sweep_keeps_and_can_drop_the_domain():
+    from pyrite.campaign.config import default_settings, material_sweep
+    from pyrite.campaign.legacy import adapt_configured_sweep
+
+    average = FiberAverage(cutoff_invang=6.0)
+    old = material_sweep("hopg", energy_bins=EnergyBins(cxr=GRID))
+    old = replace(old, n_families=4, cxr_fiber=average)
+    converted = adapt_configured_sweep(old, default_settings())
+    numerics = converted.base.numerics
+    assert numerics.cxr_reflections.fiber == average
+    kept = converted.cases(replace(numerics, seed=5))
+    assert kept and all(case["cxr_fiber"]["cutoff_invang"] == 6.0 for case in kept)
+    eight = replace(numerics, cxr_reflections=CxrReflections(n_families=8))
+    dropped = converted.cases(eight)
+    assert dropped and all("cxr_fiber" not in case for case in dropped)
+
+
+def test_pixel_scene_keeps_the_profile_fiber_domain():
+    from types import MappingProxyType
+
+    from pyrite.campaign.single_scene import resolve_pixel_scene
+    from pyrite.materials import load_material_catalog
+
+    name = "pixelated_detector_demo"
+    catalog = load_material_catalog(profile=name)
+    assert resolve_pixel_scene(catalog, "hopg", name)[6].cxr_reflections.fiber is None
+    existing = catalog.profile_transport_numerics.get(name, {})
+    table = {**existing, "cxr_fiber": {"cutoff_invang": 6.0}}
+    custom = replace(
+        catalog,
+        profile_transport_numerics=MappingProxyType(
+            {**catalog.profile_transport_numerics, name: MappingProxyType(table)}
+        ),
+    )
+    numerics = resolve_pixel_scene(custom, "hopg", name)[6]
+    assert numerics.cxr_reflections.fiber == FiberAverage(cutoff_invang=6.0)
 
 
 def json_payload(sweep, settings):

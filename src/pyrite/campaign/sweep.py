@@ -425,7 +425,9 @@ class Sweep:
     # |g| shells up to the f0 cap until the estimated in-band tail is at most
     # this fraction of the kept line yield. Both knobs omitted selects 1e-3.
     line_yield_tolerance: float | None = None
-    cxr_fiber: Any = None  # full-fiber FiberAverage (#1483, ADR-0024); None: basal
+    # Full-fiber FiberAverage (#1483, ADR-0024); None: basal. Keyword-only, so
+    # legacy positional construction keeps its argument order.
+    cxr_fiber: Any = field(default=None, kw_only=True)
     dtheta_obs_deg: InitVar[float | None] = None
     domega_sr: InitVar[float | None] = None
     beam_uvw: tuple | None = None  # None -> per-material default
@@ -1183,7 +1185,7 @@ def build_cases(
         bremsstrahlung_model=bremsstrahlung_model,
         radiative=radiative,
     )
-    selection_keys = fiber_case_fields(sweep)
+    selection_keys = fiber_case_fields(sweep, cp["composition"], bremsstrahlung_model)
     if sweep.line_yield_tolerance is not None:
         from ..montecarlo.runner.reflection_cutoff import reflection_selection_record
 

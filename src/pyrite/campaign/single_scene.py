@@ -63,6 +63,7 @@ def resolve_pixel_scene(
     catalog, material, profile_name, detector_id=None, *, command_name="run --ephemeral"
 ):
     """Resolve one profile case without constructing a Sweep or checkpoint."""
+    from pyrite._cxr_reflections import reflection_controls_from_values
     from pyrite.campaign.longitudinal import LongitudinalDistribution
     from pyrite.campaign.model import Beam, Numerics, Physics
     from pyrite.campaign.sweep import BeamSpec, beam_replace, target_from_flat
@@ -170,6 +171,10 @@ def resolve_pixel_scene(
             sampling=_profile_sampling(catalog, scan, profile_name, command_name),
             energy_model=cast(Literal["frozen", "midpoint"], energy_model),
             max_dE_frac=float(max_dE_frac),
+            # Never fall back to basal-only on a fiber profile (ADR-0024).
+            cxr_reflections=reflection_controls_from_values(
+                {"cxr_fiber": transport.get("cxr_fiber")}
+            ),
         ),
         Physics(
             emission=_emission_selection(catalog.profile_emission(profile_name) or "incoherent"),

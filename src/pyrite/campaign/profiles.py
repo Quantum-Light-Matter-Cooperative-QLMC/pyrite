@@ -76,6 +76,7 @@ from .identity_options import (
 )
 from .numerics_resolution import NUMERICS_GROUPS as NUMERICS_GROUPS
 from .numerics_resolution import NumericsResolution
+from .reflection_selection import project_fiber_identity
 from .sweep import (
     TIMEPIX3_DOMEGA_SR,
     TIMEPIX3_DTHETA_OBS_DEG,
@@ -584,11 +585,10 @@ def _identity_v1(
     # only when actually set, so pre-existing runs keep their historical
     # parameter_sha256 (and therefore their checkpoint identity) bit-for-bit.
     # The measured reflection selection (#1173) follows the same rule.
-    # So does the opt-in full-fiber domain (#1483).
-    keys = ("n_electrons", "n_electrons_brem", "line_grid_policy", "line_yield_tolerance")
-    for key in (*keys, "cxr_fiber"):
+    for key in ("n_electrons", "n_electrons_brem", "line_grid_policy", "line_yield_tolerance"):
         if sweep_payload.get(key) is None:
             sweep_payload.pop(key, None)
+    project_fiber_identity(sweep_payload, sweep)
     # Same compatibility rule for catalog_profile (Phase 3 decision 2): only
     # join the hashed payload when it diverges from "standard", so every
     # pre-existing standard-profile identity keeps its historical digest.

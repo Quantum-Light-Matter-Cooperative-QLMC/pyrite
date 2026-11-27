@@ -87,7 +87,7 @@ def sweep_fiber(sweep: Sweep):
     return fiber
 
 
-def fiber_case_fields(sweep: Sweep) -> dict[str, object]:
+def fiber_case_fields(sweep: Sweep, composition, bremsstrahlung_model: str) -> dict[str, object]:
     """Case keys of the opt-in full-fiber domain (#1483); ``{}`` when basal-only.
 
     Lines are scored as bin means (``line_quadrature="bin-mean"``), as the
@@ -96,6 +96,9 @@ def fiber_case_fields(sweep: Sweep) -> dict[str, object]:
     automatic line-grid policy resolves over the fiber domain's roll-averaged
     population and its bin-mean payload carries it (#1489). Stored catalog
     rows know only the basal ``(00l)`` lines and are never used.
+
+    A fiber case requires the BremsLib continuum when it is constructed, so
+    ``"auto"`` resolves here; other cases resolve it after construction.
 
     Validation: cxr-fiber-intensity-average
     """
@@ -110,7 +113,27 @@ def fiber_case_fields(sweep: Sweep) -> dict[str, object]:
         fields["line_quadrature"] = "bin-mean"
     if fiber.reflection_batch_size != FiberAverage(cutoff_invang=1.0).reflection_batch_size:
         fields["cxr_fiber_batch_size"] = fiber.reflection_batch_size
+    if bremsstrahlung_model == "auto":
+        from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
+
+        elements = [str(row[0]) for row in composition]
+        fields["bremsstrahlung_model"] = resolve_bremsstrahlung_model("auto", elements)
     return fields
+
+
+def project_fiber_identity(sweep_payload: dict, sweep: Sweep) -> None:
+    """Hash the opt-in full-fiber domain (#1483) as the record its cases carry.
+
+    The model marker, tensor temperature and thermal source give a changed model
+    a new stem. The execution-only batch size stays out. A basal sweep carries no
+    key, so its digest is unchanged.
+    """
+    if sweep.cxr_fiber is None:
+        sweep_payload.pop("cxr_fiber", None)
+        return
+    from ..montecarlo.spectrum.cxr.fiber import FiberCXRModel
+
+    sweep_payload["cxr_fiber"] = FiberCXRModel.from_numerics(sweep.cxr_fiber).case_record()
 
 
 #: Provenance of a full-fiber case's automatic line axis: bandwidth bounded by

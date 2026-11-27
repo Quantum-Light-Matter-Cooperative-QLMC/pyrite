@@ -70,8 +70,9 @@ class CxrReflections:
         emission, a single slab and BremsLib, on an explicit
         (``EnergyBins.cxr``) or automatic (#1489) line grid; other routes
         refuse it. They lower ``mosaic_route`` and
-        ``mosaic_nodes`` into the case as basal runs do, and refuse
-        ``"mc-sampled"`` mosaicity. Excludes ``n_families``,
+        ``mosaic_nodes`` into the case as basal runs do. A mosaic target needs
+        ``mosaic_route="mc"``: ``"analytic"`` (its width reads the basal
+        geometry) and ``"mc-sampled"`` are refused. Excludes ``n_families``,
         ``max_reflections`` and ``line_yield_tolerance``. The direct
         ``pyrite.montecarlo.spectrum.cxr.fiber.FiberCXRModel.from_numerics``
         reads this field only: the other controls here, mosaic ones included,

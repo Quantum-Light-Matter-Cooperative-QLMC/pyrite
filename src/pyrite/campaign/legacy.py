@@ -171,11 +171,13 @@ def numerics_from_legacy(old_sweep: Any, settings: Any) -> Numerics:
         energy_model=getattr(settings, "energy_model", "frozen"),
         max_dE_frac=getattr(settings, "max_dE_frac", 0.0),
         cxr_reflections=CxrReflections(
-            n_families=old_sweep.n_families,
+            # A fiber sweep's four basal DBR/Kossel families are not a public count.
+            n_families=None if old_sweep.cxr_fiber is not None else old_sweep.n_families,
             max_reflections=old_sweep.max_reflections,
             mosaic_nodes=old_sweep.mosaic_nodes,
             line_yield_tolerance=old_sweep.line_yield_tolerance,
             mosaic_route=old_sweep.mosaic_route,
+            fiber=old_sweep.cxr_fiber,
         ),
     )
 

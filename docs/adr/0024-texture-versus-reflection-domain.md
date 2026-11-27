@@ -30,7 +30,8 @@ campaign path refused it.
    fiber domain owns the line reflections. A profile spells it as a
    `cxr_fiber` table of the same fields
    (`[profiles.NAME.cxr_fiber] cutoff_invang = 8.0`), which lowers to
-   `Sweep.cxr_fiber` and joins the dataset identity only when set.
+   `Sweep.cxr_fiber` and joins the dataset
+   identity, as the case record of point 3, only when set.
 3. **Identity.** A lowered case carries the resolved
    `FiberCXRModel.case_record()` as `Case.cxr_fiber`: model marker
    `FIBER_CXR_MODEL`, crystal, cutoff, roll count, tensor temperature and
@@ -45,7 +46,8 @@ campaign path refused it.
    matched BremsLib subtraction. Streaming, audits and line-grid derivation
    then cannot bypass the domain silently.
 5. **Refuse outside the qualified envelope.** HOPG only, incoherent, single
-   flat slab, BremsLib, deterministic mosaic quadrature, fixed electron
+   flat slab, BremsLib, deterministic mosaic quadrature (a mosaic target needs
+   `mosaic_route="mc"`: the analytic width reads the basal geometry), fixed electron
    counts, bin-mean lines. The line grid is explicit (`EnergyBins.cxr`) or
    automatic, resolved and audited over the roll-averaged lines (#1489).
    Stored catalog rows, derived for the basal lines, are skipped. Measured
