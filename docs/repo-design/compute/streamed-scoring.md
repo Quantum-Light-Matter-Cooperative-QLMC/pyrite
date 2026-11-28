@@ -112,7 +112,7 @@ the joined samples, so the sinc spacing, and with it the uniform grid, is
 exact. `resonance-local` seeds are integer coverage counts. The
 `resonance-population` stop search sums line masses per collected chunk, and
 chunk boundaries follow the blocks and their line slices, so its sums can
-differ from the joined path's in the last ulp. The stop is rounded up to a whole 100 eV step, so the
+differ from the joined path's by summation rounding. The stop is rounded up to a whole 100 eV step, so the
 grid differs only if a tail ratio lands within rounding of the truncation
 limit. The truncation audit and `line_grid_resolved` record match the joined
 path to summation order.
@@ -138,6 +138,14 @@ policy's directory and threshold from `pyrite.simulate`
   from the most bytes per row seen so far, growing at most
   `LINE_SLICE_GROWTH`-fold. An electron owning more rows than that is
   collected whole. The sinc samples are still taken per block.
+  Measured on an RTX 5080 with a full-fiber HOPG case (300 keV, 0.5 um; qlmc
+  jobs 16259 and 16260): at 40k histories, 1 GiB slices took 34.2 s of grid
+  pass against 32.6 s for unlimited slices and 36.9 s at 512 MiB. A spilled
+  200k-history pass (24.9 GiB of lines) took 87.9 s with at most 2.8 GiB of
+  anonymous host memory (101.8 s and 1.8 GiB at 512 MiB, job 16259); RSS also
+  counts the reclaimable pages of the mapped line file. The stop and axis did
+  not depend on the slice size, and tail fractions agreed to 5e-9 relative.
+  At 6.02M histories the pass refused after 22 s for want of 750 GiB of disk.
 - **Blocks.** Each block's sinc samples are two raw arrays. A failed block,
   such as one replayed after an allocator OOM, is rolled back as a whole,
   slices already spilled included, so it is never counted twice. Production

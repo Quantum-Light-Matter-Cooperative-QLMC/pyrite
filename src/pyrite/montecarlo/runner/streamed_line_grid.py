@@ -47,7 +47,7 @@ if TYPE_CHECKING:
     from .line_grid_spill import LineFile, SpillStore
 
 #: Line evidence one collection call of the grid pass aims to produce.
-LINE_SLICE_BYTES = 512 * 2**20
+LINE_SLICE_BYTES = 2**30
 #: Transport rows of the first line slice, which measures the bytes per row.
 LINE_SLICE_FIRST_ROWS = 1024
 #: Most a line slice's row count may grow over the one before.
