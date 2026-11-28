@@ -13,6 +13,22 @@ exclude = [
     ".pytest_cache",
     "docs/_build",
     "docs/_autosummary",
+    "jobs",
+    "scratch",
+    "venv",
+    "env",
+    "site-packages",
+    "__marimo__",
+    ".worktrees",
+    "worktrees",
+    "pyrite-output",
+    "checkpoints",
+    "trajectories",
+    "performance-profiles",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".ty_cache",
+    ".import_linter_cache",
 ]
 
 [lint]

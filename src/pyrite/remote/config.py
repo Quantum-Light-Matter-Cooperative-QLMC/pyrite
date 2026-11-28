@@ -100,6 +100,10 @@ SYNC_PATHS = [
     "tests",
     "docs",
     "api-surface.toml",
+    "ruff.toml",
+    ".gitignore",
+    ".pre-commit-config.yaml",
+    "AGENTS.md",
 ]
 
 
