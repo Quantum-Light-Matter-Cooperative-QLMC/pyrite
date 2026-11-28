@@ -35,6 +35,10 @@ _CASE_RECORD_KEYS = frozenset(
     {"model", "crystal", "cutoff_invang", "azimuth_count", "temperature_K", "thermal_source"}
 )
 
+_HISTORY_RECORD_KEYS = (_CASE_RECORD_KEYS - {"azimuth_count"}) | {"roll_sampling", "roll_rng"}
+# Version the counter stream independently of the domain/continuum model.
+FIBER_HISTORY_RNG = "primary-counter-sector-v1"
+
 
 @dataclass(frozen=True, slots=True)
 class FiberCXRModel:
@@ -86,7 +90,7 @@ class FiberCXRModel:
         The batch size is execution-only and travels separately
         (``Case.cxr_fiber_batch_size``), like the spectrum chunks.
         """
-        return dict(
+        record = dict(
             model=FIBER_CXR_MODEL,
             crystal=self.crystal,
             cutoff_invang=self.cutoff_invang,
@@ -94,17 +98,32 @@ class FiberCXRModel:
             temperature_K=float(self.temperature_K),
             thermal_source=self._site().source,
         )
+        if self.numerics.roll_sampling == "history":
+            del record["azimuth_count"]
+            record.update(roll_sampling="history", roll_rng=FIBER_HISTORY_RNG)
+        return record
 
     @classmethod
     def from_case_record(cls, record, *, reflection_batch_size: int | None = None) -> FiberCXRModel:
         """Rebuild the model a case record names; refuse a foreign or stale record."""
-        if not isinstance(record, dict) or set(record) != _CASE_RECORD_KEYS:
-            raise ValueError(f"cxr_fiber must hold exactly {sorted(_CASE_RECORD_KEYS)}")
+        if not isinstance(record, dict) or set(record) not in (
+            _CASE_RECORD_KEYS, _HISTORY_RECORD_KEYS,
+        ):
+            raise ValueError(
+                f"cxr_fiber must hold exactly {sorted(_CASE_RECORD_KEYS)} "
+                f"or {sorted(_HISTORY_RECORD_KEYS)}"
+            )
+        history = set(record) == _HISTORY_RECORD_KEYS
+        if history and (
+            record["roll_sampling"] != "history" or record["roll_rng"] != FIBER_HISTORY_RNG
+        ):
+            raise ValueError("unknown history fiber sampling or RNG version")
         if record["model"] != FIBER_CXR_MODEL:
             raise ValueError(f"cxr_fiber model {record['model']!r} is not {FIBER_CXR_MODEL!r}")
         numerics = FiberAverage(
             cutoff_invang=record["cutoff_invang"],
-            azimuth_count=record["azimuth_count"],
+            azimuth_count=record.get("azimuth_count", 32),
+            roll_sampling="history" if history else "quadrature",
             **(
                 {}
                 if reflection_batch_size is None
@@ -229,12 +248,7 @@ class FiberReflectionSet:
         """Serializable numerical/physical identity for a caller's run record."""
         site = self.model._site()
         return dict(
-            model=FIBER_CXR_MODEL,
-            crystal=self.model.crystal,
-            cutoff_invang=float(self.model.cutoff_invang),
-            azimuth_count=int(self.model.azimuth_count),
-            temperature_K=float(self.model.temperature_K),
-            thermal_source=site.source,
+            **self.model.case_record(),
             reflection_batch_size=int(self.model.reflection_batch_size),
             thermal_doi=site.doi,
             hkls=self.hkls,
@@ -299,6 +313,8 @@ class FiberReflectionSet:
         Validation: cxr-fiber-intensity-average
         Validation: cxr-line-fourier-reduction
         """
+        if self.model.numerics.roll_sampling != "quadrature":
+            raise ValueError("history fiber sampling requires the fixed-grid campaign scorer")
         basal = [h for h in self.hkls if h[:2] == (0, 0)]
         other = [h for h in self.hkls if h[:2] != (0, 0)]
         total = np.zeros(shape, dtype=np.float64)

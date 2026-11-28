@@ -52,11 +52,16 @@ class FiberAverage:
     reflection_batch_size
         Reflections scored per coupling-table batch. Bounds memory only; it
         is not a physics truncation and changes float summation order only.
+    roll_sampling
+        "quadrature" retains the existing midpoint rule. Experimental "history"
+        samples one sector roll per primary; azimuth_count is then unused.
+        Initially limited to fixed-population campaigns on explicit line grids.
     """
 
     cutoff_invang: float
     azimuth_count: int = 32
     reflection_batch_size: int = 256
+    roll_sampling: str = "quadrature"
 
     def __post_init__(self) -> None:
         cutoff = self.cutoff_invang
@@ -69,3 +74,5 @@ class FiberAverage:
             raise ValueError("cutoff_invang must be positive and finite")
         _positive_count(self.azimuth_count, "azimuth_count")
         _positive_count(self.reflection_batch_size, "reflection_batch_size")
+        if self.roll_sampling not in ("quadrature", "history"):
+            raise ValueError("roll_sampling must be 'quadrature' or 'history'")

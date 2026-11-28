@@ -279,6 +279,50 @@ class FrozenScorer:
             device_pool_reserved_mib=_device_pool_mib(),
         )
 
+    def native(self, plan, blocks=1):
+        """Device-vectorized independent rolls using the ordinary per-hkl line physics."""
+        from pyrite.montecarlo import runner
+        from pyrite.montecarlo.runner.electron_blocks import iter_electron_blocks
+        from pyrite.montecarlo.spectrum.cxr._bin_queue import shared_bin_lines
+
+        if plan.labels.size != self.ne:
+            raise ValueError("roll assignment must cover every incident primary")
+        if not np.array_equal(self.ids, _host(self.segs["elec_id"])):
+            raise ValueError("native check requires matching retained primary ID columns")
+        _sync()
+        started = perf_counter()
+        primary_rolls = np.asarray(plan.rolls[plan.labels], dtype=np.float64)
+        spec = np.zeros(self.energy.shape, dtype=np.float64)
+        calls = row_rolls = 0
+        with shared_bin_lines() as sink:
+            if self.other and self.ids.size:
+                for part in iter_electron_blocks(self.segs, blocks):
+                    row_rolls += int(part["L_ang"].size)
+                    for start in range(0, len(self.other), self.batch):
+                        value = runner._cxr_for_segments(
+                            part, self.energy,
+                            dict(self.base, hkl_list=self.other[start:start + self.batch],
+                                 B_ang2=self.lookup.__getitem__, azimuth_rad=self.phi0,
+                                 _fiber_history_rolls=primary_rolls),
+                            self.tp["n_hat"], self.case.get("abs_layers"), self.tp.get("groove"),
+                            coherent=False, Ne=self.ne, table_cache=None,
+                        )
+                        spec += _host(value)
+                        calls += 1
+            _sync()
+            before_flush = perf_counter()
+            spec += sink.result(spec.shape)
+            _sync()
+        if not np.isfinite(spec).all():
+            raise RuntimeError("nonfinite native spectrum")
+        seconds = perf_counter() - started
+        return spec, dict(
+            seconds=seconds, pre_final_flush_s=before_flush - started,
+            final_host_flush_s=seconds - (before_flush - started), calls=calls,
+            segment_roll_evaluations=row_rolls, peak_process_rss_mib=_rss_mib(),
+            device_pool_reserved_mib=_device_pool_mib(), native_blocks=blocks,
+        )
+
     def production(self):
         from pyrite.montecarlo import runner
 
@@ -357,7 +401,10 @@ def _parse():
     p.add_argument("--histories-per-roll", type=int, default=32)
     p.add_argument("--independent", action="store_true")
     p.add_argument("--max-independent-histories", type=int, default=1024)
+    p.add_argument("--native", action="store_true", help="device-vectorized per-primary rolls")
+    p.add_argument("--native-blocks", type=int, default=1, help="whole-primary native scoring blocks")
     p.add_argument("--production-parity", action="store_true")
+    p.add_argument("--production-history-parity", action="store_true")
     p.add_argument("--warmup", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--band", type=float, nargs=2, action="append", default=[])
     p.add_argument("--transport-core", default="per-electron")
@@ -365,7 +412,7 @@ def _parse():
     p.add_argument("--plot", action="store_true")
     a = p.parse_args()
     counts = [a.histories, a.batch, a.mosaic_nodes, a.reference, a.histories_per_roll,
-              a.max_independent_histories, *a.quadratures, *a.shifted, *a.strata]
+              a.max_independent_histories, a.native_blocks, *a.quadratures, *a.shifted, *a.strata]
     if min(counts) < 1 or a.transport_seed < 0 or min(a.orientation_seeds) < 0:
         p.error("positive counts and nonnegative seeds required")
     if len(set(a.orientation_seeds)) != len(a.orientation_seeds):
@@ -433,12 +480,18 @@ def main():
     )
     if args.warmup:
         _, record["warmup"] = scorer.parts(scorer.other, [0.0])
+        if args.native:
+            warm_plan = independent_plan(scorer.ne, args.orientation_seeds[0])
+            _, record["native_warmup"] = scorer.native(warm_plan, args.native_blocks)
     basal, record["basal"] = scorer.parts(scorer.basal, [0.0])
     spectra = {"E_eV": energy, "edges_eV": edges, "basal": basal}
     groups = {}
 
-    def save_arm(name, rolls, plan=None, setup_s=0.0):
-        nonbasal, arm = scorer.parts(scorer.other, rolls, plan)
+    def save_arm(name, rolls, plan=None, setup_s=0.0, *, native=False):
+        if native:
+            nonbasal, arm = scorer.native(plan, args.native_blocks)
+        else:
+            nonbasal, arm = scorer.parts(scorer.other, rolls, plan)
         arm["roll_setup_s"] = setup_s
         arm["radiation_plus_setup_s"] = arm["seconds"] + setup_s + record["basal"]["seconds"]
         arm["history_roll_evaluations"] = scorer.ne * len(rolls) if plan is None else scorer.ne
@@ -476,6 +529,19 @@ def main():
             name = f"I_seed{seed}"
             save_arm(name, plan.rolls, plan, setup_s)
             groups.setdefault("I", []).append(name)
+        if args.native:
+            start = perf_counter()
+            plan = independent_plan(scorer.ne, seed)
+            setup_s = perf_counter() - start
+            name = f"N_seed{seed}"
+            save_arm(name, plan.rolls, plan, setup_s, native=True)
+            groups.setdefault("N", []).append(name)
+            if args.independent:
+                oracle = spectra[f"I_seed{seed}_nonbasal"]
+                candidate = spectra[name + "_nonbasal"]
+                parity = metrics(energy, args.step, candidate, oracle)
+                record["arms"][name]["scalar_same_roll_parity"] = parity
+                print(json.dumps({"native_parity": name, **parity}), flush=True)
     ref_name = f"Q{args.reference}"
     ref = spectra[ref_name + "_nonbasal"]
     reference_total = ref + basal
@@ -515,6 +581,34 @@ def main():
         spectra["production_total"] = production
         record["production_parity"] = dict(seconds=elapsed, **metrics(
             energy, args.step, reference_total, production))
+    if args.production_history_parity:
+        from pyrite.montecarlo.spectrum.cxr._fiber_history import HistoryRollSeed
+        from pyrite.montecarlo.spectrum.cxr.fiber import FIBER_HISTORY_RNG
+
+        case_history = dict(case)
+        fiber_record = dict(case_history["cxr_fiber"])
+        fiber_record.pop("azimuth_count")
+        fiber_record.update(roll_sampling="history", roll_rng=FIBER_HISTORY_RNG)
+        case_history["cxr_fiber"] = fiber_record
+        from pyrite.montecarlo.runner.fiber_emission import validate_fiber_case
+
+        validate_fiber_case(case_history)
+        case_history["_min_line_electron_blocks"] = args.native_blocks
+        angles = HistoryRollSeed(case["seed"]).for_ids(np.arange(scorer.ne))
+        plan = RollPlan(np.arange(scorer.ne), angles)
+        expected, _ = scorer.native(plan, args.native_blocks)
+        _sync()
+        started = perf_counter()
+        actual = _host(runner._cxr_for_segments(
+            scorer.segs, energy, case_history, tp["n_hat"],
+            case.get("abs_layers"), tp.get("groove"), Ne=scorer.ne,
+        ))
+        _sync()
+        spectra["production_history_total"] = actual
+        spectra["production_history_expected_total"] = expected + basal
+        parity = metrics(energy, args.step, actual, expected + basal)
+        record["production_history_parity"] = dict(seconds=perf_counter() - started, **parity)
+        print(json.dumps({"production_history_parity": parity}), flush=True)
     record["reference"] = {"arm": ref_name, "certified": False,
                            "note": "candidate reference; inspect successive Q and phase errors"}
     args.output.parent.mkdir(parents=True, exist_ok=True)

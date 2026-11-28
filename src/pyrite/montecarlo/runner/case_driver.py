@@ -689,6 +689,11 @@ def _cxr_for_segments_once(
         # One crystallite per history from the run seed's own child stream;
         # transport draws are untouched. Validation: mosaic-mc-sampled
         mosaic_kw.update(mosaic_sampling="history", mosaic_seed=int(case["seed"]))
+    if "_fiber_history_rolls" in case:
+        # Only the frozen check constructs this transient, non-persisted key.
+        if radiators is not None:
+            raise ValueError("history fiber rolls require a single slab")
+        mosaic_kw["_fiber_history_rolls"] = case["_fiber_history_rolls"]
     spec_chunk = _admit_chunk(
         case.get("spec_chunk") or _RESOURCE_POLICY.spec_chunk or _adaptive_chunk(E_grid.size),
         E_grid.size,

@@ -1193,12 +1193,26 @@ def _accumulate_per_hkl(st):
     # rows by (reflection, orientation); U_g/m_e is pre-scaled at table build.
     _nsys_push("pyrite.lines.tab")
     g_rows, es_rows, ep_rows, wm_rows, hkl_of_row = [], [], [], [], []
-    CHI_RE, CHI_IM, U_RE, U_IM = _reflection_tables(  # (N_hkl, N_tab)
-        crystal, hkl_list, E_tab, B_ang2, use_henke
-    )
+    if req._fiber_history_rolls is not None:
+        from ._fiber_history import history_coupling_tables
+
+        CHI_RE, CHI_IM, U_RE, U_IM = history_coupling_tables(st, _reflection_tables)
+    else:
+        CHI_RE, CHI_IM, U_RE, U_IM = _reflection_tables(  # (N_hkl, N_tab)
+            crystal, hkl_list, E_tab, B_ang2, use_henke
+        )
     # Exact per-layer (or groove) escape mu, folded once per call.
     mu_tables = escape_mu_tables(req, st.abs_comp)
     open_bin_line_queues(st)
+    if req._fiber_history_rolls is not None:
+        from ._fiber_history import accumulate_history_rolls
+
+        _nsys_pop()
+        accumulate_history_rolls(
+            st, (CHI_RE, CHI_IM, U_RE, U_IM), _accumulate_reflection, mu_tables
+        )
+        flush_bin_line_queues(st)
+        return
     if st.mosaic_sampled is not None:
         _nsys_pop()
         accumulate_sampled_mosaic(

@@ -90,6 +90,19 @@ def _refusal(case: Mapping[str, Any]) -> str | None:
     return None
 
 
+def _validate_history_case(case):
+    """Guard the explicit-grid, fixed-population experimental envelope."""
+    from ..spectrum.cxr._fiber_history import HistoryRollSeed
+
+    if case.get("line_grid_policy") is not None or case.get("_diagnostic_line_grid") is not None:
+        raise ValueError("history fiber sampling requires an explicit fixed line grid")
+    if case.get("adaptive_precision") is not None:
+        raise ValueError("history fiber sampling requires fixed electron counts")
+    if case.get("recip_miscut_rad") is not None and case["recip_miscut_rad"][0] != 0:
+        raise ValueError("history fiber sampling does not support reciprocal miscut")
+    HistoryRollSeed(case["seed"])
+
+
 def validate_fiber_case(case: Mapping[str, Any]) -> None:
     """Refuse a fiber case outside the qualified envelope; normalize nothing.
 
@@ -104,7 +117,9 @@ def validate_fiber_case(case: Mapping[str, Any]) -> None:
         return
     if (reason := _refusal(case)) is not None:
         raise ValueError(f"full-fiber CXR {reason} (#1483)")
-    FiberCXRModel.from_case_record(case[FIBER_CASE_KEY], reflection_batch_size=batch)
+    model = FiberCXRModel.from_case_record(case[FIBER_CASE_KEY], reflection_batch_size=batch)
+    if model.numerics.roll_sampling == "history":
+        _validate_history_case(case)
 
 
 #: Caller audit settings each roll call's own audit shares.
@@ -276,6 +291,11 @@ def fiber_lines(
         base["surface_hkl"] = (0, 0, 1)
     grid = np.asarray(E_grid, dtype=float)
     tables = _fiber_tables(table_cache)
+    if domain.model.numerics.roll_sampling == "history":
+        _validate_history_case(case)
+        if audit is not None:
+            raise ValueError("history fiber sampling does not yet support truncation audits")
+        return _history_lines(segs, grid, case, base, domain, n_hat, abs_layers, groove, Ne, tables)
     import sys
     from time import perf_counter
 
@@ -331,6 +351,38 @@ def fiber_lines(
         return value
 
     return domain._average(score, grid.shape, phi0, weighted=True)
+
+
+def _history_lines(segs, grid, case, base, domain, n_hat, abs_layers, groove, Ne, tables):
+    """One scalar basal pass and one native pass per nonbasal reflection batch.
+
+    Reuse the usual runner's electron-aligned device admission and normalization.
+    Keep each call's bin queue private so a retried GPU block cannot leave
+    already queued contributions in an outer shared sink.
+    """
+    import numpy as np
+
+    from .. import runner
+    from ..spectrum.cxr._fiber_history import HistoryRollSeed
+    from ..spectrum.cxr.fiber import _checked
+
+    roll_seed = HistoryRollSeed(case["seed"])
+    lookup = domain._thermal_lookup()
+    basal = [h for h in domain.hkls if h[:2] == (0, 0)]
+    other = [h for h in domain.hkls if h[:2] != (0, 0)]
+    batch = domain.model.reflection_batch_size
+    total = np.zeros(grid.shape, dtype=np.float64)
+    for hkls, sampled in ((basal, False), (other, True)):
+        for start in range(0, len(hkls), batch):
+            part = dict(base, hkl_list=hkls[start:start + batch], B_ang2=lookup.__getitem__)
+            if sampled:
+                part["_fiber_history_rolls"] = roll_seed
+            value = runner._cxr_for_segments(
+                segs, grid, part, n_hat, abs_layers, groove,
+                coherent=False, Ne=Ne, table_cache=tables,
+            )
+            total += _checked(value, grid.shape)
+    return total
 
 
 def fiber_emission_tables(case, layer, composition, tables):

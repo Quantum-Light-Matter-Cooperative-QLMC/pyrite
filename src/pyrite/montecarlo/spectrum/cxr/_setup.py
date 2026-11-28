@@ -130,6 +130,7 @@ class SpectrumRequest:
     physical_electrons: Any = None
     coherent_flat_omission_limit: Any = 0.0
     phase_retention: Any = None
+    _fiber_history_rolls: Any = None  # experimental retained fixed-grid seam
 
 
 @dataclass

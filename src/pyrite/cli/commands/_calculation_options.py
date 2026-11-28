@@ -129,6 +129,7 @@ CHANNELING_FLAGS = tuple(flag for flag, key in FIELD_NAMES.items() if key in CHA
 FIBER_FIELDS = {
     "cxr-fiber-cutoff-invang": "cutoff_invang",
     "cxr-fiber-roll-nodes": "azimuth_count",
+    "cxr-fiber-roll-sampling": "roll_sampling",
     "cxr-fiber-batch-size": "reflection_batch_size",
 }
 #: ``reset`` choice that removes the whole ``[cxr_fiber]`` table.
@@ -448,6 +449,11 @@ def field_params(
         "Midpoint roll nodes on one 60-degree sector about the fiber axis (table "
         "azimuth_count; default 32, use >= 128 when narrow line shapes matter)."
     ),
+)
+@click.option(
+    "--cxr-fiber-roll-sampling",
+    type=click.Choice(("quadrature", "history")),
+    help="Experimental per-primary roll sampling (history requires fixed N and an explicit line grid).",
 )
 @click.option(
     "--cxr-fiber-batch-size",

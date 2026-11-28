@@ -59,6 +59,7 @@ def mc_cxr_spectrum(
     physical_electrons=None,
     coherent_flat_omission_limit=0.0,
     phase_retention=None,
+    _fiber_history_rolls=None,
 ):
     """
     Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron] on
@@ -278,6 +279,7 @@ def mc_cxr_spectrum(
         physical_electrons=physical_electrons,
         coherent_flat_omission_limit=coherent_flat_omission_limit,
         phase_retention=phase_retention,
+        _fiber_history_rolls=_fiber_history_rolls,
     )
     return _mc_spectrum(request)
 
@@ -357,6 +359,7 @@ def _needs_per_hkl_route(st):
         or req.temporal is not None
         or req.coefficient_capture is not None
         or st.mosaic_sampled is not None
+        or req._fiber_history_rolls is not None
     )
 
 
@@ -365,6 +368,10 @@ def _mc_spectrum(request):
 
     Validation: line-scoring-roulette
     """
+    if request._fiber_history_rolls is not None:
+        from ._fiber_history import validate_history_roll_request
+
+        validate_history_roll_request(request)
     st = _prepare_spectrum(request)
     if st.grouped and request.truncation_audit is not None:
         # The grouped reduction sums substep fields per flight and fills no
