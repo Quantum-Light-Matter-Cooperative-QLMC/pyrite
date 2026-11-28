@@ -10,6 +10,7 @@ inspected.
 import gzip
 import json
 import math
+import os
 import re
 from pathlib import Path
 
@@ -19,6 +20,10 @@ from pyrite.montecarlo.transport.hard_radiative import build_radiative_partition
 from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables
 
 HERE = Path(__file__).resolve().parent
+# The committed records are Mott; ``PYRITE_COMPARE_RESULTS`` and
+# ``PYRITE_COMPARE_ELASTIC`` compare a fresh set (e.g. ELSEPA) instead.
+RESULTS = Path(os.environ.get("PYRITE_COMPARE_RESULTS", HERE / "results"))
+ELASTIC = os.environ.get("PYRITE_COMPARE_ELASTIC", "mott")
 CASES = ("w_300kev", "si_300kev", "w_800kev", "si_800kev")
 CUTOFFS_EV = (1000, 5000, 10000)
 REST_EV = 510_998.95
@@ -88,12 +93,12 @@ def _geant4(case):
 
 
 def _pyrite(case, cutoff):
-    path = HERE / "results" / f"{case}_{cutoff}ev_emission.json.gz"
+    path = RESULTS / f"{case}_{cutoff}ev_emission.json.gz"
     with gzip.open(path, "rt") as handle:
         sample = json.load(handle)
     assert sample["case"] == case
     assert sample["radiative_cutoff_eV"] == cutoff
-    assert sample["elastic_model"] == "mott"
+    assert sample["elastic_model"] == ELASTIC
     assert sample["max_hard_recoil_residual_eV_c"] < 1e-5
     photons = np.asarray(sample["hard_photons"], dtype=float).reshape(-1, 4)
     return sample, {

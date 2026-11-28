@@ -77,6 +77,7 @@ class TransportInputs:
     bunch_front_tilt: Any
     _complete_hard_photons: Any = True
     _cone_split: Any = None
+    _radiative_moment_policy: Any = None
     mixed_elastic: Any = None
 
     def as_kwargs(self):

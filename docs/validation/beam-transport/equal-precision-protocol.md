@@ -304,12 +304,98 @@ timings are in
 The raw evidence archive (`penred-straggling-evidence-2026-10-22.tar.gz`,
 SHA-256 `74bf1e56…`) is not yet uploaded as a release asset.
 
+## Frozen equivalence gate (#1041)
+
+Frozen on 2026-11-20 from pilot evidence only (qlmc re-pilot job 14170, seed
+1), before held-out seeds 101–103 ran. The machine-readable copy is
+`checks/geant4_performance/scenes.json` `precision.equivalence`;
+`analyze.py --plan` applies it.
+
+- **Scope (owner decision).** No 4π photon-band set, because PyRITE's
+  discrete 4π path is not optimized, and no discrete-photon PyRITE cone arm.
+  PyRITE runs the discrete arm for the electron transport set (transmitted,
+  backscattered, stopped, transmitted energy) and the continuous estimator for
+  the ≥ 10 keV cone yield. Geant4 runs both sets.
+- **Test.** TOST on the PyRITE/Geant4 ratio of per-primary means. Each arm
+  pools its held-out runs at the planned count. An observable passes when the
+  90% delta-method CI of ln(ratio) lies inside [ln(1 − δ), ln(1 + δ)]. It is
+  evaluated at ε = 2% only.
+- **Margins δ.** 3% for the transmitted fraction and transmitted energy, 8%
+  for the backscattered and stopped fractions, 10% for the cone yield.
+- **Set rule.** Intersection–union: a (scene, set, PyRITE arm) is equivalent
+  only if every headline observable passes and both arms met the target RSE
+  on every seed. The conjunction needs no multiplicity adjustment. Only an
+  equivalent set passes the statistical gate for a `T(ε)` ratio. Numerical
+  convergence must pass separately before any headline is permitted. Ratios
+  at ε = 5% and ratios on failed or unverified gates are qualified outcomes.
+- **Discrepancy flags.** Two-sided z tests of ratio = 1 on ln(ratio),
+  Holm-adjusted at α = 0.05 across every evaluated cell. Flagged cells link to
+  #1039, #1040 or a new discrepancy issue.
+- **Unplannable cells.** A headline observable with zero pilot yield has no
+  CV. Its cell is listed as `unplannable` and never silently dropped. Si
+  300 keV Geant4 cone had zero photons in 20 000 pilot histories, so that
+  cone comparison is untested on this slice.
+
+Numerical convergence is still outstanding. A passing gate therefore
+qualifies equivalence at the stated precision only. The analyzer records
+`statistical_gates_passed` separately, attaches an `unverified`
+`numerical_convergence` record naming both engine configurations, and keeps
+`headline=false` for every ratio. Qualification requires engine-specific
+step, electron-cutoff, table-density and quadrature/detector ladders below
+one-third of the statistical budget. Historical v1–v3 summaries that emitted
+`headline` before these ladders were available are provisional; their raw
+measurements and statistical verdicts are retained.
+
+### Amendment v3 (held-out seeds 104–106)
+
+Frozen on 2026-11-21, before seeds 104–106 ran. The machine-readable copy is
+`scenes.json` `precision.equivalence.amendment_v3`. `analyze.py` applies it
+only to a plan with `protocol_version` 3 or higher, so the v2 results keep
+their statistical verdicts. The numerical-convergence requirement above
+applies to both versions.
+
+- **Why.** The v2 plan sized each run at the history count the pilot
+  predicted would land exactly on ε. On seeds 101–103, 8 of 10 tested sets
+  missed the precision gate, both engines at RSE 0.0201–0.0211 against
+  ε = 2%. One set was equivalent (Si 3 MeV transport, a floor-bound run);
+  one failed TOST (W 1 MeV transport, interval still containing 1).
+- **Plan.** `precision_plan.py` re-plans from the 101–103 held-out evidence
+  (jobs 14460 and 14462–14464, about 50× the pilot's histories) with a
+  variance margin of 1.10. The trims are recorded in the plan instead of
+  applied by hand: `geant4-16t` dropped, `geant4-1t` at ε = 5% only. The
+  budget is unchanged at 1800 s per run. One 200 000-history run per scene is
+  added for the continuous cone arm. The plan is
+  `checks/geant4_performance/precision-plan-v3.json`. Sizing N from earlier
+  data changes only statistical power; margins, observables, ε, the CI level,
+  the set rule and the Holm family are unchanged.
+- **Floor rule.** A run at `min_histories` (2000) measures fixed cost, not
+  throughput. A speedup with either arm at the floor is never headline.
+- **Skew rule (SHIFT).** Each TOST cell reports both arms' pooled
+  SHIFT/SE ({eq}`eq-adaptive-shift`). If either exceeds 0.1, the cell passes
+  only if the interval recentred by each arm's SHIFT also lies inside the
+  margin.
+- **Tail rule.** A cone speedup is headline only if the continuous arm's
+  Hill tail slope ({eq}`eq-adaptive-hill-slope`), pooled over its runs of at
+  least 50 000 histories, is at least 3. That is MCNP's criterion for finite
+  variance. Below 3 the speedup is qualified as heavy-tailed.
+- **FOM.** Every `T(ε)` row reports FOM = 1/(worst RSE² · T). An arm is
+  FOM-stable when its FOM at the largest planned N is within a factor 1.15 of
+  its FOM at the smallest planned N. The FOM ratio at each arm's largest N is a
+  secondary speed estimate. It is reported as stable only when both arms are
+  stable, and it is never a headline.
+
+On the v2 evidence these diagnostics already show three things:
+- Geant4 32-thread transport FOM rises 1.17–1.62× between its two run sizes,
+  so thread start-up cost dominates its small runs.
+- The pooled cone tail slopes of the continuous arm are 6.7 (Si 3 MeV) and
+  6.1 (W 3 MeV).
+- The 97× Si 1 MeV cone `T(ε)` ratio at ε = 5% has PyRITE at the floor.
+
 ## Remaining gates
 
 This stage leaves the following open: the EGSnrc adapter, a PenRed
 cone-detector tally, Geant4 transport-only and cone-detector tallies
 matching the arms above, adapter support for finite beams and explicit
 secondaries, numerical refinement (including the electron cutoff and the
-estimator's straight-ray escape against full photon transport), equivalence
-margins, equal-core resources and held-out time-to-precision runs. No physics default, model
+estimator's straight-ray escape against full photon transport), equal-core resources and held-out time-to-precision runs. No physics default, model
 marker or version changes here, and no new physics-validation claim is made.

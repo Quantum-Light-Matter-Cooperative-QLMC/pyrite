@@ -12,19 +12,30 @@ Validation: radiative-moment-interpolation
 import hashlib
 import threading
 from collections import OrderedDict
+from dataclasses import asdict
 
 import numpy as np
 
 from ..._radiative_moment_policy import RADIATIVE_MOMENT_MODEL
-from .radiative_moments import prepare_radiative_moments
+from .radiative_moments import MomentPolicy, prepare_radiative_moments
 
 _CACHE_SIZE = 8
 _cache: OrderedDict[str, np.ndarray] = OrderedDict()
 _cache_lock = threading.Lock()
 
 
-def _cache_key(compositions, tables, lo, hi, cutoff, exact):
-    digest = hashlib.sha256(repr((RADIATIVE_MOMENT_MODEL, lo, hi, cutoff)).encode())
+def validate_moment_policy(policy, mode, coupled):
+    """Private convergence override; never silently ignore a requested policy."""
+    if policy is None:
+        return
+    if not isinstance(policy, MomentPolicy):
+        raise TypeError("radiative moment policy must be a MomentPolicy")
+    if mode != "table" or not coupled:
+        raise ValueError("radiative moment policy requires coupled table transport")
+
+
+def _cache_key(compositions, tables, lo, hi, cutoff, exact, policy):
+    digest = hashlib.sha256(repr((RADIATIVE_MOMENT_MODEL, lo, hi, cutoff, policy)).encode())
     # Source admission reads table endpoints; moments read only ``exact``.
     for element in sorted({element for comp in compositions for element, _ in comp}):
         table = tables[element]
@@ -45,20 +56,21 @@ def _cache_key(compositions, tables, lo, hi, cutoff, exact):
     return digest.hexdigest()
 
 
-def pack_transport_moments(compositions, tables, lo, hi, cutoff, exact):
+def pack_transport_moments(compositions, tables, lo, hi, cutoff, exact, *, policy=None):
     """Packed moment buffer for the exact ``pack_radiative_layer_tables`` output.
 
     ``exact`` must be that packer's tuple for the same compositions, tables
     and ``[lo, hi]`` eV range with dielectric suppression; its last entry is
     the per-layer plasma energy that leads the returned buffer.
     """
-    key = _cache_key(compositions, tables, float(lo), float(hi), float(cutoff), exact)
+    policy = MomentPolicy() if policy is None else policy
+    key = _cache_key(compositions, tables, float(lo), float(hi), float(cutoff), exact, policy)
     with _cache_lock:
         if key in _cache:
             _cache.move_to_end(key)
             return _cache[key]
     prepared = prepare_radiative_moments(
-        compositions, tables, lo, hi, cutoff, source_admission="exact-reference"
+        compositions, tables, lo, hi, cutoff, policy=policy, source_admission="exact-reference"
     )
     counts = np.asarray([g.size for g in prepared.energy_eV], dtype=np.int64)
     starts = np.r_[0, np.cumsum(counts[:-1])]
@@ -81,7 +93,7 @@ def pack_transport_moments(compositions, tables, lo, hi, cutoff, exact):
     return packed
 
 
-def add_moment_identity(result, arguments):
+def add_moment_identity(result, arguments, policy=None):
     """Persist exact/table policy and the actual numerical-buffer content pin."""
     layers = arguments[2].size
     packed = arguments[-1]
@@ -89,3 +101,14 @@ def add_moment_identity(result, arguments):
     result["radiative"]["moment_model"] = RADIATIVE_MOMENT_MODEL if table else "exact"
     if table:
         result["radiative"]["moment_table_sha256"] = hashlib.sha256(packed.tobytes()).hexdigest()
+    if policy is not None:
+        # Diagnostic policies must never masquerade as the released approximation.
+        result["radiative"]["moment_model"] = "diagnostic-radiative-moments-v1"
+        starts = packed[layers : 2 * layers].astype(np.int64)
+        counts = packed[2 * layers : 3 * layers].astype(np.int64)
+        energies = packed[3 * layers : 3 * layers + int(counts.sum())]
+        result["radiative"]["moment_policy"] = asdict(policy)
+        result["radiative"]["moment_energy_eV_by_layer"] = [
+            energies[start : start + count].tolist()
+            for start, count in zip(starts, counts, strict=True)
+        ]

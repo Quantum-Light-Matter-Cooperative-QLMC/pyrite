@@ -399,6 +399,15 @@ call per direction, stage and band over every segment, so a 10-history W
 
 ## PenRed arm
 
+For numerical-cutoff studies, `penred_adapter.py --electron-cutoff-kev VALUE`
+sets both electron and positron EABS for that invocation. Photon absorption,
+scoring thresholds and WCC remain unchanged. A nonnominal cutoff, C1/C2,
+DSMAX or WCR is marked accuracy-only; use `--accuracy-only` for nominal
+convergence references too. Generated configuration/material hashes are
+retained. PenRed native table-density refinement and effective-parameter
+readback remain unresolved; configuration hashes alone do not pass those gates.
+
+
 `penred_adapter.py` runs PenRed (label **PenRed (PENELOPE-2018 physics)**, never
 standalone PENELOPE-2024) on a pilot scene or matrix case and writes a
 `pyrite.equal-precision.comparison.v1` record (`--arm source|transport`). Build

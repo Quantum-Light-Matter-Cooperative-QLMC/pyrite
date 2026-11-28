@@ -754,13 +754,16 @@ def radiative_core_args(
     start=0,
     *,
     moment_mode="exact",
+    moment_policy=None,
 ) -> tuple:
     """Transport ``radiative_args``: stream keys, cutoff, physical and moment tables.
 
     Validation: dielectric-suppression
     """
     from ._jit_radiative import radiative_stream_keys
+    from .radiative_moment_transport import validate_moment_policy
 
+    validate_moment_policy(moment_policy, moment_mode, True)
     min_cutoff_eV = float(np.min(electron_cutoffs_keV)) * 1e3
     if cutoff_eV > min_cutoff_eV:
         raise ValueError("radiative_cutoff_eV must not exceed the electron cutoff")
@@ -774,7 +777,7 @@ def radiative_core_args(
         from .radiative_moment_transport import pack_transport_moments
 
         plasma = pack_transport_moments(
-            compositions, tables, min_cutoff_eV, maximum_eV, cutoff_eV, packed
+            compositions, tables, min_cutoff_eV, maximum_eV, cutoff_eV, packed, policy=moment_policy
         )
         packed = (*packed[:-1], plasma)
     elif moment_mode != "exact":

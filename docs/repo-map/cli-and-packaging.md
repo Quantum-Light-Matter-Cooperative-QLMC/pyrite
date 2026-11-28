@@ -98,6 +98,10 @@ Click layer for `pyrite checkpoint gc` (`gc_command`) and `pyrite checkpoint rm`
 ## `perf/`
 Performance sample collection and analysis. `performance_profile.py` owns the append-only runtime logger; `performance_analysis.py` owns artifact loading, summaries, and comparisons.
 Opt-in cross-engine benchmark helpers (#510, driven from `checks/equal_precision/`): `precision.py` primary-history moments, `geant4.py` TestEm5 log parsing, `benchmark_matrix.py` frozen matrix expansion, `comparison.py` common per-primary comparison schema and cone acceptance quadrature.
+`perf/_benchmark_tables.py` owns read-only benchmark table admission (#1041): invocation-local exact-request ELSEPA refinements, native-grid SBETHE selections, payload/manifest/source identities and coverage audits; unsupported meshes remain explicit. No generation or convergence verdict.
+`perf/_track_capture.py` owns bounded whole-primary source-cone benchmark captures (#1041): completion markers, source/table identity retention, payload/incident-ID checks and replay admission. `checks/geant4_performance/replay_cone.py` reuses the existing scorer on those saved rows; it never launches transport or qualifies a numerical gate.
+
+`perf/_convergence_resources.py` owns conservative #1041 confirmation population, shard and resource forecasts from pilot summaries. Every frozen comparison remains present; summary and pairing audits, seed maps and submission admission remain separate.
 
 ## `cli/commands/performance.py`
 Canonical local performance-artifact lifecycle: inventory, analysis, and preview-by-default profile deletion (`rm`; the retired `prune` spelling stays a hidden alias). `profile analyze` remains a hidden warning alias. Revalidates selected file signatures before deletion.

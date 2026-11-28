@@ -107,7 +107,12 @@ def test_mapping_covers_maintained_checks_and_known_ledger_ids() -> None:
     ledger = root / "docs" / "validation" / "physics-validation-ledger.md"
     ledger_ids = {entry.validation_id for entry in parse_ledger_parts(ledger)}
 
-    assert set(CHECK_LEDGER_IDS) == check_paths
+    # Root checks require exhaustive registration; explicitly maintained nested
+    # helpers may also register without enrolling every historical subdirectory.
+    all_check_paths = {
+        path.relative_to(root).as_posix() for path in (root / "checks").rglob("*.py")
+    }
+    assert check_paths <= set(CHECK_LEDGER_IDS) <= all_check_paths
     assert set().union(*CHECK_LEDGER_IDS.values()) <= ledger_ids
 
 

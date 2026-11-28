@@ -11,6 +11,7 @@ transport headline). Scenes are pilot ``manifest.json`` ids or frozen
 import argparse
 import hashlib
 import json
+import math
 import re
 import subprocess
 import time
@@ -76,16 +77,29 @@ def parse_args():
     parser.add_argument("--arm", choices=ARMS, default="source")
     parser.add_argument("--c1", type=float, default=0.05)
     parser.add_argument("--c2", type=float, default=0.05)
+    parser.add_argument(
+        "--electron-cutoff-kev",
+        type=float,
+        default=None,
+        help="invocation-local electron and positron EABS in keV",
+    )
+    parser.add_argument("--accuracy-only", action="store_true")
     parser.add_argument("--wcr-ev", type=float, default=None)
     parser.add_argument("--dsmax-cm", type=float, default=None)
     parser.add_argument("--timeout-s", type=float, default=None)
     args = parser.parse_args()
     if args.histories < 2 or not 0 <= args.seed < SEED_PAIRS:
         parser.error("need at least two histories and a seed pair index in range")
+    cutoff = args.electron_cutoff_kev
+    if cutoff is not None and (not math.isfinite(cutoff) or cutoff <= 0):
+        parser.error("--electron-cutoff-kev must be finite and positive")
     return args
 
 
 def write_record(args, record):
+    provenance = record.get("provenance", {})
+    if provenance.get("timing_comparison_eligible") is False:
+        record["purpose"] = "accuracy-only"
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(record, indent=2, allow_nan=False) + "\n")
     print(json.dumps({"output": str(args.output), "status": record["status"]}))
@@ -114,6 +128,13 @@ def main():
         reason = "adapter cannot express: " + ", ".join(unsupported)
         write_record(args, comparison_record(status="unsupported-physics", reason=reason, **base))
         return
+    electron_cutoff_keV = (
+        spec["electron_cutoff_keV"]
+        if args.electron_cutoff_kev is None
+        else args.electron_cutoff_kev
+    )
+    if electron_cutoff_keV >= spec["energy_keV"]:
+        raise ValueError("electron cutoff must be below beam energy")
     work = args.output.with_suffix("")
     work.mkdir(parents=True, exist_ok=False)
     thickness_cm = spec["thickness_um"] * 1e-4
@@ -130,7 +151,7 @@ def main():
             angle_deg=spec["angle_deg"],
             histories=args.histories + EXTRA_REQUESTED,
             seed_pair=args.seed,
-            electron_eabs_eV=spec["electron_cutoff_keV"] * 1e3,
+            electron_eabs_eV=electron_cutoff_keV * 1e3,
             wcr_eV=wcr_eV,
             c1=args.c1,
             c2=args.c2,
@@ -167,7 +188,8 @@ def main():
         seed_pair=args.seed,
         initial_seeds=initial_seeds,
         controls={
-            "eabs_electron_eV": spec["electron_cutoff_keV"] * 1e3,
+            "eabs_electron_eV": electron_cutoff_keV * 1e3,
+            "eabs_positron_eV": electron_cutoff_keV * 1e3,
             "wcr_eV": wcr_eV,
             "wcc_eV": spec["energy_keV"] * 1e3,
             "c1": args.c1,
@@ -175,6 +197,18 @@ def main():
             "dsmax_cm": args.dsmax_cm or 0.1 * thickness_cm,
             "threads": 1,
         },
+        timing_comparison_eligible=not (
+            args.accuracy_only
+            or electron_cutoff_keV != spec["electron_cutoff_keV"]
+            or args.c1 != 0.05
+            or args.c2 != 0.05
+            or args.dsmax_cm is not None
+            or wcr_eV != spec["hard_photon_cutoff_eV"]
+        ),
+        table_controls=dict(
+            native_grid="unresolved: adapter exposes no independent native-grid density control",
+            effective_parameter_audit="unresolved: configuration hashes are not an engine readback",
+        ),
         cache_state="fresh-process",
         timings_s={"fresh_process": elapsed, **timings},
         inputs_sha256={name: sha256(work / name) for name in ("config.in", "slab.geo")},
