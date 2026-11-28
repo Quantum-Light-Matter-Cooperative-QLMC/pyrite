@@ -501,13 +501,18 @@ class SegmentGridEvidence:
         """Bounded stop evidence for a full-fiber direction; other routes unchanged."""
         if self.case.get("cxr_fiber") is None:
             return None
-        from ..spectrum._lattice_tail import LatticeTail, stop_lattice
+        from ..spectrum._lattice_search import refine_tail
 
         began = perf_counter()
-        summary = _direction_tail(
-            self.case, self.segments, n_hat, self.Ne, self.abs_layers, self.groove, start, ceiling
-        )
-        tail = LatticeTail(stop_lattice(ceiling), summary)
+        limit = float(self.case["line_grid_policy"]["bandwidth"]["truncation_limit"])
+
+        def collect(stops):
+            return _direction_tail(
+                self.case, self.segments, n_hat, self.Ne, self.abs_layers, self.groove,
+                start, ceiling, stops=stops,
+            )
+
+        tail = refine_tail(ceiling, limit / BANDWIDTH_PROXY_SAFETY, collect)
         self._population_bytes[tuple(n_hat)] = tail.population_bytes
         if profile is not None:
             _profile_stage(

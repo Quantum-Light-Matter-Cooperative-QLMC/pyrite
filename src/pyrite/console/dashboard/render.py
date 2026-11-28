@@ -560,6 +560,8 @@ def _format_electron_progress(record):
         counts = f"histories {done:,} (max {total:,})"
     else:
         counts = f"histories {done:,}/{total:,} ({round(100 * done / total)}%)"
+        if label in ("grid", "scoring"):
+            counts += " transported; radiation may still be processing"
     if label is None:
         return counts
     return f"pass {record.get('transport_pass_index')} · {label} · {counts}"

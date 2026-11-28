@@ -276,11 +276,35 @@ def fiber_lines(
         base["surface_hkl"] = (0, 0, 1)
     grid = np.asarray(E_grid, dtype=float)
     tables = _fiber_tables(table_cache)
+    import sys
+    from time import perf_counter
+
+    from ..._backend import _to_cpu
+
+    tail_stops = None if audit is None else audit.get("tail_lattice_eV")
+    call_index = 0
+    if tail_stops is not None:
+        basal = sum(h[:2] == (0, 0) for h in domain.hkls)
+        batch = int(domain.model.reflection_batch_size)
+        total_calls = -(-basal // batch) + int(domain.model.azimuth_count) * (
+            -(-(len(domain.hkls) - basal) // batch)
+        )
+    else:
+        total_calls = 0
 
     def score(hkls, phi, weight):
+        nonlocal call_index
         part = _roll_audit(audit)
         if part is not None and "tail_lattice_eV" in part:
             part["tail_roll_weight"] = weight
+        started = perf_counter()
+        if tail_stops is not None:
+            call_index += 1
+            print(
+                f"line-grid #1527: roll/batch {call_index}/{total_calls} started "
+                f"rows={segs['L_ang'].shape[0]} candidates={len(tail_stops)}",
+                file=sys.stderr, flush=True,
+            )
         value = runner._cxr_for_segments(
             segs,
             grid,
@@ -295,6 +319,15 @@ def fiber_lines(
         )
         if part is not None:
             _fold_roll_audit(audit, part, weight)
+        if tail_stops is not None:
+            summary = None if part is None else part.get("tail_summary")
+            if summary is not None:
+                _to_cpu(summary.sums)  # synchronize only the small summary
+            print(
+                f"line-grid #1527: roll/batch {call_index}/{total_calls} returned "
+                f"wall_s={perf_counter() - started:.3f}",
+                file=sys.stderr, flush=True,
+            )
         return value
 
     return domain._average(score, grid.shape, phi0, weighted=True)

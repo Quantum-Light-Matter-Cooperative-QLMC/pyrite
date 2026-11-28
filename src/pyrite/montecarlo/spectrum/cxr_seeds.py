@@ -348,6 +348,9 @@ def _lattice_stop(tail, ceiling: float, limit: float, round_to_eV: float):
         if tail.min_energy < ceiling and lost(ceiling) <= limit:
             lowest = int(np.floor(tail.min_energy / round_to_eV)) - 1
             highest = int(np.ceil(ceiling / round_to_eV))
+            bounds = getattr(tail, "search_bounds", None)
+            if bounds is not None:
+                lowest, highest = bounds
             while highest - lowest > 1:
                 middle = (lowest + highest) // 2
                 if lost(min(ceiling, float(middle * round_to_eV))) > limit:

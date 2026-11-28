@@ -132,6 +132,10 @@ class BlockGridEvidence:
         self.defers_lines = case.get("cxr_fiber") is not None and not keep_lines
         self.summarizes_tail = self.measured and self.defers_lines
         self._tail_summary = None
+        self._tail_stops = None
+        self._tail_replay = None
+        self._resolved_tail = None
+        self.tail_replays = 0
         # Mixed transport scores no lines; its local axis is the backbone alone.
         oversampled = payload["resolution"]["policy"] == OVERSAMPLED_RESOLUTION_POLICY
         self.keeps_lines = not self.defers_lines and (
@@ -169,8 +173,10 @@ class BlockGridEvidence:
         try:
             self._record_samples(width, weight, int(segs.get("Ne", 0)))
             if self.summarizes_tail:
+                options = {} if self._tail_stops is None else {"stops": self._tail_stops}
                 part = _direction_tail(
-                    self.case, segs, self.n_hat, self.Ne, self.abs_layers, self.groove, *self.band
+                    self.case, segs, self.n_hat, self.Ne, self.abs_layers, self.groove,
+                    *self.band, **options,
                 )
                 if part is not None:
                     summary = merge_tail(summary, part)
@@ -430,7 +436,7 @@ class BlockGridEvidence:
             store.unlink(ordered.weight)
 
     def tail(self, n_hat, start, ceiling, profile):
-        """Return the fixed-size stop evidence, when the fiber path collected it."""
+        """Return exact stop evidence, replaying only the bracket when needed."""
         from ..spectrum._lattice_tail import LatticeTail, stop_lattice
 
         self._check_direction(n_hat)
@@ -438,7 +444,18 @@ class BlockGridEvidence:
             return None
         if (float(start), float(ceiling)) != self.band:
             raise ValueError("streamed tail evidence was collected over another band")
-        return LatticeTail(stop_lattice(ceiling), self._tail_summary)
+        if self._tail_replay is None:
+            return LatticeTail(stop_lattice(ceiling), self._tail_summary)
+        if self._resolved_tail is None:
+            from ..._cxr_grid_policy import BANDWIDTH_PROXY_SAFETY
+            from ..spectrum._lattice_search import refine_tail
+
+            coarse = LatticeTail(self._tail_stops, self._tail_summary)
+            limit = float(self.case["line_grid_policy"]["bandwidth"]["truncation_limit"])
+            self._resolved_tail = refine_tail(
+                ceiling, limit / BANDWIDTH_PROXY_SAFETY, self._tail_replay, coarse=coarse
+            )
+        return self._resolved_tail
 
     def populations(self, n_hat, start, ceiling, profile):
         """Every accumulated production line over the policy band."""
@@ -529,6 +546,48 @@ def resolve_streamed_line_grid(
     profile = case.get("cxr_fiber") is not None and (
         _TIMING or case.get("_profile_line_grid_stages", False)
     )
+    if evidence.summarizes_tail:
+        from ..spectrum._lattice_search import coarse_stops
+        from ..spectrum._lattice_tail import merge_tail
+        from .cxr_grid import _direction_tail
+
+        evidence._tail_stops = coarse_stops(evidence.band[1])
+
+        def replay(stops):
+            # No sinc samples, line collection or adaptive stopping on this pass.
+            summary = None
+            evidence.tail_replays += 1
+            started = perf_counter()
+            print(
+                f"line-grid #1527: refinement candidates={len(stops)}",
+                file=sys.stderr, flush=True,
+            )
+
+            def consume(segs):
+                nonlocal summary
+                part = _direction_tail(
+                    case, segs, n_hat, case["Ne"], abs_layers, groove,
+                    *evidence.band, stops=stops,
+                )
+                if part is not None:
+                    summary = merge_tail(summary, part)
+
+            _announce_transport_pass("grid")
+            _transport_case(
+                case, transport_core=transport_core, block_electrons=block_electrons,
+                block_consumer=consume, keep_segments_on_device=True,
+            )
+            print(
+                f"line-grid #1527: refinement wall_s={perf_counter() - started:.3f}",
+                file=sys.stderr, flush=True,
+            )
+            return summary
+
+        evidence._tail_replay = replay
+        print(
+            f"line-grid #1527: coarse candidates={len(evidence._tail_stops)}",
+            file=sys.stderr, flush=True,
+        )
     began = perf_counter()
     if profile:
         print(
@@ -563,6 +622,7 @@ def resolve_streamed_line_grid(
         # Do not retain the exception (its traceback owns the transport/evidence).
         retry = (exc.required_bytes,)
     finally:
+        evidence._tail_replay = None
         evidence.close()
     if profile:
         print(
@@ -576,6 +636,7 @@ def resolve_streamed_line_grid(
         from ..transport.host_memory import admit_host_allocation
 
         retry_bytes = retry[0]
+        transports = 1 + evidence.tail_replays
         del evidence
         if retry_bytes is not None:
             admit_host_allocation(retry_bytes, "streamed fiber line-grid refinement")
@@ -590,7 +651,9 @@ def resolve_streamed_line_grid(
             spill=spill,
             _keep_lines=True,
         )
-        return grid, record, {**replay, "grid_transports": 1 + replay.get("grid_transports", 1)}
+        return grid, record, {
+            **replay, "grid_transports": transports + replay.get("grid_transports", 1)
+        }
     assert resolved is not None
     grid, record = resolved
     grid_pass: dict[str, Any] = {
@@ -600,7 +663,9 @@ def resolve_streamed_line_grid(
         "spill_peak_bytes": evidence.spill_peak_bytes,
     }
     if case.get("cxr_fiber") is not None:
-        grid_pass.update(evidence.line_evidence_record(), grid_transports=1)
+        grid_pass.update(
+            evidence.line_evidence_record(), grid_transports=1 + evidence.tail_replays
+        )
     return grid, record, grid_pass
 
 
