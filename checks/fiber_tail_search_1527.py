@@ -1,4 +1,4 @@
-"""Frozen production-line benchmark for #1527 (all stops vs coarse/fine).
+"""Frozen production-line benchmark for #1527 (all, coarse/fine, pilot).
 
 Run from the repository root in the desired CPU/CUDA/ROCm environment.
 No spectrum cache or adaptive population is used. This measures radiation
@@ -20,6 +20,7 @@ from pyrite.config import CxrReflections, FiberAverage, FixedSampling, Numerics,
 from pyrite.detectors import Detector
 from pyrite.geometry import Footprint, Slab
 from pyrite.montecarlo import runner
+from pyrite.montecarlo.runner._pilot_tail import pilot_block, resolve_pilot_tail
 from pyrite.montecarlo.runner.cxr_grid import _direction_tail
 from pyrite.montecarlo.spectrum._lattice_search import refine_tail
 from pyrite.montecarlo.spectrum._lattice_tail import LatticeTail, stop_lattice
@@ -62,14 +63,16 @@ def main():
     results = {}
     for repeat in range(args.repeats):
         # Reverse order on alternate repetitions to expose warm-up effects.
-        modes = ("one", "all", "coarse-fine") if repeat % 2 == 0 else ("coarse-fine", "all", "one")
+        modes = ("one", "all", "coarse-fine", "pilot")
+        if repeat % 2:
+            modes = tuple(reversed(modes))
         for mode in modes:
             passes = []
 
-            def collect(stops):
+            def collect(stops, part=segments):
                 t = perf_counter()
                 summary = _direction_tail(
-                    case, segments, tp["n_hat"], int(tp["Ne_lines"]),
+                    case, part, tp["n_hat"], int(tp["Ne_lines"]),
                     case.get("abs_layers"), tp.get("groove"), start, ceiling, stops=stops,
                 )
                 # Construct the host view to synchronize all queued reductions.
@@ -83,17 +86,29 @@ def main():
                 collect(np.array([ceiling]))
                 print(json.dumps({"repeat": repeat, "mode": mode, "passes": passes}), flush=True)
                 continue
-            tail = (LatticeTail(full, collect(full)) if mode == "all"
-                    else refine_tail(ceiling, limit, collect))
+            certified = None
+            pilot_rows = None
+            if mode == "all":
+                tail = LatticeTail(full, collect(full))
+            elif mode == "coarse-fine":
+                tail = refine_tail(ceiling, limit, collect)
+            else:
+                stops, summary, pilot_rows = pilot_block(
+                    segments, ceiling, limit, lambda part, candidates: collect(candidates, part)
+                )
+                tail, certified = resolve_pilot_tail(ceiling, limit, stops, summary, collect)
             stop, record = _lattice_stop(tail, ceiling, limit, 100.0)
             result = {"repeat": repeat, "mode": mode, "stop_eV": stop,
                       "wall_s": perf_counter() - began, "passes": passes,
                       "fraction": record["proxy_truncated_fraction"]}
+            if mode == "pilot":
+                result.update(pilot_rows=pilot_rows, pilot_certified=certified)
             print(json.dumps(result), flush=True)
             results[mode] = result
-        assert results["all"]["stop_eV"] == results["coarse-fine"]["stop_eV"]
-        np.testing.assert_allclose(results["all"]["fraction"], results["coarse-fine"]["fraction"],
-                                   rtol=3e-7, atol=1e-15)
+        for mode in ("coarse-fine", "pilot"):
+            assert results["all"]["stop_eV"] == results[mode]["stop_eV"]
+            np.testing.assert_allclose(results["all"]["fraction"], results[mode]["fraction"],
+                                       rtol=3e-7, atol=1e-15)
 
 
 if __name__ == "__main__":

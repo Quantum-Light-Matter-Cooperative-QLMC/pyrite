@@ -135,6 +135,8 @@ class BlockGridEvidence:
         self._tail_stops = None
         self._tail_replay = None
         self._resolved_tail = None
+        self._pilot_rows = 0
+        self._pilot_certified: bool | None = None
         self.tail_replays = 0
         # Mixed transport scores no lines; its local axis is the backbone alone.
         oversampled = payload["resolution"]["policy"] == OVERSAMPLED_RESOLUTION_POLICY
@@ -169,24 +171,47 @@ class BlockGridEvidence:
         width = width.astype(self._dtypes[0], copy=False)
         weight = weight.astype(self._dtypes[1], copy=False)
         mark = self._mark()
-        summary = self._tail_summary
+        summary, stops = self._tail_summary, self._tail_stops
+        pilot_rows = self._pilot_rows
         try:
             self._record_samples(width, weight, int(segs.get("Ne", 0)))
             if self.summarizes_tail:
-                options = {} if self._tail_stops is None else {"stops": self._tail_stops}
-                part = _direction_tail(
-                    self.case, segs, self.n_hat, self.Ne, self.abs_layers, self.groove,
-                    *self.band, **options,
-                )
-                if part is not None:
-                    summary = merge_tail(summary, part)
+                if self._tail_replay is not None and stops is None:
+                    if int(segs["L_ang"].shape[0]):
+                        from ..._cxr_grid_policy import BANDWIDTH_PROXY_SAFETY
+                        from ._pilot_tail import pilot_block
+
+                        limit = float(self.case["line_grid_policy"]["bandwidth"]["truncation_limit"])
+
+                        def collect(part, candidates):
+                            return _direction_tail(
+                                self.case, part, self.n_hat, self.Ne, self.abs_layers,
+                                self.groove, *self.band, stops=candidates,
+                            )
+
+                        stops, summary, pilot_rows = pilot_block(
+                            segs, self.band[1], limit / BANDWIDTH_PROXY_SAFETY, collect
+                        )
+                        print(
+                            f"line-grid #1527: pilot rows={pilot_rows} "
+                            f"certification candidates={len(stops)}",
+                            file=sys.stderr, flush=True,
+                        )
+                else:
+                    options = {} if stops is None else {"stops": stops}
+                    part = _direction_tail(
+                        self.case, segs, self.n_hat, self.Ne, self.abs_layers, self.groove,
+                        *self.band, **options,
+                    )
+                    if part is not None:
+                        summary = merge_tail(summary, part)
             elif self.keeps_lines and int(segs["L_ang"].shape[0]):
                 for populations, electrons in self._line_slices(segs):
                     self._record_lines(populations, electrons)
         except BaseException:
             self._rollback(mark)
             raise
-        self._tail_summary = summary
+        self._tail_summary, self._tail_stops, self._pilot_rows = summary, stops, pilot_rows
 
     def _line_slices(self, segs):
         """``(populations, electrons)`` of consecutive electron-aligned block slices.
@@ -352,12 +377,20 @@ class BlockGridEvidence:
     def line_evidence_record(self) -> dict[str, Any]:
         """Actual retained line bytes, not the projected raw population size."""
         summary = self._tail_summary
-        return {
+        record: dict[str, Any] = {
             "line_evidence_mode": self.line_evidence_mode,
             "line_population_bytes": self._seen[2],
             "tail_summary_bytes": 0 if summary is None else int(summary.sums.nbytes),
             "summarized_lines": 0 if summary is None else summary.raw_lines,
         }
+        if self._pilot_rows and self._tail_stops is not None:
+            record.update(
+                pilot_rows=self._pilot_rows,
+                pilot_candidates=len(self._tail_stops),
+                pilot_certified=self._pilot_certified,
+                tail_replays=self.tail_replays,
+            )
+        return record
 
     def close(self) -> None:
         """Remove any spilled evidence."""
@@ -436,7 +469,7 @@ class BlockGridEvidence:
             store.unlink(ordered.weight)
 
     def tail(self, n_hat, start, ceiling, profile):
-        """Return exact stop evidence, replaying only the bracket when needed."""
+        """Certify the full-population neighborhood, or replay exact search."""
         from ..spectrum._lattice_tail import LatticeTail, stop_lattice
 
         self._check_direction(n_hat)
@@ -444,16 +477,21 @@ class BlockGridEvidence:
             return None
         if (float(start), float(ceiling)) != self.band:
             raise ValueError("streamed tail evidence was collected over another band")
-        if self._tail_replay is None:
+        if self._tail_replay is None or self._tail_stops is None:
             return LatticeTail(stop_lattice(ceiling), self._tail_summary)
         if self._resolved_tail is None:
             from ..._cxr_grid_policy import BANDWIDTH_PROXY_SAFETY
-            from ..spectrum._lattice_search import refine_tail
+            from ._pilot_tail import resolve_pilot_tail
 
-            coarse = LatticeTail(self._tail_stops, self._tail_summary)
             limit = float(self.case["line_grid_policy"]["bandwidth"]["truncation_limit"])
-            self._resolved_tail = refine_tail(
-                ceiling, limit / BANDWIDTH_PROXY_SAFETY, self._tail_replay, coarse=coarse
+            self._resolved_tail, self._pilot_certified = resolve_pilot_tail(
+                ceiling, limit / BANDWIDTH_PROXY_SAFETY, self._tail_stops,
+                self._tail_summary, self._tail_replay,
+            )
+            print(
+                f"line-grid #1527: pilot certified={self._pilot_certified} "
+                f"tail_replays={self.tail_replays}",
+                file=sys.stderr, flush=True,
             )
         return self._resolved_tail
 
@@ -547,11 +585,8 @@ def resolve_streamed_line_grid(
         _TIMING or case.get("_profile_line_grid_stages", False)
     )
     if evidence.summarizes_tail:
-        from ..spectrum._lattice_search import coarse_stops
         from ..spectrum._lattice_tail import merge_tail
         from .cxr_grid import _direction_tail
-
-        evidence._tail_stops = coarse_stops(evidence.band[1])
 
         def replay(stops):
             # No sinc samples, line collection or adaptive stopping on this pass.
@@ -584,10 +619,7 @@ def resolve_streamed_line_grid(
             return summary
 
         evidence._tail_replay = replay
-        print(
-            f"line-grid #1527: coarse candidates={len(evidence._tail_stops)}",
-            file=sys.stderr, flush=True,
-        )
+        print("line-grid #1527: pilot-guided certification", file=sys.stderr, flush=True)
     began = perf_counter()
     if profile:
         print(
