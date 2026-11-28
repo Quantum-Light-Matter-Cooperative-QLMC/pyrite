@@ -159,7 +159,7 @@ def test_default_margin_is_a_critical_angle_multiple(si110, kernel):
     psi_ratio = np.sqrt((solver.cutoff_eV - low) / depth)
     assert psi_ratio == pytest.approx(DECHANNELING_CRITICAL_ANGLE_MULTIPLE, rel=1e-12)
     for bad in (1.0, 0.5, float("nan")):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"critical_angle_multiple must be finite and > 1"):
             dechanneling_margin_eV(si110, bad)
 
 

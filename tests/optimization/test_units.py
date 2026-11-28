@@ -189,8 +189,13 @@ def test_quantity_parameter_candidates_keep_bounds_lattice_and_dimensions():
         {"beam.kinetic_energy": Integer(30 * ureg.keV, 40 * ureg.keV, step=2 * ureg.keV)}
     ).bind(_base())
     assert space.validate({"beam.kinetic_energy": 32 * ureg.keV}) == {"beam.kinetic_energy": 32}
-    for value in (31 * ureg.keV, 30.5 * ureg.keV, 50 * ureg.keV, 32 * ureg.nm):
-        with pytest.raises(ValueError):
+    for value, message in (
+        (31 * ureg.keV, "integer value 31 is outside allowed lattice"),
+        (30.5 * ureg.keV, r"beam\.kinetic_energy must be integral"),
+        (50 * ureg.keV, "integer value 50 is outside allowed lattice"),
+        (32 * ureg.nm, r"beam\.kinetic_energy has incompatible unit nanometer"),
+    ):
+        with pytest.raises(ValueError, match=message):
             space.validate({"beam.kinetic_energy": value})
 
 

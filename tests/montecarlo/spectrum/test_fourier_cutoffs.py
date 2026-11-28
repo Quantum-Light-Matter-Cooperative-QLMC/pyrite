@@ -45,9 +45,17 @@ def test_large_repeated_cutoffs_need_no_line_index_duplication():
     assert all(lo == 0 and hi == counts.size for _, _, lo, hi in rectangles)
 
 
-@pytest.mark.parametrize("counts", [[2, 1], [-1, 0], [1.5], [[1]]])
-def test_invalid_cutoff_plan_is_refused(counts):
-    with pytest.raises(ValueError):
+@pytest.mark.parametrize(
+    "counts,message",
+    [
+        ([2, 1], "nonnegative and sorted"),
+        ([-1, 0], "nonnegative and sorted"),
+        ([1.5], "one-dimensional integer array"),
+        ([[1]], "one-dimensional integer array"),
+    ],
+)
+def test_invalid_cutoff_plan_is_refused(counts, message):
+    with pytest.raises(ValueError, match=f"last modes must be .*{message}"):
         list(cutoff_rectangles(np.asarray(counts)))
 
 

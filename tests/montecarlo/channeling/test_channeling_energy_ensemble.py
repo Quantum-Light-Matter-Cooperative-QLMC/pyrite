@@ -19,6 +19,9 @@ from pyrite.montecarlo.channeling.energy_ensemble import (
     planar_energy_spectrum,
 )
 
+_NODES = "energy nodes and nonnegative weights must be finite"
+_ORDER = r"Gaussian quadrature order must be 3\.\.max_nodes"
+
 
 def test_mono_has_one_exact_energy_with_no_spread():
     grid = IncidentEnergyEnsemble(5e6).quadrature()
@@ -26,7 +29,7 @@ def test_mono_has_one_exact_energy_with_no_spread():
     assert grid.energies_eV.tolist() == [5e6]
     assert grid.weights.tolist() == [1.0]
     assert grid.excluded_probability == 0
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"assignment destination is read-only"):
         grid.weights[0] = 0.1
 
 
@@ -64,21 +67,27 @@ def test_positive_energy_clipping_and_explicit_weighted_nodes():
 
 
 @pytest.mark.parametrize(
-    "kwargs",
+    "kwargs,message",
     [
-        {"kinetic_energy_eV": -10},
-        {"kinetic_energy_eV": np.nan},
-        {"kinetic_energy_eV": 100, "energy_spread_frac": -0.1},
-        {"kinetic_energy_eV": 100, "energy_spread_frac": 0.1, "energy_spread_eV": 3},
-        {"kinetic_energy_eV": 100, "energy_nodes_eV": [1, 2], "node_weights": [1]},
-        {"kinetic_energy_eV": 100, "energy_nodes_eV": [1, -2], "node_weights": [1, 1]},
-        {"kinetic_energy_eV": 100, "energy_nodes_eV": [1, 2], "node_weights": [0, 0]},
-        {"kinetic_energy_eV": 100, "energy_spread_eV": 1, "order": 2},
-        {"kinetic_energy_eV": 100, "energy_spread_eV": 1, "order": 100},
+        ({"kinetic_energy_eV": -10}, "kinetic_energy_eV must be finite and positive"),
+        ({"kinetic_energy_eV": np.nan}, "kinetic_energy_eV must be finite and positive"),
+        (
+            {"kinetic_energy_eV": 100, "energy_spread_frac": -0.1},
+            "energy_spread_frac must be finite and nonnegative",
+        ),
+        (
+            {"kinetic_energy_eV": 100, "energy_spread_frac": 0.1, "energy_spread_eV": 3},
+            "provide either RMS fraction or RMS energy, not both",
+        ),
+        ({"kinetic_energy_eV": 100, "energy_nodes_eV": [1, 2], "node_weights": [1]}, _NODES),
+        ({"kinetic_energy_eV": 100, "energy_nodes_eV": [1, -2], "node_weights": [1, 1]}, _NODES),
+        ({"kinetic_energy_eV": 100, "energy_nodes_eV": [1, 2], "node_weights": [0, 0]}, _NODES),
+        ({"kinetic_energy_eV": 100, "energy_spread_eV": 1, "order": 2}, _ORDER),
+        ({"kinetic_energy_eV": 100, "energy_spread_eV": 1, "order": 100}, _ORDER),
     ],
 )
-def test_bad_ensembles_are_rejected(kwargs):
-    with pytest.raises(ValueError):
+def test_bad_ensembles_are_rejected(kwargs, message):
+    with pytest.raises(ValueError, match=message):
         IncidentEnergyEnsemble(**kwargs).quadrature()
 
 
@@ -299,5 +308,7 @@ def test_axial_energy_dependent_photon_centres_are_binned_incoherently(monkeypat
     np.testing.assert_allclose(spectrum.helicity_plus_per_eV, [0.0075, 0.015])
     smooth = axial_energy_spectrum(ensemble, config, [0.0, 150.0, 300.0], detector_sigma_eV=10)
     assert np.all(smooth.photon_density_per_eV >= 0)
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match=r"photon_energy_edges_eV must be finite, increasing bin edges"
+    ):
         axial_energy_spectrum(ensemble, config, [150, 100])

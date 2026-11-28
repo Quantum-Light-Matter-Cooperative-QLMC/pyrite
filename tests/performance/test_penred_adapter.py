@@ -21,6 +21,8 @@ from pyrite.perf.penred import (
 )
 
 ROOT = Path(__file__).resolve().parents[2] / "checks/equal_precision"
+_TERMINALS = "incomplete or duplicate primary terminal records"
+_STATE = "invalid terminal state or photon primary/energy"
 
 
 @pytest.fixture(scope="module")
@@ -71,7 +73,7 @@ def test_config_keeps_photons_unsimulated_and_suppresses_delta_rays():
     z = float(keys["sources/generic/source1/spatial/position/z"])
     assert z < 0 and x / z == pytest.approx(np.tan(np.radians(75.0)))
     assert float(keys["sources/generic/source1/direction/theta"]) == 75.0
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"WCR or electron EABS outside the benchmark range"):
         config(electron_eabs_eV=800e3)
 
 
@@ -83,7 +85,7 @@ def test_geometry_bounds_the_slab_by_six_planes():
     assert "Y-SHIFT=(+5.000000000000000E-01,   0)" in text
     sides = [line[-3:-1] for line in text.splitlines() if "SIDE POINTER" in line]
     assert sides == ["+1", "-1", "+1", "-1", "+1", "-1"]
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"slab thickness and width must be positive"):
         geometry_text(0.0, 1.0)
 
 
@@ -142,17 +144,17 @@ def test_parse_tally_groups_photons_by_primary():
 
 
 @pytest.mark.parametrize(
-    "text",
+    "text,message",
     [
-        TALLY + "T 4 5 1\n",  # duplicate terminal
-        TALLY.replace("T 4 6 300000\n", ""),  # missing primary
-        TALLY + "G 9 20000\n",  # photon of no primary
-        TALLY + "X 1\n",  # unknown record
-        TALLY.replace("T 2 4", "T 2 3"),  # unknown terminal
+        (TALLY + "T 4 5 1\n", _TERMINALS),  # duplicate terminal
+        (TALLY.replace("T 4 6 300000\n", ""), _TERMINALS),  # missing primary
+        (TALLY + "G 9 20000\n", _STATE),  # photon of no primary
+        (TALLY + "X 1\n", "invalid PenRed tally record 'X 1'"),  # unknown record
+        (TALLY.replace("T 2 4", "T 2 3"), _STATE),  # unknown terminal
     ],
 )
-def test_parse_tally_rejects_broken_records(text):
-    with pytest.raises(ValueError):
+def test_parse_tally_rejects_broken_records(text, message):
+    with pytest.raises(ValueError, match=message):
         parse_tally(text, 4)
 
 

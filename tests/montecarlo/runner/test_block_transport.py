@@ -289,7 +289,7 @@ def test_electron_blocks_cover_the_range_once():
     assert electron_blocks(10, 4) == [(0, 4), (4, 8), (8, 10)]
     assert electron_blocks(8, 8) == [(0, 8)]
     assert electron_blocks(0, 3) == []
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"block_electrons must be a positive integer"):
         electron_blocks(5, 0)
 
 

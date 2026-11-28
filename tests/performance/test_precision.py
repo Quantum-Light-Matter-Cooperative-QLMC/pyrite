@@ -27,7 +27,7 @@ def test_zero_variance_does_not_establish_precision(values):
     "ids,scores", [([-1], [1]), ([4], [1]), ([0.5], [1]), ([0], [float("nan")]), ([0], [])]
 )
 def test_invalid_primary_scores_refused(ids, scores):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"invalid primary ids, scores or incident population"):
         grouped_scores(np.array(ids), scores, 4)
 
 

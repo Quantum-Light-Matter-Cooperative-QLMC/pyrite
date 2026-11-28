@@ -151,16 +151,16 @@ def test_loss_gate_is_configurable():
 
 
 @pytest.mark.parametrize(
-    "kwargs",
+    "kwargs,message",
     [
-        {"beta": 1.0},
-        {"beta": -0.1},
-        {"beta": 0.5, "charge": np.inf},
-        {"beta": 0.5, "path_length_m": -1},
+        ({"beta": 1.0}, r"beta must be finite and in \[0, 1\)"),
+        ({"beta": -0.1}, r"beta must be finite and in \[0, 1\)"),
+        ({"beta": 0.5, "charge": np.inf}, "charge must be finite"),
+        ({"beta": 0.5, "path_length_m": -1}, "path_length_m must be finite and nonnegative"),
     ],
 )
-def test_passage_validation(kwargs):
-    with pytest.raises(ValueError):
+def test_passage_validation(kwargs, message):
+    with pytest.raises(ValueError, match=message):
         ChargedPassage(**kwargs)
 
 

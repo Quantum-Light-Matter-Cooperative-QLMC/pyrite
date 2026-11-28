@@ -21,7 +21,7 @@ from pyrite.montecarlo.transport import _simulate_trajectories as simulate_traje
 
 
 def test_normalize_requires_material():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"specify the material"):
         _normalize_composition(None, None, None)
 
 
@@ -30,7 +30,7 @@ def test_normalize_composition_passthrough():
 
 
 def test_simulate_trajectories_refuses_silent_default():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"specify the material"):
         simulate_trajectories(30.0, 4, 1e4)  # no element / composition given
 
 
@@ -42,7 +42,7 @@ def test_mc_spectrum_requires_crystal_and_hkl():
 def test_mc_spectrum_requires_B_ang2():
     # crystal + hkl supplied, but B_ang2 left at its sentinel -> explicit ValueError
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"B_ang2 \(Debye-Waller B-factor"):
         mc_cxr_spectrum({}, np.arange(50.0, 100.0, 1.0), crystal="silicon", hkl_list=[(1, 1, 1)])
 
 
@@ -429,11 +429,17 @@ def test_omitted_footprint_is_bitwise_legacy_transport():
 
 
 @pytest.mark.parametrize(
-    ("width_mm", "height_mm"), [(None, 1.0), (1.0, None), (0.0, 1.0), (-1.0, 1.0)]
+    ("width_mm", "height_mm", "message"),
+    [
+        (None, 1.0, "must both be specified"),
+        (1.0, None, "must both be specified"),
+        (0.0, 1.0, "must be finite and strictly positive"),
+        (-1.0, 1.0, "must be finite and strictly positive"),
+    ],
 )
-def test_finite_footprint_rejects_invalid_dimension_pairs(width_mm, height_mm):
+def test_finite_footprint_rejects_invalid_dimension_pairs(width_mm, height_mm, message):
     cp = crystal_params("hbn")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=f"width and height {message} in mm"):
         simulate_trajectories(
             30.0,
             4,

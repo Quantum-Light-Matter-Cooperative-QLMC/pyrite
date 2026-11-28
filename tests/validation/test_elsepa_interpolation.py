@@ -65,15 +65,15 @@ def test_identical_nodes_and_density_rescaling_leave_the_bound_unchanged():
 
 
 @pytest.mark.parametrize(
-    "mu,p0,p1",
+    "mu,p0,p1,message",
     [
-        ([0, 0, 1], [1, 1, 1], [1, 1, 1]),
-        ([0, 1], [-1, 2], [1, 1]),
-        ([0, 0.5, 1], [0, 0, 1], [1, 1, 1]),
+        ([0, 0, 1], [1, 1, 1], [1, 1, 1], "mu must increase strictly from zero to one"),
+        ([0, 1], [-1, 2], [1, 1], "DCS must be finite, nonnegative and match the angular grid"),
+        ([0, 0.5, 1], [0, 0, 1], [1, 1, 1], "each angular panel must have positive probability"),
     ],
 )
-def test_invalid_or_zero_mass_panels_are_refused(mu, p0, p1):
-    with pytest.raises(ValueError):
+def test_invalid_or_zero_mass_panels_are_refused(mu, p0, p1, message):
+    with pytest.raises(ValueError, match=message):
         _pair_moment_bounds(mu, p0, p1)
 
 

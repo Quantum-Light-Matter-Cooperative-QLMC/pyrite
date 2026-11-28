@@ -565,8 +565,12 @@ def test_mosaic_arms_parse_perfect_and_history_draws():
     gate = _gate()
     arms = gate["parse_mosaic_arms"]("perfect,4@11,256@12")
     assert arms == [("perfect", None, None), ("k4-m11", 4, 11), ("k256-m12", 256, 12)]
-    for bad in ("4", "0@1", "perfect,perfect"):
-        with pytest.raises(ValueError):
+    for bad, message in (
+        ("4", "mosaic arm '4' is not 'perfect' or K@SHIFT"),
+        ("0@1", "mosaic arm '0@1' is not 'perfect' or K@SHIFT"),
+        ("perfect,perfect", "mosaic arms must be distinct"),
+    ):
+        with pytest.raises(ValueError, match=message):
             gate["parse_mosaic_arms"](bad)
 
 

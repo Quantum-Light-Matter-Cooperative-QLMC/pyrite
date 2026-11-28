@@ -69,7 +69,9 @@ def test_home_relative_checkout_requires_a_shared_home(monkeypatch):
 
 @pytest.mark.parametrize("value", ["-dtn", "dtn host", "dtn;ls", "a/b"])
 def test_transfer_host_must_be_an_ssh_alias(value):
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match=r"expected host alias containing only letters, digits, dots,"
+    ):
         RemoteTarget(host=LOGIN, transfer_host=value)
 
 

@@ -29,7 +29,7 @@ def test_ruff_configuration_and_tasks():
         lint["extend-unfixable"]
     )
     # Rewrites that broke numerics or behaviour in the audit stay off entirely.
-    assert {"RUF005", "RUF046", "SIM118", "FURB136"} <= set(lint["ignore"])
+    assert {"RUF005", "RUF046", "SIM118", "FURB110", "FURB136"} <= set(lint["ignore"])
     assert "fixable" not in lint
     assert "unfixable" not in lint
     tasks = manifest["tool"]["pixi"]["feature"]["lint"]["tasks"]

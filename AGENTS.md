@@ -197,9 +197,9 @@ Do not add separate tutorial provenance manifests or HTML/session exports.
   returns and final expressions are Marimo graph wiring. Review findings by
   hand and run `pixi run --locked marimo check <app.py>` after edits. New Marimo
   sources must live in a protected directory. Never enable unsafe fixes globally.
-  CLI `--select`, `--fixable` and `--unsafe-fixes` override `ruff.toml` and the
-  Marimo fix ban: one-off fixes name exact codes, skip Marimo paths, and get
-  reviewed and tested ([Ruff policy](docs/repo-design/development-workspace.md#ruff-policy)).
+  CLI flags override `ruff.toml`: `--select` re-enables ignored rules, and
+  `--fixable`/`--extend-fixable` bypass the Marimo fix ban. One-off fixes name
+  exact codes, skip Marimo paths, and get reviewed and tested ([Ruff policy](docs/repo-design/development-workspace.md#ruff-policy)).
 - Kill processes by PID (`pgrep -a`, then `kill <pid>`); never `pkill`/`killall`
   patterns, which can match the agent's own shell. Never `git add .`/`-A`.
   `.agents/hooks/guard_bash.sh` blocks these and non-lease force pushes.

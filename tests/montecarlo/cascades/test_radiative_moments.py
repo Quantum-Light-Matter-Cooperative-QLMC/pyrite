@@ -116,7 +116,7 @@ def test_coverage_and_inputs_are_explicit(tables):
         prepare_radiative_moments([[("Si", -0.05)]], tables, 10000, 200000, 1000)
     with pytest.raises(ValueError, match="cutoff"):
         prepare_radiative_moments([[("Si", 0.05)]], tables, 10000, 200000, 10001)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"assignment destination is read-only"):
         p.moments[0][0, 0] = 0
 
 

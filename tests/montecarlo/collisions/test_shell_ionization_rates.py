@@ -56,9 +56,13 @@ def test_accessible_shell_outside_tabulated_grid_is_rejected():
 
 
 @pytest.mark.parametrize(
-    "composition",
-    [[], [("Si", SI_DENSITY), ("Si", SI_DENSITY)], [("Si", 0.0)]],
+    "composition,message",
+    [
+        ([], "composition must contain at least one element"),
+        ([("Si", SI_DENSITY), ("Si", SI_DENSITY)], "duplicate element in composition"),
+        ([("Si", 0.0)], "Si number density must be finite and positive"),
+    ],
 )
-def test_invalid_compositions_are_rejected(composition):
-    with pytest.raises(ValueError):
+def test_invalid_compositions_are_rejected(composition, message):
+    with pytest.raises(ValueError, match=message):
         material_shell_ionization_rates(composition, 30.0e3)

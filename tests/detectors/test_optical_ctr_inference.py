@@ -281,9 +281,9 @@ def test_charge_jitter_scales_only_pair_term_by_exact_second_moment():
         rtol=1e-11,
     )
     assert "charge jitter" in jittered.provenance
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"mean_electrons must be finite and > 1"):
         source.with_charge_jitter(mean_electrons=1.0, charge_rms_fraction=0.1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"charge_rms_fraction must be finite and nonnegative"):
         source.with_charge_jitter(mean_electrons=10.0, charge_rms_fraction=-0.1)
 
 

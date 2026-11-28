@@ -150,7 +150,7 @@ def test_every_entry_carries_the_omitted_block_as_a_declared_bound():
         assert case.free_free_upper > case.free_free_in_cut > 0.0
     case = ADMITTED_AXIAL_CASES["si-fibre/A"]
     assert case.free_free_upper == pytest.approx(0.0806, abs=5e-5)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"free_free must be"):
         dataclasses.replace(case, free_free="native")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"free_free must be"):
         dataclasses.replace(case, free_free_upper=0.5 * case.free_free_in_cut)

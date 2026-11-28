@@ -227,7 +227,8 @@ def test_degenerate_moments_report_no_error():
 )
 def test_settings_are_validated(bad):
     kw = dict(target_rse=0.1, min_histories=40, max_histories=200, block_histories=20) | bad
-    with pytest.raises(ValueError):
+    # Each refusal names the field it rejects.
+    with pytest.raises(ValueError, match=next(iter(bad))):
         AdaptiveSettings(**kw)
 
 

@@ -43,7 +43,7 @@ def test_scalar_slab_loader_and_profile_values(document, tmp_path):
     assert catalog.profile_target_refs["standard"] == {"silicon": "film"}
     with pytest.raises(TypeError):
         catalog.named_targets["film"]["thickness_ang"] = 1
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"cannot set WRITEABLE flag to True of this array"):
         catalog.materials["silicon"].scan.thickness_ang.flags.writeable = True
     with pytest.raises(KeyError, match="unknown target preset"):
         load_target("missing", catalog=catalog)

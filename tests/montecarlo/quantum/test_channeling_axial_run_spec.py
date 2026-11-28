@@ -142,25 +142,48 @@ def test_invalid_configuration(update, match):
 
 
 @pytest.mark.parametrize(
-    "entry",
+    "entry,message",
     [
-        {"version": 1, "kind": "gaussian", "waist_ang": 0},
-        {"version": 1, "kind": "gaussian", "waist_ang": 1.0, "dimension": 1},
-        {"version": 1, "kind": "gaussian", "waist_ang": 1.0, "impact_average": "uniform"},
-        {"version": 1, "kind": "gaussian", "waist_ang": 1.0, "tilt_offset_rad": [0, float("inf")]},
-        {"version": 1, "kind": "laguerre_gauss", "waist_ang": 1.0, "ell": 1, "p": True},
-        {"version": 1, "kind": "mixture", "components": []},
-        {
-            "version": 1,
-            "kind": "mixture",
-            "components": [
-                {"weight": 0, "entry": {"version": 1, "kind": "gaussian", "waist_ang": 1}}
-            ],
-        },
+        ({"version": 1, "kind": "gaussian", "waist_ang": 0}, r"entry\.waist_ang must be finite"),
+        (
+            {"version": 1, "kind": "gaussian", "waist_ang": 1.0, "dimension": 1},
+            "entry must have dimension=2",
+        ),
+        (
+            {"version": 1, "kind": "gaussian", "waist_ang": 1.0, "impact_average": "uniform"},
+            "weighted impact quadrature is not yet supported",
+        ),
+        (
+            {
+                "version": 1,
+                "kind": "gaussian",
+                "waist_ang": 1.0,
+                "tilt_offset_rad": [0, float("inf")],
+            },
+            r"entry\.tilt_offset_rad\[1\] must be finite",
+        ),
+        (
+            {"version": 1, "kind": "laguerre_gauss", "waist_ang": 1.0, "ell": 1, "p": True},
+            r"entry\.p must be an integer",
+        ),
+        (
+            {"version": 1, "kind": "mixture", "components": []},
+            r"mixture\.components must be a nonempty list",
+        ),
+        (
+            {
+                "version": 1,
+                "kind": "mixture",
+                "components": [
+                    {"weight": 0, "entry": {"version": 1, "kind": "gaussian", "waist_ang": 1}}
+                ],
+            },
+            "mixture weight must be finite and positive",
+        ),
     ],
 )
-def test_invalid_entry_recipes(entry):
-    with pytest.raises(ValueError):
+def test_invalid_entry_recipes(entry, message):
+    with pytest.raises(ValueError, match=message):
         resolve_axial_spec(recipe(entry=entry))
 
 

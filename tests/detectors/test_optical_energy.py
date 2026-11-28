@@ -5,6 +5,9 @@ import pytest
 
 from pyrite.detectors.optical_energy import CalibratedPulseEnergyDetector
 
+_OUTSIDE_BAND = "outside its calibrated energy band"
+_BAD_GRID = "input must be finite, nonnegative photons/eV"
+
 
 def _calibrated(**kwargs):
     params = dict(
@@ -64,23 +67,23 @@ def test_zero_photons_and_response_fingerprint():
     assert _calibrated().response_sha256 == det.response_sha256
     assert _calibrated(efficiency=np.array([0.5, 0.6, 0.5])).response_sha256 != det.response_sha256
     # Calibration arrays are copied, made read-only; external mutation cannot change calibration.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"assignment destination is read-only"):
         det.efficiency[0] = 0
 
 
 @pytest.mark.parametrize(
-    "energies,photons",
+    "energies,photons,message",
     [
-        ([0.5, 1.0], [0.0, 1.0]),
-        ([1.0, 3.1], [0.0, 0.0]),
-        ([1.0, 1.0], [1.0, 1.0]),
-        ([1.0, 2.0], [1.0, -1.0]),
-        ([1.0, np.nan], [0.0, 0.0]),
-        ([1.0, 2.0], [np.inf, 0.0]),
+        ([0.5, 1.0], [0.0, 1.0], _OUTSIDE_BAND),
+        ([1.0, 3.1], [0.0, 0.0], _OUTSIDE_BAND),
+        ([1.0, 1.0], [1.0, 1.0], _BAD_GRID),
+        ([1.0, 2.0], [1.0, -1.0], _BAD_GRID),
+        ([1.0, np.nan], [0.0, 0.0], _BAD_GRID),
+        ([1.0, 2.0], [np.inf, 0.0], _BAD_GRID),
     ],
 )
-def test_bad_grid_or_band_refused(energies, photons):
-    with pytest.raises(ValueError):
+def test_bad_grid_or_band_refused(energies, photons, message):
+    with pytest.raises(ValueError, match=message):
         _calibrated().predict(energies, photons)
 
 
@@ -117,7 +120,7 @@ def test_batched_pulse_reduction_has_exact_nonuniform_grid_units():
 def test_batched_pulse_reduction_checks_every_spectrum():
     det = _calibrated()
     for photons in (np.ones((2, 4)), [[1, 1, 1], [1, -1, 1]], [[1, 1, 1], [1, np.nan, 1]]):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"input must be finite, nonnegative photons/eV"):
             det.predict_batch([1, 2, 3], photons)
 
 

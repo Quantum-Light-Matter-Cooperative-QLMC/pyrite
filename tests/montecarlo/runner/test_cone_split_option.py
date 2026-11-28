@@ -94,7 +94,7 @@ def test_policy_defaults_round_trip_and_build():
     ],
 )
 def test_policy_validates_fields(field, value):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=f"cone split {field}"):
         ConeSplitting(**{field: value})
 
 

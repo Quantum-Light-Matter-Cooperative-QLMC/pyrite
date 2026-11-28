@@ -189,7 +189,7 @@ def test_namespace_matches_actual_philox_keys_and_primary_separation():
 def test_namespace_range_validation(field, value):
     fields = dict(root_seed=620, parent_id=17, earlier_depth_index=3, insertion_component=1)
     fields[field] = value
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=f"{field} must be an integer in"):
         AuxiliaryAddress(**fields)
 
 

@@ -81,13 +81,13 @@ def test_case_record_round_trips_and_refuses_foreign_records():
     model = fiber.FiberCXRModel.from_numerics(FiberAverage(cutoff_invang=6.0))
     record = model.case_record()
     assert fiber.FiberCXRModel.from_case_record(record) == model
-    for bad in (
-        {**record, "model": "hopg-fiber-v0"},
-        {**record, "thermal_source": "elsewhere"},
-        {k: v for k, v in record.items() if k != "temperature_K"},
-        {**record, "extra": 1},
+    for bad, message in (
+        ({**record, "model": "hopg-fiber-v0"}, "cxr_fiber model 'hopg-fiber-v0' is not"),
+        ({**record, "thermal_source": "elsewhere"}, "thermal source no longer matches"),
+        ({k: v for k, v in record.items() if k != "temperature_K"}, "must hold exactly"),
+        ({**record, "extra": 1}, "must hold exactly"),
     ):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=message):
             fiber.FiberCXRModel.from_case_record(bad)
 
 
@@ -129,7 +129,7 @@ def test_case_schema_validates_fiber_fields():
     basal = _lower(_numerics())
     with pytest.raises(ValueError, match="requires cxr_fiber"):
         replace(basal, cxr_fiber_batch_size=8)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"cxr_fiber_batch_size must be a positive integer"):
         replace(case, cxr_fiber_batch_size=0)
 
 

@@ -124,7 +124,7 @@ def test_per_beam_line_grids_are_exact_read_only_and_projected(tmp_path, monkeyp
     np.testing.assert_array_equal(scan.E_grid_line_by_energy[25.0], np.linspace(10.0, 58.0, 17))
     with pytest.raises(TypeError):
         scan.E_grid_line_by_energy[25.0] = np.array([1.0])
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"assignment destination is read-only"):
         scan.E_grid_line_by_energy[25.0][0] = 1.0
 
     monkeypatch.setattr(config, "CATALOG", catalog)
@@ -1836,11 +1836,11 @@ def test_packaged_catalog_exposes_frozen_ordered_public_api():
         CATALOG.materials["new"] = CATALOG.material("mote2")  # type: ignore[index]
     with pytest.raises(FrozenInstanceError):
         CATALOG.material("mote2").label = "changed"  # type: ignore[misc]
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"assignment destination is read-only"):
         CATALOG.material("mote2").scan.tilt_deg[0] = 1.0
     with pytest.raises(TypeError):
         CATALOG.crystal("hbn").lattice["c"] = 1.0  # type: ignore[index]
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"assignment destination is read-only"):
         CATALOG.crystal("hbn").basis[0][1][0] = 1.0
 
     np.testing.assert_array_equal(
@@ -1899,11 +1899,13 @@ def test_exposed_arrays_cannot_have_writes_reenabled():
 
     for values in arrays:
         try:
-            with pytest.raises(ValueError):
+            with pytest.raises(
+                ValueError, match=r"cannot set WRITEABLE flag to True of this array"
+            ):
                 values.flags.writeable = True
         finally:
             values.flags.writeable = False
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"assignment destination is read-only"):
             values[0] = -1.0
 
 

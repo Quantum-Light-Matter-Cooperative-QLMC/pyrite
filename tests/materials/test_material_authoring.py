@@ -165,7 +165,7 @@ def test_failed_publication_rolls_back(tmp_path, monkeypatch, _isolate_user_cata
 
 def test_invalid_definition_rolls_back_without_records(_isolate_user_catalog):
     built = build_medium("invalid", formula="Si", density_g_cm3=2.33)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"definition changed since build"):
         save_material(replace(built, record_toml="[composition]\nSi = -1\n"))
     assert not (_isolate_user_catalog / "media" / "invalid.toml").exists()
 

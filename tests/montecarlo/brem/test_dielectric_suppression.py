@@ -34,18 +34,18 @@ def test_low_high_energy_limits_and_broadcast():
 
 
 @pytest.mark.parametrize(
-    ("kinetic", "photon", "plasma"),
+    ("kinetic", "photon", "plasma", "message"),
     [
-        (-1.0, 1.0, 1.0),
-        (np.nan, 1.0, 1.0),
-        (1.0, 0.0, 1.0),
-        (1.0, np.inf, 1.0),
-        (1.0, 1.0, -1.0),
-        (1.0, 1.0, np.nan),
+        (-1.0, 1.0, 1.0, "electron_kinetic_eV must be finite"),
+        (np.nan, 1.0, 1.0, "electron_kinetic_eV must be finite"),
+        (1.0, 0.0, 1.0, "photon_energy_eV must be finite"),
+        (1.0, np.inf, 1.0, "photon_energy_eV must be finite"),
+        (1.0, 1.0, -1.0, "plasma_energy_eV must be finite"),
+        (1.0, 1.0, np.nan, "plasma_energy_eV must be finite"),
     ],
 )
-def test_factor_refuses_invalid_inputs(kinetic, photon, plasma):
-    with pytest.raises(ValueError):
+def test_factor_refuses_invalid_inputs(kinetic, photon, plasma, message):
+    with pytest.raises(ValueError, match=message):
         ter_mikaelian_factor(kinetic, photon, plasma)
 
 

@@ -10,6 +10,8 @@ from pyrite.materials.crystal import (
     kinematic_validity,
 )
 
+_RANGE = "energy must be positive; coupling and thickness nonnegative"
+
 
 def test_reference_parameters():
     # omega=2/A, |chi|=0.001, Delta=0.4/A^2: independent hand calculation.
@@ -64,16 +66,16 @@ def test_zero_coupling_thickness_and_absorption_limits():
 
 
 @pytest.mark.parametrize(
-    "args",
+    "args,message",
     [
-        (0, 0.1, 1, 1, 1),
-        (100, -1, 1, 1, 1),
-        (100, 1, 1, -1, 1),
-        (100, 1, np.nan, 1, 1),
-        (100, 1, 1, 1, np.nan),
-        (100, 1, 1, 1, 0),
+        ((0, 0.1, 1, 1, 1), _RANGE),
+        ((100, -1, 1, 1, 1), _RANGE),
+        ((100, 1, 1, -1, 1), _RANGE),
+        ((100, 1, np.nan, 1, 1), "kinematic validity inputs must be finite"),
+        ((100, 1, 1, 1, np.nan), "absorption length must be positive"),
+        ((100, 1, 1, 1, 0), "absorption length must be positive"),
     ],
 )
-def test_invalid_inputs(args):
-    with pytest.raises(ValueError):
+def test_invalid_inputs(args, message):
+    with pytest.raises(ValueError, match=message):
         kinematic_validity(*args)

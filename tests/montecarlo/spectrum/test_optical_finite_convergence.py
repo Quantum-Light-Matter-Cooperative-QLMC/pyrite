@@ -43,9 +43,9 @@ def test_pitch_converges_but_tight_window_is_flagged():
 
 
 def test_refuses_bad_refinement_controls():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"refinements must be a positive integer"):
         _run(32, 0.2e-6, refinements=0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"rtol must lie in"):
         _run(32, 0.2e-6, rtol=0.0)
     with pytest.raises(ValueError, match="remote"):
         _run(1024, 0.2e-6, refinements=3)
@@ -153,7 +153,7 @@ def test_finite_disc_changes_the_spectrum_and_needs_resolved_energy_nodes():
 
 def test_spectral_convergence_refuses_bad_controls():
     for kw in ({"n_energy": 4}, {"n_energy": 1}, {"refinements": 0}, {"rtol": 1.0}):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=next(iter(kw))):
             _band(1e-6, **kw)
 
 
@@ -221,7 +221,7 @@ def test_aperture_band_converges_over_two_refinements_of_each_axis():
 
 def test_aperture_band_refuses_bad_controls():
     for kw in ({"n_energy": 4}, {"refinements": 0}, {"rtol": 0.0}):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=next(iter(kw))):
             _aperture_band(**kw)
     with pytest.raises(TypeError):
         _aperture_band(aperture=None)

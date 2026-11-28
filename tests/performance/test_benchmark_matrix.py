@@ -31,16 +31,19 @@ def test_range_table_is_hashed_and_log_log_interpolated():
 
 
 @pytest.mark.parametrize(
-    "text",
+    "text,message",
     [
-        "energy,range\n0.1,0.01\n1,0.5\n",
-        "kinetic_energy_MeV,csda_range_g_cm2\n0.1,0.01\n",
-        "kinetic_energy_MeV,csda_range_g_cm2\n1,0.5\n0.1,0.01\n",
-        "kinetic_energy_MeV,csda_range_g_cm2\n0.1,-1\n1,0.5\n",
+        ("energy,range\n0.1,0.01\n1,0.5\n", "header must be"),
+        ("kinetic_energy_MeV,csda_range_g_cm2\n0.1,0.01\n", "needs at least two two-column rows"),
+        (
+            "kinetic_energy_MeV,csda_range_g_cm2\n1,0.5\n0.1,0.01\n",
+            "energies and ranges must increase strictly",
+        ),
+        ("kinetic_energy_MeV,csda_range_g_cm2\n0.1,-1\n1,0.5\n", "entries must be finite"),
     ],
 )
-def test_invalid_range_tables_refused(text):
-    with pytest.raises(ValueError):
+def test_invalid_range_tables_refused(text, message):
+    with pytest.raises(ValueError, match=f"range table {message}"):
         parse_range_table(text)
 
 

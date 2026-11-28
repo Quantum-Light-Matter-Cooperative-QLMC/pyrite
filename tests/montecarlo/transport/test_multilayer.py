@@ -165,9 +165,9 @@ def test_substrate_composition_presets_and_crystal():
     assert 0.04 < si["Si"] < 0.06
     sapphire = dict(substrate_composition("sapphire"))  # crystalline, from CRYSTALS
     assert sapphire["O"] == pytest.approx(1.5 * sapphire["Al"])
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"unknown substrate"):
         substrate_composition("unobtainium")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"unknown substrate"):
         substrate_composition("al2o3")
 
 
@@ -243,7 +243,7 @@ def test_substrate_radiator_crystalline_vs_amorphous():
     # a crystalline substrate carries its own radiator (crystal params); an
     # amorphous preset radiates no coherent lines (None)
     assert substrate_radiator("sio2") is None
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"unknown substrate"):
         substrate_radiator("al2o3")
     si = substrate_radiator("silicon")
     assert si is not None
@@ -255,7 +255,7 @@ def test_substrate_radiator_crystalline_vs_amorphous():
     assert sapphire["crystal"] == "sapphire"
     assert set(sapphire) == {"crystal", "hkl_list", "B_ang2", "beam_uvw", "surface_hkl"}
     assert len(sapphire["hkl_list"]) > 0
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"unknown substrate"):
         substrate_radiator("unobtainium")
 
 
@@ -402,7 +402,7 @@ def test_build_cases_substrate_sugar_matches_single_layer_stack():
 
 @pytest.mark.filterwarnings("ignore:Sweep.substrate:DeprecationWarning")
 def test_build_cases_rejects_substrate_plus_stack():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"give either substrate= or stack=, not both"):
         build_cases(
             Sweep(
                 material="mose2",

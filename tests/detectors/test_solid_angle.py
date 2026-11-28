@@ -83,14 +83,14 @@ def test_wider_chip_spreads_polar_angles():
 
 
 def test_nside_must_be_positive():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"n_side must be >= 1"):
         detector_directions(THETA, n_side=0, domega_sr=OMEGA)
 
 
 def test_solid_angle_spectrum_validates_shapes():
     """mc_cxr_spectrum_solid_angle rejects malformed grids before any GPU work."""
     segs = {"E_keV": np.array([25.0]), "Ne": 1, "thickness_ang": 1e7}
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"n_hats must be"):
         mc_cxr_spectrum_solid_angle(
             segs,
             np.arange(500.0, 600.0),
@@ -100,7 +100,7 @@ def test_solid_angle_spectrum_validates_shapes():
             weights=np.ones(3),
             B_ang2=0.8,
         )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"weights must be"):
         mc_cxr_spectrum_solid_angle(
             segs,
             np.arange(500.0, 600.0),

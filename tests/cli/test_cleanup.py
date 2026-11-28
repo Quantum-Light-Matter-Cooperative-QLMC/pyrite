@@ -72,7 +72,7 @@ def test_draft_failure_readonly_and_concurrent_edit_never_save(_isolate_user_cat
     before = snapshot(_isolate_user_catalog)
     invalid = CatalogDraft.open(selected)
     create_detector(invalid.document, "invalid", scalar={"solid_angle_sr": -1})
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"solid_angle_sr must be >= 0"):
         invalid.save()
     assert snapshot(_isolate_user_catalog) == before
     readonly = CatalogDraft.open(selected)

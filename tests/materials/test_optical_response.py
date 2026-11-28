@@ -148,7 +148,7 @@ def test_response_refuses_unsupported_input(overrides, message):
 def test_response_identity_and_immutable_data():
     response = _response()
     for nodes in response.segments[0]:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"cannot set WRITEABLE flag to True of this array"):
             nodes.setflags(write=True)
     assert replace(response, temperature_K=301).digest != response.digest
     assert replace(response, sample_state="different film").digest != response.digest

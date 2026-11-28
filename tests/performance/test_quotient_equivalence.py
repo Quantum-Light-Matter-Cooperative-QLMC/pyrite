@@ -50,7 +50,7 @@ def test_paired_interval_uses_observed_covariance_and_rejects_injected_bias():
 
 @pytest.mark.parametrize("candidate,bound", [([np.nan, 0], 1), ([2.0, 0], 1)])
 def test_bad_paired_scores_are_rejected(candidate, bound):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"nonfinite score or known support violated"):
         methods()["paired_interval"]([0, 0], candidate, bound=bound, margin=0.1, comparisons=1)
 
 
@@ -267,8 +267,14 @@ def test_equivalence_loader_requires_complete_fixed_design_and_pairing(
         ],
     )
     main = runpy.run_path(str(ROOT / "checks/equal_precision/analyze_equivalence.py"))["main"]
-    if mutation in ["pair", "pilot", "score", "controls"]:
-        with pytest.raises(ValueError):
+    refusals = {
+        "pair": "primary coupling provenance mismatch",
+        "pilot": "pilot/preflight population or protocol mismatch",
+        "score": "known physical score support/population violated",
+        "controls": "held-out controls differ from frozen preflight",
+    }
+    if mutation in refusals:
+        with pytest.raises(ValueError, match=refusals[mutation]):
             main()
     else:
         main()

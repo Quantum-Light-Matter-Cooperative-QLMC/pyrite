@@ -52,9 +52,17 @@ def test_free_particle_spectrum_has_no_resolved_gaps(profile):
     assert max(spectrum["gap_to_width"][:10]) < 1e-12
 
 
-@pytest.mark.parametrize("angles,gaps", [([0.9], []), ([np.nan], []), ([], [0]), ([], [1])])
-def test_invalid_threshold_is_rejected(profile, angles, gaps):
-    with pytest.raises(ValueError):
+@pytest.mark.parametrize(
+    "angles,gaps,message",
+    [
+        ([0.9], [], "critical-angle multiples must be finite"),
+        ([np.nan], [], "critical-angle multiples must be finite"),
+        ([], [0], "gap fractions must be finite and between 0 and 1"),
+        ([], [1], "gap fractions must be finite and between 0 and 1"),
+    ],
+)
+def test_invalid_threshold_is_rejected(profile, angles, gaps, message):
+    with pytest.raises(ValueError, match=message):
         boundary_candidates(profile, 16.92e6, 16, [], angles, gaps)
 
 

@@ -81,8 +81,12 @@ def test_jitter_covariance_limits_and_rank():
     # No coherent part: raw jitter is the linear charge term only.
     raw = ChargeJitterModel(1e6, 0.05, 1).port_covariance(a, np.zeros_like(a))[0]
     np.testing.assert_allclose(raw, np.outer(a[0], a[0]) * 0.05**2)
-    for bad in (dict(charge_rms_fraction=1.0), dict(shots_per_point=0), dict(mean_electrons=1.0)):
-        with pytest.raises(ValueError):
+    for bad, message in (
+        (dict(charge_rms_fraction=1.0), r"charge_rms_fraction must lie in \[0, 1\)"),
+        (dict(shots_per_point=0), "shots_per_point must be a positive integer"),
+        (dict(mean_electrons=1.0), "mean_electrons must be finite and > 1"),
+    ):
+        with pytest.raises(ValueError, match=message):
             ChargeJitterModel(
                 **{**dict(mean_electrons=1e6, charge_rms_fraction=0.1, shots_per_point=4), **bad}
             )

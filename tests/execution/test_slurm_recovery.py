@@ -40,7 +40,9 @@ def _executor(tmp_path, *, tasks=2, attempts=2):
 def test_array_spec_is_compact_and_validates():
     assert _array_spec([0, 1, 2, 4, 7, 8], 3) == "0-2,4,7-8%3"
     for bad in ([], [2, 1], [1, 1], [-1]):
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            ValueError, match=r"array indexes must be sorted, unique and nonnegative"
+        ):
             _array_spec(bad, 2)
 
 
@@ -67,9 +69,9 @@ def test_sbatch_retry_overrides_array_and_tags_attempt(monkeypatch, tmp_path):
     ]
     _cancel_job("456")
     assert commands[-1] == ["scancel", "456"]
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"invalid SLURM array specification"):
         _submit(tmp_path / "script.sbatch", array_spec="0;rm -rf /%2")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"invalid SLURM job id"):
         _cancel_job("456;echo unsafe")
 
 

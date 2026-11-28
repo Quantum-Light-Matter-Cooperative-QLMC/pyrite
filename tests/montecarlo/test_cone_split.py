@@ -132,13 +132,13 @@ def test_refuses_cores_and_models_without_splitting(extra):
 
 
 def test_cone_split_validates_its_request():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"n_hat must be a finite nonzero three-vector"):
         ConeSplit((0.0, 0.0, 0.0), THETA_C, 0.05)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"half_angle_rad must lie in"):
         ConeSplit(N_HAT, 2.0, 0.05)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"target_weight must be positive and finite"):
         ConeSplit(N_HAT, THETA_C, 0.0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"min_energy_keV must be finite and non-negative"):
         ConeSplit(N_HAT, THETA_C, 0.05, min_energy_keV=-1.0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"angle_scale must be positive"):
         ConeSplit(N_HAT, THETA_C, 0.05, angle_scale=0.0)

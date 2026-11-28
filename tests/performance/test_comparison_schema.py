@@ -85,7 +85,9 @@ def test_failed_outcomes_keep_reason_without_scores():
         reason="no released SBETHE table",
     )
     assert "moments" not in record and record["reason"]
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match=r"unsuccessful outcomes need a reason and carry no scores"
+    ):
         comparison_record(
             case_id="x", engine="g", arm="a", status="timeout", n_primaries=2,
             energy_keV=1, seed=None,
@@ -242,5 +244,5 @@ def test_per_primary_cone_scores_report_unresolved_and_unconverged():
 
     rough = converged_cone_scores(spike, [1, 0, 0], math.radians(5), rtol=1e-12, max_order=8)
     assert rough["converged"] is False and rough["order"] == 8
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"need a positive rtol and room for one order doubling"):
         converged_cone_scores(spike, [1, 0, 0], 0.1, rtol=0.0)

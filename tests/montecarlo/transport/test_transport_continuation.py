@@ -536,7 +536,7 @@ def test_continuation_stats_are_recorded_and_cleared():
     "kwargs", [{"rows_per_round": 0}, {"active_histories": 0}, {"rows_per_round": -1}]
 )
 def test_invalid_schedule_is_rejected(kwargs):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=f"{next(iter(kwargs))} must be a positive integer"):
         TransportContinuationConfig(**kwargs)
 
 

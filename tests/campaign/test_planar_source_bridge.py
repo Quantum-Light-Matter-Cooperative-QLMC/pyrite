@@ -55,7 +55,7 @@ def test_projected_entry_is_identical_to_existing_solver_reference():
     assert projected.state_digest == spec.digest
 
     # Returning a fresh mutable initial state must not mutate the stored source.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"assignment destination is read-only"):
         projected.subspace_density[...] = 0
     writable, entry = projected.initial
     assert writable.flags.writeable

@@ -68,35 +68,35 @@ def test_invalid_chunk_size(bad):
 
 
 @pytest.mark.parametrize(
-    "kwargs",
+    "kwargs,message",
     [
-        {"cpu_cores": 0},
-        {"cpu_cores": "3"},
-        {"memory_bytes": -2},
-        {"gpu_count": -1},
-        {"accelerator": "cuda2"},
-        {"accelerator": "cpu", "gpu_count": 1},
-        {"gpu_memory_bytes": 100},
-        {"accelerator": "cuda"},
+        ({"cpu_cores": 0}, "cpu_cores must be a positive integer"),
+        ({"cpu_cores": "3"}, "cpu_cores must be a positive integer"),
+        ({"memory_bytes": -2}, "memory_bytes must be a nonnegative integer"),
+        ({"gpu_count": -1}, "gpu_count must be a nonnegative integer"),
+        ({"accelerator": "cuda2"}, "unsupported accelerator requirement"),
+        ({"accelerator": "cpu", "gpu_count": 1}, "cpu-only work cannot request GPUs"),
+        ({"gpu_memory_bytes": 100}, "gpu_memory_bytes requires gpu_count > 0"),
+        ({"accelerator": "cuda"}, "device-specific work must request at least one GPU"),
     ],
 )
-def test_invalid_resources(kwargs):
-    with pytest.raises(ValueError):
+def test_invalid_resources(kwargs, message):
+    with pytest.raises(ValueError, match=message):
         ResourceRequest(**kwargs)
 
 
 def test_work_and_retry_validation():
     assert ExecutionState.SUCCEEDED.value == "succeeded"
     assert RetryPolicy().max_attempts == 1
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"max_attempts must be a positive integer"):
         RetryPolicy(max_attempts=0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"unit_id must be nonempty"):
         WorkUnit("", 0, 1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"work unit must cover at least one nonnegative index"):
         WorkUnit("unit", 2, 2)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"case_keys must align with the work interval"):
         WorkUnit("unit", 0, 2, case_keys=("only-one",))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"estimated_cost must be finite and nonnegative"):
         WorkUnit("unit", 0, 1, estimated_cost=float("nan"))
 
 
