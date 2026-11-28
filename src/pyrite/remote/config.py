@@ -97,6 +97,9 @@ SYNC_PATHS = [
     "LICENSE-SVML.md",
     # Generator sources (ADR-0014): lets the box run `pyrite tables generate`.
     "vendor",
+    "tests",
+    "docs",
+    "api-surface.toml",
 ]
 
 

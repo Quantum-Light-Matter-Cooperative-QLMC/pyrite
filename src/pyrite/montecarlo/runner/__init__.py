@@ -17,7 +17,7 @@ from contextlib import nullcontext
 from contextvars import ContextVar
 from functools import partial as partial
 from time import perf_counter as perf_counter
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -183,7 +183,7 @@ def _nsys_push(message):
         return
     from cupy.cuda import nvtx
 
-    nvtx.RangePush(message)
+    cast(Any, nvtx).RangePush(message)
 
 
 def _nsys_pop():
@@ -192,7 +192,7 @@ def _nsys_pop():
         return
     from cupy.cuda import nvtx
 
-    nvtx.RangePop()
+    cast(Any, nvtx).RangePop()
 
 
 def _process_pool_kwargs():

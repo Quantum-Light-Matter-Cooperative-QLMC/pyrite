@@ -803,9 +803,9 @@ packaging = { features = ["cpu", "py313", "test"], solve-group = "py313" }
 py315 = { features = ["py315", "test", "lint", "docs", "notebooks", "browser", "dask", "optimization"], no-default-feature = true }
 # Developer GPU environments retain their existing capabilities. Each shares
 # its solve with the corresponding lean runtime, not with other GPU vendors.
-nvidia = { features = ["py313", "gpu-stack", "cuda", "test", "docs", "notebooks", "dask", "optimization"], solve-group = "gpu-nvidia" }
-amd = { features = ["py313", "gpu-stack", "amd", "test", "notebooks", "dask", "optimization"], solve-group = "gpu-amd" }
-intel = { features = ["py313", "gpu-stack", "intel", "test", "notebooks", "dask", "optimization"], solve-group = "gpu-intel" }
+nvidia = { features = ["py313", "gpu-stack", "cuda", "test", "docs", "notebooks", "dask", "optimization", "lint"], solve-group = "gpu-nvidia" }
+amd = { features = ["py313", "gpu-stack", "amd", "test", "notebooks", "dask", "optimization", "lint", "docs"], solve-group = "gpu-amd" }
+intel = { features = ["py313", "gpu-stack", "intel", "test", "notebooks", "dask", "optimization", "lint", "docs"], solve-group = "gpu-intel" }
 # Production simulations: core + cluster/optimization extras, no contributor
 # groups or app/plot extras. Select explicitly; existing targets are unchanged.
 runtime-cpu = { features = ["cpu", "py313", "dask", "optimization"], solve-group = "py313" }

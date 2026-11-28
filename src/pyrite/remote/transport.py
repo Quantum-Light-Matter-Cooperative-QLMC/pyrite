@@ -30,8 +30,14 @@ _SYNC_EXCLUDED_DIRS = {
     ".mypy_cache",
     ".pytest_cache",
     ".ruff_cache",
+    "_build",
+    "_autosummary",
+    ".ty_cache",
+    ".import_linter_cache",
+    "__marimo__",
+    ".doctrees",
 }
-_SYNC_EXCLUDED_SUFFIXES = {".pyc", ".pyo"}
+_SYNC_EXCLUDED_SUFFIXES = {".pyc", ".pyo", ".nbc", ".nbi"}
 
 
 @contextmanager
