@@ -35,7 +35,7 @@ def test_policy_validation_and_conflicting_legacy_kwargs() -> None:
         Timepix3ResponseNumerics(n_mc=True)
     with pytest.raises(ValueError, match="seed"):
         Timepix3ResponseNumerics(seed=-1)
-    with pytest.raises(TypeError, match="Timepix3.numerics"):
+    with pytest.raises(TypeError, match=r"Timepix3\.numerics"):
         Timepix3(numerics=object())
     with pytest.raises(ValueError, match="conflicts"):
         Timepix3(n_mc=256, numerics=Timepix3ResponseNumerics(n_mc=128))

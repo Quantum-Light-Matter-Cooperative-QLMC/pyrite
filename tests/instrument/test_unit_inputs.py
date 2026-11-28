@@ -129,12 +129,12 @@ def test_semantic_energy_rejects_invalid_inputs(value: object, error: type[Excep
 
 def test_semantic_and_numeric_energy_arguments_conflict_even_when_equivalent() -> None:
     options = dict(transverse=Spot(), longitudinal=PointBunch())
-    with pytest.raises(TypeError, match="energy_keV.*kinetic_energy"):
+    with pytest.raises(TypeError, match=r"energy_keV.*kinetic_energy"):
         Beam(energy_keV=60, kinetic_energy=60 * ureg.keV, **options)
-    with pytest.raises(TypeError, match="energy_keV.*kinetic_energy"):
+    with pytest.raises(TypeError, match=r"energy_keV.*kinetic_energy"):
         Beam(60, kinetic_energy=60 * ureg.keV, **options)
     beam = Beam(kinetic_energy=60 * ureg.keV, **options)
-    with pytest.raises(TypeError, match="energy_keV.*kinetic_energy"):
+    with pytest.raises(TypeError, match=r"energy_keV.*kinetic_energy"):
         replace(beam, kinetic_energy=80 * ureg.keV)
 
 
@@ -148,9 +148,9 @@ def test_semantic_scalar_energy_must_remain_finite_positive_as_python_float(
     assert np.isfinite(value) and value > 0
     quantity = Q_(value, "keV")
     options = dict(transverse=Spot(), longitudinal=PointBunch())
-    with pytest.raises(ValueError, match="kinetic_energy.*finite.*positive"):
+    with pytest.raises(ValueError, match=r"kinetic_energy.*finite.*positive"):
         Beam(kinetic_energy=quantity, **options)
-    with pytest.raises(ValueError, match="kinetic_energy.*finite.*positive"):
+    with pytest.raises(ValueError, match=r"kinetic_energy.*finite.*positive"):
         Beam(60, **options).with_kinetic_energy(quantity)
 
 

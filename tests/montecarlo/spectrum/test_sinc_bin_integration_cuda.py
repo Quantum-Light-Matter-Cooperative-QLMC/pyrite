@@ -427,7 +427,7 @@ def test_sparse_near_keeps_every_job_past_a_uint32_thread_grid():
     # 64 first-zero widths span 1000 eV: ~2e6 near bins, ~6.5e4 jobs per line.
     a = np.full(len(e), 64.0 * np.pi / 1000.0, dtype=np.float32)
     w = rng.uniform(0.5, 1.0, len(e)).astype(np.float32)
-    _, first, stop, _, n_jobs, _ = _bin_sparse.prepare_sparse_reduction(
+    _, _first, _stop, _, n_jobs, _ = _bin_sparse.prepare_sparse_reduction(
         cp.asarray(e), cp.asarray(a), cp.asarray(w), cp.asarray(edges)
     )
     assert n_jobs * _bin_sparse._WARP_LANES > 2**32

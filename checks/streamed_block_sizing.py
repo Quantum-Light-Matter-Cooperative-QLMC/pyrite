@@ -42,6 +42,8 @@ import time
 
 os.environ.setdefault("PYRITE_MC_BACKEND", "cuda")
 
+from pathlib import Path
+
 import cupy
 import numpy as np
 
@@ -446,7 +448,7 @@ def sweep(arms, outdir):
     import shlex
     import subprocess
 
-    text = RTX6000_ARMS if arms == "rtx6000" else open(arms).read()
+    text = RTX6000_ARMS if arms == "rtx6000" else Path(arms).read_text()
     os.makedirs(outdir, exist_ok=True)
     lines = [line.split() for line in text.splitlines() if line.strip() and line[0] != "#"]
     for i, (mode, n, block, scratch, threads, batch, *envs) in enumerate(lines, 1):
@@ -457,7 +459,7 @@ def sweep(arms, outdir):
         print("ARM", tag, " ".join(envs), flush=True)
         with open(os.path.join(outdir, tag + ".log"), "w") as log:
             rc = subprocess.run(cmd, env=env, stdout=log, stderr=subprocess.STDOUT).returncode
-        tail = open(os.path.join(outdir, tag + ".log")).read().splitlines()[-3:]
+        tail = Path(outdir, tag + ".log").read_text().splitlines()[-3:]
         print(
             f"rc={rc}", *(t for t in tail if t.startswith(("RESULT", "cupy", "Error"))), flush=True
         )

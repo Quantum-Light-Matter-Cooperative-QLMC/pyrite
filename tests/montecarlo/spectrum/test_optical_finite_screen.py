@@ -16,6 +16,10 @@ from pyrite.montecarlo.spectrum.optical_finite_screen import (
     spectral_energy_per_eV,
 )
 
+_RADII = "screen radii require 0 <= inner_radius_m <= outer_radius_m"
+_BACKWARD = r"PEC backward emission requires beta_z < 0 and \|beta_xyz\| < 1"
+_CHARGE = "charge_c must be one elementary charge"
+
 
 def _source(*, hole=0, outer=4e-6, time=0.0, charge=-1.602176634e-19, n=256):
     screen = PECCircularScreen(outer, hole, beta_z=-0.95, arrival_time_s=time, charge_c=charge)
@@ -108,20 +112,23 @@ def test_mesh_refinement_and_aperture_radius_limits():
 
 
 @pytest.mark.parametrize(
-    "screen",
+    "screen,message",
     [
-        dict(outer_radius_m=-1),
-        dict(outer_radius_m=2e-6, inner_radius_m=3e-6),
-        dict(outer_radius_m=1e-6, beta_z=0),
-        dict(outer_radius_m=1e-6, beta_z=1),
-        dict(outer_radius_m=1e-6, charge_c=0),
-        dict(outer_radius_m=1e-6, charge_c=-2 * 1.602176634e-19),
-        dict(outer_radius_m=1e-6, beta_z=0.8),
-        dict(outer_radius_m=2e-6, inner_radius_m=1e-6, electron_x_m=1.2e-6),
+        (dict(outer_radius_m=-1), _RADII),
+        (dict(outer_radius_m=2e-6, inner_radius_m=3e-6), _RADII),
+        (dict(outer_radius_m=1e-6, beta_z=0), _BACKWARD),
+        (dict(outer_radius_m=1e-6, beta_z=1), _BACKWARD),
+        (dict(outer_radius_m=1e-6, charge_c=0), _CHARGE),
+        (dict(outer_radius_m=1e-6, charge_c=-2 * 1.602176634e-19), _CHARGE),
+        (dict(outer_radius_m=1e-6, beta_z=0.8), _BACKWARD),
+        (
+            dict(outer_radius_m=2e-6, inner_radius_m=1e-6, electron_x_m=1.2e-6),
+            "electron must pass strictly inside the hole",
+        ),
     ],
 )
-def test_refuse_invalid_screen(screen):
-    with pytest.raises(ValueError):
+def test_refuse_invalid_screen(screen, message):
+    with pytest.raises(ValueError, match=message):
         PECCircularScreen(**screen)
 
 

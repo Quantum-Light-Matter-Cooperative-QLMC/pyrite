@@ -66,7 +66,7 @@ def test_series_branch_at_exact_resonance():
     """Rows centred on a grid node with q = 0 take the |w|^2 series branch."""
     rng = np.random.default_rng(3)
     lines, d, g_phase, L_esc, coefs, bounds, grids = _case(rng, n_rows=40, n_flights=5, n_E=31)
-    E_vac, a_vac, half_dL, apb, bma, q = lines
+    E_vac, a_vac, half_dL, _apb, bma, q = lines
     E_vac[:10] = grids[0][7]
     half_dL[:10] = 0.0
     q[:10] = 0.0

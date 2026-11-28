@@ -3,10 +3,10 @@
 import plotly.graph_objects as go
 from plotly.colors import qualitative
 
-_COLORS = qualitative.Plotly
-
 from .._labels import FIELD_SYMBOLS, field_label, field_value_text
 from .._temporal_frames import temporal_frame
+
+_COLORS = qualitative.Plotly
 
 
 def temporal_chart(

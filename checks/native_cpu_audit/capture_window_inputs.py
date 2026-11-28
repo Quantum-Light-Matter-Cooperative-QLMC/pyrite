@@ -10,6 +10,8 @@ from pathlib import Path
 
 import numpy as np
 
+from pyrite.montecarlo.spectrum.cxr import _node_window as nw
+
 case, outdir = sys.argv[1], Path(sys.argv[2])
 outdir.mkdir(parents=True, exist_ok=True)
 spec = importlib.util.spec_from_file_location(
@@ -17,7 +19,6 @@ spec = importlib.util.spec_from_file_location(
 )
 audit = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(audit)
-from pyrite.montecarlo.spectrum.cxr import _node_window as nw
 
 orig = nw._sincsq_window_reduce
 calls = []
@@ -59,5 +60,5 @@ def rec(E_r, a_width, weights, E_grid, node, lo, hi, mode, mu, step, bounds, out
 nw._sincsq_window_reduce = rec
 run, meta = audit.photon_case_workload() if case == "photon-case" else audit.case_workload(case)
 run()
-json.dump(calls, open(outdir / "calls.json", "w"), indent=1)
+(outdir / "calls.json").write_text(json.dumps(calls, indent=1))
 print(json.dumps(calls))

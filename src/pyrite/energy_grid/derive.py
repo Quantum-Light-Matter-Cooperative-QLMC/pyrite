@@ -336,9 +336,9 @@ def _geometry_plan(materials, reference_scan, tilts=None, azimuths=None, thickne
     geometry actually simulated. The second return value (a legacy large-tilt spot-check set)
     is empty: the full product already spans the largest tilt.
     """
-    raw_tilts = tilts if tilts else reference_scan.tilt_deg
-    raw_azims = azimuths if azimuths else reference_scan.tilt_azim_deg
-    thicks = thicknesses if thicknesses else [DIAGNOSTIC_THICKNESS_ANG]
+    raw_tilts = tilts or reference_scan.tilt_deg
+    raw_azims = azimuths or reference_scan.tilt_azim_deg
+    thicks = thicknesses or [DIAGNOSTIC_THICKNESS_ANG]
     tilt_vals = [float(value) for value in _unique_angles(raw_tilts)]
     azim_vals = [float(value) for value in _unique_angles(raw_azims)]
     coarse = [

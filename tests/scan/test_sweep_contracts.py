@@ -430,7 +430,7 @@ def test_fresh_missing_directional_fails_then_resumes(tmp_path, retain_results):
     observation = FakeObservation()
     results = {}
     events = []
-    with pytest.raises(ValueError, match="'second'.*'directional'"):
+    with pytest.raises(ValueError, match=r"'second'.*'directional'"):
         run_sweep(
             cases,
             results,

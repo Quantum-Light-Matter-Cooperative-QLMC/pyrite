@@ -12,6 +12,7 @@ stores and unsupported filesystems require a separate publication backend.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -156,11 +157,10 @@ class CaseArtifactStore:
                 )
                 with tmp.open("rb") as stream:
                     os.fsync(stream.fileno())
-                try:
-                    # Atomic create-if-absent, unlike os.replace (last writer wins).
+                # Atomic create-if-absent, unlike os.replace (last writer wins).
+                # FileExistsError: another worker won; validate its file before committing.
+                with contextlib.suppress(FileExistsError):
                     os.link(tmp, target)
-                except FileExistsError:
-                    pass  # Another worker won. Validate its file before committing.
             finally:
                 tmp.unlink(missing_ok=True)
 
@@ -198,10 +198,9 @@ class CaseArtifactStore:
                 )
                 stream.flush()
                 os.fsync(stream.fileno())
-            try:
+            # First committed receipt wins, regardless of retry order.
+            with contextlib.suppress(FileExistsError):
                 os.link(tmp, receipt_path)
-            except FileExistsError:
-                pass  # First committed receipt wins, regardless of retry order.
         finally:
             tmp.unlink(missing_ok=True)
         ref = self.reference(name, key)

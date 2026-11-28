@@ -141,5 +141,5 @@ def test_energy_bins_energies_readback_and_replacement() -> None:
     ],
 )
 def test_energy_bins_replacement_refuses_invalid_grids(value, error) -> None:
-    with pytest.raises(error, match="EnergyBins.brem_energies"):
+    with pytest.raises(error, match=r"EnergyBins\.brem_energies"):
         EnergyBins().with_brem_energies(value)

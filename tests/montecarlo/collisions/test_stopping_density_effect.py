@@ -80,7 +80,7 @@ def test_omitting_delta_costs_under_two_percent_of_stopping_power():
     the omission is ~40x smaller at that operating point. It is retained, and
     stated, rather than corrected.
     """
-    worst = {E: (0.0, "") for E in SWEPT_keV}
+    worst = dict.fromkeys(SWEPT_keV, (0.0, ""))
     for element, params in TRANSPORT_ELEMENTS.items():
         for E in SWEPT_keV:
             fraction = float(sternheimer_delta(element, E)) / _bracket(params["J_keV"], E)

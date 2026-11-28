@@ -168,7 +168,7 @@ def test_coupled_route_cannot_score_uncoupled_continuum(monkeypatch):
 def test_producer_must_return_declared_slot_on_native_grid(slot, shape):
     descriptor = ModelDescriptor("emission.cxr", "test", "test", output_slots=("spec",))
     adapter = ea.EmissionAdapter(descriptor, lambda batch: ea.EmissionOutput(slot, np.zeros(shape)))
-    with pytest.raises(ValueError, match="component|native grid"):
+    with pytest.raises(ValueError, match=r"component|native grid"):
         adapter.evaluate(_batch(), "spec")
 
 

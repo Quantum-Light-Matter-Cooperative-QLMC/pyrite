@@ -117,7 +117,7 @@ def test_exhaustion_and_host_admission(execution, monkeypatch, serial, admission
     monkeypatch.setattr(runner, "_spectrum_case", spectrum)
     monkeypatch.setattr(runner, "_admit_cpu_fallback", refuse_host)
     case = {"spec_chunk": 8, "brem_chunk": 8}
-    with pytest.raises(BackendResourceError, match="cannot admit CPU fallback") as caught:
+    with pytest.raises(BackendResourceError, match="cannot admit CPU fallback") as caught:  # noqa: PT012 - one call, chosen by the parametrized branch
         if serial:
             runner.run_cases([case], progress=False)
         else:

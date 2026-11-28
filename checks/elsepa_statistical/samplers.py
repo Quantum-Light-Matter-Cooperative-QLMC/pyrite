@@ -14,7 +14,8 @@ from numba import njit
 from pyrite.montecarlo.transport.scattering import _elsepa_bracket, _elsepa_invert_row
 
 if TYPE_CHECKING:
-    from pyrite.montecarlo.transport._jit_device import _elsepa_invert_tail
+    # Name only: sample_device is rebound into the production device namespace.
+    from pyrite.montecarlo.transport._jit_device import _elsepa_invert_tail  # noqa: TC004
 
 ELSEPA_TAIL_INVERSION = np.int32(0)
 I32_ONE = np.int32(1)

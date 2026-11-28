@@ -8,7 +8,7 @@ DOCS = Path(__file__).resolve().parents[2] / "docs"
 
 def _toc_targets(page: Path) -> set[Path]:
     targets: set[Path] = set()
-    for block in re.findall(r"```\{toctree\}\n(.*?)```", page.read_text(), re.S):
+    for block in re.findall(r"```\{toctree\}\n(.*?)```", page.read_text(), re.DOTALL):
         for line in block.splitlines():
             entry = line.strip()
             if not entry or entry.startswith(":"):

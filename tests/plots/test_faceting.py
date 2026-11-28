@@ -6,7 +6,7 @@ import numpy as np
 
 matplotlib.use("Agg")
 
-from pyrite.results import Settings, results_dataframe  # noqa: E402
+from pyrite.results import Settings, results_dataframe
 
 
 def _rec(crystal, thick, tilt, E0):

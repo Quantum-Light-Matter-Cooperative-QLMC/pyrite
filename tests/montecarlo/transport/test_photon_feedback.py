@@ -224,10 +224,15 @@ def test_primary_relaxation_source_budget_closes_without_primary_debit(silicon_s
 
 
 @pytest.mark.parametrize(
-    "kind,energy", [(-1, 0), (ANNIHILATION_AT_REST, 1), (ANNIHILATION_IN_FLIGHT, -1)]
+    "kind,energy,message",
+    [
+        (-1, 0, "unknown annihilation kind"),
+        (ANNIHILATION_AT_REST, 1, "at-rest annihilation requires zero kinetic energy"),
+        (ANNIHILATION_IN_FLIGHT, -1, "annihilation kinetic energies must be finite"),
+    ],
 )
-def test_invalid_annihilation_sources_rejected(kind, energy):
-    with pytest.raises(ValueError):
+def test_invalid_annihilation_sources_rejected(kind, energy, message):
+    with pytest.raises(ValueError, match=message):
         annihilation_emissions([kind], [energy], [[0, 0, 1]], [[0, 0, 0]], [1])
 
 

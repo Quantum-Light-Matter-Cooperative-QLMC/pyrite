@@ -56,7 +56,7 @@ def test_native_union_limit_accepts_boundary_and_rejects_overflow():
     request = Acquisition.native(exposure_s=1)
     acquisition, _ = resolve_acquisition(request, detector, [np.arange(65_536) + 0.5])
     assert len(acquisition.measured_edges_eV) == 65_537
-    with pytest.raises(ValueError, match="65,536.*explicit measured_edges_eV"):
+    with pytest.raises(ValueError, match=r"65,536.*explicit measured_edges_eV"):
         resolve_acquisition(request, detector, [np.arange(65_537) + 0.5])
 
 

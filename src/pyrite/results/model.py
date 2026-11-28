@@ -665,7 +665,7 @@ class Result:
         components: tuple[str, ...] | None = None,
     ) -> AcquisitionBatch:
         """Score selected pixels using this result's frozen acquisition identity."""
-        acquisition, beam, digest, scene = self._acquisition_context()
+        acquisition, beam, digest, _scene = self._acquisition_context()
         assert self.spatial is not None
         selected = (
             (("coherent", "brem") if self._emission_policy() == "coherent" else ("cxr", "brem"))
@@ -690,7 +690,7 @@ class Result:
         pixel_chunk: int = 1024,
     ) -> np.ndarray:
         """Return the configured total or reporting-window detector count image."""
-        acquisition, beam, digest, scene = self._acquisition_context()
+        acquisition, beam, digest, _scene = self._acquisition_context()
         assert self.spatial is not None
         selected = (
             (("coherent", "brem") if self._emission_policy() == "coherent" else ("cxr", "brem"))

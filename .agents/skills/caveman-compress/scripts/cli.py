@@ -6,6 +6,7 @@ Usage:
     caveman <filepath>
 """
 
+import contextlib
 import sys
 
 # Force UTF-8 on stdout/stderr before any code can print. Windows consoles
@@ -14,15 +15,13 @@ import sys
 for _stream in (sys.stdout, sys.stderr):
     reconfigure = getattr(_stream, "reconfigure", None)
     if callable(reconfigure):
-        try:
+        with contextlib.suppress(Exception):
             reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
 
-from pathlib import Path
+from pathlib import Path  # noqa: E402
 
-from .compress import backup_dir_for, compress_file
-from .detect import detect_file_type, should_compress
+from .compress import backup_dir_for, compress_file  # noqa: E402
+from .detect import detect_file_type, should_compress  # noqa: E402
 
 
 def print_usage():

@@ -200,7 +200,7 @@ def run(route, material, e0_kev, tilt_deg, max_histories, out_prefix):
             if isinstance(v, np.ndarray) and v.dtype.kind in "fiucb"
         }
         np.savez_compressed(f"{out_prefix}.npz", **arrays)
-        sampling_dump = {k: v for k, v in sampling.items() if k not in ("statistics",)}
+        sampling_dump = {k: v for k, v in sampling.items() if k != "statistics"}
         record["adaptive_sampling"] = sampling_dump
     Path(f"{out_prefix}.json").write_text(json.dumps(record, default=_json_default))
     print(

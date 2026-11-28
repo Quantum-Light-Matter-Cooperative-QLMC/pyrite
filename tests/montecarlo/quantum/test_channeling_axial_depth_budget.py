@@ -73,7 +73,7 @@ def test_source_normalization_uses_lower_reference_yield_and_additive_errors():
 def test_depth_intervals_are_uniform_and_are_not_interpolated_or_extrapolated():
     ev = evidence(interval(200.0, 500.0), interval(700.0, 900.0))
     for depth in (200.0, 501.0, 600.0, 700.0, 901.0, 1000.0, 0.0):
-        with pytest.raises(ValueError, match="outside certified|positive"):
+        with pytest.raises(ValueError, match=r"outside certified|positive"):
             require(ev, depth)
     assert require(ev, 500.0) is ev.intervals[0]
     assert require(ev, 900.0) is ev.intervals[1]

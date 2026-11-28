@@ -1,4 +1,9 @@
+import os
+import subprocess
+import sys
+import textwrap
 import types
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -549,12 +554,6 @@ def test_cpu_spectrum_backend_updates_active_itemsize() -> None:
         assert runner._spectrum_mod.REAL is np.float64
         assert runner._real_itemsize() == 8
 
-
-import os
-import subprocess
-import sys
-import textwrap
-from types import SimpleNamespace
 
 pytestmark = [
     pytest.mark.hardware,

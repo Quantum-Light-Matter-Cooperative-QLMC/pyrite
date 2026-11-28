@@ -26,14 +26,14 @@ import os
 
 os.environ["PYRITE_MC_BACKEND"] = "cpu"
 
-import sys  # noqa: E402
+import sys
 
-import numpy as np  # noqa: E402
+import numpy as np
 
-from pyrite.campaign.geometry import DEFAULT_FOOTPRINT  # noqa: E402
-from pyrite.campaign.sweep import BeamSpec, Stack, Sweep, build_cases  # noqa: E402
-from pyrite.detectors import EnergyBins  # noqa: E402
-from pyrite.montecarlo import (  # noqa: E402
+from pyrite.campaign.geometry import DEFAULT_FOOTPRINT
+from pyrite.campaign.sweep import BeamSpec, Stack, Sweep, build_cases
+from pyrite.detectors import EnergyBins
+from pyrite.montecarlo import (
     _segments_in_layer,
     _spectrum_case,
     _transport_case,

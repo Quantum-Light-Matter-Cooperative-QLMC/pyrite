@@ -494,7 +494,7 @@ def test_local_sdbase_maps_every_file_to_its_box_arcname(monkeypatch, tmp_path):
     from pyrite.xsgen import sources, verify
 
     root = tmp_path / "sdbase"
-    expected = {arc: path for arc, path in _sdbase(tmp_path).items()}
+    expected = dict(_sdbase(tmp_path).items())
     monkeypatch.setattr(sources, "installed_data_dir", lambda code, name: root)
     monkeypatch.setattr(
         verify, "verify_pinned", lambda codes: [verify.TableCheck("sbethe", "x", "k", verify.OK)]

@@ -16,6 +16,7 @@ try:
 except cupy.cuda.runtime.CUDARuntimeError:
     pytest.skip("CUDA runtime unavailable", allow_module_level=True)
 
+# Device imports follow the module-level CUDA skip above.
 from cupyx import jit  # noqa: E402
 
 from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table  # noqa: E402

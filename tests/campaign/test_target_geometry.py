@@ -56,9 +56,9 @@ def test_footprint_makes_the_pairing_rule_unrepresentable():
 
 @pytest.mark.parametrize("bad", [0.0, -1.0, float("inf"), float("nan")])
 def test_footprint_rejects_nonpositive_and_nonfinite(bad):
-    with pytest.raises(ValueError, match="Footprint.width_mm must be finite and positive"):
+    with pytest.raises(ValueError, match=r"Footprint\.width_mm must be finite and positive"):
         Footprint(bad, 5.0)
-    with pytest.raises(ValueError, match="Footprint.height_mm must be finite and positive"):
+    with pytest.raises(ValueError, match=r"Footprint\.height_mm must be finite and positive"):
         Footprint(5.0, bad)
 
 
@@ -78,9 +78,9 @@ def test_blazed_grooves_are_not_sweepable():
 
 
 def test_slab_rejects_empty_material_and_bad_thickness():
-    with pytest.raises(ValueError, match="Slab.material must be a non-empty material key"):
+    with pytest.raises(ValueError, match=r"Slab\.material must be a non-empty material key"):
         Slab("  ", footprint=Footprint(5.0, 5.0))
-    with pytest.raises(ValueError, match="Slab.thickness_ang must be finite and positive"):
+    with pytest.raises(ValueError, match=r"Slab\.thickness_ang must be finite and positive"):
         Slab(MATERIAL, thickness_ang=0.0, footprint=Footprint(5.0, 5.0))
 
 
@@ -165,7 +165,7 @@ def test_ungrooved_target_accepts_any_observation_angle():
 
 
 def test_layer_validates_material_and_thickness():
-    with pytest.raises(ValueError, match="Layer.material must be a non-empty material key"):
+    with pytest.raises(ValueError, match=r"Layer\.material must be a non-empty material key"):
         Layer("", 5e6)
     with pytest.raises(ValueError, match=r"Layer.thickness_ang \('sio2'\)"):
         Layer("sio2", -1.0)
@@ -373,9 +373,9 @@ def test_the_canonical_target_spelling_does_not_warn():
 def test_reading_a_retired_flat_name_raises():
     sweep = _sweep(tilt_deg=45.0)
     assert sweep.target.tilt_deg == 45.0
-    with pytest.raises(AttributeError, match="sweep.target"):
+    with pytest.raises(AttributeError, match=r"sweep\.target"):
         float(sweep.tilt_deg)
-    with pytest.raises(AttributeError, match="sweep.target"):
+    with pytest.raises(AttributeError, match=r"sweep\.target"):
         assert sweep.tilt_deg == 45.0
 
 

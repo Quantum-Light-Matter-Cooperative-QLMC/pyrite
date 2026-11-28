@@ -34,9 +34,16 @@ def test_discordant_population_cannot_pass(diagnostic):
     assert r["difference_ci"] == [-1.0, 1.0]
 
 
-@pytest.mark.parametrize("candidate", [np.full(10, np.nan), np.full(10, 2), np.zeros(9)])
-def test_bad_binary_scores_refused(diagnostic, candidate):
-    with pytest.raises(ValueError):
+@pytest.mark.parametrize(
+    "candidate,message",
+    [
+        (np.full(10, np.nan), "binary scores required"),
+        (np.full(10, 2), "binary scores required"),
+        (np.zeros(9), "matching nonempty primary vectors required"),
+    ],
+)
+def test_bad_binary_scores_refused(diagnostic, candidate, message):
+    with pytest.raises(ValueError, match=message):
         diagnostic["fraction_bound"](
             np.zeros(10), candidate, alpha=0.01, comparisons=32, margin=0.002
         )

@@ -190,7 +190,7 @@ def test_tilted_finite_footprint_reducer_applies_the_analytic_transverse_factor(
         "n_hat": np.array([1.0, 0.0, 0.1]) / np.linalg.norm([1.0, 0.0, 0.1]),
     }
     segments, record = _tilted_identical_tracks(6, 2.0)
-    single = {key: value for key, value in segments.items()}
+    single = dict(segments.items())
     single.update(
         {
             key: segments[key][:1]

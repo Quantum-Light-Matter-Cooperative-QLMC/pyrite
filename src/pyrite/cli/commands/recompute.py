@@ -104,7 +104,7 @@ def _brem_cli_json(args):
         if resumable
         else (str(caught) or type(caught).__name__ if caught is not None else "operation failed")
     )
-    errors = {material: message for material in failed}
+    errors = dict.fromkeys(failed, message)
     result = cli_json.operation_summary(
         "rebrem",
         requested,
@@ -409,7 +409,7 @@ def _cxr_cli_json(args):
         if resumable
         else (str(caught) or type(caught).__name__ if caught is not None else "operation failed")
     )
-    errors = {material: message for material in failed}
+    errors = dict.fromkeys(failed, message)
     result = cli_json.operation_summary(
         "reline",
         requested,

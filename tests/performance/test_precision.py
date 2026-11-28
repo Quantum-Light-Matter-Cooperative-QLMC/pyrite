@@ -27,7 +27,7 @@ def test_zero_variance_does_not_establish_precision(values):
     "ids,scores", [([-1], [1]), ([4], [1]), ([0.5], [1]), ([0], [float("nan")]), ([0], [])]
 )
 def test_invalid_primary_scores_refused(ids, scores):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"invalid primary ids, scores or incident population"):
         grouped_scores(np.array(ids), scores, 4)
 
 
@@ -165,11 +165,10 @@ def test_deadline_stops_launcher_and_child(tmp_path):
     launcher = "import subprocess,sys,time; subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2]]); time.sleep(30)"
     script = Path(__file__).resolve().parents[2] / "checks/equal_precision/run_pilot.py"
     run_command = runpy.run_path(str(script))["run_command"]
-    with (tmp_path / "sample.log").open("w") as log:
-        with pytest.raises(subprocess.TimeoutExpired):
-            run_command(
-                [sys.executable, "-c", launcher, child, str(marker)], os.environ.copy(), log, 0.15
-            )
+    with (tmp_path / "sample.log").open("w") as log, pytest.raises(subprocess.TimeoutExpired):
+        run_command(
+            [sys.executable, "-c", launcher, child, str(marker)], os.environ.copy(), log, 0.15
+        )
     time.sleep(0.65)
     assert not marker.exists()
 
@@ -189,13 +188,12 @@ def test_deadline_stops_pixi_launched_python(tmp_path):
     child = "import sys,time; from pathlib import Path; time.sleep(0.5); Path(sys.argv[1]).write_text('late')"
     script = Path(__file__).resolve().parents[2] / "checks/equal_precision/run_pilot.py"
     run_command = runpy.run_path(str(script))["run_command"]
-    with (tmp_path / "pixi.log").open("w") as log:
-        with pytest.raises(subprocess.TimeoutExpired):
-            run_command(
-                [pixi, "run", "--as-is", "python", "-c", child, str(marker)],
-                os.environ.copy(),
-                log,
-                0.3,
-            )
+    with (tmp_path / "pixi.log").open("w") as log, pytest.raises(subprocess.TimeoutExpired):
+        run_command(
+            [pixi, "run", "--as-is", "python", "-c", child, str(marker)],
+            os.environ.copy(),
+            log,
+            0.3,
+        )
     time.sleep(0.65)
     assert not marker.exists()

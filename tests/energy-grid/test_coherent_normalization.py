@@ -16,6 +16,8 @@ from pyrite.montecarlo.spectrum.coherent_normalization import (
     _triangle_power_integral,
 )
 
+_POWER_INPUTS = "power bounds require finite nonnegative certified"
+
 
 def _row():
     duration = np.array([100.0, 120.0])
@@ -217,8 +219,16 @@ def test_sampled_power_bounds_refuse_invalid_sample_partitions(energies):
         )
 
 
-@pytest.mark.parametrize("invalid", ["norms", "errors", "derivative", "factors"])
-def test_sampled_power_bounds_refuse_nonfinite_certificate_inputs(invalid):
+@pytest.mark.parametrize(
+    "invalid,message",
+    [
+        ("norms", _POWER_INPUTS),
+        ("errors", _POWER_INPUTS),
+        ("derivative", _POWER_INPUTS),
+        ("factors", "form-factor bounds must enclose F"),
+    ],
+)
+def test_sampled_power_bounds_refuse_nonfinite_certificate_inputs(invalid, message):
     norms = np.ones((1, 2))
     errors = np.zeros((1, 2))
     derivative = np.ones(2)
@@ -226,7 +236,7 @@ def test_sampled_power_bounds_refuse_nonfinite_certificate_inputs(invalid):
     {"norms": norms, "errors": errors, "derivative": derivative, "factors": factors}[invalid].flat[
         0
     ] = np.nan
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=message):
         _sampled_power_bounds(
             np.array([0.5]),
             norms,

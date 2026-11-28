@@ -269,7 +269,7 @@ def bloch_basis(profile, gamma, n_cells, max_order):
 
 def project(waves, n_cells, orders, vectors):
     """Band populations ``sum_r <|V_r^dagger c_r(y)|^2>_y`` of exit waves ``(n_z, n_x, n_y)``."""
-    n_z, n_x, n_y = waves.shape
+    n_z, n_x, _n_y = waves.shape
     spectrum = np.fft.fft(waves, axis=1) / n_x  # plane-wave amplitudes per y column
     out = np.zeros((n_z, orders.size))
     for r in range(n_cells):

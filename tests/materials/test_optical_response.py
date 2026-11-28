@@ -107,7 +107,7 @@ def test_disjoint_support_never_interpolates_through_a_gap():
         )
     )
     np.testing.assert_array_equal(response.epsilon([2.0, 3.0]), [2 + 1j, 3 + 2j])
-    with pytest.raises(ValueError, match="sample.*gap"):
+    with pytest.raises(ValueError, match=r"sample.*gap"):
         response.epsilon([1.5, 2.5, 3.5])
 
 
@@ -148,7 +148,7 @@ def test_response_refuses_unsupported_input(overrides, message):
 def test_response_identity_and_immutable_data():
     response = _response()
     for nodes in response.segments[0]:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"cannot set WRITEABLE flag to True of this array"):
             nodes.setflags(write=True)
     assert replace(response, temperature_K=301).digest != response.digest
     assert replace(response, sample_state="different film").digest != response.digest

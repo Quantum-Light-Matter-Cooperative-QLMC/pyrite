@@ -229,7 +229,7 @@ def test_reflection_chunks_partition_every_radiator_without_touching_the_rest():
     single = {"crystal": "silicon", "hkl_list": hkl, "Ne": 8}
     parts = gate["reflection_chunks"](single, 4)
     assert [len(p["hkl_list"]) for p in parts] == [4, 4, 2]
-    assert sum((p["hkl_list"] for p in parts), []) == hkl
+    assert [h for p in parts for h in p["hkl_list"]] == hkl
     assert all(
         {k: v for k, v in p.items() if k != "hkl_list"} == {"crystal": "silicon", "Ne": 8}
         for p in parts
@@ -240,9 +240,9 @@ def test_reflection_chunks_partition_every_radiator_without_touching_the_rest():
     layered = {"crystal": "mos2", "hkl_list": hkl[:3], "layer_radiators": [film, sub, None]}
     parts = gate["reflection_chunks"](layered, 4)
     films = [p["layer_radiators"][0] for p in parts]
-    assert sum((f["hkl_list"] for f in films if f is not None), []) == film["hkl_list"]
+    assert [h for f in films if f is not None for h in f["hkl_list"]] == film["hkl_list"]
     assert films[1:] == [None, None]
-    assert sum((p["layer_radiators"][1]["hkl_list"] for p in parts), []) == hkl
+    assert [h for p in parts for h in p["layer_radiators"][1]["hkl_list"]] == hkl
     assert all(p["layer_radiators"][2] is None for p in parts)
 
 
@@ -565,8 +565,12 @@ def test_mosaic_arms_parse_perfect_and_history_draws():
     gate = _gate()
     arms = gate["parse_mosaic_arms"]("perfect,4@11,256@12")
     assert arms == [("perfect", None, None), ("k4-m11", 4, 11), ("k256-m12", 256, 12)]
-    for bad in ("4", "0@1", "perfect,perfect"):
-        with pytest.raises(ValueError):
+    for bad, message in (
+        ("4", "mosaic arm '4' is not 'perfect' or K@SHIFT"),
+        ("0@1", "mosaic arm '0@1' is not 'perfect' or K@SHIFT"),
+        ("perfect,perfect", "mosaic arms must be distinct"),
+    ):
+        with pytest.raises(ValueError, match=message):
             gate["parse_mosaic_arms"](bad)
 
 

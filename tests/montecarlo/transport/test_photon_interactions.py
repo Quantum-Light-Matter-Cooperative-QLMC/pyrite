@@ -212,17 +212,25 @@ def test_zero_angle_compton_has_no_bound_final_state(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "sampler,accessor",
+    "sampler,accessor,no_support",
     [
-        (sample_rayleigh, "coherent_form_factor_table"),
-        (sample_compton, "incoherent_scattering_function_table"),
+        (
+            sample_rayleigh,
+            "coherent_form_factor_table",
+            "interaction weights must have a positive finite total",
+        ),
+        (
+            sample_compton,
+            "incoherent_scattering_function_table",
+            "incoherent scattering function has no positive support",
+        ),
     ],
 )
-def test_zero_support_and_no_forced_acceptance(monkeypatch, sampler, accessor):
+def test_zero_support_and_no_forced_acceptance(monkeypatch, sampler, accessor, no_support):
     monkeypatch.setattr(
         scattering, accessor, lambda el: (np.array([0.0, 1e9]), np.array([0.0, 0.0]))
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=no_support):
         sampler("C", 1e5, [0, 0, 1], [])
     monkeypatch.setattr(
         scattering, accessor, lambda el: (np.array([0.0, 1e9]), np.array([1.0, 1.0]))

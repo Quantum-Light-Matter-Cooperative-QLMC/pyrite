@@ -102,7 +102,7 @@ def observable_applicability(scene: Mapping[str, Any]) -> dict[str, str]:
     where transmission is expected to be unresolved.
     """
     endpoint = float(scene["energy_keV"])
-    out = {name: "headline" for name in TERMINAL_FRACTIONS}
+    out = dict.fromkeys(TERMINAL_FRACTIONS, "headline")
     out["side_exited"] = "headline" if scene.get("width_mm", 10.0) < 10.0 else "diagnostic"
     stopping = scene.get("t_over_r") is not None and float(scene["t_over_r"]) >= 1.0
     out["transmitted_energy_keV_per_primary"] = "diagnostic" if stopping else "headline"

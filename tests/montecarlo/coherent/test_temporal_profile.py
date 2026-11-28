@@ -143,7 +143,7 @@ def test_bunch_offsets_spread_the_envelope():
     _, _, single_rms = _moments(*_run(_segments([0.0]), coherent=False)[1:])
     expected = np.sqrt(single_rms**2 + np.var(t0 / C_ANG_PER_FS))
     for intensity in (coh, box):
-        mass, _, rms = _moments(t, intensity)
+        _mass, _, rms = _moments(t, intensity)
         assert rms == pytest.approx(expected, rel=0.05)
     # Long bunch: the cross-electron term vanishes, so both policies agree.
     assert _moments(t, coh)[0] == pytest.approx(_moments(t, box)[0], rel=0.05)

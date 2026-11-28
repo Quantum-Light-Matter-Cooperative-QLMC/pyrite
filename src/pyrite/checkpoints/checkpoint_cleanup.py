@@ -6,6 +6,7 @@ datasets together with the CAS blobs they alone kept reachable. Click wiring for
 both lives in :mod:`pyrite.cli.commands.cleanup`.
 """
 
+import contextlib
 import hashlib
 import json
 import os
@@ -376,16 +377,12 @@ def clear_checkpoints(
                 artifact.unlink()
         directory = root / stem
         if directory.is_dir():
-            try:
+            with contextlib.suppress(OSError):
                 directory.rmdir()
-            except OSError:
-                pass
     for blob in blobs:
         blob.unlink()
-        try:
+        with contextlib.suppress(OSError):
             blob.parent.rmdir()
-        except OSError:
-            pass
     _cli_core.emit_result(
         f"deleted {len(selected)} dataset(s) and {len(blobs)} unreachable CAS blob(s)"
     )

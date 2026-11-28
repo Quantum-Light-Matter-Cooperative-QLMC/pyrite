@@ -64,7 +64,7 @@ def test_band_bin_grid_tiles_the_band_exactly():
     assert edges[-1] == pytest.approx(10_000.0)
     np.testing.assert_allclose(widths, 500.0)
     assert band_bin_grid(2000.0, 2600.0, 500.0).size == 4
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"band must satisfy 0 < start < stop"):
         band_bin_grid(3.0, 2.0)
 
 
@@ -95,7 +95,7 @@ def test_shells_partition_the_dominant_reflection_set():
     assert first_eight == sorted(
         dominant_reflections("silicon", n_families=10**9, B_ang2=0.46, g_max_invang=8.0)
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"g_max_invang must lie in"):
         reflection_shells("silicon", 0.46, F0_RANGE_INVANG + 1.0)
 
 
@@ -125,7 +125,7 @@ def test_selection_reports_an_unconverged_cap():
     assert not result.converged
     assert result.cutoff_invang == pytest.approx(6.0)
     assert len(result.hkl_list) == 3
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"tolerance must lie in"):
         select_reflection_cutoff(score, shells, 0.0)
 
 
@@ -156,7 +156,7 @@ def test_lazy_shells_match_the_eager_partition_and_stop_early():
     assert [(u, sorted(m)) for u, m in lazy] == [(u, sorted(m)) for u, m in eager]
     first = next(iter_reflection_shells("silicon", 0.46))
     assert first == eager[0]
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"g_max_invang must lie in"):
         next(iter_reflection_shells("silicon", 0.46, F0_RANGE_INVANG + 1.0))
 
 
@@ -224,7 +224,7 @@ def test_selection_keeps_the_spectrum_of_the_selected_set_on_the_axis():
     assert pruned["hkl_list"] == outcome.hkl_list
     bins = axis_yield_weights(grid, "bin-mean")
     assert bins.sum() == pytest.approx(9500.0 + (grid[1] - grid[0]))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"unknown line quadrature"):
         axis_yield_weights(grid, "simpson")
 
 

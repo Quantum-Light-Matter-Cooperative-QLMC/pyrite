@@ -141,13 +141,13 @@ def test_emission_selection_normalizes_and_preserves_identity(selection, expecte
 
 @pytest.mark.parametrize("selection", [(), [], set(), frozenset(), "unknown", ("both",), [1], [[]]])
 def test_emission_rejects_empty_and_invalid_modes(selection):
-    with pytest.raises(ValueError, match="emission.*one or both"):
+    with pytest.raises(ValueError, match=r"emission.*one or both"):
         pr.Physics(emission=selection)
 
 
 @pytest.mark.parametrize("selection", [None, 1, {"coherent": True}, iter(["coherent"])])
 def test_emission_rejects_unsupported_collections(selection):
-    with pytest.raises(TypeError, match="emission.*mode string"):
+    with pytest.raises(TypeError, match=r"emission.*mode string"):
         pr.Physics(emission=selection)
 
 
@@ -162,7 +162,7 @@ def test_emission_does_not_retain_mutable_input():
 
 
 def test_both_alias_is_rejected_after_removal():
-    with pytest.raises(ValueError, match='emission="both" was removed in 0.15.0'):
+    with pytest.raises(ValueError, match=r'emission="both" was removed in 0\.15\.0'):
         pr.Physics(emission="both")
 
 

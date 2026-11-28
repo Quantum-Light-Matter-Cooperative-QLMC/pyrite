@@ -107,7 +107,7 @@ def simulate_photon_events(
     charged_feedback: bool = False,
     physics: Physics | None = None,
     numerics: Numerics | None = None,
-    channeling: Channeling | None | _Unset = UNSET,
+    channeling: Channeling | _Unset | None = UNSET,
     observation: Observation | None = None,
 ) -> PhotonEventObservation:
     """Transport one Scene once and score one physical photon emission component.

@@ -70,9 +70,9 @@ INVALID = [
 
 @pytest.mark.parametrize("value, error", INVALID)
 def test_semantic_lengths_refuse_invalid_quantities(value, error):
-    with pytest.raises(error, match="ChannelingNumerics.zone_max_length"):
+    with pytest.raises(error, match=r"ChannelingNumerics\.zone_max_length"):
         ChannelingNumerics(zone_max_length=value)
-    with pytest.raises(error, match="ChannelingNumerics.step_length"):
+    with pytest.raises(error, match=r"ChannelingNumerics\.step_length"):
         ChannelingNumerics().with_step_length(value)
 
 

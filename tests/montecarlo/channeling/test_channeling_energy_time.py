@@ -37,7 +37,7 @@ def test_records_are_validated_frozen_and_normalized():
     space = _space(weights=[1, 1, 2, 0, 0])
     np.testing.assert_allclose(space.weights, [0.25, 0.25, 0.5, 0, 0])
     assert not space.uniform_weights
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"assignment destination is read-only"):
         space.arrival_time_fs[0] = 1.0
     for bad in (
         dict(kinetic_energy_eV=np.r_[1.0, 0.0, 1.0, 1.0, 1.0]),
@@ -45,7 +45,8 @@ def test_records_are_validated_frozen_and_normalized():
         dict(weights=np.zeros(5)),
         dict(arrival_time_fs=np.r_[0, 1, np.nan, 2, 3]),
     ):
-        with pytest.raises(ValueError):
+        # Each refusal names the field it rejects.
+        with pytest.raises(ValueError, match=next(iter(bad))):
             _space(**bad)
 
 

@@ -14,6 +14,9 @@ from pyrite.montecarlo.runner.adaptive import run_stopping_rule, without_wall_cl
 from pyrite.montecarlo.runner.independent import IndependentStoppingMonitor
 from tests.montecarlo.runner.test_adaptive_stopping import _RULE_ONLY, _case
 
+_TARGET = "brem_target_rse must be a positive finite number"
+_ORDERED = "need 2 <= brem_min_histories <= brem_max_histories"
+
 
 def _policy(**kw):
     return Precision(
@@ -138,20 +141,21 @@ def test_light_case_brem_converges_first_with_equal_minima():
 
 
 @pytest.mark.parametrize(
-    "kw",
+    "kw,message",
     [
-        {"brem_target_rse": True},
-        {"brem_target_rse": float("nan")},
-        {"brem_target_rse": 0},
-        {"brem_max_histories": 220},
-        {"brem_min_histories": True},
-        {"brem_min_histories": 80, "brem_max_histories": 60},
-        {"brem_max_histories": 1},
-        {"observables": ("brem",)},  # brem keys need the cxr observable (#1398)
+        ({"brem_target_rse": True}, _TARGET),
+        ({"brem_target_rse": float("nan")}, _TARGET),
+        ({"brem_target_rse": 0}, _TARGET),
+        ({"brem_max_histories": 220}, "brem_max_histories must not exceed max_histories"),
+        ({"brem_min_histories": True}, "brem_min_histories must be a positive integer"),
+        ({"brem_min_histories": 80, "brem_max_histories": 60}, _ORDERED),
+        ({"brem_max_histories": 1}, _ORDERED),
+        # brem keys need the cxr observable (#1398)
+        ({"observables": ("brem",)}, "need the cxr observable"),
     ],
 )
-def test_invalid_independent_policies(kw):
-    with pytest.raises(ValueError):
+def test_invalid_independent_policies(kw, message):
+    with pytest.raises(ValueError, match=message):
         _policy(**kw)
 
 
@@ -338,7 +342,7 @@ def test_inheritance_carries_the_cxr_minimum_capped_at_the_brem_maximum():
     )
     assert legacy.to_dict() == explicit.to_dict()
     # A smaller explicit brem maximum caps the inherited minimum.
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(DeprecationWarning, match="brem stopping without brem_target_rse"):
         capped = Precision(**kw, brem_max_histories=2000)
     assert capped.brem_min_histories == 2000
 
@@ -355,12 +359,12 @@ def test_inheritance_warning_names_the_source_and_the_missing_keys():
     """From a catalog the warning's own frame is not the user's: it must say where to look."""
     payload = {"target_rse": 0.1, "min_electrons": 40, "max_electrons": 200}
     payload["observables"] = ["line", "brem"]
-    with pytest.warns(DeprecationWarning) as caught:
+    with pytest.warns(DeprecationWarning, match="brem stopping without brem_target_rse") as caught:
         Precision.from_dict(payload, source="profile 'cleo_sub'")
     message = str(caught[0].message)
     assert "profile 'cleo_sub'" in message
     assert "missing brem_target_rse and brem_max_histories" in message
-    with pytest.warns(DeprecationWarning) as caught:
+    with pytest.warns(DeprecationWarning, match="brem stopping without brem_target_rse") as caught:
         Precision.from_dict(payload)
     assert "profile" not in str(caught[0].message)
 

@@ -56,7 +56,7 @@ def test_default_run_is_incoherent_and_adaptive_with_a_hashed_stem(monkeypatch):
 
 
 def test_coherent_profile_gets_qualified_stem_and_divergent_digest(monkeypatch):
-    _s_def, _sw, id_def, stem_def = _resolved_run(monkeypatch, [])
+    _s_def, _sw, id_def, _stem_def = _resolved_run(monkeypatch, [])
     settings, _sweep, identity, stem = _resolved_run(monkeypatch, [], emission="coherent")
 
     assert settings.emission == "coherent"

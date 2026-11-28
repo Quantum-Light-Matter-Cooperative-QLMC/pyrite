@@ -132,15 +132,20 @@ def test_precision_energy_budget_groups_all_segments_and_terminal_residual():
 
 
 @pytest.mark.parametrize(
-    "field,value", [("E_start_keV", 71.0), ("hard_radiative_k_eV", -1.0), ("v_hat", 0.0)]
+    "field,value,message",
+    [
+        ("E_start_keV", 71.0, "primary energy conservation failed"),
+        ("hard_radiative_k_eV", -1.0, "invalid photon energy"),
+        ("v_hat", 0.0, "direction normalization failed"),
+    ],
 )
-def test_precision_budget_refuses_invalid_trajectories(field, value):
+def test_precision_budget_refuses_invalid_trajectories(field, value, message):
     checks = runpy.run_path(str(ROOT / "checks/equal_precision/precision_checks.py"))[
         "trajectory_checks"
     ]
     result = _toy_trajectory()
     result[field][1 if field == "E_start_keV" else 0] = value
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=message):
         checks(result, 2, 100.0, 1000.0)
 
 

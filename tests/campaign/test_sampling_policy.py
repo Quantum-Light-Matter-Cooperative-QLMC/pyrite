@@ -133,7 +133,7 @@ def test_electron_budget_names_raise_naming_histories(cls, argument, replacement
 
 
 def test_public_precision_is_removed_naming_adaptive_sampling():
-    with pytest.raises(ImportError, match="use pyrite.config.AdaptiveSampling"):
+    with pytest.raises(ImportError, match=r"use pyrite\.config\.AdaptiveSampling"):
         from pyrite.config import Precision  # noqa: F401
     assert "Precision" not in dir(pr.config)
 
@@ -242,7 +242,7 @@ def test_legacy_policy_changes_case_identity_while_cxr_only_keeps_it():
     assert not any(key.startswith("brem_") for key in cxr_only)
     assert _adaptive_sampling_markers(cxr_only) == {"adaptive_sampling_model": "decision-points-v4"}
     cxr_key = case_content_key({**fixed, "adaptive_precision": cxr_only})
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(DeprecationWarning, match="brem stopping without brem_target_rse"):
         legacy_key = case_content_key({**fixed, "adaptive_precision": _legacy_payload()})
     assert legacy_key != cxr_key
     explicit = Precision(

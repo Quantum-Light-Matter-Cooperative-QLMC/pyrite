@@ -245,11 +245,13 @@ def run_adaptive_streamed(case, block_electrons, *, transport_core="auto", spill
         sink = MonitoredScoringSink(case, _max_histories(case), block_electrons)
         sized = not isinstance(block_electrons, Integral)
         # Same scoped allocator cap as the fixed streamed route.
-        with block_electrons.pool_limit() if sized else nullcontext():
-            with collect_line_data_coverage() as line_coverage:
-                sink.coverage = line_coverage
-                fixed, sampling, tp = _monitored_pass(case, transport_core, sink, block_electrons)
-                sink.finish()
+        with (
+            block_electrons.pool_limit() if sized else nullcontext(),
+            collect_line_data_coverage() as line_coverage,
+        ):
+            sink.coverage = line_coverage
+            fixed, sampling, tp = _monitored_pass(case, transport_core, sink, block_electrons)
+            sink.finish()
         out = sink.result(fixed, tp["segs"], line_coverage)
         out.update({key: tp[key] for key in RECOVERY_KEYS if key in tp})
         transports = sink.passes

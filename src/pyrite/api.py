@@ -271,7 +271,7 @@ def simulate(
     numerics: Numerics | None = None,
     filters: tuple[FilterPlate | Filter, ...] | None = None,
     acquisition: Acquisition | NativeAcquisition | None = None,
-    channeling: Channeling | None | _Unset = UNSET,
+    channeling: Channeling | _Unset | None = UNSET,
     observation: Observation | None = None,
     executor: "Executor | None" = None,
     progress: "Callable[[SimulationProgress], None] | None" = None,
@@ -499,8 +499,7 @@ def _case_result(
             **(
                 {"spectrum_recovery": {k: output[k] for k in _RECOVERY_KEYS if k in output}}
                 if output.get("_gpu_oom_retries")
-                or "_recovery_path" in output
-                and output["_recovery_path"] != "device_spectrum"
+                or ("_recovery_path" in output and output["_recovery_path"] != "device_spectrum")
                 else {}
             ),
             # Channeling-zone fates and angles (#506); absent when off.
@@ -553,7 +552,7 @@ def observation_plan(
     numerics: Numerics,
     *,
     physics: Physics | None = None,
-    channeling: Channeling | None | _Unset = UNSET,
+    channeling: Channeling | _Unset | None = UNSET,
     observation: Observation | None = None,
 ) -> ObservationPlan:
     """Plan ``scene``'s counting observation without running transport.

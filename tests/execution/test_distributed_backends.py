@@ -65,7 +65,7 @@ def test_inspect_pure_and_distinct_from_scientific_identity(tmp_path):
     assert plan["physics_identity_unchanged"]
     assert json.loads(json.dumps(plan)) == plan
     assert list(tmp_path.iterdir()) == []
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"case_count must be a nonnegative integer"):
         inspect_execution(profile, -1)
 
 
@@ -88,16 +88,16 @@ def test_dask_profile_factory_and_optional_dependency(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "bad",
+    "bad,message",
     [
-        {"cluster": "existing"},
-        {"cluster": "local", "adaptive": True},
-        {"cluster": "slurm", "workers": -1},
-        {"cluster": "slurm", "partition": "gpu\n#SBATCH --foo"},
+        ({"cluster": "existing"}, "requires exactly one of scheduler_address or scheduler_file"),
+        ({"cluster": "local", "adaptive": True}, "does not support adaptive SLURM scaling"),
+        ({"cluster": "slurm", "workers": -1}, "workers must be an integer >= 1"),
+        ({"cluster": "slurm", "partition": "gpu\n#SBATCH --foo"}, "unsafe SLURM partition"),
     ],
 )
-def test_dask_config_validation(bad):
-    with pytest.raises(ValueError):
+def test_dask_config_validation(bad, message):
+    with pytest.raises(ValueError, match=message):
         DaskConfig(**bad)
 
 
@@ -106,7 +106,7 @@ def test_direction_keys_unique_and_independent_of_scalar_key(tmp_path):
     b = np.array([[0.0, 1.0, 0.0]])
     assert directional_content_key(KEY, a) != directional_content_key(KEY, b)
     assert directional_content_key(KEY, a) == directional_content_key(KEY, a.copy())
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"observation directions must have shape"):
         directional_content_key(KEY, [1, 0, 0])
     store = CaseArtifactStore(tmp_path)
     scalar = store.publish("hopg", KEY, {"spec": np.array([2.0])})

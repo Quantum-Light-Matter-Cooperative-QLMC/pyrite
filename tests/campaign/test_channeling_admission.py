@@ -130,7 +130,7 @@ def test_tampered_admission_records_refuse():
 def test_channeling_refuses_opt_in_without_a_model_and_unknown_values():
     with pytest.raises(ValueError, match="requires a channeling model"):
         channeling_from_fields({"channeling_admission": "accept-inaccurate"})
-    with pytest.raises(ValueError, match="Channeling.admission must be one of"):
+    with pytest.raises(ValueError, match=r"Channeling\.admission must be one of"):
         replace(PLANAR, admission="yes")
 
 
@@ -145,7 +145,7 @@ def test_admitted_axial_record_is_unchanged_by_the_opt_in():
 
 def test_unadmitted_axial_refuses_by_default_naming_the_opt_in():
     thin = replace(axial_case(), thickness_ang=2000.0)
-    with pytest.raises(AxialAdmissionError, match="thickness_ang.*accept-inaccurate"):
+    with pytest.raises(AxialAdmissionError, match=r"thickness_ang.*accept-inaccurate"):
         resolve_channeling([thin], axial_channeling())
 
 
@@ -168,7 +168,7 @@ def test_unadmitted_axial_runs_marked_without_budget():
 def test_admitted_axial_case_cannot_run_as_unadmitted():
     thin = replace(axial_case(), thickness_ang=2000.0)
     opted = replace(axial_channeling(), **OPT_IN)
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="outside the measured admission table"):
         (out,) = resolve_channeling([thin], opted)
     with pytest.raises(AxialAdmissionError, match="admitted as si-fibre/A"):
         replace(out, thickness_ang=3000.0)

@@ -319,7 +319,7 @@ def test_status_stream_explains_disconnect_after_retries(monkeypatch, capsys):
 
     monkeypatch.setattr(viewer.subprocess, "Popen", lambda *_args, **_kwargs: FakeProcess())
 
-    with pytest.raises(SystemExit, match="after 2 reconnect attempts.*job is unaffected"):
+    with pytest.raises(SystemExit, match=r"after 2 reconnect attempts.*job is unaffected"):
         next(viewer._status_stream("printf snapshot"))
 
     assert capsys.readouterr().err.count("reconnecting") == 2

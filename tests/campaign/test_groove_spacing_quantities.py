@@ -70,9 +70,9 @@ def test_external_registry_and_detached_scalar_readback() -> None:
     ],
 )
 def test_invalid_periods(value: object, error: type[Exception]) -> None:
-    with pytest.raises(error, match="BlazedGrooves.spacing"):
+    with pytest.raises(error, match=r"BlazedGrooves\.spacing"):
         BlazedGrooves(spacing=value)
-    with pytest.raises(error, match="BlazedGrooves.spacing"):
+    with pytest.raises(error, match=r"BlazedGrooves\.spacing"):
         BlazedGrooves(1).with_spacing(value)
 
 

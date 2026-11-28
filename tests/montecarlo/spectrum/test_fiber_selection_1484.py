@@ -1,5 +1,7 @@
 """Measured reflection selection over the full fiber domain (#1484)."""
 
+from typing import ClassVar
+
 import numpy as np
 import pytest
 
@@ -49,7 +51,7 @@ def test_shells_partition_the_prepared_domain(cutoff):
 
 
 class _Continuum:
-    calls: list = []
+    calls: ClassVar[list] = []
 
     def __init__(self, model, case, segments, n_hat, band_eV, *, groove, Ne, floor_keV, max_keV):
         assert band_eV == (200.0, 800.0)

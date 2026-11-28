@@ -494,9 +494,8 @@ class StoppingMonitor:
         # (checked first: rounding may put the ratio an ulp above 1).
         # The near-constant policy exception uses EMPIRICAL CV <= target,
         # not a bound on population variability or any unseen tail.
-        variance_passes = (
-            name != "cxr"
-            or vov is not None
+        variance_passes = name != "cxr" or (
+            vov is not None
             and (
                 (cv is not None and cv <= s.target_rse)
                 or s.max_variance_of_variance >= 1.0

@@ -76,8 +76,13 @@ def test_side_by_side_labels_only_on_outer_axes():
 def test_tilt_lists_and_ranges():
     assert parse_tilts("30, 45") == (30.0, 45.0)
     assert parse_tilts("0:20:5, 45") == (0.0, 5.0, 10.0, 15.0, 20.0, 45.0)
-    for bad in ("a", "0:10", "10:0:5", "0:10:0"):
-        with pytest.raises(ValueError):
+    for bad, message in (
+        ("a", "cannot read tilt 'a'"),
+        ("0:10", "tilt range '0:10' must be start:stop:step"),
+        ("10:0:5", "tilt range '10:0:5' must be start:stop:step"),
+        ("0:10:0", "tilt range '0:10:0' must be start:stop:step"),
+    ):
+        with pytest.raises(ValueError, match=message):
             parse_tilts(bad)
 
 
@@ -104,24 +109,24 @@ def test_display_cells_do_not_feed_calculation():
 
 
 @pytest.mark.parametrize(
-    "updates",
+    "updates,message",
     [
-        {"electrons": 0},
-        {"thickness_ang": 0},
-        {"width_mm": None},
-        {"width_mm": 0.0},
-        {"energy_points": 1},
-        {"start_eV": 1},
-        {"stop_eV": 40_000.0},
-        {"tilts_deg": ()},
-        {"tilts_deg": (30.0, 30.0)},
-        {"energy_points": 1_000_000, "angle_points": 3600},
-        {"components": ()},
-        {"components": ("coherent",)},
+        ({"electrons": 0}, "electrons, reflections and batch must be positive"),
+        ({"thickness_ang": 0}, "target thickness must be positive"),
+        ({"width_mm": None}, "footprint needs positive width and height"),
+        ({"width_mm": 0.0}, "footprint needs positive width and height"),
+        ({"energy_points": 1}, "use at least 2 energy points"),
+        ({"start_eV": 1}, "photon bounds must satisfy"),
+        ({"stop_eV": 40_000.0}, "photon bounds must satisfy"),
+        ({"tilts_deg": ()}, "supply at least one finite target tilt"),
+        ({"tilts_deg": (30.0, 30.0)}, "target tilts must be distinct"),
+        ({"energy_points": 1_000_000, "angle_points": 3600}, "result arrays need"),
+        ({"components": ()}, "select components from"),
+        ({"components": ("coherent",)}, "select components from"),
     ],
 )
-def test_physical_and_memory_validation(updates):
-    with pytest.raises(ValueError):
+def test_physical_and_memory_validation(updates, message):
+    with pytest.raises(ValueError, match=message):
         replace(MapConfig(), **updates)
 
 

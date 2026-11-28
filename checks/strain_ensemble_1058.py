@@ -68,7 +68,7 @@ def arcsine_gauss_profile(x, a, sigma):
 
 def cbs_case(material, d_ang, kinetic_eV, psi_rad, divergence_rad, frequency_hz=1.0e9):
     """Forward planar CBS lever: line shift, envelope and sideband check."""
-    gamma, beta = kinematics(kinetic_eV)
+    _gamma, beta = kinematics(kinetic_eV)
     g = 2 * np.pi / d_ang
     scale = HBARC_EV_ANG * beta * g / (1.0 - beta)  # eV per rad of tilt
     e0 = scale * np.sin(psi_rad)

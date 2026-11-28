@@ -403,17 +403,15 @@ def run(args):
         "frozen-cheap-heldout": (screen(), pilot),
     }
     boundaries = sorted(
-        set(
-            [
-                float(edges[0]),
-                float(edges[-1]),
-                *[
-                    value
-                    for value in (1000.0, 5000.0, 20000.0, 100000.0, 1000000.0)
-                    if edges[0] < value < edges[-1]
-                ],
-            ]
-        )
+        {
+            float(edges[0]),
+            float(edges[-1]),
+            *[
+                value
+                for value in (1000.0, 5000.0, 20000.0, 100000.0, 1000000.0)
+                if edges[0] < value < edges[-1]
+            ],
+        }
     )
     bands = list(zip(boundaries[:-1], boundaries[1:], strict=True))
     weights = band_weights(edges, bands)

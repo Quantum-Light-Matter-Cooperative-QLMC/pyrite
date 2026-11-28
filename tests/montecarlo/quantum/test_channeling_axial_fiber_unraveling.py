@@ -45,7 +45,10 @@ def _kick_column(scale):
     return scale * (rng.normal(size=(1, 3, 3)) + 1j * rng.normal(size=(1, 3, 3)))
 
 
-def _channels(checks, kick_scale, azimuths=tuple(np.pi / 2 * np.arange(4)), half=2):
+_AZIMUTHS = tuple(np.pi / 2 * np.arange(4))
+
+
+def _channels(checks, kick_scale, azimuths=_AZIMUTHS, half=2):
     _, study = checks
     span = np.array([half, half])
     kraus = study["_kraus"](

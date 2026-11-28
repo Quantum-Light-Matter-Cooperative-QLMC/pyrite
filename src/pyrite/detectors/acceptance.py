@@ -93,9 +93,9 @@ class AngularAcceptance:
 
     def __init__(
         self,
-        polar_deg: float | None | _Unset = _UNSET,
-        azimuthal_deg: float | None | _Unset = _UNSET,
-        solid_angle_sr: float | None | _Unset = _UNSET,
+        polar_deg: float | _Unset | None = _UNSET,
+        azimuthal_deg: float | _Unset | None = _UNSET,
+        solid_angle_sr: float | _Unset | None = _UNSET,
         *,
         polar: object = _UNSET,
         azimuthal: object = _UNSET,

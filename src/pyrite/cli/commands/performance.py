@@ -1,5 +1,6 @@
 """Local compute-performance artifact lifecycle."""
 
+import contextlib
 import os
 import re
 import shutil
@@ -156,9 +157,7 @@ def rm_command(profiles, all_profiles, yes, performance_dir):
             raise CLIError(f"refusing to prune: performance profile changed: {path}")
     for name in selected:
         shutil.rmtree(available[name])
-    try:
+    with contextlib.suppress(OSError):
         os.rmdir(performance_dir)
-    except OSError:
-        pass
     emit_result(f"deleted {len(selected)} local performance profile(s)")
     return 0

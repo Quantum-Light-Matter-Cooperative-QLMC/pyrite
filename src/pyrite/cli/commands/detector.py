@@ -70,8 +70,7 @@ def _referencing_profiles(document, name):
         if isinstance(row, dict)
         and (
             row.get("detector") == name
-            or isinstance(row.get("detectors"), dict)
-            and name in row["detectors"].values()
+            or (isinstance(row.get("detectors"), dict) and name in row["detectors"].values())
         )
     )
 

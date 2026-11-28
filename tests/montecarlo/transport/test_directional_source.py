@@ -403,7 +403,7 @@ def test_detector_acceptance_remains_strictly_positive():
     from pyrite import Detector
     from pyrite.detectors import AngularAcceptance
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"solid_angle_sr must be finite and positive"):
         Detector(acceptance=AngularAcceptance(polar_deg=1.0, solid_angle_sr=0.0))
 
 

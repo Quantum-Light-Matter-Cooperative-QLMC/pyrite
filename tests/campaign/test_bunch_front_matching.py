@@ -91,7 +91,7 @@ def test_off_axis_reflection_cancels_independent_ray_phases(tilt, azimuth, energ
 
 @pytest.mark.parametrize("hkl", [(0, 0, 0), (0.0, 0.0, 2.0), (0, 2), (0, 0, -2)])
 def test_invalid_or_negative_default_resonance_is_rejected(hkl):
-    with pytest.raises(ValueError, match="hkl|Miller"):
+    with pytest.raises(ValueError, match=r"hkl|Miller"):
         _scene().phase_matched_bunch_front_tilt(hkl)
 
 

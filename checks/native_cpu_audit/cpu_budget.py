@@ -12,6 +12,7 @@ reduction kernel; before/inside/after rounds with exact output hashes.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import multiprocessing as mp
 import os
@@ -150,10 +151,8 @@ def arm(case, processes, threads):
     finally:
         for pipe, process in zip(pipes, workers, strict=True):
             if process.is_alive():
-                try:
+                with contextlib.suppress(BrokenPipeError, OSError):
                     pipe.send(0)
-                except (BrokenPipeError, OSError):
-                    pass
             process.join(timeout=10)
             if process.is_alive():
                 process.terminate()

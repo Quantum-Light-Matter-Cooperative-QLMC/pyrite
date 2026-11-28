@@ -55,7 +55,7 @@ def test_projected_entry_is_identical_to_existing_solver_reference():
     assert projected.state_digest == spec.digest
 
     # Returning a fresh mutable initial state must not mutate the stored source.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"assignment destination is read-only"):
         projected.subspace_density[...] = 0
     writable, entry = projected.initial
     assert writable.flags.writeable
@@ -104,7 +104,7 @@ def test_projection_configuration_accepts_quantities_at_the_diagnostic_boundary(
 
 def test_projection_rejects_wrong_dimension_before_solver_work():
     spec = pr.TransverseStateSpec.recipe("gaussian", waist_ang=0.8, dimension=1)
-    with pytest.raises(ValueError, match="project_planar_source.kinetic_energy_eV.*energy.*eV"):
+    with pytest.raises(ValueError, match=r"project_planar_source\.kinetic_energy_eV.*energy.*eV"):
         _project(spec, kinetic_energy_eV=1 * ureg.mm)
 
 
@@ -177,7 +177,7 @@ def test_refusal_before_case_creation_or_propagation():
         longitudinal=pr.beams.PointBunch(),
         state=spec,
     )
-    with pytest.raises(ValueError, match="not yet.*transport"):
+    with pytest.raises(ValueError, match=r"not yet.*transport"):
         beam.to_spec()
 
 
@@ -252,9 +252,9 @@ def test_preprojected_cr_input_validates_population_and_exclusivity():
         )
     with pytest.raises(ValueError, match="shape"):
         channeling_spectrum(solver, 20.0, grid, 0.0, entry_initial=(np.ones((2, 2)), 0.0), **kwargs)
+    rho = proj.initial[0]
+    rho[0, 0, 1] += 0.25j
     with pytest.raises(ValueError, match="Hermitian"):
-        rho = proj.initial[0]
-        rho[0, 0, 1] += 0.25j
         channeling_spectrum(
             solver, 20.0, grid, 0.0, entry_initial=(rho, proj.entry_population), **kwargs
         )
@@ -264,8 +264,8 @@ def test_preprojected_cr_input_validates_population_and_exclusivity():
         score_planar_source(
             proj, depth_ang=20.0, photon_energy_eV=grid, theta_rad=0.0, aperture_rad=-0.1
         )
+    capped = replace(proj, channeling=_channeling(zone_max_ang=10.0))
     with pytest.raises(ValueError, match="zone_max_ang"):
-        capped = replace(proj, channeling=_channeling(zone_max_ang=10.0))
         score_planar_source(capped, depth_ang=20.0, photon_energy_eV=grid, theta_rad=0.0)
 
 
@@ -288,9 +288,9 @@ def test_two_dimensional_source_requires_explicit_in_plane_angular_model():
 @pytest.mark.parametrize("unit", ["delta_degC", "delta_degF"])
 def test_projection_refuses_temperature_difference_as_absolute_temperature(unit):
     spec = pr.TransverseStateSpec.recipe("gaussian", waist_ang=0.8, dimension=1)
-    with pytest.raises(ValueError, match="project_planar_source.temperature_K.*difference"):
+    with pytest.raises(ValueError, match=r"project_planar_source\.temperature_K.*difference"):
         _project(spec, temperature_K=ureg.Quantity(20, unit))
-    with pytest.raises(ValueError, match="project_planar_source.temperature_K.*difference"):
+    with pytest.raises(ValueError, match=r"project_planar_source\.temperature_K.*difference"):
         project_planar_source(
             spec,
             channeling=_channeling(),

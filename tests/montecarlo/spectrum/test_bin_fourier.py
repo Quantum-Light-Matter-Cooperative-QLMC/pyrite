@@ -136,9 +136,8 @@ def test_reduction_override_is_validated_restored_and_resolved(monkeypatch):
 
     grid = 500.0 + 0.25 * np.arange(11)
     edges = np.r_[grid - 0.125, grid[-1] + 0.125]
-    with pytest.raises(ValueError, match="method"):
-        with bin_reduction_override("fft"):
-            pass
+    with pytest.raises(ValueError, match="method"), bin_reduction_override("fft"):
+        pass
     with pytest.raises(ValueError, match="flush_lines"):
         with bin_reduction_override("fourier", flush_lines=0):
             pass

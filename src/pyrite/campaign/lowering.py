@@ -39,7 +39,7 @@ def build_case(
     numerics: Numerics | None = None,
     *,
     physics: Physics | None = None,
-    channeling: Channeling | None | _Unset = UNSET,
+    channeling: Channeling | _Unset | None = UNSET,
     observation: Observation | None = None,
 ) -> Case:
     """Resolve and lower one scene to the existing typed transport input.
@@ -179,7 +179,7 @@ def build_sweep_cases(
     numerics: Numerics | None = None,
     *,
     physics: Physics | None = None,
-    channeling: Channeling | None | _Unset = UNSET,
+    channeling: Channeling | _Unset | None = UNSET,
     observation: Observation | None = None,
     check_kinematic_validity: bool = True,
 ) -> list[Case]:

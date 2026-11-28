@@ -48,7 +48,7 @@ def joy_luo_only(monkeypatch):
     # resolves these names), not the package re-export.
     monkeypatch.setattr(transport.stopping, "_element_crossover_keV", lambda *_: np.inf)
     monkeypatch.setattr(transport.stopping, "_CROSSOVER_CACHE", {})
-    return None
+    return
 
 
 def composition(material):

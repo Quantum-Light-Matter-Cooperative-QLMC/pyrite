@@ -162,7 +162,7 @@ def test_simulate_applies_kernel_tuning_around_run_case(monkeypatch):
 
 def test_batch_executors_reject_a_per_call_schedule():
     scene = _scene(pr.Numerics(execution=_tuned()))
-    with pytest.raises(ValueError, match="default KernelTuning.transport"):
+    with pytest.raises(ValueError, match=r"default KernelTuning\.transport"):
         pr.simulate(
             scene.beam,
             scene.target,

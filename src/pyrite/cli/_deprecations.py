@@ -363,7 +363,7 @@ class RetiredOption(click.Option):
 
     def _merge(self, ctx: click.Context, param: click.Parameter, value):
         if value is None or value == () or value is False:
-            return None
+            return
         if ctx.get_parameter_source(self.canonical_dest) is ParameterSource.COMMANDLINE:
             raise click.UsageError(
                 f"{self.retired_flag} is the retired spelling of {self.replacement}; "
@@ -372,7 +372,7 @@ class RetiredOption(click.Option):
         warn_flag(ctx, self.retired_flag, self.replacement)
         ctx.params[self.canonical_dest] = value
         ctx.set_parameter_source(self.canonical_dest, ParameterSource.COMMANDLINE)
-        return None
+        return
 
 
 def option_message(command: str, flag: str) -> str:

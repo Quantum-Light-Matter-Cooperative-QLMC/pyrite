@@ -58,7 +58,7 @@ def test_inconsistent_replica_observables_rejected(tmp_path, monkeypatch, incomp
 @pytest.mark.parametrize("scores", [{}, {"transmitted": [1.0, 0.0]}])
 def test_missing_headline_observable_rejected_before_summary(tmp_path, monkeypatch, scores):
     _write_sample(tmp_path, "sample", 1, scores)
-    with pytest.raises(ValueError, match="missing required observable.*photons_ge10kev"):
+    with pytest.raises(ValueError, match=r"missing required observable.*photons_ge10kev"):
         _analyze(tmp_path, monkeypatch)
     assert not (tmp_path / "summary" / "summary.json").exists()
 

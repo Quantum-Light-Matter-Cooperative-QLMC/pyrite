@@ -5,6 +5,7 @@ test to ``$RSSPROBE_DIR/<worker>.jsonl``: RSS at test start, sampled peak
 process RSS and process-tree RSS (children included), wall time, ru_maxrss.
 """
 
+import contextlib
 import json
 import os
 import resource
@@ -43,10 +44,8 @@ class _Sampler(threading.Thread):
                 tree = rss
                 try:
                     for child in self.proc.children(recursive=True):
-                        try:
+                        with contextlib.suppress(psutil.Error):
                             tree += child.memory_info().rss
-                        except psutil.Error:
-                            pass
                 except psutil.Error:
                     pass
                 self.tree_peak = max(self.tree_peak, tree)
@@ -58,7 +57,8 @@ def pytest_runtest_protocol(item, nextitem):
     global _OUT
     if _OUT is None:
         os.makedirs(_DIR, exist_ok=True)
-        _OUT = open(os.path.join(_DIR, f"{_WORKER}.jsonl"), "a", buffering=1)
+        # Lives for the whole pytest worker; line-buffered so a killed worker keeps its rows.
+        _OUT = open(os.path.join(_DIR, f"{_WORKER}.jsonl"), "a", buffering=1)  # noqa: SIM115
     start = _self_rss()
     maxrss0 = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     sampler = _Sampler()

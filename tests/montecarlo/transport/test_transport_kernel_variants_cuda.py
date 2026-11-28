@@ -171,6 +171,6 @@ def test_variants_separate_precision_and_reject_unknown_precision():
     assert fp64 is not mixed
     assert mixed is transport_kernel_variant(switches, "mixed")
     before = transport_kernel_variant.cache_info().currsize
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="transport precision must be one of"):
         transport_kernel_variant(switches, "fp32")
     assert transport_kernel_variant.cache_info().currsize == before

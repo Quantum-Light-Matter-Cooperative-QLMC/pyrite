@@ -71,8 +71,10 @@ def main() -> None:
     matrices = ci_matrices()
     if output := os.environ.get("GITHUB_OUTPUT"):
         with Path(output).open("a", encoding="utf-8") as stream:
-            for name, matrix in matrices.items():
-                stream.write(f"{name}={json.dumps(matrix, separators=(',', ':'))}\n")
+            stream.writelines(
+                f"{name}={json.dumps(matrix, separators=(',', ':'))}\n"
+                for name, matrix in matrices.items()
+            )
     else:
         print(json.dumps(matrices, indent=2))
 

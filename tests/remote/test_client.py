@@ -164,7 +164,9 @@ def test_errors_are_library_errors(destination, monkeypatch, capsys):
         submit(target="absent", materials=["hopg"], dry_run=True)
     with pytest.raises(ValueError, match="unknown profile"):
         submit("absent", target=destination, dry_run=True)
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match=r"expected host alias containing only letters, digits, dots,"
+    ):
         RemoteTarget(host="bad;host")
 
     def fail(job):

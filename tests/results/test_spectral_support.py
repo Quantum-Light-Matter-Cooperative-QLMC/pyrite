@@ -270,7 +270,7 @@ def test_yield_types_are_frozen_values():
     with pytest.raises(AttributeError):
         result.inside = 2.0  # type: ignore[misc]
     binned = nodes_to_bins([0.0, 1.0], [1.0, 1.0], [0.0, 1.0], boundary="raise")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"assignment destination is read-only"):
         binned.mass[0] = 3.0
 
 

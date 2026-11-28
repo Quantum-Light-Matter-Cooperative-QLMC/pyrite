@@ -60,6 +60,7 @@ entirely. Only ``numpy``, ``pyrite._util.env``, ``pyrite.paths``, the grid leave
 ``pyrite.materials.crystal`` kinematics are used here.
 """
 
+import contextlib
 import hashlib
 import json
 import math
@@ -1241,10 +1242,8 @@ def store_coordinates(key: str, record: Mapping[str, Any]) -> None:
                 json.dump(dict(record), stream, sort_keys=True)
             os.replace(temporary, path)
         except BaseException:
-            try:
+            with contextlib.suppress(OSError):
                 os.remove(temporary)
-            except OSError:
-                pass
             raise
     except OSError:
         return

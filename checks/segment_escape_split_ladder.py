@@ -41,16 +41,16 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
-from soft_deflection_line_sensitivity import cxr_metrics, peak_windows  # noqa: E402
+from soft_deflection_line_sensitivity import cxr_metrics, peak_windows
 
-from pyrite._backend import REAL, xp  # noqa: E402
-from pyrite.campaign.config import material_sweep  # noqa: E402
-from pyrite.campaign.sweep import build_cases  # noqa: E402
-from pyrite.montecarlo import runner  # noqa: E402
-from pyrite.montecarlo.spectrum import brem, characteristic  # noqa: E402
-from pyrite.montecarlo.spectrum.cxr import _batched as lines_batched  # noqa: E402
-from pyrite.montecarlo.spectrum.cxr import _kernels  # noqa: E402
-from pyrite.montecarlo.spectrum.cxr import _setup as lines_setup  # noqa: E402
+from pyrite._backend import REAL, xp
+from pyrite.campaign.config import material_sweep
+from pyrite.campaign.sweep import build_cases
+from pyrite.montecarlo import runner
+from pyrite.montecarlo.spectrum import brem, characteristic
+from pyrite.montecarlo.spectrum.cxr import _batched as lines_batched
+from pyrite.montecarlo.spectrum.cxr import _kernels
+from pyrite.montecarlo.spectrum.cxr import _setup as lines_setup
 
 MATERIAL = "hopg"
 E0_KEV = 100.0

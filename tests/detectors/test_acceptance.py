@@ -51,7 +51,7 @@ def test_angular_acceptance_analytic_reference_and_small_patch():
     "kwargs", [{}, {"polar_deg": 2}, {"polar_deg": 2, "azimuthal_deg": 4, "solid_angle_sr": 0.01}]
 )
 def test_angular_acceptance_requires_exactly_two(kwargs):
-    with pytest.raises(ValueError, match="polar_deg.*azimuthal_deg.*solid_angle_sr"):
+    with pytest.raises(ValueError, match=r"polar_deg.*azimuthal_deg.*solid_angle_sr"):
         pr.detectors.AngularAcceptance(**kwargs)
 
 
@@ -73,18 +73,38 @@ def test_angular_acceptance_rejects_invalid_inputs(kwargs):
 
 
 @pytest.mark.parametrize(
-    "theta,acceptance",
+    "theta,acceptance,message",
     [
-        (0, pr.detectors.AngularAcceptance(polar_deg=1, azimuthal_deg=1)),
-        (180, pr.detectors.AngularAcceptance(azimuthal_deg=1, solid_angle_sr=0.01)),
-        (1, pr.detectors.AngularAcceptance(polar_deg=3, azimuthal_deg=1)),
-        (179, pr.detectors.AngularAcceptance(azimuthal_deg=360, solid_angle_sr=0.1)),
-        (90, pr.detectors.AngularAcceptance(azimuthal_deg=1, solid_angle_sr=1)),
-        (90, pr.detectors.AngularAcceptance(polar_deg=1, solid_angle_sr=1)),
+        (0, pr.detectors.AngularAcceptance(polar_deg=1, azimuthal_deg=1), "at a polar pole"),
+        (
+            180,
+            pr.detectors.AngularAcceptance(azimuthal_deg=1, solid_angle_sr=0.01),
+            "at a polar pole",
+        ),
+        (
+            1,
+            pr.detectors.AngularAcceptance(polar_deg=3, azimuthal_deg=1),
+            r"polar_deg/2 must lie in \[0, 180\]",
+        ),
+        (
+            179,
+            pr.detectors.AngularAcceptance(azimuthal_deg=360, solid_angle_sr=0.1),
+            "solid_angle_sr cannot be reached",
+        ),
+        (
+            90,
+            pr.detectors.AngularAcceptance(azimuthal_deg=1, solid_angle_sr=1),
+            "solid_angle_sr cannot be reached",
+        ),
+        (
+            90,
+            pr.detectors.AngularAcceptance(polar_deg=1, solid_angle_sr=1),
+            "resolved azimuthal_deg must be <= 360",
+        ),
     ],
 )
-def test_angular_acceptance_rejects_unreachable_patch(theta, acceptance):
-    with pytest.raises(ValueError):
+def test_angular_acceptance_rejects_unreachable_patch(theta, acceptance, message):
+    with pytest.raises(ValueError, match=message):
         pr.Detector(theta, acceptance=acceptance)
 
 

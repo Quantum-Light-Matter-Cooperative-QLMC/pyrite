@@ -110,7 +110,7 @@ def test_documented_root_classification_matches_governed_inventory():
         for name, classification, canonical in re.findall(
             r"^\| `([\w]+)` \| (Retained|Deprecated|Deferred) \| `([\w.]+)` \|",
             (root / "docs/reference/python-api/compatibility.md").read_text(),
-            re.M,
+            re.MULTILINE,
         )
     }
     assert documented == {

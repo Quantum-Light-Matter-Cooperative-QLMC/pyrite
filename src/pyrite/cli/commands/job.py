@@ -5,6 +5,7 @@ import click
 from ...console.output import confirm_destructive, emit_result, output_option
 from ...remote import lifecycle, viewer
 from .. import _completion as _cli_completion
+from .._options import target_commands
 from . import remote as remote_cli
 from ._remote_actions import _cli_jobs, _cli_logs, _cli_stack, _cli_status
 
@@ -153,7 +154,5 @@ def stop_command(jobid: str | None, all_: bool, profile: str | None, yes: bool):
     with targets.selected_for_profile(profile):
         lifecycle.stop_jobs(profile=profile, yes=yes)
 
-
-from .._options import target_commands  # noqa: E402
 
 target_commands(command)

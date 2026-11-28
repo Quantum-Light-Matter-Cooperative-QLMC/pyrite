@@ -13,7 +13,7 @@ from pyrite.montecarlo.groove import (
     in_material,
     surface_depth_ang,
 )
-from pyrite.montecarlo.spectrum import _brem_dsigma_dk, mc_brem_spectrum
+from pyrite.montecarlo.spectrum import _brem_dsigma_dk, mc_brem_spectrum, mc_cxr_spectrum
 from pyrite.montecarlo.transport import (
     TRANSPORT_ELEMENTS,
     _element_crossover_keV,
@@ -256,13 +256,13 @@ def test_entry_points_land_on_relief_facet():
 
 
 def test_blazed_groove_spec_validates_geometry():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"blazed grooves require theta_obs = 90 deg exactly"):
         blazed_groove_spec(1e4, np.deg2rad(119.0), TP, np.pi)  # theta_obs != 90
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"blazed grooves require tilt_azim = 180 deg"):
         blazed_groove_spec(1e4, np.pi / 2, TP, 0.0)  # azim != 180
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"blazed grooves require 0 < tilt_polar < 90 deg"):
         blazed_groove_spec(1e4, np.pi / 2, 0.0, np.pi)  # tp == 0
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"groove spacing_ang must be positive"):
         blazed_groove_spec(-1.0, np.pi / 2, TP, np.pi)  # spacing <= 0
 
 
@@ -900,9 +900,6 @@ def test_finite_side_exit_before_reentry_records_no_vacuum_leg():
     assert out["vacuum_start_ang"].shape == (0, 3)
 
 
-from pyrite.montecarlo.spectrum import mc_cxr_spectrum
-
-
 def _hopg_spectrum(groove=None, thickness_ang=2.0e5):
     from pyrite.montecarlo.geometry import tilted_geometry
 
@@ -963,7 +960,7 @@ def test_spectrum_groove_rejects_layers():
         seed=1,
         elastic_model="sr",
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"groove escape is v1 single-slab only"):
         mc_cxr_spectrum(
             segs,
             np.linspace(500.0, 3000.0, 50),
@@ -1095,7 +1092,7 @@ def test_brem_groove_rejects_layers_and_wrong_direction():
     composition = [("C", 0.1136)]
     n_hat = np.array([np.cos(TP), 0.0, -np.sin(TP)])
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"groove escape is v1 single-slab only"):
         mc_brem_spectrum(
             segments,
             grid,
@@ -1104,7 +1101,7 @@ def test_brem_groove_rejects_layers_and_wrong_direction():
             groove=SPEC,
             layers=[(0.0, 1.0e5, composition)],
         )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"groove escape requires n_hat"):
         mc_brem_spectrum(
             segments,
             grid,

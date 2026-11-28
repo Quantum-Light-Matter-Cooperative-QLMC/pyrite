@@ -94,7 +94,9 @@ def test_automatic_resolution_refuses_a_coherent_case():
 def test_refusal_names_both_derived_steps():
     segs = _segments()
     case = {"coherent_emission": True, "line_grid_policy": {"resolution": {}}}
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(
+        ValueError, match=r"automatic line-grid resolution does not support"
+    ) as excinfo:
         resolve_cxr_grid(case, segs, np.array([0.0, 0.0, 1.0]), 3, None)
     message = str(excinfo.value)
     assert "decoherence-grouped floor" in message

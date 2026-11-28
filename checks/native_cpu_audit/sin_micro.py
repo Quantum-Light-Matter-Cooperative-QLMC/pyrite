@@ -72,10 +72,16 @@ arms += [("np.sin strict", np_sin, False), ("np.sin fastmath=True", np_sin, True
 arms += [("sinc2 vector_sin", vs_sinc2, False), ("sinc2_pi", sinc2_pi, False)]
 arms += [("sinc2_pi contract", sinc2_pi, {"contract"})]
 cpu = next(
-    (ln.split(":", 1)[1].strip() for ln in open("/proc/cpuinfo") if ln.startswith("model name")),
+    (
+        ln.split(":", 1)[1].strip()
+        for ln in Path("/proc/cpuinfo").read_text().splitlines()
+        if ln.startswith("model name")
+    ),
     platform.processor(),
 )
-flags = next((ln for ln in open("/proc/cpuinfo") if ln.startswith("flags")), "")
+flags = next(
+    (ln for ln in Path("/proc/cpuinfo").read_text().splitlines() if ln.startswith("flags")), ""
+)
 isa = "avx512f" if " avx512f" in flags else ("avx2" if " avx2" in flags else "other")
 for name, fn, fm in arms:
     f = mk(fn, fm)

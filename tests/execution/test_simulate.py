@@ -207,7 +207,7 @@ def test_worker_artifacts_are_checked_against_source_and_directions(
             return [DirectionalArtifactRef(scalar, directional)]
 
     if wrong_key:
-        with pytest.raises(ArtifactIntegrityError, match="key|identity"):
+        with pytest.raises(ArtifactIntegrityError, match=r"key|identity"):
             api.simulate(scene, numerics=controls, executor=Worker())
     else:
         result = api.simulate(scene, numerics=controls, executor=Worker())

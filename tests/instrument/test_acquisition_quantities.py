@@ -146,7 +146,7 @@ def test_uniform_quantity_bounds_match_numeric_edges() -> None:
         )
     with pytest.raises(TypeError, match="requires bin_width_eV or bin_width"):
         Acquisition.uniform(exposure_s=1.0, minimum_eV=0, maximum_eV=2)
-    with pytest.raises(TypeError, match="Acquisition.uniform.maximum"):
+    with pytest.raises(TypeError, match=r"Acquisition\.uniform\.maximum"):
         Acquisition.uniform(exposure_s=1.0, minimum_eV=0, maximum=2.0, bin_width_eV=1)
 
 
@@ -159,7 +159,7 @@ def test_native_request_quantities() -> None:
     assert semantic.hit_threshold == Q_(1000, "eV")
     assert semantic.with_exposure(Q_(1, "s")) == NativeAcquisition(1.0, 1000.0)
     assert semantic.with_hit_threshold(Q_(0, "eV")).hit_threshold_eV == 0.0
-    with pytest.raises(TypeError, match="NativeAcquisition.exposure_s and exposure"):
+    with pytest.raises(TypeError, match=r"NativeAcquisition\.exposure_s and exposure"):
         NativeAcquisition(1.0, exposure=Q_(1, "s"))
-    with pytest.raises(ValueError, match="NativeAcquisition.exposure"):
+    with pytest.raises(ValueError, match=r"NativeAcquisition\.exposure"):
         Acquisition.native(exposure=Q_(-1, "s"))

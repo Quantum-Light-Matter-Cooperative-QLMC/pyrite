@@ -80,7 +80,7 @@ def test_observation_average_and_nan_support_are_preserved() -> None:
 @pytest.mark.parametrize("unit", ["s", "mm", "dimensionless", "radian", "Hz"])
 def test_to_energy_rejects_nonenergy_dimensions(unit: str) -> None:
     spectrum = SpectralDensity([1.0, 2.0], [3.0, 4.0]).quantify()
-    with pytest.raises(ValueError, match="energy_unit.*energy"):
+    with pytest.raises(ValueError, match=r"energy_unit.*energy"):
         spectrum.to_energy(unit)
 
 

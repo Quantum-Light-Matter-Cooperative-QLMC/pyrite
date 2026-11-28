@@ -91,7 +91,7 @@ def test_analysis_refuses_pooling_changed_precision_sources_or_controls(
     monkeypatch.setattr(sys, "argv", ["analyze", str(tmp_path), "--output", str(target)])
     main = runpy.run_path(str(root / "checks/equal_precision/analyze_precision.py"))["main"]
     if mutation is not None:
-        with pytest.raises(ValueError, match="replica.*source|replica.*control"):
+        with pytest.raises(ValueError, match=r"replica.*source|replica.*control"):
             main()
     else:
         main()

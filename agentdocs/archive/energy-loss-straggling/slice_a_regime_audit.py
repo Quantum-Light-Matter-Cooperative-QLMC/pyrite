@@ -687,7 +687,7 @@ def urban_variance_keV2(
     phase observable; a mismatch is a variance the sampler would have to be
     corrected for, and is slice C's to close.
     """
-    f_1, E_1, f_2, E_2 = urban_levels(Z, I_keV)
+    _f_1, E_1, _f_2, E_2 = urban_levels(Z, I_keV)
     n_1, n_2, n_3, _, _ = urban_channels(Z, I_keV, S_keV_per_ang, E_keV, s_ang)
     T_up = 0.5 * E_keV
     var_urban = n_1 * E_1 * E_1 + n_2 * E_2 * E_2 + n_3 * URBAN_E0_KEV * T_up
@@ -744,7 +744,7 @@ def report_urban() -> None:
                 Z = float(TRANSPORT_ELEMENTS[element]["Z"])
                 I_keV = float(TRANSPORT_ELEMENTS[element]["J_keV"])
                 S_i = stopping_keV_per_ang([(element, n_i)], E0)
-                f_1, E_1, f_2, E_2 = urban_levels(Z, I_keV)
+                _f_1, E_1, f_2, E_2 = urban_levels(Z, I_keV)
                 n_1, n_2, n_3, closure, frac = urban_channels(Z, I_keV, S_i, E0, lam)
                 flags = ("!T" if E_2 > 0.5 * E0 else "") + ("!L" if n_2 == 0.0 else "")
                 print(

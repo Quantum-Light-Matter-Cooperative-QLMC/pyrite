@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 def slab_footprint(
-    footprint: Footprint | None | _Unset,
+    footprint: Footprint | _Unset | None,
     width: object,
     height: object,
     infinite_via_dimensions: bool,

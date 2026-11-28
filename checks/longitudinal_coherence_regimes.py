@@ -100,7 +100,7 @@ def _channeling_table() -> bool:
     for crystal in ("silicon", "diamond"):
         profile = planar_profile(crystal, (1, 1, 0), 293.15)
         for kinetic in (5e6, 20e6, 54e6):
-            gamma, beta = longitudinal_kinematics(kinetic)
+            gamma, _beta = longitudinal_kinematics(kinetic)
             states = transverse_states(profile, gamma, 0.0)
             bound = np.flatnonzero(states.energies_eV < states.barrier_eV)
             if bound.size < 2:

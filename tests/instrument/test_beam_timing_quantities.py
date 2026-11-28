@@ -121,7 +121,7 @@ def test_offsets_must_be_representable_in_numeric_storage(magnitude: str) -> Non
     if np.finfo(np.longdouble).max <= np.finfo(float).max:
         pytest.skip("longdouble has no wider exponent range than Python float")
     quantity = Q_(np.array([magnitude], dtype=np.longdouble), "fs")
-    with pytest.raises(ValueError, match="arrival_offsets.*representable"):
+    with pytest.raises(ValueError, match=r"arrival_offsets.*representable"):
         Offsets(arrival_offsets=quantity)
 
 

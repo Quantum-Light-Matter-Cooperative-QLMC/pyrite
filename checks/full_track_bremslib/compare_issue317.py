@@ -29,7 +29,8 @@ def geant4_dpwa(reference=HERE / "reference"):
     """Per case ``(N, n_transmitted, n_reflected)`` over the concatenated DPWA shard logs."""
     out = {}
     for case in CASES:
-        text = gzip.open(reference / f"{case}_ssdpwa.log.gz", "rt").read()
+        with gzip.open(reference / f"{case}_ssdpwa.log.gz", "rt") as log:
+            text = log.read()
         t, r = _T.findall(text), _R.findall(text)
         assert len(t) == len(r) == 10, case
         n = 10_000  # run_ssdpwa.sbatch: /run/beamOn 10000 per shard

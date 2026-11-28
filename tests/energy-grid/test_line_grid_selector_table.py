@@ -90,6 +90,12 @@ COMBINATIONS = list(
         (RP, KC), (UNSET, RP, KC), (UNSET, OS, NYQ, LOC), ANY_QUADRATURE, (False, True)
     )
 )
+# The resolver's refusals for an invalid axis combination.
+_INCOMPATIBLE_AXES = (
+    r"cannot be combined with (feature )?windows"
+    r"|needs bin-mean quadrature"
+    r"|needs the resonance-population bandwidth"
+)
 
 
 @pytest.mark.parametrize(
@@ -106,7 +112,7 @@ def test_every_combination_resolves_and_falls_back_as_its_row_says(
         per_call["resolution"] = resolution
     axis, fallback = _expected(bandwidth, resolution, quadrature, windows)
     if axis is None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=_INCOMPATIBLE_AXES):
             resolve_cxr_grid_policy(
                 start_eV=10.0, stop_eV=1000.0, bandwidth_policy=builder, per_call=per_call
             )
@@ -132,7 +138,9 @@ def test_every_combination_resolves_and_falls_back_as_its_row_says(
     else:
         assert fallback == "refuses"
         assert widened is None
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            ValueError, match=r"resonance-population bandwidth cannot measure channeling"
+        ):
             _auditable_policy(unaudited, payload)
 
 

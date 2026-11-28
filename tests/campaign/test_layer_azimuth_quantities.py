@@ -61,9 +61,9 @@ def test_external_input_and_readback_are_detached():
     ],
 )
 def test_semantic_rotation_refuses_invalid_quantities(angle, error):
-    with pytest.raises(error, match="Layer.azimuth"):
+    with pytest.raises(error, match=r"Layer\.azimuth"):
         Layer("silicon", 2000.0, azimuth=angle)
-    with pytest.raises(error, match="Layer.azimuth"):
+    with pytest.raises(error, match=r"Layer\.azimuth"):
         Layer("silicon", 2000.0).with_azimuth(angle)
 
 

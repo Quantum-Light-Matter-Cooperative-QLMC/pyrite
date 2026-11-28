@@ -63,7 +63,7 @@ def test_constant_density_is_invariant_under_coarsening():
 
 @pytest.mark.parametrize("args", [(0, 10, 2), (10, 5, 2), (1, 10, 1)])
 def test_invalid_band_or_insufficient_cells_refused(args):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"require 0 < start < stop and at least two cells"):
         uniform_cells(*args)
 
 

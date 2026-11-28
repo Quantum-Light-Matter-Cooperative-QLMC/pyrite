@@ -97,11 +97,11 @@ def test_unsupported_case_fails_before_transport(monkeypatch):
 
 def test_other_entry_points_fail_before_transport(monkeypatch):
     _no_transport(monkeypatch)
-    with pytest.raises(ValueError, match="supported only by pyrite.simulate"):
-        scene = _scene()
+    scene = _scene()
+    with pytest.raises(ValueError, match=r"supported only by pyrite\.simulate"):
         simulate_trajectories(scene.beam, scene.target, numerics=_numerics(5))
     # Planar, directional and photon paths enter transport through this guard.
-    with pytest.raises(ValueError, match="supported only by pyrite.simulate"):
+    with pytest.raises(ValueError, match=r"supported only by pyrite\.simulate"):
         with transport_tuning(_numerics(5)):
             pass
     with pytest.raises(ValueError, match="executor does not support"):

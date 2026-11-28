@@ -83,29 +83,29 @@ def test_shell_weights_match_scalar_reflection_sum():
 
 
 @pytest.mark.parametrize(
-    "kwargs",
+    "kwargs,message",
     [
-        {"azimuth_count": 0},
-        {"azimuth_count": 2.5},
-        {"crystal": "hbn"},
-        {"cutoff_invang": float("nan")},
-        {"temperature_K": 10000},
+        ({"azimuth_count": 0}, "azimuth_count must be a positive integer"),
+        ({"azimuth_count": 2.5}, "azimuth_count must be a positive integer"),
+        ({"crystal": "hbn"}, "currently requires HOPG"),
+        ({"cutoff_invang": float("nan")}, "cutoff_invang must be positive and finite"),
+        ({"temperature_K": 10000}, r"thermal row holds only at 300 \+- 10 K"),
     ],
 )
-def test_invalid_model_refuses(kwargs):
-    with pytest.raises(ValueError):
+def test_invalid_model_refuses(kwargs, message):
+    with pytest.raises(ValueError, match=message):
         _model(**kwargs)
 
 
 def test_unsupported_spectrum_options_refuse():
     domain = _model().prepare()
-    for options in (
-        {"coherent": True},
-        {"surface_hkl": (1, 0, 0)},
-        {"truncation_audit": {}},
-        {"mosaic_sampling": "history"},
+    for options, message in (
+        ({"coherent": True}, "supports incoherent emission only"),
+        ({"surface_hkl": (1, 0, 0)}, "requires the positive c axis along the sample normal"),
+        ({"truncation_audit": {}}, "fiber-weighted audits"),
+        ({"mosaic_sampling": "history"}, "supports deterministic mosaic quadrature only"),
     ):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=message):
             domain.spectrum({}, [100.0, 200.0], **options)
 
 
@@ -251,7 +251,8 @@ def test_wider_domains_prepare_roll_closed(cutoff):
     ],
 )
 def test_fiber_average_validates(kwargs):
-    with pytest.raises(ValueError):
+    # Each refusal names the field it rejects.
+    with pytest.raises(ValueError, match=next(iter(kwargs))):
         FiberAverage(**({"cutoff_invang": 8.0} | kwargs))
 
 
@@ -270,7 +271,7 @@ def test_fiber_numerics_sit_beside_mosaic_controls():
         assert model.reflection_batch_size == 256
     with pytest.raises(ValueError, match="basal-only"):
         fiber.FiberCXRModel.from_numerics(CxrReflections())
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"cutoff_invang must lie in"):
         fiber.FiberCXRModel.from_numerics(FiberAverage(cutoff_invang=80.0))
 
 

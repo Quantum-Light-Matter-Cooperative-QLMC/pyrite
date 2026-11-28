@@ -126,7 +126,7 @@ class MaterialProgress:
             stems = previous.get("checkpoint_stems")
             if isinstance(stems, list):
                 self.checkpoint_stems.extend(item for item in stems if isinstance(item, str))
-        self.checkpoint_stems = sorted(set([*self.checkpoint_stems, stem]))
+        self.checkpoint_stems = sorted({*self.checkpoint_stems, stem})
 
     def sweep_callbacks(self, *, logged, case_cost_fn):
         """``run_sweep`` callback keywords; reporters off when nothing observes them."""

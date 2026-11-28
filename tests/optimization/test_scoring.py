@@ -5,6 +5,9 @@ import pytest
 
 from pyrite.optimization import FixedWindowYield
 
+_BAD_DENSITY = "line density must be finite and match a one-dimensional energy grid"
+_BAD_GRID = "radiation diagnostics require a finite increasing grid"
+
 
 def store(energy=(100, 130, 200, 300), density=(1, 1, 1, 1), **fields):
     return {"case": {30: {"E_grid": energy, "spec": density, **fields}}}
@@ -52,19 +55,19 @@ def test_uncovered_window_is_an_error_not_silently_truncated(bounds):
 
 
 @pytest.mark.parametrize(
-    "energy,density",
+    "energy,density,message",
     [
-        ((100, 200), (1, np.nan)),
-        ((100, 200), (1, np.inf)),
-        ((100, 200), (1,)),
-        (((100, 200),), ((1, 1),)),
-        ((100, 100, 300), (1, 1, 1)),
-        ((100, np.nan, 300), (1, 1, 1)),
-        ((100,), (1,)),
+        ((100, 200), (1, np.nan), _BAD_DENSITY),
+        ((100, 200), (1, np.inf), _BAD_DENSITY),
+        ((100, 200), (1,), _BAD_DENSITY),
+        (((100, 200),), ((1, 1),), _BAD_DENSITY),
+        ((100, 100, 300), (1, 1, 1), _BAD_GRID),
+        ((100, np.nan, 300), (1, 1, 1), _BAD_GRID),
+        ((100,), (1,), _BAD_GRID),
     ],
 )
-def test_invalid_samples_fail_explicitly(energy, density):
-    with pytest.raises(ValueError):
+def test_invalid_samples_fail_explicitly(energy, density, message):
+    with pytest.raises(ValueError, match=message):
         FixedWindowYield(100, 200)(store(energy, density))
 
 

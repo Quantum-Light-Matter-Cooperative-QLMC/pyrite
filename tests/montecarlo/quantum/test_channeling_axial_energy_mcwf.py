@@ -7,6 +7,7 @@ import sys
 import types
 from pathlib import Path
 from types import SimpleNamespace
+from typing import ClassVar
 
 import numpy as np
 import pytest
@@ -64,7 +65,7 @@ def lib(monkeypatch):
 
     class Profile:
         period_ang = (2.0, 2.0)
-        strings = [SimpleNamespace(position_ang=(0.0, 0.0))]
+        strings: ClassVar[list] = [SimpleNamespace(position_ang=(0.0, 0.0))]
 
         def on_grid(self, cells, shape):
             return np.zeros(shape)
@@ -361,7 +362,7 @@ def test_bounded_checkpoint_can_resume_with_different_chunk_admission(lib):
     assert [cp.processed_histories for cp in snapshots] == [5, 10]
     assert snapshots[0].bin_counts_processed.sum() == 5
     assert not snapshots[0].density_sums.flags.writeable
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"assignment destination is read-only"):
         snapshots[0].density_sums[0, 0, 0, 0] = 3
     resumed = mod.axial_energy_mcwf(
         d,

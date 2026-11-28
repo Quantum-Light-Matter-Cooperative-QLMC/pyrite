@@ -184,7 +184,7 @@ def test_tag_release_notes_start_at_the_previous_tag(tmp_path: Path) -> None:
 
 
 def test_tag_release_notes_refuse_a_tag_that_does_not_match_the_version(tmp_path) -> None:
-    with pytest.raises(release.ReleaseError, match="does not match the package version 0.5.0"):
+    with pytest.raises(release.ReleaseError, match=r"does not match the package version 0\.5\.0"):
         release.tag_release_notes(tmp_path, "v0.6.0", "0.5.0")
 
 
@@ -194,5 +194,5 @@ def test_release_command_fails_before_editing_when_removals_are_due(monkeypatch,
     monkeypatch.setattr(release, "removal_targets", lambda: {"module pyrite.old": "0.5.0"})
     monkeypatch.setattr(release, "bump_versions", lambda *a: pytest.fail("edited files"))
 
-    with pytest.raises(SystemExit, match="module pyrite.old"):
+    with pytest.raises(SystemExit, match=r"module pyrite\.old"):
         dev_cli.main(["release", "99.0.0", "--check"])

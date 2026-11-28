@@ -101,7 +101,7 @@ def test_public_alias_and_pickle_identity_survive_owner_move() -> None:
 
 @pytest.mark.parametrize("unit", ["s", "Hz", "mm", "radian", "dimensionless"])
 def test_bad_energy_unit_refused(unit: str) -> None:
-    with pytest.raises(ValueError, match="energy_unit.*energy"):
+    with pytest.raises(ValueError, match=r"energy_unit.*energy"):
         _batch(realized=False).quantify().to_energy(unit)
 
 

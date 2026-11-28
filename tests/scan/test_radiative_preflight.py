@@ -24,7 +24,7 @@ def test_auto_requires_opt_in_for_uncoupled_transport(source, grooved):
 
 def test_explicit_coupled_default_degrades_only_under_the_flag():
     """The coupled default (#642) is strict unless the run opts into fallback."""
-    with pytest.raises(ValueError, match="grooved targets.*--allow-physics-fallback"):
+    with pytest.raises(ValueError, match=r"grooved targets.*--allow-physics-fallback"):
         resolve_run_radiative_model("bremslib-soft-hard", "bremslib", grooved=True)
     with pytest.warns(PhysicsFallbackWarning, match="uncoupled"):
         model, cutoff, events = resolve_run_radiative_model(

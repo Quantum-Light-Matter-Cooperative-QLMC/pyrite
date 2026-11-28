@@ -196,7 +196,20 @@ def test_recoil_slope_keep_matches_chain():
 
 def test_amplitude_only_kernel_matches_full_kernel():
     """``|A|^2`` alone equals the full kernel's first output bit for bit (#862)."""
-    names = "chi_re chi_im u_re u_im g2 g_dot_e om v_dot_e vdg k_dot_g k_dot_v gamma".split()
+    names = [
+        "chi_re",
+        "chi_im",
+        "u_re",
+        "u_im",
+        "g2",
+        "g_dot_e",
+        "om",
+        "v_dot_e",
+        "vdg",
+        "k_dot_g",
+        "k_dot_v",
+        "gamma",
+    ]
     args = [_spiky((_N, _NG), 0.1, 3.0) for _ in names]
     args += [_spiky((_N, _NG), -1.0, 1.0), _spiky((_N, _NG), -1.0, 1.0), np.float32(3.86e-3)]
     alone = _line_amplitude._cxr_amp_sq_total_core(*args)

@@ -72,13 +72,13 @@ def test_optional_mosaic_and_numeric_schema_refusal():
     info = replace(_info(), mosaic_fwhm_deg=None)
     assert info.mosaic_fwhm is None
     assert _crystal(info).mosaic_fwhm is None
-    with pytest.raises(TypeError, match="CrystalInfo.V_cell is numeric-only"):
+    with pytest.raises(TypeError, match=r"CrystalInfo\.V_cell is numeric-only"):
         replace(info, V_cell=Q_(20, "angstrom**3"))
     with pytest.raises(TypeError, match=r"CrystalInfo.lattice\[a\] is numeric-only"):
         replace(info, lattice={"a": Q_(5, "angstrom")})
     with pytest.raises(TypeError, match=r"CrystalInfo.composition\[Si\] is numeric-only"):
         replace(info, composition=(("Si", Q_(0.1, "1/angstrom**3")),))
-    with pytest.raises(TypeError, match="CrystalSpec.B_ang2 is numeric-only"):
+    with pytest.raises(TypeError, match=r"CrystalSpec\.B_ang2 is numeric-only"):
         replace(_crystal(info), B_ang2=Q_(0.46, "angstrom**2"))
     with pytest.raises(TypeError, match=r"MediumSpec.composition\[Si\] is numeric-only"):
         MediumSpec("test", (("Si", Q_(0.1, "1/angstrom**3")),))

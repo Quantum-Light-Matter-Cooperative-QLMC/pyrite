@@ -113,12 +113,12 @@ def clear_remote(materials, yes=False, catalog_profile="standard"):
     existing = transport._ssh_capture(listing).split()
     if not existing:
         print(f"(nothing to clear for {label})")
-        return
+        return None
     print("would delete on the box:")
     for f in existing:
         print(f"  pyrite-output/checkpoints/{f}")
     if not _cli_core.confirm_destructive(yes, "Delete these remote checkpoints?"):
-        return
+        return None
     return _clear_exact_remote_stems(stems, label)
 
 
@@ -303,6 +303,7 @@ def prune_remote(
             obsolete_stems=obsolete_stems,
             yes=True,
         )
+    return None
 
 
 def _run_remote_prune(
@@ -372,3 +373,4 @@ def prune_job_dirs(*, profile=None, all_jobs=False, yes=False):
             print(f"(no terminal job directories to prune for {scope})")
     if live_kept:
         print(f"kept {len(live_kept)} live job(s): {', '.join(live_kept)}")
+    return None

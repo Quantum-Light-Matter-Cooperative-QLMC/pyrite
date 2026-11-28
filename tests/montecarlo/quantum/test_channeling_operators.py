@@ -436,7 +436,7 @@ def test_transverse_covariance_follows_plane_and_beam(mos2_tilted):
 
 
 def test_anisotropic_tds_kernel_is_positive_and_matches_decoherence(mos2_tilted):
-    plane, beam = MOS2_TILTED
+    _plane, beam = MOS2_TILTED
     with pytest.raises(ChannelingDataError, match="beam_uvw"):
         tds_kernel(mos2_tilted, ENERGY_EV, **SMALL)
     kernel = tds_kernel(mos2_tilted, ENERGY_EV, n_cells=8, max_order=24, beam_uvw=beam)

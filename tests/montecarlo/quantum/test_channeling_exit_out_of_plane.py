@@ -288,7 +288,7 @@ def test_eta_nodes_cover_the_gaussian():
     assert weights @ np.exp(-0.5 * (eta / width) ** 2) == pytest.approx(
         np.sqrt(np.pi / 2) * width, rel=1e-5
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"divergence_y_rad must be positive"):
         eta_nodes(0.0, 1.36e6)
 
 

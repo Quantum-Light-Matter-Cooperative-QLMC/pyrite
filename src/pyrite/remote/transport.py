@@ -11,7 +11,7 @@ import sys
 import tarfile
 import tempfile
 import uuid
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -862,10 +862,8 @@ def _remote_sync_lock():
             )
         yield
     finally:
-        try:
+        with suppress(OSError):
             proc.stdin.close()
-        except OSError:
-            pass
         proc.wait()
 
 

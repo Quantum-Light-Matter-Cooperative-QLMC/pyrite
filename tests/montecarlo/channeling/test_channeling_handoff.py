@@ -159,7 +159,7 @@ def test_no_scattering_limit_dechannels_nothing():
 
 
 def test_zone_rows_satisfy_the_event_contract_and_open_their_electrons(zone):
-    _case_, segs = zone
+    _case, segs = zone
     check_segment_event_contract(segs)
     tagged = segs["channeling_zone"]
     assert np.all(segs["flight_id"][tagged] == 0)
@@ -176,7 +176,7 @@ def test_zone_rows_satisfy_the_event_contract_and_open_their_electrons(zone):
 
 
 def test_population_accounting_closes(zone):
-    _case_, segs = zone
+    _case, segs = zone
     info = segs["channeling"]
     fates = info["fates"]
     assert sum(fates.values()) == N == segs["Ne"]
@@ -202,7 +202,7 @@ def test_population_accounting_closes(zone):
 
 
 def test_handoff_rows_continue_with_the_sampled_plane_angle(zone):
-    case, segs = zone
+    _case, segs = zone
     info = segs["channeling"]
     tagged = segs["channeling_zone"]
     dechannel = tagged & (segs["event_kind"] == SegmentEvent.DECHANNEL)

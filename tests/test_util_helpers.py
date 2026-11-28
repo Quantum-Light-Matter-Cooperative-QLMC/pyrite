@@ -31,7 +31,7 @@ def test_observation_payload_digest_is_unchanged_and_tolerates_nan():
 
     assert payload_digest(_PAYLOAD) == _PAYLOAD_SHA256
     payload_digest({"x": float("nan")})  # historical behavior: no ValueError
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Out of range float values are not JSON compliant"):
         canonical_json_digest({"x": float("nan")})
 
 

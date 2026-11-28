@@ -40,7 +40,7 @@ def prepare_feedback_scene(
         stopping.extend(_case_stopping_tables(body))
         elastic.extend(_case_elastic_kwargs(body)["elastic_tables"])
         body_brems = _case_bremslib_tables(body)
-        if set(element for element, _ in composition) - body_brems.keys():
+        if {element for element, _ in composition} - body_brems.keys():
             raise ValueError(
                 "charged scene feedback requires BremsLib tables for every body element"
             )

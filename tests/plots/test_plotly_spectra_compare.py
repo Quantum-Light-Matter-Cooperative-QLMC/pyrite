@@ -253,7 +253,7 @@ def test_compare_chart_single_hue_value_still_renders_one_line():
 
 
 def test_compare_chart_rejects_unknown_hue():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"hue must be one of"):
         compare_spectrum_chart(_store_single_tilt(), _settings(), hue="not_a_field")
 
 

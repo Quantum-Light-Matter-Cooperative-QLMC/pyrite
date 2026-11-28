@@ -102,7 +102,7 @@ def test_views_and_pint_readback_do_not_mutate_numeric_tally() -> None:
 
 @pytest.mark.parametrize("unit", ["s", "mm", "dimensionless", "radian", "Hz"])
 def test_rejects_non_energy_conversion(unit: str) -> None:
-    with pytest.raises(ValueError, match="energy_unit.*energy"):
+    with pytest.raises(ValueError, match=r"energy_unit.*energy"):
         _tally().quantify().to_energy(unit)
 
 

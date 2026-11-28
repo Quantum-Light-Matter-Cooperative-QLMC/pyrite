@@ -7,6 +7,8 @@ import numpy as np
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2] / "checks/equal_precision"
+_WORKLOAD = "activity sample does not match frozen workload/audit"
+_COUNTS = "invalid activity counts or incomplete histories"
 
 
 def test_table_coverage_uses_entire_electron_path_and_explicit_units():
@@ -14,9 +16,9 @@ def test_table_coverage_uses_entire_electron_path_and_explicit_units():
     assert check([1000, 10000, 1000000], [10, 800], True)["covered"]
     assert not check([10000, 100000, 500000], [10, 800], True)["covered"]
     assert not check([20, 100, 800], [10, 300])["covered"]
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"invalid table energy grid"):
         check([1, np.nan, 3], [1, 3])
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"invalid table energy grid"):
         check([1, 3, 2], [1, 3])
 
 
@@ -51,7 +53,7 @@ G4WT0 >  Energy thresholds : gamma 990 eV e- 4.04011 MeV e+ 990 eV proton 100 me
     assert result["Silicon"]["gamma_production_threshold_keV"] == 0.99
     assert result["Silicon"]["electron_production_threshold_keV"] == pytest.approx(4040.11)
     assert "electron_tracking_threshold_keV" not in result["Silicon"]
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"missing material production-cut dump"):
         parse("no threshold dump")
 
 
@@ -124,9 +126,18 @@ def test_complete_audited_scores_are_accepted():
 
 
 @pytest.mark.parametrize(
-    "corruption", ["source", "controls", "warmup", "audit", "table", "shape", "nan"]
+    "corruption,message",
+    [
+        ("source", "validation protocol/source mismatch"),
+        ("controls", "resolved control mismatch"),
+        ("warmup", "incomplete same-workload warmup"),
+        ("audit", "trajectory invariant failed"),
+        ("table", "table energy domain not covered"),
+        ("shape", "invalid incident-primary score population"),
+        ("nan", "invalid incident-primary score population"),
+    ],
 )
-def test_loader_rejects_inconsistent_numerical_validation_evidence(corruption):
+def test_loader_rejects_inconsistent_numerical_validation_evidence(corruption, message):
     record, scores, protocol, scene = evidence()
     if corruption == "source":
         record["validation_sources"] = {}
@@ -142,14 +153,22 @@ def test_loader_rejects_inconsistent_numerical_validation_evidence(corruption):
         scores["transmitted"] = np.zeros(3)
     else:
         scores["transmitted"][0] = np.nan
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=message):
         runpy.run_path(str(ROOT / "analyze_cheap_validation.py"))["check_record"](
             record, scores, protocol, "frozen", scene
         )
 
 
-@pytest.mark.parametrize("corruption", ["fraction", "partition", "ledger", "blocks"])
-def test_score_and_audit_bookkeeping_cannot_be_faked_by_valid_shapes(corruption):
+@pytest.mark.parametrize(
+    "corruption,message",
+    [
+        ("fraction", "nonbinary terminal/angular score"),
+        ("partition", "terminal/angular partition mismatch"),
+        ("ledger", "raw primary score energy ledger mismatch"),
+        ("blocks", "incomplete warmup/measurement trajectory audit"),
+    ],
+)
+def test_score_and_audit_bookkeeping_cannot_be_faked_by_valid_shapes(corruption, message):
     record, scores, protocol, scene = evidence()
     if corruption == "fraction":
         scores["transmitted"][0] = 0.5
@@ -159,7 +178,7 @@ def test_score_and_audit_bookkeeping_cannot_be_faked_by_valid_shapes(corruption)
         scores["terminal_energy_keV_per_primary"][0] = 200
     else:
         record["trajectory_blocks"] = [dict(record["trajectory_blocks"][0], primaries=8)]
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=message):
         runpy.run_path(str(ROOT / "analyze_cheap_validation.py"))["check_record"](
             record, scores, protocol, "frozen", scene
         )
@@ -188,9 +207,18 @@ def test_activity_ladder_keeps_all_scenes_and_fresh_planning_population():
 
 
 @pytest.mark.parametrize(
-    "corruption", [None, "seed", "cap", "warmup", "audit", "counts", "capacity"]
+    "corruption,message",
+    [
+        (None, None),
+        ("seed", _WORKLOAD),
+        ("cap", _WORKLOAD),
+        ("warmup", _COUNTS),
+        ("audit", _WORKLOAD),
+        ("counts", _COUNTS),
+        ("capacity", _WORKLOAD),
+    ],
 )
-def test_activity_ladder_rejects_incomplete_or_mismatched_planning_samples(corruption):
+def test_activity_ladder_rejects_incomplete_or_mismatched_planning_samples(corruption, message):
     import json
 
     protocol = json.loads((ROOT / "activity-ladder.json").read_bytes())
@@ -223,7 +251,7 @@ def test_activity_ladder_rejects_incomplete_or_mismatched_planning_samples(corru
     if corruption is None:
         check(record, scene["id"], 0.05, protocol)
     else:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=message):
             check(record, scene["id"], 0.05, protocol)
 
 

@@ -8,6 +8,7 @@ cancellable) and only executes when the driver blocks on a completion.
 
 import concurrent.futures as cf
 from concurrent.futures.process import BrokenProcessPool
+from typing import ClassVar
 
 import pytest
 
@@ -18,7 +19,7 @@ from pyrite.montecarlo.runner import scheduling
 class _LazyPool:
     """Records submissions; a submitted job runs only when the driver waits."""
 
-    instances: list["_LazyPool"] = []
+    instances: ClassVar[list["_LazyPool"]] = []
 
     def __init__(self, max_workers=None, **_kwargs):
         self.max_workers = max_workers

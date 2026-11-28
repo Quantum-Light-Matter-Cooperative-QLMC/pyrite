@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "equal_precision"))
-from paired_equivalence import paired_interval  # noqa: E402
+from paired_equivalence import paired_interval
 
 
 def samples(root, arm, scene, seeds, histories, keep=None):

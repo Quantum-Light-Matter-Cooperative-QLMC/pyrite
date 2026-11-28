@@ -142,7 +142,8 @@ def test_mcwf_matches_direct_seeded_solver(config):
     ],
 )
 def test_invalid_inputs(config, updates):
-    with pytest.raises(ValueError):
+    # Each refusal names the field it rejects.
+    with pytest.raises(ValueError, match=next(iter(updates))):
         propagate_axial(replace(config, **updates))
 
 

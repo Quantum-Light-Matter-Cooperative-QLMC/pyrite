@@ -155,7 +155,7 @@ def _fake_transport(batches):
         for done, total in batches:
             if sink is not None:
                 sink(done, total)
-        return None
+        return
 
     return transport
 

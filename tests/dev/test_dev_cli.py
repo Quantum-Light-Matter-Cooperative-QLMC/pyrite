@@ -790,7 +790,7 @@ def test_check_lines_reports_oversized_source_path(
     path.write_text(source)
     monkeypatch.setattr(dev_module, "ROOT", tmp_path)
 
-    with pytest.raises(dev_module.AgentToolingError, match="oversized.py") as error:
+    with pytest.raises(dev_module.AgentToolingError, match=r"oversized\.py") as error:
         dev_module.main(["check-lines"])
     assert f": {limit + 1} (limit {limit})" in str(error.value)
 

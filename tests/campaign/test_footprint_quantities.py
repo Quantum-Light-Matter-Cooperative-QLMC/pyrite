@@ -68,7 +68,7 @@ def test_legacy_numeric_and_quantity_inputs_still_lower_identically() -> None:
     ],
 )
 def test_invalid_semantic_width_and_replacement(value: object, error: type[Exception]) -> None:
-    with pytest.raises(error, match="Footprint.width"):
+    with pytest.raises(error, match=r"Footprint\.width"):
         Footprint(5.0, 6.0).with_width(value)
 
 
@@ -92,7 +92,7 @@ def test_semantic_width_rejects_float_storage_overflow_or_underflow(value: str) 
         pytest.skip("longdouble has no wider exponent range than float")
     source = np.longdouble(value)
     assert np.isfinite(source) and source > 0
-    with pytest.raises(ValueError, match="Footprint.width.*representable"):
+    with pytest.raises(ValueError, match=r"Footprint\.width.*representable"):
         Footprint(5.0, 5.0).with_width(Q_(source, "mm"))
 
 

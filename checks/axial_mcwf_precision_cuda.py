@@ -174,7 +174,7 @@ def measure(cp, cells, points, chunks, n, depths, step, energy):
         "identical_jump_sequences": identical,
         "electrons": electrons,
         "divergence_steps": sorted(int(s) for s in divergence_steps if s is not None),
-        "time_s": {dtype: t for dtype, t in times.items()},
+        "time_s": dict(times.items()),
         "warm_time_ratio_complex128_over_complex64": total["complex128"] / total["complex64"],
     }
 

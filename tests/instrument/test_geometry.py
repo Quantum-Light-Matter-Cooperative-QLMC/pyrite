@@ -191,7 +191,9 @@ def test_tile_inheritance_conserves_discrete_pixel_flux() -> None:
 
 @pytest.mark.parametrize("angular_shape", [(0, 1), (1, 0), (5, 1), (1, 5)])
 def test_angular_tiles_reject_invalid_shape(angular_shape) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match=r"angular_shape must be positive and not exceed the pixel"
+    ):
         angular_tiles(planar_detector_rays(_detector()), angular_shape)
 
 

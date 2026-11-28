@@ -38,9 +38,9 @@ def test_state_spec_unit_inputs_canonicalize_before_serialization_and_identity()
 
 
 def test_state_spec_unit_inputs_reject_wrong_dimensions():
-    with pytest.raises(ValueError, match="TransverseStateSpec.waist_ang.*length.*angstrom"):
+    with pytest.raises(ValueError, match=r"TransverseStateSpec\.waist_ang.*length.*angstrom"):
         pr.TransverseStateSpec.recipe("gaussian", waist_ang=2 * ureg.fs)
-    with pytest.raises(ValueError, match="TransverseStateSpec.semiangle_rad.*angle"):
+    with pytest.raises(ValueError, match=r"TransverseStateSpec\.semiangle_rad.*angle"):
         pr.TransverseStateSpec.recipe(
             "aperture_probe", kinetic_energy_eV=30_000, semiangle_rad=1 * ureg.dimensionless
         )
@@ -168,7 +168,7 @@ def test_beam_stores_spec_but_refuses_unimplemented_production_injection():
         energy_keV=30, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch(), state=spec
     )
     assert beam.state == spec
-    with pytest.raises(ValueError, match="not yet.*transport"):
+    with pytest.raises(ValueError, match=r"not yet.*transport"):
         beam.to_spec()
     with pytest.raises(TypeError, match="TransverseStateSpec"):
         pr.Beam(

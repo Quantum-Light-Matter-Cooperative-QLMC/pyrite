@@ -110,7 +110,7 @@ def request(case, hook, log, phase):
         "wall_s": wall,
         "transport_s": out.get("_t_transport"),
         "peak_pool_bytes": hook.peak - before,
-        "schedule_log": sorted(set(m for m in log.messages if "transport schedule" in m)),
+        "schedule_log": sorted({m for m in log.messages if "transport schedule" in m}),
         "segments": int(out["segs"]["L_ang"].size),
         "digest": digest(out["segs"]),
     }

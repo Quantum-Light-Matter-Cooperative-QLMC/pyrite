@@ -75,7 +75,7 @@ def test_arrays_are_snapshots_and_every_readback_is_isolated() -> None:
 
 @pytest.mark.parametrize("unit", ["s", "radian", "sr", "1/keV/sr", "dimensionless"])
 def test_conversion_refuses_nonenergy_and_normalization_requests(unit: str) -> None:
-    with pytest.raises(ValueError, match="energy_unit.*energy"):
+    with pytest.raises(ValueError, match=r"energy_unit.*energy"):
         source().quantify().to_energy(unit)
 
 

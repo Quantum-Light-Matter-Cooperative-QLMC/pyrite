@@ -23,7 +23,7 @@ def capture(tmp_path, monkeypatch):
 
 
 def test_all_existing_builders_accept_selection_without_transport(capture):
-    selection, case, data = load_saved_capture(str(capture), first=3)
+    selection, _case, data = load_saved_capture(str(capture), first=3)
     assert selection.histories == 3
     assert len(data["E"]) == 9
     assert data["Ne"] == 3

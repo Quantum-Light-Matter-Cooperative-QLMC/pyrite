@@ -631,7 +631,7 @@ def test_numerics_line_resolution_validates_its_value_and_grid():
 
     with pytest.raises(ValueError, match="line_resolution must be one of"):
         pr.Numerics(line_resolution="resonance-local")
-    with pytest.raises(ValueError, match="explicit energy_bins.cxr"):
+    with pytest.raises(ValueError, match=r"explicit energy_bins\.cxr"):
         pr.Numerics(
             line_resolution="sinc-nyquist", energy_bins=EnergyBins(cxr=np.linspace(10, 100, 5))
         )

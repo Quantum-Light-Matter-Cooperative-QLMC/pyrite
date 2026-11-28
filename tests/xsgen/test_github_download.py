@@ -143,7 +143,7 @@ def test_a_release_without_the_asset_says_so(no_token, monkeypatch, tmp_path):
         fetch_module, "urlopen", lambda request, **kw: _Response(_release_body("other.zip"))
     )
 
-    with pytest.raises(DataFetchError, match="has no elsepa-tables.zip"):
+    with pytest.raises(DataFetchError, match=r"has no elsepa-tables\.zip"):
         fetch_module._download(URL, tmp_path / "a.zip", "ELSEPA tables")
 
 

@@ -533,15 +533,19 @@ def runtime_structure(content):
     tree = ast.parse(content)
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef) and any(
-            isinstance(decorator, ast.Attribute)
-            and isinstance(decorator.value, ast.Name)
-            and decorator.value.id == "app"
-            and decorator.attr == "cell"
-            or isinstance(decorator, ast.Call)
-            and isinstance(decorator.func, ast.Attribute)
-            and isinstance(decorator.func.value, ast.Name)
-            and decorator.func.value.id == "app"
-            and decorator.func.attr == "cell"
+            (
+                isinstance(decorator, ast.Attribute)
+                and isinstance(decorator.value, ast.Name)
+                and decorator.value.id == "app"
+                and decorator.attr == "cell"
+            )
+            or (
+                isinstance(decorator, ast.Call)
+                and isinstance(decorator.func, ast.Attribute)
+                and isinstance(decorator.func.value, ast.Name)
+                and decorator.func.value.id == "app"
+                and decorator.func.attr == "cell"
+            )
             for decorator in node.decorator_list
         ):
             # Marimo injects these dependency parameters by name, not position.

@@ -5,6 +5,7 @@ They are provenance records and artifact-GC roots; paused or failed runs must
 not claim a completed lock.
 """
 
+import contextlib
 import json
 import os
 import tempfile
@@ -95,10 +96,8 @@ def write_lock(
             os.fsync(handle.fileno())
         os.replace(temporary, destination)
     except BaseException:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(temporary)
-        except OSError:
-            pass
         raise
     return destination
 

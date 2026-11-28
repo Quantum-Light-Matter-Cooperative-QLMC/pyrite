@@ -149,7 +149,7 @@ def test_documented_autosummary_exports_have_inventory_entries() -> None:
     documented = {
         name
         for page in pages
-        for name in re.findall(r"^   (pyrite\.[\w.]+)$", page.read_text(), re.M)
+        for name in re.findall(r"^   (pyrite\.[\w.]+)$", page.read_text(), re.MULTILINE)
     }
     assert documented
     assert documented <= registered, sorted(documented - registered)

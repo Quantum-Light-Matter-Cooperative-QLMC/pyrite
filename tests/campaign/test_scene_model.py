@@ -45,7 +45,7 @@ def _case_bytes(cases) -> list[bytes]:
 
 
 def test_scene_rejects_implicit_sweep_values() -> None:
-    with pytest.raises(ValueError, match="put multiple values in Sweep.axes"):
+    with pytest.raises(ValueError, match=r"put multiple values in Sweep\.axes"):
         Scene(
             beam=BeamSpec(energy_keV=[30.0, 60.0]),
             target=Slab("hopg", footprint=Footprint(5.0, 5.0)),
@@ -165,8 +165,11 @@ def test_quantity_paths_keep_owner_requirement_for_explicit_quantities(value) ->
 def test_quantity_paths_keep_owner_dimension_and_value_checks() -> None:
     from pyrite.units import ureg
 
-    for value in (1 * ureg.second, -1 * ureg.nm):
-        with pytest.raises(ValueError):
+    for value, message in (
+        (1 * ureg.second, r"Layer\.thickness received unit 'second'"),
+        (-1 * ureg.nm, r"Layer\.thickness must be finite and positive"),
+    ):
+        with pytest.raises(ValueError, match=message):
             Sweep(base=_scene(), axes={"target.layers[1].thickness": [value]})
 
 

@@ -382,7 +382,7 @@ def test_shell_schema_rows_and_budget(secondaries, keep_on_device):
     budget = 2 * (4 * (2 * row_bytes + 24) + 13)
     records = []
     cont = TransportContinuationConfig(rows_per_round=4, on_round=records.append)
-    counts, rows, _, _ = _drive(cont, budget=budget, keep_on_device=keep_on_device, alloc=alloc)
+    _counts, rows, _, _ = _drive(cont, budget=budget, keep_on_device=keep_on_device, alloc=alloc)
     history, ordinal = _expected()
     np.testing.assert_array_equal(rows[5], history)
     np.testing.assert_array_equal(rows[2], ordinal)
@@ -483,7 +483,7 @@ def test_automatic_quantum_resizes_after_the_first_round(keep_on_device):
 def test_draining_rounds_spread_scratch_over_remaining_lanes():
     row_bytes = continuation_row_bytes(_alloc(1))
     budget = 8 * (256 * (2 * row_bytes + 24) + 13)
-    _, _, launches, records = _short_rows(TransportContinuationConfig(), budget)
+    _, _, _launches, records = _short_rows(TransportContinuationConfig(), budget)
     drain = [r for r in records[1:] if not r["pending"] and not r["refilled"]]
     # The 300-row history finishes in fewer rounds than 300 / 16.
     assert drain and len(records) - 1 < int(np.ceil(300 / 16))
@@ -536,7 +536,7 @@ def test_continuation_stats_are_recorded_and_cleared():
     "kwargs", [{"rows_per_round": 0}, {"active_histories": 0}, {"rows_per_round": -1}]
 )
 def test_invalid_schedule_is_rejected(kwargs):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=f"{next(iter(kwargs))} must be a positive integer"):
         TransportContinuationConfig(**kwargs)
 
 
@@ -548,9 +548,9 @@ def test_history_order_must_be_a_permutation():
 
 def test_segment_overflow_raises():
     cont = TransportContinuationConfig(rows_per_round=2)
+    launches = []
+    out = tuple(np.empty((1,) + a.shape[1:], a.dtype) if a.shape[0] else a for a in _alloc(1))
     with pytest.raises(RuntimeError, match="segment buffer exhausted"):
-        launches = []
-        out = tuple(np.empty((1,) + a.shape[1:], a.dtype) if a.shape[0] else a for a in _alloc(1))
         _drive_continuation_rounds(
             _fake_core(LENGTHS, launches),
             (),

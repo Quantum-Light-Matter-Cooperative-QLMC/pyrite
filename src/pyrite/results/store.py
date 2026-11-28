@@ -14,8 +14,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 
-EmissionMode = Literal["incoherent", "coherent", "both"]
-
 import numpy as np
 
 from .._mixed_elastic_policy import validate_transport_mode
@@ -51,6 +49,7 @@ from ..montecarlo import (
 )
 from ..quantum._channeling import channeling_from_fields, validate_channeling_run
 
+EmissionMode = Literal["incoherent", "coherent", "both"]
 PER_NA = 6.2415e9  # electrons/s at 1 nA
 DEFAULT_BUNCH_CHARGE_PC = 1.0
 DEFAULT_REP_RATE_HZ = 5000.0

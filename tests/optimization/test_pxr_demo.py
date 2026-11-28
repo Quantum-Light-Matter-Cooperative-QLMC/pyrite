@@ -9,7 +9,7 @@ from pyrite.optimization import FixedWindowYield, OptunaOptimizer, TrialState
 
 pytest.importorskip("optuna")
 
-from checks.pxr_optimization import (  # noqa: E402
+from checks.pxr_optimization import (
     BUDGET,
     GRID,
     SCORER,

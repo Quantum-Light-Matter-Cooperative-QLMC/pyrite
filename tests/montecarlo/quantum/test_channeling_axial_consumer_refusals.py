@@ -53,7 +53,7 @@ def test_axial_result_is_refused_before_mutating_store(axial_case):
 def test_axial_replay_refuses_before_inputs_or_segments(axial_case, monkeypatch, streaming):
     artifact = SimpleNamespace(case=axial_case)
     monkeypatch.setattr(artifacts, "read_trajectory_artifact", lambda *_a, **_kw: artifact)
-    with pytest.raises(TrajectoryArtifactError, match="#623"):
+    with pytest.raises(TrajectoryArtifactError, match="#623"):  # noqa: PT012 - one call, chosen by the parametrized branch
         if streaming:
             artifacts.stream_spectrum_from_artifact("unused.h5")
         else:

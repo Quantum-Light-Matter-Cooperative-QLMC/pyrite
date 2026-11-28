@@ -35,14 +35,14 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
-import transport_kernel_builds as _builds  # noqa: E402
-from transport_kernel_builds import (  # noqa: E402
+import transport_kernel_builds as _builds
+from transport_kernel_builds import (
     _function_attributes,
     _functions,
     _scene_kwargs,
     parse_build,
 )
-from transport_kernel_variants import _digest, _max_threads_per_sm, _sync  # noqa: E402
+from transport_kernel_variants import _digest, _max_threads_per_sm, _sync
 
 # #821 anchors (scenes.json) with histories sized for a few seconds per warm run.
 _builds.SCENES.update(
@@ -206,7 +206,7 @@ def attributes(args):
     arms = Arms(args.arms)
     records = {}
     for name in args.arms:
-        precision, threads, _ = arms.spec[name]
+        precision, _threads, _ = arms.spec[name]
         arms.select(name)
         simulate_trajectories(**kwargs, Ne=500, seed=1, transport_precision=precision)
         _sync()

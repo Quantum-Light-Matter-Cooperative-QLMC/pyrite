@@ -162,7 +162,7 @@ def _build_sections(args, materials, job_records, detail):
             pass
 
     progress_lines = []
-    for _mat, rec in job_records.items():
+    for rec in job_records.values():
         progress_lines.append(json.dumps(rec))
 
     if progress_lines:

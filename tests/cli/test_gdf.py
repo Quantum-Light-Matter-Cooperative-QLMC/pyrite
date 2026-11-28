@@ -101,7 +101,7 @@ def test_named_beam_workflow(catalog, monkeypatch, normalization):
     captured = {}
 
     def run(args):
-        settings, sweep, identity, stem = scan._resolved_run(args, "hopg")
+        _settings, sweep, identity, stem = scan._resolved_run(args, "hopg")
         captured.update(sweep=sweep, identity=identity, stem=stem)
         assert not hasattr(args, "gdf_overrides")
 

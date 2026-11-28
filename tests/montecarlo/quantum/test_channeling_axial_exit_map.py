@@ -104,7 +104,7 @@ def test_incidence_nodes_are_a_normalized_truncated_gaussian():
 
 def test_one_cell_carries_every_populated_supercell_order():
     """A 2x3 supercell populates only the one-cell orders, with equal weights."""
-    profile, grid, potential, absorptive = _cell()
+    profile, _grid, potential, absorptive = _cell()
     tilt = (1.7e-3, -0.6e-3)
     cells = (2, 3)
     big = RealSpaceGrid(

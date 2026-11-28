@@ -151,7 +151,7 @@ def test_clearing_scalar_geometry_cannot_silently_restore_defaults(editor, value
 def test_invalid_configuration_cannot_save(editor, values, match):
     invalid = editor.patch(values)
     assert any(match in error for error in invalid.errors())
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=f"(?s)invalid material catalog.*{match}"):
         invalid.save()
     assert "notebook" not in read_raw(bundled_catalog())["profiles"]
 
@@ -163,7 +163,7 @@ def test_incompatible_pixel_scalar_configuration_is_not_replaced_with_default(ed
     invalid = editor.detector("default", values=values, migrate=True)
     assert invalid.errors()
     assert invalid.row["detectors"]["default"]["solid_angle_sr"] == 0.1
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"pixel detector acceptance is derived from its geometry"):
         invalid.save()
 
 
@@ -398,7 +398,7 @@ def test_widget_decode_preserves_optional_settings_and_numeric_types():
         "straggling": False,
     }
     assert calculation_defaults("physics")["emission"] == "incoherent"
-    with pytest.raises(ValueError, match="energy_keV.values"):
+    with pytest.raises(ValueError, match=r"energy_keV\.values"):
         field_values(
             {"energy_keV.values": {"explicit": True, "value": "bad"}}, {"energy_keV.values": [30.0]}
         )

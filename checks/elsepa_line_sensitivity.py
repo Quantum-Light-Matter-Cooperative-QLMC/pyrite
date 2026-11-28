@@ -39,11 +39,11 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
-from soft_deflection_line_sensitivity import cxr_metrics, peak_windows  # noqa: E402
+from soft_deflection_line_sensitivity import cxr_metrics, peak_windows
 
-from pyrite.campaign.config import material_sweep  # noqa: E402
-from pyrite.campaign.sweep import build_cases  # noqa: E402
-from pyrite.montecarlo import runner  # noqa: E402
+from pyrite.campaign.config import material_sweep
+from pyrite.campaign.sweep import build_cases
+from pyrite.montecarlo import runner
 
 MATERIALS = ("silicon", "hopg", "mos2")
 CASES = ((30.0, 1000.0), (30.0, 20000.0), (100.0, 1000.0), (100.0, 20000.0))  # (E0 keV, t A)

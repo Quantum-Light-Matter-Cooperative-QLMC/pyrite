@@ -953,7 +953,7 @@ class Slab(SlabDimensions, _TargetGeometry):
         mosaic: bool = False,
         cut: CrystalCut | None = None,
         *,
-        footprint: Footprint | None | _Unset = _UNSET,
+        footprint: Footprint | _Unset | None = _UNSET,
         width: object = _UNSET,
         height: object = _UNSET,
         _infinite_via_dimensions: bool = False,

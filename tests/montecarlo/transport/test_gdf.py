@@ -224,7 +224,7 @@ def test_normalization_and_cpu_transport(tmp_path, screen):
     assert result["Ne"] == 8
     assert result["n_step_limited"] == 0
     path.write_bytes(path.read_bytes() + b"changed")
-    with pytest.raises(ValueError, match="changed|cannot read"):
+    with pytest.raises(ValueError, match=r"changed|cannot read"):
         simulate_trajectories(
             30,
             2,
@@ -385,7 +385,7 @@ def test_screen_requires_valid_crossing_times(tmp_path, value):
     if value is not None:
         arrays["t"] = value
     path = write_gdf(tmp_path / "screen.gdf", arrays, times=(0.1,), kind="position")
-    with pytest.raises(MaterialConfigError, match="missing required|lengths|finite"):
+    with pytest.raises(MaterialConfigError, match=r"missing required|lengths|finite"):
         load_gdf_beam(path, screen_position_m=0.1)
 
 

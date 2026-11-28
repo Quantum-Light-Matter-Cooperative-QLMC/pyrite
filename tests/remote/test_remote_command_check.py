@@ -4,7 +4,7 @@ import pytest
 
 from pyrite import remote
 from pyrite.cli.commands import _remote_actions
-from pyrite.cli.commands import remote as cli  # noqa: F401
+from pyrite.cli.commands import remote as cli
 from pyrite.remote import (  # noqa: F401
     _queue_scripts,
     config,

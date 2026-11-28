@@ -4,6 +4,7 @@ import queue
 import warnings
 from pathlib import Path
 from types import SimpleNamespace
+from typing import ClassVar
 from unittest.mock import Mock
 
 import numpy as np
@@ -47,7 +48,7 @@ class FakeWorker:
     spectrum, so both must be rejected.
     """
 
-    runs: list = []
+    runs: ClassVar[list] = []
 
     def __init__(self, payload, workdir, timeout, on_event):
         self.workdir, self.on_event, self.environment = workdir, on_event, ENV
@@ -318,7 +319,7 @@ def _silent_worker(tmp_path, stderr="worker said this"):
 
 def test_worker_timeout_reports_stderr(tmp_path):
     worker = _silent_worker(tmp_path)
-    with worker._stderr, pytest.raises(kt._WorkerError, match="no worker reply.*worker said this"):
+    with worker._stderr, pytest.raises(kt._WorkerError, match=r"no worker reply.*worker said this"):
         worker._next()
 
 
@@ -328,6 +329,24 @@ def test_worker_interrupt_keeps_stderr_as_a_note(tmp_path):
     with worker._stderr, pytest.raises(KeyboardInterrupt) as caught:
         worker._next()
     assert any("worker said this" in note for note in caught.value.__notes__)
+
+
+def test_worker_error_releases_stderr_capture(tmp_path):
+    worker = _silent_worker(tmp_path)
+    stderr = worker._stderr
+    with pytest.raises(kt._WorkerError):
+        worker._next()
+    assert stderr.closed
+    assert worker._stderr is None
+
+
+def test_worker_close_releases_stderr_capture(tmp_path):
+    worker = _silent_worker(tmp_path)
+    stderr = worker._stderr
+    worker.close()
+    worker.close()
+    assert stderr.closed
+    assert worker._stderr is None
 
 
 @pytest.mark.parametrize(("reserved", "warns"), [(10.0, False), (4096.0, True)])

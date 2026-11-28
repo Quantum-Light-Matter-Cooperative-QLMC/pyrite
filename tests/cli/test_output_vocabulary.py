@@ -35,13 +35,13 @@ def test_value_sources_map_into_the_documented_vocabulary(raw, human):
 
 @pytest.mark.parametrize("raw", ["fixed", "yours", "", "preset"])
 def test_unknown_value_sources_are_rejected(raw):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"unknown value source"):
         value_source(raw)
 
 
 def test_object_origins_are_bundled_user_or_catalog():
     assert {object_origin(raw) for raw in ("bundled", "user", "yours", "catalog")} == OBJECT_ORIGINS
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"unknown object origin"):
         object_origin("[bundled]")
 
 

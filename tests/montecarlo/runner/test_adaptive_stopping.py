@@ -227,7 +227,8 @@ def test_degenerate_moments_report_no_error():
 )
 def test_settings_are_validated(bad):
     kw = dict(target_rse=0.1, min_histories=40, max_histories=200, block_histories=20) | bad
-    with pytest.raises(ValueError):
+    # Each refusal names the field it rejects.
+    with pytest.raises(ValueError, match=next(iter(bad))):
         AdaptiveSettings(**kw)
 
 
@@ -859,7 +860,7 @@ def test_energy_range_replay_rechecks_statistics_before_accepting_stop(monkeypat
         case={"seed": 1, "E0_keV": 30.0},
         E_cut_by_electrons=np.ones(80),
         block_electrons=AdaptiveChunkPlan(20),
-        beam_kw={key: None for key in block_transport.BUNCH_KWARGS},
+        beam_kw=dict.fromkeys(block_transport.BUNCH_KWARGS),
         monitor=monitor,
     )
     grow = _grid(40, 80)[1]
@@ -994,7 +995,7 @@ def test_adaptive_host_admission_refuses_before_kept_growth(monkeypatch):
         original_admit(required, phase)
 
     monkeypatch.setattr(host_memory, "admit_host_allocation", admit)
-    with pytest.raises(host_memory.HostMemoryResourceError, match="lower max_histories.*#1280"):
+    with pytest.raises(host_memory.HostMemoryResourceError, match=r"lower max_histories.*#1280"):
         transport_case_adaptive(_case(), _SETTINGS, transport_core="per-electron")
     assert calls == [0]
 

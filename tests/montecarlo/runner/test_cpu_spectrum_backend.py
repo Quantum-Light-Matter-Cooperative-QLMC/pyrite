@@ -12,14 +12,11 @@ def test_cpu_context_switches_leaf_staging_and_restores_on_error(monkeypatch):
     monkeypatch.setattr(_kernels, "xp", device)
     monkeypatch.setattr(_position_twins, "xp", device)
     row = np.arange(9, dtype=np.float64).reshape(3, 3)
-    with pytest.raises(RuntimeError, match="restore"):
-        with _cpu_spectrum_backend():
-            with _kernels._RowStager() as stage:
-                np.testing.assert_array_equal(stage(row), row)
-                np.testing.assert_array_equal(
-                    _position_twins.stage_row("r_mid_f64", row, stage), row
-                )
-            raise RuntimeError("restore")
+    with pytest.raises(RuntimeError, match="restore"), _cpu_spectrum_backend():  # noqa: PT012 - the raise exercises the context manager's exit path
+        with _kernels._RowStager() as stage:
+            np.testing.assert_array_equal(stage(row), row)
+            np.testing.assert_array_equal(_position_twins.stage_row("r_mid_f64", row, stage), row)
+        raise RuntimeError("restore")
     assert _kernels.xp is device
     assert _position_twins.xp is device
 
@@ -140,9 +137,8 @@ def test_cuda_oom_recovers_without_device_allocations(monkeypatch, tmp_path, pyt
         return pool.malloc(size)
 
     used = pool.used_bytes()
-    with cp.cuda.using_allocator(allocate):
-        with pytest.warns(RuntimeWarning, match="CPU NumPy"):
-            actual = runner._spectrum_with_recovery(case, tp, engine="auto")
+    with cp.cuda.using_allocator(allocate), pytest.warns(RuntimeWarning, match="CPU NumPy"):
+        actual = runner._spectrum_with_recovery(case, tp, engine="auto")
     assert allocations == []
     assert pool.used_bytes() == used
     assert actual["_recovery_path"] == "cpu_spectrum"

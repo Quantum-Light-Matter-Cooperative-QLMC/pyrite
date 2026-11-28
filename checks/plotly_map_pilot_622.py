@@ -404,7 +404,7 @@ def drive(page, url, grid):  # noqa: C901, PLR0915 - linear scripted scenario
     # 3. map quantity change keeps a valid selection
     page.select("integrated coherent flux", "integrated flux under the dominant line")
     page.wait(
-        lambda: page.map_cells() and page.map_cells()["targets"] != cells["targets"] or True, 20
+        lambda: (page.map_cells() and page.map_cells()["targets"] != cells["targets"]) or True, 20
     )
     _settle(page)
     gated_cells = page.map_cells()

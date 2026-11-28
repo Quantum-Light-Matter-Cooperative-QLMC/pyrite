@@ -49,7 +49,7 @@ BANDS = ("photons_1_10keV", "photons_10_50keV", "photons_50_100keV", "photons_ge
 
 def audit_log(text, material, elastic="ss"):
     """Check matched bounds from the app's own dumps; return parsed facts."""
-    processes = set(re.findall(r"^G4BENCH_PROCESS e- (\S+)$", text, re.M))
+    processes = set(re.findall(r"^G4BENCH_PROCESS e- (\S+)$", text, re.MULTILINE))
     if processes != EXPECTED_PROCESSES[elastic]:
         raise RuntimeError(f"unexpected electron processes {sorted(processes)}")
     block = text.split(f"Material : Bench{material}", 1)[1]
@@ -65,9 +65,9 @@ def audit_log(text, material, elastic="ss"):
         if not re.search(pattern, text):
             raise RuntimeError(f"missing bound: {pattern}")
     step = re.search(r"Step function for e\+-\s+(\(.*?\))", text).group(1)
-    timing = dict(
-        (k, float(v)) for k, v in re.findall(r"(\w+_s)=([0-9.]+)", text.split("G4BENCH_TIMING")[1])
-    )
+    timing = {
+        k: float(v) for k, v in re.findall(r"(\w+_s)=([0-9.]+)", text.split("G4BENCH_TIMING")[1])
+    }
     return dict(
         processes=sorted(processes),
         gamma_threshold=thresholds.group(1),

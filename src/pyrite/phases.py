@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from ._numerics_groups import KernelTuning
     from .campaign.model import Numerics, Scene
     from .campaign.trajectory_product import Trajectories
-    from .campaign.trajectory_product import Trajectories as TransportedScene  # noqa: F401
+    from .campaign.trajectory_product import Trajectories as TransportedScene
     from .results.model import Result
 
 __all__ = ["SimulationProgress", "TransportedScene", "score_spectra", "simulate_transport"]

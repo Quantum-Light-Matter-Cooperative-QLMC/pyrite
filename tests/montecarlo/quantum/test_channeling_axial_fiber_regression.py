@@ -210,7 +210,7 @@ def test_without_jumps_the_estimator_is_the_exact_regression():
 
 
 def test_signed_spectrum_reproduces_the_qrt_photon_law():
-    channels, entry, values, traces, _ = _dense(0.0, 0.0)
+    _channels, _entry, values, traces, _ = _dense(0.0, 0.0)
     energies = np.linspace(0.05, 1.2, 18)
     expected = on_axis_photon_spectrum(
         RegressionCorrelation(DEPTHS, _full(values), traces, 0), energies, KINETIC

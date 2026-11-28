@@ -67,7 +67,7 @@ def test_catalog_rejects_unknown_crystal_texture(tmp_path, texture):
     from pyrite.materials import MaterialConfigError, load_material_catalog
 
     text = _minimal_catalog().replace("layers_per_cell = 2", f"texture = {texture}")
-    with pytest.raises(MaterialConfigError, match="crystals.mos2.texture"):
+    with pytest.raises(MaterialConfigError, match=r"crystals\.mos2\.texture"):
         load_material_catalog(_write_catalog(tmp_path, text))
 
 
@@ -124,7 +124,7 @@ def test_per_beam_line_grids_are_exact_read_only_and_projected(tmp_path, monkeyp
     np.testing.assert_array_equal(scan.E_grid_line_by_energy[25.0], np.linspace(10.0, 58.0, 17))
     with pytest.raises(TypeError):
         scan.E_grid_line_by_energy[25.0] = np.array([1.0])
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"assignment destination is read-only"):
         scan.E_grid_line_by_energy[25.0][0] = 1.0
 
     monkeypatch.setattr(config, "CATALOG", catalog)
@@ -321,7 +321,7 @@ def test_profile_artifact_ref_rejects_beam_energy_the_artifact_never_covered(tmp
         "energy_keV = { values = [25.0, 30.0, 40.0] }",
     )
 
-    with pytest.raises(MaterialConfigError, match="do not include .40.0."):
+    with pytest.raises(MaterialConfigError, match=r"do not include \[40\.0\]"):
         load_material_catalog(_write_catalog(tmp_path, text))
 
 
@@ -369,7 +369,7 @@ def test_profile_artifact_ref_rejects_missing_or_wrong_material(tmp_path):
     from pyrite.materials import MaterialConfigError, load_material_catalog
 
     missing = "a" * 64
-    with pytest.raises(MaterialConfigError, match="artifact .* is missing"):
+    with pytest.raises(MaterialConfigError, match=r"artifact .* is missing"):
         load_material_catalog(_write_catalog(tmp_path, _catalog_with_artifact_ref(missing)))
 
     identity = artifacts.artifact_identity(
@@ -630,7 +630,7 @@ def test_profile_convergence_numerics_are_validated_and_exposed(tmp_path):
     }
 
     path.write_text(text.replace("n_families = 3", "n_families = 0"))
-    with pytest.raises(MaterialConfigError, match="profiles.narrowed.n_families"):
+    with pytest.raises(MaterialConfigError, match=r"profiles\.narrowed\.n_families"):
         load_material_catalog(path)
 
 
@@ -1094,7 +1094,7 @@ def test_catalog_detector_bounds_match_the_detector_dataclass(tmp_path, field, v
     from pyrite.detectors import Detector
     from pyrite.materials import MaterialConfigError, load_material_catalog
 
-    with pytest.raises((TypeError, ValueError)) as dataclass_error:
+    with pytest.raises((TypeError, ValueError)) as dataclass_error:  # noqa: PT012 - one call, chosen by the parametrized branch
         if field == "observation_angle_deg":
             Detector(observation_angle_deg=value)
         else:
@@ -1836,11 +1836,11 @@ def test_packaged_catalog_exposes_frozen_ordered_public_api():
         CATALOG.materials["new"] = CATALOG.material("mote2")  # type: ignore[index]
     with pytest.raises(FrozenInstanceError):
         CATALOG.material("mote2").label = "changed"  # type: ignore[misc]
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"assignment destination is read-only"):
         CATALOG.material("mote2").scan.tilt_deg[0] = 1.0
     with pytest.raises(TypeError):
         CATALOG.crystal("hbn").lattice["c"] = 1.0  # type: ignore[index]
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"assignment destination is read-only"):
         CATALOG.crystal("hbn").basis[0][1][0] = 1.0
 
     np.testing.assert_array_equal(
@@ -1899,11 +1899,13 @@ def test_exposed_arrays_cannot_have_writes_reenabled():
 
     for values in arrays:
         try:
-            with pytest.raises(ValueError):
+            with pytest.raises(
+                ValueError, match=r"cannot set WRITEABLE flag to True of this array"
+            ):
                 values.flags.writeable = True
         finally:
             values.flags.writeable = False
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"assignment destination is read-only"):
             values[0] = -1.0
 
 
@@ -1954,7 +1956,7 @@ def test_grid_descriptor_types_are_strict_and_errors_are_wrapped(tmp_path, valid
     from pyrite.materials import MaterialConfigError, load_material_catalog
 
     text = _minimal_catalog().replace(valid, invalid)
-    with pytest.raises(MaterialConfigError, match="profiles.standard"):
+    with pytest.raises(MaterialConfigError, match=r"profiles\.standard"):
         load_material_catalog(_write_catalog(tmp_path, text))
 
 
@@ -2209,7 +2211,7 @@ display_name = "FrF"
     (tmp_path / "cifs").mkdir()
     fixture = Path(__file__).parents[1] / "data" / "materials" / "frf.cif"
     (tmp_path / "cifs" / "frf.cif").write_bytes(fixture.read_bytes())
-    with pytest.raises(MaterialConfigError, match="unsupported transport elements.*Fr"):
+    with pytest.raises(MaterialConfigError, match=r"unsupported transport elements.*Fr"):
         load_material_catalog(_write_catalog(tmp_path, text))
 
 

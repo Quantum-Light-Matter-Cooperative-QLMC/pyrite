@@ -92,7 +92,7 @@ def test_linear_weights_integrate_the_interpolant_exactly(omega):
 
 def test_linear_quadrature_has_no_line_replicas_at_large_angle():
     """One line, far off axis: the trapezoid sum aliases replicas, linear does not."""
-    gamma, beta = longitudinal_kinematics(KINETIC)
+    _gamma, beta = longitudinal_kinematics(KINETIC)
     hbar_v = HBARC_EV_ANG * beta
     z = np.linspace(0.0, 3000.0, 201)
     delta = 30.0  # eV transition
@@ -135,7 +135,7 @@ def test_polarization_spectrum_refuses_an_unknown_quadrature():
 )
 def test_directional_observation_is_unadmitted_and_needs_the_opt_in(detector):
     detector = _planar_detector() if detector is None else detector
-    with pytest.raises(AxialAdmissionError, match="zero-aperture.*accept-inaccurate"):
+    with pytest.raises(AxialAdmissionError, match=r"zero-aperture.*accept-inaccurate"):
         _scene(detector, admission="admitted")
     case = _scene(detector)
     assert case["channeling"]["case_key"] == "unadmitted"

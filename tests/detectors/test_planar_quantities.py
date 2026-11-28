@@ -60,7 +60,7 @@ def test_pose_legacy_and_conflicts() -> None:
     ],
 )
 def test_pose_center_refuses_invalid_values(value, error) -> None:
-    with pytest.raises(error, match="PlanarPose.center"):
+    with pytest.raises(error, match=r"PlanarPose\.center"):
         PlanarPose(center=value)
 
 
@@ -139,5 +139,5 @@ def test_pixel_pitch_replacement_conflicts_and_registry() -> None:
         (Q_([1, -1], "mm"), ValueError),
         (Q_([1, 1], "s"), ValueError),
     ):
-        with pytest.raises(error, match="PixelGrid.pitch"):
+        with pytest.raises(error, match=r"PixelGrid\.pitch"):
             grid.with_pitch(value)

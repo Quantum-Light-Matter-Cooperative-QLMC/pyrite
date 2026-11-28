@@ -191,9 +191,16 @@ def test_beam_metrics_reuse_sampled_definition(capture):
     assert metrics.x.position_sigma_mm == reference.x.position_sigma_mm
 
 
-@pytest.mark.parametrize("edges", [[1], [1, 0], [0, np.nan]])
-def test_invalid_edges(capture, edges):
-    with pytest.raises(ValueError):
+@pytest.mark.parametrize(
+    "edges,message",
+    [
+        ([1], "at least two finite edges"),
+        ([1, 0], "strictly increasing"),
+        ([0, np.nan], "at least two finite edges"),
+    ],
+)
+def test_invalid_edges(capture, edges, message):
+    with pytest.raises(ValueError, match=f"depth_edges_ang must .*{message}"):
         summarize_trajectories(capture[0], depth_edges_ang=edges, energy_edges_keV=[0, 10])
 
 

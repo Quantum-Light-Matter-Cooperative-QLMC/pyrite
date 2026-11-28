@@ -99,7 +99,7 @@ def test_crystal_params_complete(material):
 
 
 def test_crystal_params_unknown_raises():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"unknown material"):
         crystal_params("unobtanium")
 
 
@@ -180,7 +180,7 @@ def test_legacy_flat_detector_inputs_normalize_to_detector_and_cases():
 
 
 def test_conflicting_nested_and_flat_detector_inputs_fail_actionably():
-    with pytest.raises(ValueError, match="conflicting nested detector.*theta_obs_deg"):
+    with pytest.raises(ValueError, match=r"conflicting nested detector.*theta_obs_deg"):
         Sweep(
             material="mose2",
             detector=Detector(observation_angle_deg=119.0),
@@ -524,7 +524,7 @@ def test_scalar_constant_and_near_uniform_energy_grids_stay_exact(monkeypatch, c
     assert case["E_grid_line"].shape == expected.shape
     assert not case["E_grid_line"].flags.writeable
     assert not case["E_grid_brem"].flags.writeable
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"assignment destination is read-only"):
         case["E_grid_line"][0] = -1.0
 
     monkeypatch.setattr(runner.case_driver, "simulate_trajectories", lambda *args, **kwargs: {})
@@ -563,18 +563,18 @@ def test_build_cases_sweeps_rectangular_footprints_and_labels_them():
 
 
 @pytest.mark.parametrize(
-    ("width", "height"),
+    ("width", "height", "message"),
     [
-        (0.1, None),
-        (None, 0.1),
-        (0.0, 0.1),
-        (0.1, -0.1),
-        (float("inf"), 0.1),
-        (0.1, float("inf")),
+        (0.1, None, "crystal_width_mm and crystal_height_mm must be supplied together"),
+        (None, 0.1, "crystal_width_mm and crystal_height_mm must be supplied together"),
+        (0.0, 0.1, r"Footprint\.width_mm must be finite and positive"),
+        (0.1, -0.1, r"Footprint\.height_mm must be finite and positive"),
+        (float("inf"), 0.1, r"Footprint\.width_mm must be finite and positive"),
+        (0.1, float("inf"), r"Footprint\.height_mm must be finite and positive"),
     ],
 )
-def test_build_cases_rejects_invalid_footprint(width, height):
-    with pytest.raises(ValueError):
+def test_build_cases_rejects_invalid_footprint(width, height, message):
+    with pytest.raises(ValueError, match=message):
         build_cases(Sweep(material="mose2", crystal_width_mm=width, crystal_height_mm=height))
 
 
@@ -1023,7 +1023,9 @@ def test_build_cases_omits_groove_spacing_when_unset():
 
 
 def test_build_cases_groove_requires_azim_180():
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match=r"blazed grooves require tilt_azim_deg == 180 for every case"
+    ):
         build_cases(
             Sweep(
                 material="hopg",
@@ -1037,7 +1039,9 @@ def test_build_cases_groove_requires_azim_180():
 
 
 def test_build_cases_groove_requires_tilt_between_0_and_90():
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match=r"blazed grooves require 0 < tilt_deg < 90 for every case"
+    ):
         build_cases(
             Sweep(
                 material="hopg",
@@ -1053,7 +1057,7 @@ def test_build_cases_groove_requires_tilt_between_0_and_90():
 
 @pytest.mark.filterwarnings("ignore:Sweep.substrate:DeprecationWarning")
 def test_build_cases_groove_rejects_substrate():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"grooves are v1 single-slab only"):
         build_cases(
             Sweep(
                 material="hopg",
@@ -1088,7 +1092,7 @@ def test_build_cases_groove_allows_default_finite_footprint():
 
 
 def test_build_cases_groove_rejects_nonpositive_spacing():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"BlazedGrooves\.spacing_ang must be finite and positive"):
         build_cases(
             Sweep(
                 material="hopg",
@@ -1102,7 +1106,9 @@ def test_build_cases_groove_rejects_nonpositive_spacing():
 
 
 def test_build_cases_groove_requires_theta_obs_90():
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match=r"blazed grooves require theta_obs_deg == 90 for every case"
+    ):
         build_cases(
             Sweep(
                 material="hopg",

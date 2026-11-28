@@ -113,7 +113,7 @@ def fit_line(merged: dict, guess_eV: float, half_window: float = 0.22) -> dict:
     from scipy.optimize import curve_fit
 
     o = merged["settings"]
-    gamma, beta = _kinematics(o["energy_eV"])
+    _gamma, beta = _kinematics(o["energy_eV"])
     doppler = 1.0 / (1.0 - beta)
     e = np.asarray(merged["photon_energy_eV"])
     y = np.asarray(merged["spectrum_per_eV_sr"])

@@ -141,7 +141,7 @@ def test_real_primary_transport_and_aperture_are_replayed_once(selected, monkeyp
     other = aperture_from_payload(replay["photon_aperture"])
     np.testing.assert_array_equal(tally.total_per_primary_eV, other.total_per_primary_eV)
     assert tally.observation_identity_digest == other.observation_identity_digest
-    with pytest.raises(TrajectoryArtifactError, match="photon_transport|every segment|bounded"):
+    with pytest.raises(TrajectoryArtifactError, match=r"photon_transport|every segment|bounded"):
         stream_spectrum_from_artifact(path)
 
 

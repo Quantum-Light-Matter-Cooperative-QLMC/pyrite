@@ -148,12 +148,14 @@ class _MassOnlyDone(Exception):
     """Raised after the screen in ``PROBE_MASS_ONLY`` mode to skip production."""
 
 
-def optimal_bound(mass, rows, var_a, scales=np.geomspace(1e-4, 1e4, 801)):
+def optimal_bound(mass, rows, var_a, scales=None):
     """Best FOM gain of per-history keep probabilities ``p ∝ m/sqrt(rows)``.
 
     Free exact screen, production time proportional to rows scored; the
     Horvitz-Thompson added variance is ``sum m^2 (1/p - 1)``.
     """
+    if scales is None:
+        scales = np.geomspace(1e-4, 1e4, 801)
     scored = mass > 0.0
     m, r = mass[scored], rows[scored].astype(float)
     shape = m / np.sqrt(np.maximum(r, 1.0))

@@ -245,7 +245,7 @@ def test_library_root_accepts_a_deposit_or_the_data_directory_itself(library):
 
 
 def test_library_root_names_what_it_looked_for(tmp_path):
-    with pytest.raises(SourceUnavailableError, match="SDCS/SDCS_<Z>.txt"):
+    with pytest.raises(SourceUnavailableError, match=r"SDCS/SDCS_<Z>\.txt"):
         library_root(tmp_path)
 
 

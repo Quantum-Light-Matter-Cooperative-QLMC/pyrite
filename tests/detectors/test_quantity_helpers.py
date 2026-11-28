@@ -43,7 +43,7 @@ def test_grating_geometry_and_pixel_integrals():
     assert centers.shape == integral.shape == (16,)
     assert integral.units == ureg.dimensionless
     assert integral.magnitude.sum() == pytest.approx(1.6)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"incidence_angle received unit"):
         q.grating_q(groove_density=Q_(1200, "1/mm"), incidence_angle=Q_(87, ""))
 
 
@@ -81,7 +81,7 @@ def test_detected_image_q_preserves_integral_units():
     np.testing.assert_allclose(pixels.magnitude, x_ref)
     np.testing.assert_allclose(counts.magnitude, counts_ref)
     assert counts.units == ureg.dimensionless
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"physical CCD controls require physical=True"):
         q.detected_image_q(
             energies, spectrum, grating, ccd, Q_(200, "mm"), active_thickness=Q_(30, "um")
         )

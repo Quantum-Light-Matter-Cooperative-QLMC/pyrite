@@ -109,7 +109,7 @@ def _grooved_sweep():
 
 def test_grooved_default_requires_explicit_uncoupled():
     sweep = _grooved_sweep()
-    with pytest.raises(ValueError, match="radiative_model='uncoupled'.*--radiative-model"):
+    with pytest.raises(ValueError, match=r"radiative_model='uncoupled'.*--radiative-model"):
         build_cases(sweep, 4, 4)
     with pytest.raises(ValueError, match="--allow-physics-fallback"):
         resolve_run_models(default_settings(), ["C"], grooved=True)

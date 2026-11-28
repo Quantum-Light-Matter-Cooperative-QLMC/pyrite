@@ -62,7 +62,7 @@ def codes(tmp_path, monkeypatch):
 
 
 def test_one_deterministic_archive_and_checksum_per_code(codes, tmp_path):
-    root, local = codes
+    _root, local = codes
     first = bundles.build_bundles(tmp_path / "out1", archives=local)
     second = bundles.build_bundles(tmp_path / "out2", archives=local)
 

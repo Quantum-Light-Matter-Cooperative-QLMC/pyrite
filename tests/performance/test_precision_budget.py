@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
+_FAMILY = "complete original pinned confidence family required"
 
 
 def fixture():
@@ -86,8 +87,17 @@ def test_interval_outside_budget_is_failed_not_merely_unresolved():
     assert all(t["status"] == "failed" for t in run(summary, protocol)["results"][0]["targets"])
 
 
-@pytest.mark.parametrize("corruption", ["incomplete", "protocol", "source", "duplicate", "ci"])
-def test_reject_corrupt_or_unpinned_family(corruption):
+@pytest.mark.parametrize(
+    "corruption,message",
+    [
+        ("incomplete", _FAMILY),
+        ("protocol", _FAMILY),
+        ("source", _FAMILY),
+        ("duplicate", _FAMILY),
+        ("ci", "invalid confidence interval"),
+    ],
+)
+def test_reject_corrupt_or_unpinned_family(corruption, message):
     summary, protocol = copy.deepcopy(fixture())
     if corruption == "incomplete":
         summary["complete_fixed_design"] = False
@@ -99,7 +109,7 @@ def test_reject_corrupt_or_unpinned_family(corruption):
         summary["comparisons"] *= 2
     else:
         summary["comparisons"][0]["difference_ci"] = [1, -1]
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=message):
         run(summary, protocol)
 
 

@@ -28,7 +28,7 @@ def test_json_round_trip_preserves_response_identity_without_source_access(monke
     ):
         np.testing.assert_array_equal(nodes, original_nodes)
         np.testing.assert_array_equal(eps, original_eps)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"cannot set WRITEABLE flag to True of this array"):
             eps.setflags(write=True)
 
 

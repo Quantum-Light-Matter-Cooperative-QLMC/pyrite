@@ -215,7 +215,7 @@ def test_missing_positron_table_recovery_requests_positron_species(monkeypatch, 
     from pyrite.xsgen._errors import TableNotFoundError
 
     monkeypatch.setattr(f"pyrite.xsgen.{code}.catalog.resolve", lambda key: None)
-    with pytest.raises(TableNotFoundError, match="--projectile positron"):
+    with pytest.raises(TableNotFoundError, match="--projectile positron"):  # noqa: PT012 - one call, chosen by the parametrized branch
         if code == "elsepa":
             resolve_layer_tables(CATALOG.crystal("silicon").composition, projectile="positron")
         else:

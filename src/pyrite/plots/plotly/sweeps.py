@@ -10,8 +10,6 @@ from __future__ import annotations
 import numpy as np
 import plotly.graph_objects as go
 from plotly.colors import qualitative
-
-_COLORS = qualitative.Plotly
 from plotly.subplots import make_subplots
 
 from ...results import records_for_cases
@@ -28,6 +26,8 @@ from .._frames import (
     pick_hue,
     scan_mode,
 )
+
+_COLORS = qualitative.Plotly
 
 
 def metric_vs_chart(

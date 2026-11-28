@@ -43,11 +43,11 @@ def test_atomic_wrappers_keep_complex_values_shapes_and_nan_policy():
     assert np.isnan(f.magnitude[:, 0]).all()
     f.magnitude[0, 1] = 0
     assert q.atomic_form_factor_q("Si", g, e).magnitude[0, 1] != 0
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"outside Chantler range"):
         q.henke_dispersion_q("Si", e, on_out_of_range="raise")
     with pytest.raises(TypeError):
         q.cromer_mann_f0_q("Si", 2.0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"g received unit"):
         q.atomic_form_factor_q("Si", Q_(2, "eV"), e)
 
 
@@ -69,7 +69,7 @@ def test_crystal_geometry_and_couplings_preserve_units():
     assert q.U_g_q("silicon", (1, 1, 1), energy, b_factor=b).to("keV").magnitude == pytest.approx(
         c.U_g("silicon", (1, 1, 1), 1000.0, 0.0) / 1000
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"lattice\.a received unit"):
         q.reciprocal_g_vector_q((1, 1, 1), {"system": "cubic", "a": 1 * ureg.keV})
 
 
@@ -91,7 +91,7 @@ def test_absorption_and_reflections_keep_domain_and_indices():
 def test_inputs_do_not_convert_bare_numbers_or_dimensionless_angles():
     with pytest.raises(TypeError):
         q.chi_g_q("silicon", (1, 1, 1), 1000, b_factor=Q_(0, "angstrom**2"))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"tilt received unit"):
         q.photon_energies_q(
             "silicon",
             Q_(60, "keV"),

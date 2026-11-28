@@ -45,11 +45,11 @@ import numpy as np
 from scipy.signal import find_peaks
 
 sys.path.insert(0, str(Path(__file__).parent))
-from soft_inelastic_deflection import inelastic_transport_rates  # noqa: E402
+from soft_inelastic_deflection import inelastic_transport_rates
 
-from pyrite.campaign.config import material_sweep  # noqa: E402
-from pyrite.campaign.sweep import build_cases  # noqa: E402
-from pyrite.montecarlo import runner  # noqa: E402
+from pyrite.campaign.config import material_sweep
+from pyrite.campaign.sweep import build_cases
+from pyrite.montecarlo import runner
 
 MATERIAL = "silicon"
 CUTOFF_EV = 50.0

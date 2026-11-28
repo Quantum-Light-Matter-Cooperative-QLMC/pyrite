@@ -24,10 +24,16 @@ from fast_variants import build_reducer as build
 tag, ind, arms = sys.argv[1], Path(sys.argv[2]), sys.argv[3:]
 files = sorted(ind.glob("call*.npz"))
 calls = [np.load(f) for f in files]
-flags = next((ln for ln in open("/proc/cpuinfo") if ln.startswith("flags")), "")
+flags = next(
+    (ln for ln in Path("/proc/cpuinfo").read_text().splitlines() if ln.startswith("flags")), ""
+)
 isa = "avx512f" if " avx512f" in flags else ("avx2" if " avx2" in flags else "other")
 cpu = next(
-    (ln.split(":", 1)[1].strip() for ln in open("/proc/cpuinfo") if ln.startswith("model name")),
+    (
+        ln.split(":", 1)[1].strip()
+        for ln in Path("/proc/cpuinfo").read_text().splitlines()
+        if ln.startswith("model name")
+    ),
     platform.processor(),
 )
 ld_ref = {}

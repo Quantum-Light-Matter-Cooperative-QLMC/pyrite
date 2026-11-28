@@ -231,7 +231,7 @@ def check_sample(path, original, cp, traj):
         assert h.attrs["complete"] and h.attrs["schema_version"] == 3
         view = traj.transport_view(h)
         n = int(original["electron_id"].shape[0])
-        order = h["transport_order"] if "transport_order" in h else None
+        order = h.get("transport_order")
         for lo, hi in ((0, min(12, n)), (max(0, n - 12), n)):
             original_rows = order[lo:hi] if order is not None else np.arange(lo, hi)
             for key in ("electron_id", "r_mid", "L_ang", "E_start_keV"):

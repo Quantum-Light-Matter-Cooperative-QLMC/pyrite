@@ -639,8 +639,8 @@ def test_rebrem_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
     # Compared key by key: a graded profile continuum (hopg is refined,
     # so its grid carries two step sizes) resolves to a ``brem_nodes`` array,
     # and a dict holding one cannot be compared with ``==``.
-    by_name = {name: kwargs for name, kwargs in calls}
-    explicit_by_name = {name: kwargs for name, kwargs in explicit}
+    by_name = dict(calls)
+    explicit_by_name = dict(explicit)
     assert by_name.keys() == explicit_by_name.keys()
     for name, got in by_name.items():
         want = explicit_by_name[name]
@@ -1097,7 +1097,7 @@ def test_reline_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
     calls.clear()
     reline.recxr_checkpoints(checkpoint_dir=tmp_path, require_identity=True)
 
-    assert {name: kwargs for name, kwargs in calls} == {name: kwargs for name, kwargs in explicit}
+    assert dict(calls) == dict(explicit)
     assert {kwargs["cxr_ne"] for _, kwargs in calls} == {300}
     assert {kwargs["profile_defaults"] for _, kwargs in calls} == {True}
 

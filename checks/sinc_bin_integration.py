@@ -245,7 +245,7 @@ def cmd_agree(args):
             raise SystemExit(f"{path} was evaluated on different segments")
         rows = {}
         for key in data.files:
-            if key in ("meta",) or key.endswith(":grid") or key not in ref.files:
+            if key == "meta" or key.endswith(":grid") or key not in ref.files:
                 continue
             a, b = ref[key], data[key]
             peak = float(np.abs(a).max())

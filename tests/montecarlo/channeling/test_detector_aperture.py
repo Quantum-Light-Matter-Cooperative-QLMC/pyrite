@@ -41,16 +41,16 @@ def test_aperture_integrates_angular_variation_and_converges():
 
 
 @pytest.mark.parametrize(
-    "omega,distance,order",
+    "omega,distance,order,message",
     [
-        (0, 5000, 3),
-        (np.nan, 5000, 3),
-        (2 * np.pi, 5000, 3),
-        (0.1, 0, 3),
-        (0.1, 5000, 0),
-        (0.1, 5000, True),
+        (0, 5000, 3, "solid_angle_sr must be finite"),
+        (np.nan, 5000, 3, "solid_angle_sr must be finite"),
+        (2 * np.pi, 5000, 3, "solid_angle_sr must be finite"),
+        (0.1, 0, 3, "distance_mm must be finite and positive"),
+        (0.1, 5000, 0, "order must be a positive integer"),
+        (0.1, 5000, True, "order must be a positive integer"),
     ],
 )
-def test_invalid_geometry_refuses(omega, distance, order):
-    with pytest.raises(ValueError):
+def test_invalid_geometry_refuses(omega, distance, order, message):
+    with pytest.raises(ValueError, match=message):
         square_aperture_rule([0, 0, 1], [1, 0, 0], omega, distance, order)

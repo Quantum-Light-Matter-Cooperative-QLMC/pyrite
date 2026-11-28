@@ -74,9 +74,9 @@ def test_invalid_sections_refuse(kwargs, message):
 
 
 def test_invalid_zone_numerics_refuse():
-    with pytest.raises(ValueError, match="ChannelingNumerics.basis_size"):
+    with pytest.raises(ValueError, match=r"ChannelingNumerics\.basis_size"):
         ChannelingNumerics(basis_size=0)
-    with pytest.raises(ValueError, match="ChannelingNumerics.zone_max_ang"):
+    with pytest.raises(ValueError, match=r"ChannelingNumerics\.zone_max_ang"):
         ChannelingNumerics(zone_max_ang=-10.0)
     with pytest.raises(TypeError, match="ChannelingNumerics"):
         Channeling("planar", plane=(1, 1, 0), numerics=Numerics())

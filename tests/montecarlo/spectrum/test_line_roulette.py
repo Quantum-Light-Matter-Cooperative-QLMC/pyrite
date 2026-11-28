@@ -126,7 +126,8 @@ def test_policy_enters_the_case_payload_with_its_model():
     ],
 )
 def test_invalid_policy_is_refused(payload):
-    with pytest.raises(ValueError):
+    # Each refusal names the last field it rejects.
+    with pytest.raises(ValueError, match=f"line roulette.*{list(payload)[-1]}"):
         LineRoulette.from_dict(payload)
 
 

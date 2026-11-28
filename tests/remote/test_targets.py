@@ -10,6 +10,9 @@ from pyrite.console import config as store
 from pyrite.remote import config, scripts, targets
 from tests.helpers.cli import assert_clean_result, invoke
 
+_SBATCH_LONG_OPTIONS = "expected space-separated sbatch long options"
+_COMMAND_PREFIX = "expected a command prefix such as"
+
 
 @pytest.fixture
 def configured(monkeypatch, tmp_path):
@@ -59,16 +62,16 @@ def test_legacy_selection(configured, monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "values",
+    "values,message",
     [
-        {"host": "-bad"},
-        {"host": "box", "partition": "bad\ntext"},
-        {"host": "box", "remote_dir": "../relative"},
-        {"host": "box", "pixi": "pixi;bad"},
+        ({"host": "-bad"}, "expected host alias"),
+        ({"host": "box", "partition": "bad\ntext"}, "invalid target partition"),
+        ({"host": "box", "remote_dir": "../relative"}, "remote_dir must be an absolute POSIX path"),
+        ({"host": "box", "pixi": "pixi;bad"}, "pixi must be an executable name"),
     ],
 )
-def test_invalid_target(values):
-    with pytest.raises(ValueError):
+def test_invalid_target(values, message):
+    with pytest.raises(ValueError, match=message):
         targets.RemoteTarget(**values)
 
 
@@ -199,27 +202,30 @@ def test_site_policy_fields_round_trip_through_cli(configured):
 
 
 @pytest.mark.parametrize(
-    "values",
+    "values,message",
     [
-        {"host": "box", "account": "pi lab"},
-        {"host": "box", "constraint": "A100\n#SBATCH --x"},
-        {"host": "box", "constraint": "A100 H200"},
-        {"host": "box", "max_time": "24h"},
-        {"host": "box", "mail_type": "END,NEVER"},
-        {"host": "box", "mail_type": "END\n#SBATCH --x"},
-        {"host": "box", "mail_user": "me@lab edu"},
-        {"host": "box", "mail_user": "me@lab.edu\n#SBATCH --x"},
-        {"host": "box", "qos": "high p"},
-        {"host": "box", "sbatch_extra": "--exclude=node3\n#SBATCH --x"},
-        {"host": "box", "sbatch_extra": "-x node3"},
-        {"host": "box", "sbatch_extra": "--comment='a;b'"},
-        {"host": "box", "sbatch_extra": "--time=10"},
-        {"host": "box", "sbatch_extra": "--output=/tmp/x"},
-        {"host": "box", "sbatch_extra": "--qos=highp"},
+        ({"host": "box", "account": "pi lab"}, "expected a SLURM account name"),
+        ({"host": "box", "constraint": "A100\n#SBATCH --x"}, "invalid target constraint"),
+        ({"host": "box", "constraint": "A100 H200"}, "expected a SLURM feature expression"),
+        ({"host": "box", "max_time": "24h"}, "expected a SLURM time limit"),
+        ({"host": "box", "mail_type": "END,NEVER"}, "expected comma-separated SLURM mail events"),
+        ({"host": "box", "mail_type": "END\n#SBATCH --x"}, "invalid target mail_type"),
+        ({"host": "box", "mail_user": "me@lab edu"}, "expected an email address"),
+        ({"host": "box", "mail_user": "me@lab.edu\n#SBATCH --x"}, "invalid target mail_user"),
+        ({"host": "box", "qos": "high p"}, "expected a SLURM QOS name"),
+        (
+            {"host": "box", "sbatch_extra": "--exclude=node3\n#SBATCH --x"},
+            "invalid target sbatch_extra",
+        ),
+        ({"host": "box", "sbatch_extra": "-x node3"}, _SBATCH_LONG_OPTIONS),
+        ({"host": "box", "sbatch_extra": "--comment='a;b'"}, _SBATCH_LONG_OPTIONS),
+        ({"host": "box", "sbatch_extra": "--time=10"}, "--time is not allowed in sbatch_extra"),
+        ({"host": "box", "sbatch_extra": "--output=/tmp/x"}, "--output is not allowed"),
+        ({"host": "box", "sbatch_extra": "--qos=highp"}, "--qos is not allowed"),
     ],
 )
-def test_invalid_site_policy_fields(values):
-    with pytest.raises(ValueError):
+def test_invalid_site_policy_fields(values, message):
+    with pytest.raises(ValueError, match=message):
         targets.RemoteTarget(**values)
 
 
@@ -272,7 +278,7 @@ def test_qos_and_sbatch_extra_render_directives(configured):
 
 
 def test_sbatch_extra_names_owning_setting():
-    with pytest.raises(ValueError, match="set remote.qos instead"):
+    with pytest.raises(ValueError, match=r"set remote\.qos instead"):
         targets.RemoteTarget(host="box", sbatch_extra="--qos=highp")
 
 
@@ -324,10 +330,17 @@ def test_host_exec_wraps_host_side_python(configured):
 
 
 @pytest.mark.parametrize(
-    "value", ["srun; rm -rf ~", "srun $(id)", "srun 'quoted'", "srun --x  --y", "srun\n"]
+    "value,message",
+    [
+        ("srun; rm -rf ~", _COMMAND_PREFIX),
+        ("srun $(id)", _COMMAND_PREFIX),
+        ("srun 'quoted'", _COMMAND_PREFIX),
+        ("srun --x  --y", _COMMAND_PREFIX),
+        ("srun\n", "invalid target host_exec: expected printable string"),
+    ],
 )
-def test_host_exec_rejects_shell_text(value):
-    with pytest.raises(ValueError):
+def test_host_exec_rejects_shell_text(value, message):
+    with pytest.raises(ValueError, match=message):
         targets.RemoteTarget(host="box", host_exec=value)
 
 
@@ -357,7 +370,9 @@ def test_nice_defaults_to_10000_and_zero_omits_it(configured):
 
 @pytest.mark.parametrize("value", ["-5", "10k", ""])
 def test_invalid_nice(value):
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match=r"expected a non-negative SLURM nice value such as 10000, or"
+    ):
         targets.RemoteTarget(host="box", nice=value)
 
 

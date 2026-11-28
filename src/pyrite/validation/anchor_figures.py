@@ -34,6 +34,7 @@ Run (CPU-force on a box with the cupy wheel but no CUDA device):
   pixi run python -c "import sys;sys.modules['cupy']=None;from pyrite.validation.anchor_figures import main;main()"
 """
 
+import contextlib  # noqa: I001 -- isort would split the `X as X` re-exports one per statement
 import hashlib
 import json
 import os
@@ -43,12 +44,10 @@ from pathlib import Path
 import numpy as np
 from tabulate import tabulate
 
-from pyrite.paths import cache_dir  # noqa: E402
+from pyrite.paths import cache_dir
 
-_HERE = Path(__file__).resolve().parent
-_PACKAGE_ROOT = _HERE.parent
-from pyrite.detectors import Detector, LegacyEDS  # noqa: E402, I001
-from pyrite.materials.crystal import crystal_absorption_length_ang  # noqa: E402
+from pyrite.detectors import Detector, LegacyEDS
+from pyrite.materials.crystal import crystal_absorption_length_ang
 from pyrite.montecarlo import (
     aperture_fwhm_eV,
     beta_from_keV,
@@ -57,9 +56,9 @@ from pyrite.montecarlo import (
     mc_cxr_spectrum,
 )
 from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
-from pyrite.montecarlo.geometry import tilted_geometry  # noqa: E402
-from pyrite.console.outputs import output_dir  # noqa: E402
-from pyrite.validation._anchor_conditions import (  # noqa: E402, F401, I001
+from pyrite.montecarlo.geometry import tilted_geometry
+from pyrite.console.outputs import output_dir
+from pyrite.validation._anchor_conditions import (
     GRAPHITE_B_002 as GRAPHITE_B_002,
     ZHAI_SUPPLEMENTARY_STUDIES as ZHAI_SUPPLEMENTARY_STUDIES,
     SupplementaryCoherentStudy as SupplementaryCoherentStudy,
@@ -80,19 +79,22 @@ from pyrite.validation._anchor_conditions import (  # noqa: E402, F401, I001
     single_segment_anchor as single_segment_anchor,
     theory_line_energies as theory_line_energies,
 )
-from pyrite.validation.feranchuk_spence import (  # noqa: E402
+from pyrite.validation.feranchuk_spence import (
     escape_limited_length_ang,
 )
-from pyrite.validation._zhai import (  # noqa: E402
+from pyrite.validation._zhai import (
     ZHAI_CACHE_FORMAT as ZHAI_CACHE_FORMAT,
     ZHAI_CACHE_SCHEMA,
     ZHAI_DETECTOR as ZHAI_DETECTOR,
     detector_metadata as detector_metadata,
 )
-from pyrite.validation.validation_background import (  # noqa: E402
+from pyrite.validation.validation_background import (
     compare_external_background,
     subtract_external_background,
 )
+
+_HERE = Path(__file__).resolve().parent
+_PACKAGE_ROOT = _HERE.parent
 
 _EXTERNAL_BREM_V1 = _HERE / "reference_data" / "external_brem" / "v1"
 _ZHAI_FIG3B_BREM = _EXTERNAL_BREM_V1 / "zhai_fig3b_25kev_1mm_brem.csv"
@@ -1045,10 +1047,8 @@ def export_all_figures(
     """
     import matplotlib
 
-    try:
+    with contextlib.suppress(Exception):
         matplotlib.use("Agg")
-    except Exception:
-        pass
 
     outpath = output_dir("figures") if outdir is None else Path(outdir)
     outpath.mkdir(parents=True, exist_ok=True)
@@ -1128,10 +1128,8 @@ def validation_table(anchor: ZhaiAnchor, model: dict) -> list[list]:
 def main(outdir: str | None = None, ne: int = 500, ne_brem: int = 200) -> None:
     import matplotlib
 
-    try:
+    with contextlib.suppress(Exception):
         matplotlib.use("Agg")
-    except Exception:
-        pass
 
     anchor = ZhaiAnchor()
     print(f"Running MC model spectra (ne={ne}, ne_brem={ne_brem}); slow on CPU...")

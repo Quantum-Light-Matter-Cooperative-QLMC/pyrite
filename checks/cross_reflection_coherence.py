@@ -196,10 +196,10 @@ def main() -> None:
         print(f"  sinc first-zero half-width [eV]  p5 {w5:.1f}  p50 {w50:.1f}  p95 {w95:.1f}")
         print("  reflection   E_res [eV]   share of peak   bound at its own peak")
         for hkl, E_res, share, at_peak in lines:
-            print(f"  {str(hkl):>12}   {E_res:9.1f}   {share:13.3e}   {at_peak:21.3e}")
+            print(f"  {hkl!s:>12}   {E_res:9.1f}   {share:13.3e}   {at_peak:21.3e}")
         print("  pair                        |<exp(-i dg.r)>|")
         for hkl, hkl2, factor in pairs:
-            print(f"  {str(hkl):>12} x {str(hkl2):<12}  {factor:.3e}")
+            print(f"  {hkl!s:>12} x {hkl2!s:<12}  {factor:.3e}")
         print(f"  worst-case bound, all bins                    {summary['worst']:.3e}")
         print(
             f"  worst-case bound, bins above 1e-3 of peak     "

@@ -90,9 +90,17 @@ def test_project_beam_entry_stretch_axis_follows_azimuth():
     np.testing.assert_allclose(entry[1], [0.0, 1.0 / np.cos(theta)], atol=1e-9)
 
 
-@pytest.mark.parametrize(("width", "height"), [(None, 1.0), (1.0, None), (0.0, 1.0), (-1.0, 1.0)])
-def test_validate_transverse_dimensions_rejects_invalid_pairs(width, height):
-    with pytest.raises(ValueError):
+@pytest.mark.parametrize(
+    ("width", "height", "message"),
+    [
+        (None, 1.0, "must both be specified"),
+        (1.0, None, "must both be specified"),
+        (0.0, 1.0, "must be finite and strictly positive"),
+        (-1.0, 1.0, "must be finite and strictly positive"),
+    ],
+)
+def test_validate_transverse_dimensions_rejects_invalid_pairs(width, height, message):
+    with pytest.raises(ValueError, match=f"width and height {message}"):
         validate_transverse_dimensions(width, height, unit="Ang")
 
 

@@ -106,7 +106,7 @@ def test_snapshot_readback_and_conversion_are_independent() -> None:
 
 @pytest.mark.parametrize("unit", ["second", "radian", "steradian", "dimensionless"])
 def test_bad_energy_units_rejected(unit: str) -> None:
-    with pytest.raises(ValueError, match="energy_unit.*energy"):
+    with pytest.raises(ValueError, match=r"energy_unit.*energy"):
         _spatial().quantify_spectra(pixels=[(0, 0)]).to_energy(unit)
 
 
@@ -197,7 +197,7 @@ def test_integrated_image_snapshot_isolation_and_validation() -> None:
     with pytest.raises(ValueError, match="at least two energy samples"):
         spatial.quantify_image((1000.0, 1100.0))
     for unit in ("second", "steradian", "dimensionless"):
-        with pytest.raises(ValueError, match="energy_unit.*energy"):
+        with pytest.raises(ValueError, match=r"energy_unit.*energy"):
             view.to_energy(unit)
     with pytest.raises((ValueError, TypeError), match="finite"):
         QuantifiedSpatialImage(np.array([[np.nan]]), np.array([1000.0, 3000.0]), "cxr", False)

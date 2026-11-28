@@ -229,7 +229,7 @@ GROUP BY label
 def launches(args):
     with sqlite3.connect(args.sqlite) as db:
         rows = db.execute(_LAUNCH_QUERY).fetchall()
-    print(json.dumps({label: count for label, count in rows}, indent=1))
+    print(json.dumps(dict(rows), indent=1))
 
 
 def main():
