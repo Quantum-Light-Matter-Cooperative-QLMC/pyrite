@@ -86,6 +86,7 @@ def main():
     p.add_argument("--batch", type=int, default=256)
     p.add_argument("--transport-seed", type=int, default=101)
     p.add_argument("--mosaic", action="store_true")
+    p.add_argument("--joint-mosaic", action="store_true", help="sample tilt and roll per primary")
     p.add_argument("--mosaic-nodes", type=int, default=3)
     p.add_argument("--energy-start", type=float, default=100)
     p.add_argument("--energy-max", type=float, default=4000)
@@ -100,6 +101,7 @@ def main():
     if not 10 <= a.energy_start < a.energy_max <= 1000 * a.energy or a.step <= 0:
         p.error("invalid energy grid")
     a.reference = 2  # the legacy quadrature count is immaterial to history mode
+    a.mosaic = a.mosaic or a.joint_mosaic
     a.mosaic_route = "mc" if a.mosaic else "auto"
     grid = np.arange(a.energy_start, a.energy_max, a.step)
     if grid.size < 2:
@@ -108,6 +110,11 @@ def main():
     old = FiberCXRModel.from_case_record(case["cxr_fiber"])
     model = replace(old, numerics=replace(old.numerics, roll_sampling="history"))
     case = dict(case, cxr_fiber=model.case_record(), Ne_brem=a.brem_histories)
+    if a.joint_mosaic:
+        from pyrite.montecarlo.runner.fiber_emission import validate_fiber_case
+
+        case["mosaic_mc_sampling"] = "history"
+        validate_fiber_case(case)
     for live in (False, True):
         assert streaming_refusal(case, live=live) is None
 

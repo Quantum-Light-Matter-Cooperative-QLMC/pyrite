@@ -805,6 +805,9 @@ Full-fiber options (profile [cxr_fiber] table; experimental):
   --cxr-fiber-roll-nodes N        Midpoint roll nodes on one 60-degree sector about the
                                   fiber axis (table azimuth_count; default 32, use >=
                                   128 when narrow line shapes matter).  [x>=1]
+  --cxr-fiber-roll-sampling [quadrature|history]
+                                  Experimental per-primary roll sampling (history
+                                  requires fixed N and an explicit line grid).
   --cxr-fiber-batch-size N        Full-fiber reflections per coupling-table batch (table
                                   reflection_batch_size; default 256). Bounds memory
                                   only; not part of the result identity.  [x>=1]

@@ -85,11 +85,34 @@ def history_tilts(seed, elec_ids, fwhm_rad, draws):
     if int(ids.min()) < 0:
         raise ValueError("mosaic history ids must be non-negative")
     root = child_stream_root(int(seed), *MOSAIC_CHILD)
-    lo = int(ids.min())
-    shift = counter_uniforms(root, int(ids.max()) - lo + 1, 2, start=lo)[ids - lo]
+    shift = _history_shifts(root, ids)
     u = np.mod(lattice_points(draws)[None, :, :] + shift[:, None, :], 1.0)
     u = np.clip(u, _U_EDGE, 1.0 - _U_EDGE)
     return float(fwhm_rad) * _FWHM_TO_SIGMA * ndtri(u)
+
+
+def _history_shifts(root, ids):
+    """Same counter uniforms, with allocation bounded by represented IDs.
+
+    Keep the existing fast dense path for contiguous populations; sparse
+    replay blocks may contain very large gaps between global primary IDs.
+    """
+    lo = int(ids.min())
+    span = int(ids.max()) - lo + 1
+    if span <= 2 * ids.size:
+        return counter_uniforms(root, span, 2, start=lo)[ids - lo]
+    from ...transport.kinematics import (
+        _SM64_GOLDEN,
+        _SM64_ONE,
+        _SM64_S12,
+        _U52_SCALE,
+        _splitmix64_array,
+    )
+
+    keys = _splitmix64_array(np.uint64(root) + _SM64_GOLDEN * (ids.astype(np.uint64) + _SM64_ONE))
+    first = keys + _SM64_GOLDEN
+    draws = np.stack((_splitmix64_array(first), _splitmix64_array(first + _SM64_GOLDEN)), axis=1)
+    return ((draws >> _SM64_S12).astype(np.float64) + 0.5) * _U52_SCALE
 
 
 def tilt_rotate(g, dx, dy):

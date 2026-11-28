@@ -27,18 +27,18 @@ from pyrite.montecarlo.trajectories import (
 SPECTRA = ("spec", "spec_characteristic", "brem_wide", "brem")
 
 
-def _case(lines, brem, mosaic=False):
+def _case(lines, brem, mosaic=False, *, joint=False):
     scene = Scene(
         Beam(30.0, transverse=Spot(), longitudinal=PointBunch()),
-        Slab("hopg", 5000.0, tilt_deg=15.0, mosaic=mosaic, footprint=Footprint(5.0, 5.0)),
+        Slab("hopg", 5000.0, tilt_deg=15.0, mosaic=mosaic or joint, footprint=Footprint(5.0, 5.0)),
         Detector(),
     )
     numerics = Numerics(
         sampling=FixedSampling(cxr_histories=lines, brem_histories=brem),
         cxr_reflections=CxrReflections(
             fiber=FiberAverage(cutoff_invang=4, reflection_batch_size=16, roll_sampling="history"),
-            mosaic_route="mc" if mosaic else "auto",
-            mosaic_nodes=2,
+            mosaic_route="mc-sampled" if joint else "mc" if mosaic else "auto",
+            mosaic_nodes=1 if joint else 2,
         ),
         energy_bins=EnergyBins(
             cxr=np.arange(200.0, 3000.0, 40.0), brem=np.arange(500.0, 30000.0, 500.0)
@@ -69,8 +69,12 @@ def _parity(reference, actual, *, line_tol):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("lines,brem", [(6, 8), (8, 6)])
-def test_history_live_streams_with_unequal_populations(lines, brem):
-    case = _case(lines, brem)
+@pytest.mark.parametrize("joint", [False, True])
+def test_history_live_streams_with_unequal_populations(lines, brem, joint):
+    case = _case(lines, brem, joint=joint)
+    if joint:
+        assert case["mosaic_mc_sampling"] == "history"
+        assert case["mosaic_mc_nodes"] == 1
     with bin_reduction_override("pairs"):
         tp = runner._transport_case(case, transport_core="per-electron")
         assert (tp["Ne_lines"], tp["Ne_brem"]) == (lines, brem)
@@ -81,9 +85,9 @@ def test_history_live_streams_with_unequal_populations(lines, brem):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("mosaic", [False, True])
-def test_history_artifact_replay_and_case_identity(tmp_path, mosaic):
-    case = _case(6, 8, mosaic)
+@pytest.mark.parametrize("mode", ["perfect", "quadrature", "joint"])
+def test_history_artifact_replay_and_case_identity(tmp_path, mode):
+    case = _case(6, 8, mosaic=mode == "quadrature", joint=mode == "joint")
     tp = runner._transport_case(case, transport_core="per-electron")
     retained = runner._spectrum_case(case, tp)
     inputs = {key: value for key, value in tp.items() if key != "segs"}

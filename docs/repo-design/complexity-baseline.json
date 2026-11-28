@@ -490,7 +490,7 @@
     {
       "path": "src/pyrite/montecarlo/spectrum/cxr/_fiber_history.py",
       "name": "validate_history_roll_request",
-      "cc": 33
+      "cc": 22
     },
     {
       "path": "src/pyrite/montecarlo/spectrum/cxr/_per_hkl.py",

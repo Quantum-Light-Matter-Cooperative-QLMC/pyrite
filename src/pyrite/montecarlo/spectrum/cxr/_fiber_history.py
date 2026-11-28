@@ -68,10 +68,11 @@ def validate_history_roll_request(request):
         or request.layers is not None
         or request.groove is not None
         or request.sinc_cutoff is not None
-        or request.mosaic_sampling != "quadrature"
+        or request.mosaic_sampling not in ("quadrature", "history")
         or request.phase_retention is not None
     ):
         raise ValueError("history fiber rolls require fixed-grid incoherent HOPG scoring")
+    _validate_history_mosaic(request, rolls)
     if request.recip_miscut_rad is not None and request.recip_miscut_rad[0] != 0:
         raise ValueError("history fiber rolls do not yet support reciprocal miscut")
     for axis in (request.beam_uvw, request.surface_hkl):
@@ -81,6 +82,25 @@ def validate_history_roll_request(request):
         raise ValueError("score basal reflections separately from history fiber rolls")
     if request.segments.get("cone_split") is not None:
         raise ValueError("history fiber rolls do not support detector cone splitting")
+    _validate_primary_rolls(request, rolls)
+
+
+def _validate_history_mosaic(request, rolls):
+    """Require a common primary seed and valid sampled mosaic width."""
+    if request.mosaic_sampling == "history" and (
+        not isinstance(rolls, HistoryRollSeed)
+        or request.mosaic_seed != rolls.seed
+        or not request.mosaic_fwhm_rad
+        or not math.isfinite(request.mosaic_fwhm_rad)
+        or request.mosaic_fwhm_rad <= 0
+    ):
+        raise ValueError(
+            "history fiber rolls with sampled mosaic require a common case seed and positive FWHM"
+        )
+
+
+def _validate_primary_rolls(request, rolls):
+    """Validate global primary identity or an explicit sector-roll array."""
     if isinstance(rolls, HistoryRollSeed):
         # Ordinary transport has a shared global ID in both columns. Refuse
         # lineage/renumbering routes rather than assigning the wrong roll.
@@ -213,16 +233,72 @@ def history_coupling_tables(st, build):
     return tables
 
 
-def accumulate_history_rolls(st, tables, accumulate_reflection, mu_tables):
-    """One table row per reflection, one device orientation per primary.
+def tilt_terms(tilts, *, xp):
+    """One draw's Rodrigues coefficients, shared by all reflections on device."""
+    dx, dy = xp.asarray(tilts, dtype=np.float64).T
+    angle = xp.hypot(dx, dy)
+    small = angle < 1e-15
+    safe = xp.where(small, 1.0, angle)
+    return (
+        xp.where(small, 0.0, dx / safe),
+        xp.where(small, 0.0, dy / safe),
+        xp.sin(angle),
+        1.0 - xp.cos(angle),
+    )
 
-    Calls the existing per-row line physics (also used by sampled mosaic).
-    At most one reflection's orientation vectors live at once, plus the
-    current batch of energy tables; no history x reflection x energy tensor.
-    Deterministic mosaic quadrature is nested outside the line contribution.
+
+def apply_history_tilt(g_rows, terms, *, xp):
+    """Row-wise R_m(dx,dy) @ g, after roll; no dense rotation matrices."""
+    kx, ky, sin_a, one_minus_cos = terms
+    gx, gy, gz = g_rows.T
+    kg = xp.stack((ky * gz, -kx * gz, -ky * gx + kx * gy), axis=1)
+    kkg = xp.stack((ky * kg[:, 2], -kx * kg[:, 2], -ky * kg[:, 0] + kx * kg[:, 1]), axis=1)
+    return g_rows + sin_a[:, None] * kg + one_minus_cos[:, None] * kkg
+
+
+def _history_orientation_rows(st, c, s, *, xp):
+    """Yield reflection index, invariant g², oriented history rows and weight."""
+    from ....materials.crystal import reciprocal_g_vector
+
+    reflections = []
+    for hkl in st.request.hkl_list:
+        g, _ = reciprocal_g_vector(hkl, st.info["lattice"])
+        if st.R_orient is not None:
+            g = st.R_orient @ g
+        reflections.append((g, float(g @ g)))
+    sampled = st.mosaic_sampled
+    if sampled is not None:
+        # Both sampled_mosaic and primary_roll_rows use the sorted unique
+        # IDs of the SAME clipped/expanded segment rows. Their history axes
+        # therefore agree, including for missing or step-major primaries.
+        # Tilt draws are shared with the basal scorer through its existing
+        # mosaic stream; the independent fiber roll stream is unchanged.
+        if sampled.tilts.shape[0] != c.size:
+            raise RuntimeError("sampled mosaic and fiber history populations disagree")
+        for draw in range(sampled.draws):
+            terms = tilt_terms(sampled.tilts[:, draw, :], xp=xp)
+            for i, (g, g2) in enumerate(reflections):
+                gh = roll_vectors(g, c, s, xp=xp)
+                yield i, g2, apply_history_tilt(gh, terms, xp=xp), 1.0 / sampled.draws
+        return
+    orientations = ((None, 1.0),) if st.mosaic_quad is None else st.mosaic_quad
+    orientations = tuple(
+        (None if m is None else xp.asarray(m, dtype=np.float64), w) for m, w in orientations
+    )
+    # Keep the existing deterministic accumulation order unchanged.
+    for i, (g, g2) in enumerate(reflections):
+        for mosaic, weight in orientations:
+            yield i, g2, roll_vectors(g, c, s, xp=xp, mosaic=mosaic), weight
+
+
+def accumulate_history_rolls(st, tables, accumulate_reflection, mu_tables):
+    """One coupling row per reflection, one roll per represented primary.
+
+    Mosaic tilts are either deterministic quadrature or K counter-addressed
+    draws of the existing sampled-mosaic route. No history x reflection x
+    energy tensor is materialized. Each draw retains weight 1/K.
     """
     from ...._backend import REAL, xp
-    from ....materials.crystal import reciprocal_g_vector
     from ._kernels import _matvec3, _rowdot3
 
     rolls, rows = primary_roll_rows(st.seg_elec_id, st.request._fiber_history_rolls, xp=xp)
@@ -230,33 +306,22 @@ def accumulate_history_rolls(st, tables, accumulate_reflection, mu_tables):
         return
     c, s = xp.cos(rolls), xp.sin(rolls)
     chi_re, chi_im, u_re, u_im = tables
-    orientations = ((None, 1.0),) if st.mosaic_quad is None else st.mosaic_quad
-    # Upload these tiny matrices once rather than for each reflection.
-    orientations = tuple(
-        (None if m is None else xp.asarray(m, dtype=np.float64), w) for m, w in orientations
-    )
-    for i, hkl in enumerate(st.request.hkl_list):
-        g, _ = reciprocal_g_vector(hkl, st.info["lattice"])
-        if st.R_orient is not None:
-            g = st.R_orient @ g
-        g2 = REAL(float(g @ g))  # rotation invariant, like sampled mosaic
-        for mosaic, weight in orientations:
-            gh = roll_vectors(g, c, s, xp=xp, mosaic=mosaic)
-            es, ep = polarization_rows(st.n_hat, gh, xp=xp)
-            G, ES, EP = (a.astype(REAL, copy=False)[rows] for a in (gh, es, ep))
-            accumulate_reflection(
-                st,
-                G,
-                ES,
-                EP,
-                g2,
-                _matvec3(G, st.n_hat_d),
-                _rowdot3(G, ES),
-                _rowdot3(G, EP),
-                chi_re[i],
-                chi_im[i],
-                u_re[i],
-                u_im[i],
-                weight,
-                mu_tables,
-            )
+    for i, g2, gh, weight in _history_orientation_rows(st, c, s, xp=xp):
+        es, ep = polarization_rows(st.n_hat, gh, xp=xp)
+        G, ES, EP = (a.astype(REAL, copy=False)[rows] for a in (gh, es, ep))
+        accumulate_reflection(
+            st,
+            G,
+            ES,
+            EP,
+            REAL(g2),
+            _matvec3(G, st.n_hat_d),
+            _rowdot3(G, ES),
+            _rowdot3(G, EP),
+            chi_re[i],
+            chi_im[i],
+            u_re[i],
+            u_im[i],
+            weight,
+            mu_tables,
+        )

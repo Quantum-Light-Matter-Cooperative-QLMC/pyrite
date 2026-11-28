@@ -77,9 +77,11 @@ class CxrReflections:
         (``EnergyBins.cxr``) or automatic (#1489) line grid; other routes
         refuse it. They lower ``mosaic_route`` and
         ``mosaic_nodes`` into the case as basal runs do. A mosaic target needs
-        ``mosaic_route="mc"``: ``"analytic"`` (its width reads the basal
-        geometry, and ``"auto"`` resolves to it here) and ``"mc-sampled"``
-        are refused. Excludes ``n_families``,
+        explicit ``mosaic_route="mc"`` or, for ``fiber.roll_sampling="history"``
+        on a fixed grid and fixed population, ``"mc-sampled"``. Set
+        ``mosaic_nodes=1`` for one tilt per history. ``"analytic"`` and
+        ``"auto"`` (which resolves to analytic here) are refused on mosaic
+        targets. Excludes ``n_families``,
         ``max_reflections`` and ``line_yield_tolerance``. The direct
         ``pyrite.montecarlo.spectrum.cxr.fiber.FiberCXRModel.from_numerics``
         reads this field only: the other controls here, mosaic ones included,

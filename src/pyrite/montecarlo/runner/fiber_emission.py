@@ -73,7 +73,15 @@ def _refusal(case: Mapping[str, Any]) -> str | None:
         (case.get("layer_radiators") is not None, "requires a single slab"),
         (case.get("abs_layers") is not None, "requires a single slab"),
         (case.get("groove_spacing_ang") is not None, "requires a flat slab"),
-        (case.get("mosaic_mc_sampling") is not None, "requires deterministic mosaic quadrature"),
+        (
+            case.get("mosaic_mc_sampling") is not None
+            and not (
+                case.get("mosaic_mc_sampling") == "history"
+                and isinstance(case.get(FIBER_CASE_KEY), Mapping)
+                and case[FIBER_CASE_KEY].get("roll_sampling") == "history"
+            ),
+            "requires deterministic mosaic quadrature unless fiber roll_sampling='history'",
+        ),
         # The analytic width takes psi from the basal ``hkl_list`` (store_result).
         (case.get("mosaic_fwhm_rad") is not None, "requires mosaic_route='mc' for mosaicity"),
         (case.get("cxr_source") == "none", "needs CXR lines"),
@@ -101,6 +109,24 @@ def _validate_history_case(case):
     if case.get("recip_miscut_rad") is not None and case["recip_miscut_rad"][0] != 0:
         raise ValueError("history fiber sampling does not support reciprocal miscut")
     HistoryRollSeed(case["seed"])
+    if case.get("mosaic_mc_sampling") is not None:
+        import math
+        from numbers import Integral
+
+        fwhm = case.get("mosaic_mc_fwhm_rad")
+        draws = case.get("mosaic_mc_nodes", 1)
+        if (
+            case["mosaic_mc_sampling"] != "history"
+            or fwhm is None
+            or not math.isfinite(fwhm)
+            or fwhm <= 0
+            or isinstance(draws, bool)
+            or not isinstance(draws, Integral)
+            or draws < 1
+        ):
+            raise ValueError(
+                "sampled fiber mosaic requires positive FWHM and a positive draw count"
+            )
 
 
 def validate_fiber_case(case: Mapping[str, Any]) -> None:
