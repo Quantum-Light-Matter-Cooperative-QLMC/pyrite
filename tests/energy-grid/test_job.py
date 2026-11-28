@@ -113,13 +113,18 @@ def test_start_submits_slice_zero_with_nice(monkeypatch):
     calls = []
     monkeypatch.setattr(job.remote, "sync_code", lambda: calls.append("sync"))
     monkeypatch.setattr(job.remote, "_new_jobid", lambda: "20260719-120000-deadbeef")
-    monkeypatch.setattr(job.remote, "_stage_job_script", lambda *args: calls.append(args))
+    monkeypatch.setattr(
+        job.remote,
+        "_stage_job_script",
+        lambda *args, supports_pack: calls.append((args, supports_pack)),
+    )
     monkeypatch.setattr(
         job.remote,
         "_submit_staged_job",
         lambda *args, **kwargs: calls.append((args, kwargs)) or "220",
     )
     job.start(slice_minutes=10.0, materials="hopg", energies="30")
+    assert calls[-2][1] is False
     assert calls[-1][1] == {"nice": True}
 
 

@@ -20,6 +20,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -46,10 +50,11 @@ jobs:
           filters: |
             quantum:
               - '.github/workflows/ci.yml'
-              - 'src/pyrite/montecarlo/channeling/**'
-              - 'src/pyrite/apps/axial_channeling.py'
-              - 'src/pyrite/apps/channeling_app.py'
-              - 'src/pyrite/materials/channeling/**'
+              - '.github/actions/**'
+              - 'pyproject.toml'
+              - 'pixi.lock'
+              # Quantum tests also import shared runner, material and utility code.
+              - 'src/pyrite/**'
               - 'tests/montecarlo/quantum/**'
               - 'tests/montecarlo/channeling/**'
               - 'tests/materials/test_channeling_*.py'
@@ -79,7 +84,7 @@ jobs:
       group: format-pr-${{ github.event.pull_request.number }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # Format the source commit, not GitHub's synthetic merge commit.
           ref: ${{ github.event.pull_request.head.sha }}
@@ -236,7 +241,7 @@ jobs:
   full:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-pyrite
         with:
           environment: py314
@@ -298,7 +303,7 @@ jobs:
       SUITES: ${{ matrix.suites }}
       SLOW: ${{ (github.event_name == 'schedule' || inputs.slow) && '--slow' || '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-pyrite
         with:
           environment: py314
@@ -309,18 +314,22 @@ jobs:
         shell: bash
         run: |
           read -ra suites <<< "$SUITES"
+          slow_args=()
+          if [[ "$SLOW" == "--slow" ]]; then
+            slow_args+=(--slow)
+          fi
           rc=0
           for suite in "${suites[@]}"; do
             echo "::group::$suite"
             export PYRITE_TEST_DIAGNOSTICS="numba-diagnostics/$suite"
-            pixi run --locked -e py314 pyrite-dev test-suite "$suite" $SLOW --durations=10 \
+            pixi run --locked -e py314 pyrite-dev test-suite "$suite" "${slow_args[@]}" --durations=10 \
               --junitxml="numba-junit-$suite.xml" || rc=1
             echo "::endgroup::"
           done
           exit "$rc"
       - name: Upload test results and worker diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: numba-junit-${{ matrix.shard }}-${{ github.run_id }}
           path: |

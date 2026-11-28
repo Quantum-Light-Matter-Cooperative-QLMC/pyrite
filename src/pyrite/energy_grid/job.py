@@ -248,9 +248,12 @@ def start(
     if dry_run:
         print(script)
         return jobid
+    from ..remote.jobs import require_job_environment
+
+    require_job_environment(supports_pack=False)
     if not no_sync:
         remote.sync_code()
-    remote._stage_job_script(jobid, [], upload, script)
+    remote._stage_job_script(jobid, [], upload, script, supports_pack=False)
     scheduler_id = remote._submit_staged_job(jobid, [], nice=True)
     print(f"submitted SLURM job {scheduler_id} as {jobid}")
     print(f"status: pyrite energy-grid job status {jobid}")

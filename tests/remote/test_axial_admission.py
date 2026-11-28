@@ -122,7 +122,9 @@ def _record_remote_effects(monkeypatch):
     monkeypatch.setattr(queue, "_profile_jobid", lambda profile: profile)
     monkeypatch.setattr(transport, "sync_code", lambda *_a, **_k: effects.append("sync"))
     monkeypatch.setattr(
-        queue, "_stage_job_script", lambda jobid, *_a: effects.append(("stage", jobid))
+        queue,
+        "_stage_job_script",
+        lambda jobid, *_a, supports_pack: effects.append(("stage", jobid, supports_pack)),
     )
     monkeypatch.setattr(
         queue, "_submit_staged_job", lambda *_a, **_k: effects.append("submit") or "4242"
@@ -136,7 +138,7 @@ def test_admitted_fibre_profile_submits_and_stages(fibre_profiles, monkeypatch, 
     submission = queue.start_queue(
         ["silicon"], catalog_profile=profile, chunk_minutes=0, _return_submission=True
     )
-    assert effects == ["busy", "live", "sync", ("stage", profile), "submit"]
+    assert effects == ["busy", "live", "sync", ("stage", profile, True), "submit"]
     assert submission.scheduler_id == "4242"
     assert submission.stems and submission.stems[0].startswith(f"silicon@{profile}-")
     assert profile in submission.script

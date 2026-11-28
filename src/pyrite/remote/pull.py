@@ -356,6 +356,7 @@ def pull(
     use_slim = True  # component directories are projected to one transfer pickle
     if use_slim and not no_sync:
         transport.sync_code()  # box must rebuild the grid from the same config.py
+    config.prepare_host_environment()
     failed = []
     completed = []
     failure_errors = {}

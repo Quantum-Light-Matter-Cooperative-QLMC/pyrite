@@ -7,11 +7,18 @@ from . import config, scripts, state, transport
 from .reporting import is_quiet
 
 
-def _stage_job_script(jobid: str, stems: list[str], upload: str, script: str) -> None:
+def require_job_environment(*, supports_pack: bool = False) -> None:
+    """Reject unsupported job types before any staging or submission."""
+    if config.remote_env_transfer() == "pack" and not supports_pack:
+        raise SystemExit("this remote job type does not yet support env_transfer=pack")
+
+
+def _stage_job_script(
+    jobid: str, stems: list[str], upload: str, script: str, *, supports_pack: bool = False
+) -> None:
     """Reserve stems and upload a batch script, releasing on upload failure."""
+    require_job_environment(supports_pack=supports_pack)
     if config.remote_env_transfer() == "pack":
-        if "PYRITE_PACK_PREFIX=" not in script:
-            raise SystemExit("this remote job type does not yet support env_transfer=pack")
         from ._environment_pack import stage_pack
 
         stage_pack()

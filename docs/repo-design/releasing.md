@@ -76,20 +76,27 @@ automatic PyPI publication.
 
 ## Publishing
 
-Pushing a `v*` tag runs `.github/workflows/release.yml`, which publishes the
-GitHub Release for it, then publishes the package to PyPI:
+Pushing a `v*` tag runs `.github/workflows/release.yml`, which verifies the
+built distributions before publishing the GitHub Release and then PyPI:
 
 1. It refuses a tag that is not `v{__version__}` for the tagged commit, so a
    tag on an unbumped commit publishes nothing.
-2. It renders notes with `python -m pyrite.devtools.release vX.Y.Z` (also
+2. It builds the tagged commit's wheel and source distribution, checks them
+   with Twine, audits the sdist, and installs each artifact in a separate
+   clean virtual environment for a version/import/CLI smoke and `pip check`.
+   Only then does it upload the distributions as a workflow artifact.
+3. It renders notes with `python -m pyrite.devtools.release vX.Y.Z` (also
    `pyrite-dev release-notes vX.Y.Z`): the same grouping as above, from the
    previous `v*` tag to the new one.
-3. It creates the Release titled `PyRITE X.Y.Z` and marks it **Latest**.
-4. Only after the release job succeeds, it builds the tagged commit's wheel
-   and source distribution, checks them with Twine, and uploads them as a
-   workflow artifact.
-5. Only after the build job succeeds, it downloads those distributions and
-   publishes them to PyPI using Trusted Publishing in the `pypi` environment.
+4. It creates the Release titled `PyRITE X.Y.Z` and marks it **Latest**.
+5. Only after both build and release succeed, it downloads those distributions
+   and publishes them to PyPI using Trusted Publishing in the `pypi` environment.
+
+If PyPI publication fails after the GitHub Release exists, inspect the PyPI
+project for files already published and fix the cause. Re-run the failed
+publish job if no files were published, rather than creating another GitHub
+Release or moving the tag. If publication was partial, coordinate recovery of
+missing files with the maintainer; PyPI filenames cannot be reused.
 
 Configure the `pyrite-mc` project's PyPI Trusted Publisher for this repository,
 workflow filename `release.yml`, and environment `pypi`. When migrating from

@@ -93,7 +93,7 @@ def start_rebrem_queue(
 
     if not no_sync:
         transport.sync_code()
-    _stage_job_script(jobid, stems, upload, script)
+    _stage_job_script(jobid, stems, upload, script, supports_pack=True)
     scheduler_id = _submit_staged_job(jobid, stems, nice=chunked)
 
     print(
@@ -211,7 +211,7 @@ def start_recxr_queue(
 
     if not no_sync:
         transport.sync_code()
-    _stage_job_script(jobid, stems, upload, script)
+    _stage_job_script(jobid, stems, upload, script, supports_pack=True)
     scheduler_id = _submit_staged_job(jobid, stems, nice=chunked)
 
     print(

@@ -80,11 +80,15 @@ def test_exact_cli_api_script_parity(destination, capsys, chunk_minutes):
 def test_submission_uses_same_staging_and_retains_target(destination, monkeypatch, capsys):
     staged = []
     monkeypatch.setattr(queue, "_refuse_if_busy", lambda *a: None)
-    monkeypatch.setattr(queue, "_stage_job_script", lambda *a: staged.append(a))
+    monkeypatch.setattr(
+        queue, "_stage_job_script", lambda *a, supports_pack: staged.append((a, supports_pack))
+    )
     monkeypatch.setattr(queue, "_submit_staged_job", lambda *a, **kw: "123")
     handle = submit("standard", target="compute", materials=["hopg"], no_sync=True)
-    assert staged[0][0] == handle.jobid
-    assert staged[0][-1] == handle.script
+    args, supports_pack = staged[0]
+    assert args[0] == handle.jobid
+    assert args[-1] == handle.script
+    assert supports_pack is True
     assert handle.scheduler_id == "123"
     targets.save_target("compute", {"host": "changed"}, edit=True)
     seen = []

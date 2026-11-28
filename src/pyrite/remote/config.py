@@ -569,8 +569,16 @@ def host_exec() -> str | None:
     return _slurm_setting("remote.host_exec", HOST_EXEC) or None
 
 
+def prepare_host_environment() -> None:
+    """Stage offline artifacts on the submitter before executing a host helper."""
+    if remote_env_transfer() == "pack":
+        from ._environment_pack import stage_pack
+
+        stage_pack()
+
+
 def host_run_command(extra_env: str = "") -> str:
-    """Return ``<runtime env> <pixi> run --as-is -e <env>`` for host-side PyRITE outside a job.
+    """Return the runtime launcher for host-side PyRITE outside a job.
 
     With ``host_exec`` (e.g. ``srun --time=00:30:00``) the command runs inside
     that allocation instead of on the login node; ``/usr/bin/env`` carries the
@@ -580,8 +588,13 @@ def host_run_command(extra_env: str = "") -> str:
     non-executable ``~/.local/bin/env`` shell snippet that shadows the real one.
     """
     assignments = f"{remote_runtime_env()} {extra_env}".rstrip()
-    command = f"{assignments} {shell_remote_run()}"
     prefix = host_exec()
+    if remote_env_transfer() == "pack":
+        from ._environment_pack import host_pack_launcher
+
+        command = f"{assignments} {host_pack_launcher()}"
+    else:
+        command = f"{assignments} {shell_remote_run()}"
     return f"{prefix} /usr/bin/env {command}" if prefix else command
 
 

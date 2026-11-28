@@ -101,7 +101,7 @@ def test_scoring_inventory_checks_metadata_before_job_staging(tmp_path, monkeypa
         return trajectories.inventory(selected_root, stem, cases, energies, for_scoring=for_scoring)
 
     monkeypatch.setattr(trajectories, "remote_inventory", remote_inventory)
-    monkeypatch.setattr(jobs, "_stage_job_script", lambda *_a: pytest.fail("job staged"))
+    monkeypatch.setattr(jobs, "_stage_job_script", lambda *_a, **_k: pytest.fail("job staged"))
     monkeypatch.setattr(jobs, "_submit_staged_job", lambda *_a: pytest.fail("job submitted"))
     with pytest.raises(TrajectoryArtifactError, match="#623"):
         trajectories.submit_score({"root": str(root), "stem": "saved"})
@@ -289,11 +289,14 @@ def test_score_submits_to_slurm_without_scoring_on_login_node(monkeypatch):
     monkeypatch.setattr(
         jobs,
         "_stage_job_script",
-        lambda job, stems, upload, script: calls.update(job=job, stems=stems, script=script),
+        lambda job, stems, upload, script, *, supports_pack: calls.update(
+            job=job, stems=stems, script=script, supports_pack=supports_pack
+        ),
     )
     monkeypatch.setattr(jobs, "_submit_staged_job", lambda *_a: "123")
     job = trajectories.submit_score(dict(stem="silicon"))
     assert calls["job"] == job and calls["stems"] == ["silicon"]
+    assert calls["supports_pack"] is False
     assert (
         "#SBATCH --gres=" in calls["script"]
         and "pyrite.remote.trajectories score" in calls["script"]

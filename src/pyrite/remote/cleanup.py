@@ -314,6 +314,7 @@ def _run_remote_prune(
     yes,
 ):
     """Run remote pruning against one exact, already-resolved stem selection."""
+    config.prepare_host_environment()
     output = transport._ssh_capture(
         scripts._prune_checkpoint_stems_command(
             f"prune-{scripts._new_jobid()}",

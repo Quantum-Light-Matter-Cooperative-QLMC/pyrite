@@ -261,7 +261,9 @@ def start(args: argparse.Namespace) -> str:
         return jobid
     if not args.no_sync:
         remote.sync_code()
-    remote._stage_job_script(jobid, [], remote._write_job_script_command(jobdir, metadata), script)
+    remote._stage_job_script(
+        jobid, [], remote._write_job_script_command(jobdir, metadata), script, supports_pack=True
+    )
     scheduler_id = remote._submit_staged_job(jobid, [], nice=True)
     print(f"submitted SLURM job {scheduler_id} as {jobid}")
     print(f"status: python -m pyrite.energy_grid.convergence_job status {jobid}")
@@ -306,7 +308,9 @@ def start_windows(args: argparse.Namespace) -> str:
         return jobid
     if not args.no_sync:
         remote.sync_code()
-    remote._stage_job_script(jobid, [], remote._write_job_script_command(jobdir, metadata), script)
+    remote._stage_job_script(
+        jobid, [], remote._write_job_script_command(jobdir, metadata), script, supports_pack=True
+    )
     scheduler_id = remote._submit_staged_job(jobid, [], nice=True)
     print(f"submitted SLURM job {scheduler_id} as {jobid}")
     print(f"status: python -m pyrite.energy_grid.convergence_job status {jobid}")
@@ -473,7 +477,9 @@ def start_precision(args: argparse.Namespace) -> str:
         return jobid
     if not args.no_sync:
         remote.sync_code()
-    remote._stage_job_script(jobid, [], remote._write_job_script_command(jobdir, metadata), script)
+    remote._stage_job_script(
+        jobid, [], remote._write_job_script_command(jobdir, metadata), script, supports_pack=True
+    )
     scheduler_id = remote._submit_staged_job(jobid, [], nice=True)
     print(f"submitted SLURM job {scheduler_id} as {jobid}")
     print(f"status: python -m pyrite.energy_grid.convergence_job status {jobid}")
@@ -528,7 +534,9 @@ def start_bandwidth(args: argparse.Namespace) -> str:
         return jobid
     if not args.no_sync:
         remote.sync_code()
-    remote._stage_job_script(jobid, [], remote._write_job_script_command(jobdir, metadata), script)
+    remote._stage_job_script(
+        jobid, [], remote._write_job_script_command(jobdir, metadata), script, supports_pack=True
+    )
     scheduler_id = remote._submit_staged_job(jobid, [], nice=True)
     print(f"submitted SLURM job {scheduler_id} as {jobid}")
     print(f"status: python -m pyrite.energy_grid.convergence_job status {jobid}")

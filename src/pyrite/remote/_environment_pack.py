@@ -238,6 +238,26 @@ def stage_pack() -> None:
         )
 
 
+def host_pack_launcher() -> str:
+    """Launch a host helper from the shared prefix without polluting its stdout.
+
+    The whole wrapper runs under host_exec when configured. The temporary job
+    log is only for provisioning; command stdout remains a data stream.
+    """
+    bootstrap = (
+        r"""JOBDIR=$(mktemp -d "${SLURM_TMPDIR:-${TMPDIR:-/tmp}}/pyrite-host.XXXXXXXX") || exit 1
+trap 'rc=$?; if [ "$rc" -ne 0 ]; then
+  cat "$JOBDIR/log" >&2 2>/dev/null || true
+fi; rm -rf -- "$JOBDIR"; exit "$rc"' EXIT
+: > "$JOBDIR/log" || exit 1
+{
+"""
+        + unpack_block()
+        + '\n} >&2\n"$@"'
+    )
+    return f"bash -c {config.shell_arg(bootstrap)} pyrite-host"
+
+
 def unpack_block() -> str:
     """Render shared-prefix creation and activation, with no online fallback."""
     identity = pack_identity()

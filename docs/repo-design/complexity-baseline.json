@@ -659,7 +659,7 @@
     {
       "path": "src/pyrite/remote/_queue_scripts.py",
       "name": "_queue_script",
-      "cc": 30
+      "cc": 24
     },
     {
       "path": "src/pyrite/remote/cleanup.py",

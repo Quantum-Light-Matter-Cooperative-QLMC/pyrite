@@ -63,9 +63,8 @@ The submitter needs `pixi-pack` on PATH and the contributor environment's
 `build` and PyYAML packages. Install `pixi global install pixi-pack` on the
 submitter and `pixi global install pixi-unpack` on the cluster login host
 (with its user-local installation visible from compute nodes). A
-`pixi-unpack` binary copied to `~/.pixi/bin/` also works. Sync and submission
-check the login host for `pixi-unpack`, not `pixi`: the host needs `pixi` only
-for the login-host helpers noted below.
+`pixi-unpack` binary copied to `~/.pixi/bin/` also works. Pack targets need
+`pixi-unpack`, not `pixi`; install-mode targets still need `pixi`.
 Use the contributor environment to submit; choose `runtime-cpu` or
 `runtime-nvidia` on the target to omit developer dependencies. For online
 install-mode jobs, `runtime-amd` and `runtime-intel` are also available where
@@ -84,7 +83,20 @@ A missing pack, mismatched checkout/lock, or unsupported non-wheel dependency
 fails closed. AMD source-build environments and py-spy's network-capable
 launcher are not supported in this mode. Leave `env_transfer = "install"`
 (the default) for existing sites such as qlmc. This setting affects SSH
-queue payloads, not standalone execution profiles or login-host helpers.
+queue payloads and host helpers, not standalone execution profiles.
+
+Checkpoint `remote pull` (including transfer-node pulls), checkpoint `remote gc`,
+and trajectory inventory/export stage the current pack and reuse the same locked
+prefix as queue jobs. Run `remote sync` first if the checkout has changed
+(`remote pull` syncs by default). Provisioning and Python execute inside
+`host_exec` when configured; use an allocation launcher on sites that prohibit
+compute or environment unpacking on login nodes. Nothing resolves packages on
+those nodes. For a failed checkpoint pull, a raw checkpoint directory can also
+be copied via the transfer host using `rsync`.
+
+Queue scans (including trajectory capture), Zhai reproduction, brem/line
+recomputation and energy-grid convergence jobs support pack mode. The energy-grid
+bounds/derive batch job and trajectory-score batch job still require install mode.
 
 ## Run and inspect a profile
 

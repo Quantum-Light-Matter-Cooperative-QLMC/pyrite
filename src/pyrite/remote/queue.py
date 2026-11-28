@@ -409,7 +409,7 @@ def start_queue(
     # create the job dir and write run.sh (script piped over stdin).
     # Send as LF-only bytes: text=True on Windows translates \n->\r\n,
     # which produces a CRLF run.sh that bash silently refuses to execute.
-    _stage_job_script(jobid, stems, upload, script)
+    _stage_job_script(jobid, stems, upload, script, supports_pack=True)
     scheduler_id = _submit_staged_job(jobid, stems, nice=chunked)
     report(
         f"\nJOB {jobid} · SUBMITTED\n"
@@ -506,7 +506,7 @@ def start_zhai_queue(
 
     if not no_sync:
         transport.sync_code()
-    _stage_job_script(jobid, stems, upload, script)
+    _stage_job_script(jobid, stems, upload, script, supports_pack=True)
     scheduler_id = _submit_staged_job(jobid, stems)
 
     print(

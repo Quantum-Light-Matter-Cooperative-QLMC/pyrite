@@ -106,6 +106,7 @@ def remote_inventory(
     )
     if for_scoring:
         request["for_scoring"] = True
+    config.prepare_host_environment()
     return json.loads(transport._ssh_capture(_host_command("inventory", request)))
 
 
@@ -181,6 +182,7 @@ def pull_files(records, remote_root, local_root, *, artifacts=True, overwrite=Fa
 def remote_export(request, local_root, *, overwrite=False):
     """Export selected histories on the host; download only the resulting VTK files."""
     request = dict(request, root=capture_root(request.get("root")), export_id=uuid.uuid4().hex)
+    config.prepare_host_environment()
     response = json.loads(transport._ssh_capture(_host_command("export", request)))
     return pull_files(
         response["files"], response["root"], local_root, artifacts=False, overwrite=overwrite
@@ -191,6 +193,7 @@ def submit_score(request):
     """Submit spectrum replay to SLURM, leaving both captures and checkpoints remote."""
     from . import jobs, scripts
 
+    jobs.require_job_environment(supports_pack=False)
     request = dict(request, root=capture_root(request.get("root")))
     records = remote_inventory(
         request["root"],
@@ -224,7 +227,7 @@ def submit_score(request):
         "parallel_materials: 1\nchunk_minutes: 0\n"
     )
     upload = scripts._write_job_script_command(jobdir, metadata)
-    jobs._stage_job_script(jobid, stems, upload, script)
+    jobs._stage_job_script(jobid, stems, upload, script, supports_pack=False)
     jobs._submit_staged_job(jobid, stems)
     return jobid
 

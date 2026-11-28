@@ -101,12 +101,18 @@ def test_submission_embeds_expected_inventory_in_staged_script(monkeypatch):
     monkeypatch.setattr(queue, "_refuse_if_busy", lambda *args: None)
     monkeypatch.setattr(scripts, "_stems", lambda *args: ["hopg"])
     staged = []
-    monkeypatch.setattr(queue, "_stage_job_script", lambda *args: staged.append(args[-1]))
+    monkeypatch.setattr(
+        queue,
+        "_stage_job_script",
+        lambda *args, supports_pack: staged.append((args[-1], supports_pack)),
+    )
     monkeypatch.setattr(queue, "_submit_staged_job", lambda *args, **kwargs: "123")
     queue.start_queue(["hopg"], no_sync=True)
     assert len(staged) == 1
-    assert "python -m pyrite.remote.physics_identity" in staged[0]
-    assert '"dataset_digest":"same"' in staged[0]
+    script, supports_pack = staged[0]
+    assert supports_pack is True
+    assert "python -m pyrite.remote.physics_identity" in script
+    assert '"dataset_digest":"same"' in script
 
 
 def test_staged_table_digest_change_is_detected_by_real_scan_resolution(monkeypatch):
