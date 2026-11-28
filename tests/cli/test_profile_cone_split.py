@@ -174,7 +174,7 @@ def test_hand_written_key_is_validated_at_catalog_load(catalog):
     ):
         profile.write_text(f"{_SPLIT_PROFILE}cone_split = {value}\n")
         load_material_catalog.cache_clear()
-        with pytest.raises(MaterialConfigError, match="profiles.split.cone_split") as raised:
+        with pytest.raises(MaterialConfigError, match=r"profiles.split.cone_split") as raised:
             load_material_catalog(catalog, profile="split")
         assert message in str(raised.value)
     refused = invoke(root_command, ["profile", "numerics", "validate", "split"])
