@@ -211,6 +211,9 @@ def test_report_json_carries_provenance_ranks_and_missing_scc(repo, monkeypatch,
     assert "scc not found" in report["inventory"]["scc"]["error"]
     assert report["cc"]["ranks"] == {"A": 2, "B": 0, "C": 0, "D": 1, "E": 0, "F": 0}
     assert report["cc"]["hotspots"] == ["src/pyrite/hot.py:1 hot CC 25"]
+    assert len(report["cc"]["per_routine"]) == 3
+    assert report["cognitive"]["routines"] == 3
+    assert report["cognitive"]["matched_radon"] == 3
 
 
 def test_scc_inventory_reads_python_totals(tmp_path, monkeypatch) -> None:
@@ -246,7 +249,20 @@ def test_dev_cli_parser_forwards_complexity_options(monkeypatch) -> None:
     calls = []
     monkeypatch.setattr(complexity, "run", lambda root, **kwargs: calls.append(kwargs) or 0)
 
-    dev_cli.main(["complexity", "--scope", "tests", "--top", "3", "--churn", "50"])
+    dev_cli.main(
+        [
+            "complexity",
+            "--scope",
+            "tests",
+            "--top",
+            "3",
+            "--churn",
+            "50",
+            "--metric",
+            "cognitive",
+            "--suggest",
+        ]
+    )
 
     assert calls == [
         {
@@ -256,5 +272,7 @@ def test_dev_cli_parser_forwards_complexity_options(monkeypatch) -> None:
             "as_json": False,
             "top": 3,
             "churn": 50,
+            "metric": "cognitive",
+            "suggest": True,
         }
     ]

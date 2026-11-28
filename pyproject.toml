@@ -149,6 +149,7 @@ lint = [
     "nbqa>=1.9.1",
     "nbstripout>=0.9.1",
     "radon==6.0.1",
+    "complexipy==9.0.0",
 ]
 
 docs = [

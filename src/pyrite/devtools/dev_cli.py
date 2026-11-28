@@ -482,6 +482,8 @@ def cmd_complexity(args: argparse.Namespace) -> None:
             as_json=getattr(args, "json", False),
             top=getattr(args, "top", 15),
             churn=getattr(args, "churn", None),
+            metric=getattr(args, "metric", "all"),
+            suggest=getattr(args, "suggest", False),
         )
     except ComplexityToolError as exc:
         raise SystemExit(f"complexity: {exc}") from exc
@@ -837,8 +839,8 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
         "complexity",
         help="report source complexity or run the high-CC ratchet",
         description=(
-            "Report Radon CC/MI and optional scc inventory and git churn; "
-            "--check fails on new or worsened routines above CC 20."
+            "Report Radon CC/MI, Complexipy cognitive complexity, and optional inventory/churn; "
+            "--check fails on new or worsened routines above CC 20 (Radon only)."
         ),
     )
     complexity_mode = complexity.add_mutually_exclusive_group()
@@ -851,6 +853,15 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     complexity_mode.add_argument("--json", action="store_true", help="emit the report as JSON")
     complexity.add_argument(
         "--scope", choices=("src", "tests"), default="src", help="tests are report-only"
+    )
+    complexity.add_argument(
+        "--metric",
+        choices=("all", "cyclomatic", "cognitive"),
+        default="all",
+        help="select report metrics; the ratchet always uses Radon",
+    )
+    complexity.add_argument(
+        "--suggest", action="store_true", help="show read-only cognitive refactoring suggestions"
     )
     complexity.add_argument("--top", type=_positive_int, default=15, help="list length")
     complexity.add_argument(

@@ -431,6 +431,10 @@ def build_report(
             "mean": round(sum(ccs) / len(ccs), 2) if ccs else 0.0,
             "ranks": {rank: ranks.get(rank, 0) for rank in "ABCDEF"},
             "hotspots": [r.describe() for r in current.hotspots()[:top]],
+            "per_routine": [
+                {"path": r.path, "name": r.name, "lineno": r.lineno, "col": r.col, "cc": r.cc}
+                for r in current.routines
+            ],
         },
         "mi": {
             "ranks": {rank: mi_ranks.get(rank, 0) for rank in "ABC"},
@@ -452,7 +456,7 @@ def build_report(
 
 
 def render_report(report: dict[str, Any]) -> str:
-    prov, inv, cc, mi = report["provenance"], report["inventory"], report["cc"], report["mi"]
+    prov, inv = report["provenance"], report["inventory"]
     lines = [
         f"scope {prov['scope']} @ {prov['git_head'] or 'unknown'}; radon {prov['radon']}, "
         f"python {prov['python']}",
@@ -467,12 +471,20 @@ def render_report(report: dict[str, Any]) -> str:
             f"scc {scc['version']}: {scc['count']} files, {scc['code']} code / "
             f"{scc['comment']} comment / {scc['blank']} blank lines, complexity {scc['complexity']}"
         )
-    ranks = " ".join(f"{k} {v}" for k, v in cc["ranks"].items())
-    lines.append(f"CC: {cc['routines']} routines, mean {cc['mean']}; {ranks}")
-    lines.append(f"top hotspots (CC > {prov['threshold']}):")
-    lines += [f"  {item}" for item in cc["hotspots"]] or ["  none"]
-    lines.append("MI (informational): " + " ".join(f"{k} {v}" for k, v in mi["ranks"].items()))
-    lines += [f"  {item}" for item in mi["lowest"]]
+    if "cc" in report:
+        cc = report["cc"]
+        ranks = " ".join(f"{k} {v}" for k, v in cc["ranks"].items())
+        lines.append(f"CC: {cc['routines']} routines, mean {cc['mean']}; {ranks}")
+        lines.append(f"top hotspots (CC > {prov['threshold']}):")
+        lines += [f"  {item}" for item in cc["hotspots"]] or ["  none"]
+    if "mi" in report:
+        mi = report["mi"]
+        lines.append("MI (informational): " + " ".join(f"{k} {v}" for k, v in mi["ranks"].items()))
+        lines += [f"  {item}" for item in mi["lowest"]]
+    if "cognitive" in report:
+        from pyrite.devtools.cognitive import render_cognitive
+
+        lines.append(render_cognitive(report["cognitive"]))
     if "churn" in report:
         history = report["churn"]
         if "error" in history:
@@ -485,6 +497,15 @@ def render_report(report: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _validate_report_mode(metric: str, *, suggest: bool, gate: bool) -> None:
+    if metric not in {"all", "cyclomatic", "cognitive"}:
+        raise ComplexityToolError(f"unknown metric {metric!r}")
+    if gate and (metric == "cognitive" or suggest):
+        raise ComplexityToolError("cognitive complexity and suggestions are report-only")
+    if suggest and metric == "cyclomatic":
+        raise ComplexityToolError("--suggest requires the cognitive or all metric")
+
+
 def run(
     root: Path,
     *,
@@ -495,13 +516,16 @@ def run(
     top: int = 15,
     churn: int | None = None,
     baseline: Path | None = None,
+    metric: str = "all",
+    suggest: bool = False,
 ) -> int:
     """Execute one ``pyrite-dev complexity`` invocation; return its exit status."""
+    _validate_report_mode(metric, suggest=suggest, gate=check or write)
     radon_version = radon_modules()[0]
     baseline_path = root / (baseline or BASELINE_PATH)
     if (check or write) and scope != "src":
         raise ComplexityToolError("the ratchet covers --scope src only; tests are report-only")
-    current = scan(root, scope, maintainability=not (check or write))
+    current = scan(root, scope, maintainability=not (check or write) and metric != "cognitive")
     if write:
         changes = write_baseline(baseline_path, current, radon_version)
         print(f"wrote {baseline_path.relative_to(root)} ({len(current.hotspots())} hotspots)")
@@ -524,5 +548,12 @@ def run(
             print(f"{stale} baseline entries improved or resolved; lock in with --write")
         return 0
     report = build_report(root, current, radon_version, top=top, churn=churn)
+    if metric != "cyclomatic":
+        from pyrite.devtools.cognitive import build_cognitive_report
+
+        report["cognitive"] = build_cognitive_report(root, current, top=top, suggest=suggest)
+    if metric == "cognitive":
+        del report["cc"]
+        del report["mi"]
     print(json.dumps(report, indent=2) if as_json else render_report(report))
-    return 1 if current.failures else 0
+    return 1 if current.failures or report.get("cognitive", {}).get("failures") else 0

@@ -7,8 +7,11 @@ metric-only rewrites. Implementation: `pyrite.devtools.complexity`; baseline:
 `docs/repo-design/complexity-baseline.json`.
 
 ```bash
-pyrite-dev complexity                    # report: inventory, CC ranks, hotspots, MI
-pyrite-dev complexity --json             # same report as JSON
+pyrite-dev complexity                    # inventory, CC/MI and cognitive complexity
+pyrite-dev complexity --metric cyclomatic # Radon-only report
+pyrite-dev complexity --metric cognitive  # cognitive report with matching CC locations
+pyrite-dev complexity --suggest --top 20  # read-only suggestions for cognitive hotspots
+pyrite-dev complexity --json             # full per-routine scores, not just hotspots
 pyrite-dev complexity --churn 300        # add git churn over the last 300 commits
 pyrite-dev complexity --scope tests      # analyze tests separately (report only)
 pyrite-dev complexity --check            # ratchet; also run by `pyrite-dev verify`
@@ -20,6 +23,7 @@ pyrite-dev complexity --write            # rewrite the baseline, print its chang
 | Measure | Tool | Role |
 |---|---|---|
 | Per-routine CC | Radon, pinned `radon==6.0.1` in the `lint` group | Gate (`--check`) and report |
+| Cognitive complexity | Complexipy, pinned `complexipy==9.0.0` in `lint` | Informational only |
 | Maintainability index (MI) | Radon `mi_visit` | Informational only |
 | Line inventory | `scc` on `PATH`, or `PYRITE_SCC=/path/to/scc` | Informational, optional |
 | Churn | `git log --numstat --no-renames`, scope pathspec only | Informational, opt-in |
@@ -40,6 +44,29 @@ report exits 1, `--check` fails, and `--write` refuses to run.
 Each report states the scope, `git` HEAD, Radon and Python versions, threshold,
 and exclusions. Output is sorted, so the same tree and tool versions give the
 same report. `--check` scans without MI and takes a few seconds.
+
+## Cognitive complexity (pilot)
+
+Complexipy penalizes nested control flow, complementing Radon's path count.
+The default report includes both tools; `--metric cyclomatic` does not import
+Complexipy. `--check` and `--write` remain exclusively Radon operations, and
+no Complexipy snapshots or automatic fixes are used. The Python API analyzes
+only files successfully parsed by the existing scan, with inline ignores
+disabled; any cognitive scan failure is visible and makes the report exit 1.
+
+The JSON report includes all Radon routines and all Complexipy function
+records, source ranges, provisional cross-tool matches and unmatched counts.
+Complexipy includes nested functions in enclosing scores and may start at a
+decorator, unlike Radon. The matched CC is the outer routine's score, not a
+sum of nested CC scores. Do not interpret a matched location as metric parity.
+An unmatched routine has no invented cognitive or cyclomatic score.
+
+Cognitive thresholds >15, >20, >30, >50 and >100 are reported as counts.
+A future ratchet above 30 is a candidate only after reviewing nested functions,
+decorators, repeated names, async functions and coverage differences. Keep
+baseline updates explicit and reviewed; do not weaken the existing kernel
+exceptions or refactor numerical kernels just to reduce a metric. Suggestions
+are read-only, restricted to displayed hotspots, and require human review.
 
 ## Ratchet policy
 

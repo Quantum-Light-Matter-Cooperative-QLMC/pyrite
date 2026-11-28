@@ -79,7 +79,7 @@
     {
       "path": "src/pyrite/checkpoints/checkpoint_cleanup.py",
       "name": "clear_checkpoints",
-      "cc": 25
+      "cc": 23
     },
     {
       "path": "src/pyrite/checkpoints/recompute.py",
@@ -510,17 +510,12 @@
     {
       "path": "src/pyrite/montecarlo/trajectory_export.py",
       "name": "export_segments_vtp",
-      "cc": 38
+      "cc": 37
     },
     {
       "path": "src/pyrite/montecarlo/trajectory_scene.py",
       "name": "export_trajectory_scene",
       "cc": 37
-    },
-    {
-      "path": "src/pyrite/montecarlo/trajectory_selection.py",
-      "name": "read_selection",
-      "cc": 21
     },
     {
       "path": "src/pyrite/montecarlo/trajectory_selection.py",
