@@ -180,43 +180,10 @@ def _load_material_catalog_cached(
         for name, row in profiles.items()
         if isinstance(row.get("materials"), list)
     }
-    profile_beams: dict[str, Mapping[str, object]] = {}
-    for name, row in profiles.items():
-        beam_value = row.get("beam")
-        if isinstance(beam_value, str):
-            named_beam = beams.get(beam_value)
-            if named_beam is None:
-                errors.add(f"profiles.{name}.beam", f"unknown beam {beam_value!r}")
-                continue
-            # Resolve to values only -- the name itself must never reach a
-            # consumer (decision 3), and `label` is display metadata that never
-            # shaped the inline-block payload this replaces.
-            profile_beams[name] = MappingProxyType(
-                {k: v for k, v in named_beam.items() if k != "label"}
-            )
-        elif isinstance(beam_value, Mapping):
-            profile_beams[name] = MappingProxyType(dict(cast("Mapping[str, object]", beam_value)))
-    for name, fields in profile_beams.items():
-        if "gdf_path" in fields:
-            beam_path = Path(str(fields["gdf_path"])).expanduser()
-            if not beam_path.is_absolute():
-                beam_path = catalog_root(source) / beam_path
-            profile_beams[name] = MappingProxyType({**fields, "gdf_path": str(beam_path.resolve())})
+    profile_beams = _resolve_profile_beams(profiles, beams, source, errors)
     if errors.items:
         raise MaterialConfigError(errors.items, profile=profile)
-    profile_detectors: dict[str, Mapping[str, object]] = {}
-    for name, row in profiles.items():
-        detector_value = row.get("detector")
-        if isinstance(detector_value, str):
-            named_detector = detectors.get(detector_value)
-            if named_detector is None:
-                errors.add(f"profiles.{name}.detector", f"unknown detector {detector_value!r}")
-                continue
-            profile_detectors[name] = named_detector
-        elif isinstance(detector_value, Mapping):
-            # _parse_profiles already replaced an inline block with its validated
-            # spec; anything else with a detector key was rejected there.
-            profile_detectors[name] = cast("Mapping[str, object]", detector_value)
+    profile_detectors = _resolve_profile_detectors(profiles, detectors, errors)
     if errors.items:
         raise MaterialConfigError(errors.items, profile=profile)
     profile_emissions = {
@@ -237,17 +204,7 @@ def _load_material_catalog_cached(
         for name, row in profiles.items()
         if isinstance(row.get("line_grid_policy"), Mapping)
     }
-    profile_transport_numerics = {}
-    for name, row in profiles.items():
-        numerics = {key: row[key] for key in _PROFILE_SCALAR_NUMERICS_KEYS if key in row}
-        for key in ("n_electrons", "n_electrons_brem"):
-            if key not in row:
-                continue
-            grid = _grid(row[key], f"profiles.{name}.{key}", errors)
-            if grid is not None:
-                numerics[key] = tuple(int(value) for value in grid)
-        if numerics:
-            profile_transport_numerics[name] = MappingProxyType(numerics)
+    profile_transport_numerics = _resolve_profile_transport_numerics(profiles, errors)
     if errors.items:
         raise MaterialConfigError(errors.items, profile=profile)
     profile_filters = {
@@ -260,32 +217,9 @@ def _load_material_catalog_cached(
         for name, row in profiles.items()
         if isinstance(row.get("physical_detector"), Mapping)
     }
-    profile_detector_sets: dict[str, Mapping[str, Mapping[str, object]]] = {}
-    for name, row in profiles.items():
-        declared = row.get("detectors")
-        if isinstance(declared, Mapping):
-            resolved: dict[str, Mapping[str, object]] = {}
-            for detector_id, value in declared.items():
-                if isinstance(value, str):
-                    detector_spec = detectors.get(value)
-                    if detector_spec is None:
-                        errors.add(
-                            f"profiles.{name}.detectors.{detector_id}",
-                            f"unknown detector {value!r}",
-                        )
-                        continue
-                    resolved[detector_id] = detector_spec
-                else:
-                    resolved[detector_id] = cast(Mapping[str, object], value)
-        else:
-            resolved = {}
-            if name in profile_physical_detectors:
-                resolved["physical"] = profile_physical_detectors[name]
-            if name in profile_detectors:
-                resolved["default"] = profile_detectors[name]
-            if not resolved:
-                resolved["default"] = MappingProxyType({})
-        profile_detector_sets[name] = MappingProxyType(resolved)
+    profile_detector_sets = _resolve_profile_detector_sets(
+        profiles, detectors, profile_detectors, profile_physical_detectors, errors
+    )
     curves = resolve_object_curves(source, detectors, profile_detector_sets, gratings, errors)
     if errors.items:
         raise MaterialConfigError(errors.items, profile=profile)
@@ -323,6 +257,125 @@ def _load_material_catalog_cached(
         gratings=MappingProxyType(gratings),
         curves=MappingProxyType(curves),
     )
+
+
+def _resolve_profile_beams(
+    profiles: Mapping[str, Mapping[str, object]],
+    beams: Mapping[str, Mapping[str, object]],
+    source: Path,
+    errors: _Errors,
+) -> dict[str, Mapping[str, object]]:
+    """Resolve value-only beam specs, then anchor relative GDF asset paths."""
+    resolved: dict[str, Mapping[str, object]] = {}
+    for name, row in profiles.items():
+        value = row.get("beam")
+        if isinstance(value, Mapping):
+            resolved[name] = MappingProxyType(dict(cast("Mapping[str, object]", value)))
+            continue
+        if not isinstance(value, str):
+            continue
+        named = beams.get(value)
+        if named is None:
+            errors.add(f"profiles.{name}.beam", f"unknown beam {value!r}")
+            continue
+        # The reference name and display label must not shape the beam payload.
+        resolved[name] = MappingProxyType({k: v for k, v in named.items() if k != "label"})
+    for name, fields in resolved.items():
+        if "gdf_path" not in fields:
+            continue
+        beam_path = Path(str(fields["gdf_path"])).expanduser()
+        if not beam_path.is_absolute():
+            beam_path = catalog_root(source) / beam_path
+        resolved[name] = MappingProxyType({**fields, "gdf_path": str(beam_path.resolve())})
+    return resolved
+
+
+def _resolve_profile_detectors(
+    profiles: Mapping[str, Mapping[str, object]],
+    detectors: Mapping[str, Mapping[str, object]],
+    errors: _Errors,
+) -> dict[str, Mapping[str, object]]:
+    """Resolve the legacy scalar detector field, retaining validated inline specs."""
+    resolved: dict[str, Mapping[str, object]] = {}
+    for name, row in profiles.items():
+        value = row.get("detector")
+        if isinstance(value, Mapping):
+            # _parse_profiles already validated the inline block.
+            resolved[name] = cast("Mapping[str, object]", value)
+            continue
+        if not isinstance(value, str):
+            continue
+        named = detectors.get(value)
+        if named is None:
+            errors.add(f"profiles.{name}.detector", f"unknown detector {value!r}")
+            continue
+        resolved[name] = named
+    return resolved
+
+
+def _resolve_profile_transport_numerics(
+    profiles: Mapping[str, Mapping[str, object]], errors: _Errors
+) -> dict[str, Mapping[str, object]]:
+    """Freeze scalar numerical controls and decoded electron-count sweeps."""
+    resolved: dict[str, Mapping[str, object]] = {}
+    for name, row in profiles.items():
+        numerics = {key: row[key] for key in _PROFILE_SCALAR_NUMERICS_KEYS if key in row}
+        for key in ("n_electrons", "n_electrons_brem"):
+            if key not in row:
+                continue
+            grid = _grid(row[key], f"profiles.{name}.{key}", errors)
+            if grid is not None:
+                numerics[key] = tuple(int(value) for value in grid)
+        if numerics:
+            resolved[name] = MappingProxyType(numerics)
+    return resolved
+
+
+def _resolve_detector_collection(
+    declared: Mapping[str, object],
+    detectors: Mapping[str, Mapping[str, object]],
+    path: str,
+    errors: _Errors,
+) -> dict[str, Mapping[str, object]]:
+    """Resolve a validated explicit detector collection without legacy fallbacks."""
+    resolved: dict[str, Mapping[str, object]] = {}
+    for detector_id, value in declared.items():
+        if not isinstance(value, str):
+            resolved[detector_id] = cast(Mapping[str, object], value)
+            continue
+        spec = detectors.get(value)
+        if spec is None:
+            errors.add(f"{path}.{detector_id}", f"unknown detector {value!r}")
+            continue
+        resolved[detector_id] = spec
+    return resolved
+
+
+def _resolve_profile_detector_sets(
+    profiles: Mapping[str, Mapping[str, object]],
+    detectors: Mapping[str, Mapping[str, object]],
+    profile_detectors: Mapping[str, Mapping[str, object]],
+    profile_physical_detectors: Mapping[str, Mapping[str, object]],
+    errors: _Errors,
+) -> dict[str, Mapping[str, Mapping[str, object]]]:
+    """Resolve explicit detector sets or synthesize the legacy/default collection."""
+    sets: dict[str, Mapping[str, Mapping[str, object]]] = {}
+    for name, row in profiles.items():
+        declared = row.get("detectors")
+        if isinstance(declared, Mapping):
+            resolved = _resolve_detector_collection(
+                declared, detectors, f"profiles.{name}.detectors", errors
+            )
+        else:
+            resolved = {}
+            if name in profile_physical_detectors:
+                resolved["physical"] = profile_physical_detectors[name]
+            if name in profile_detectors:
+                resolved["default"] = profile_detectors[name]
+            if not resolved:
+                resolved["default"] = MappingProxyType({})
+        sets[name] = MappingProxyType(resolved)
+    return sets
 
 
 def _resolve_presets(

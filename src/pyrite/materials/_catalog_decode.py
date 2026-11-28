@@ -113,6 +113,106 @@ def _direction(value: object, path: str, errors: _Errors) -> tuple[int, int, int
     return out
 
 
+def _grid_values(
+    payload: object, path: str, errors: _Errors, *, unit: str | None, expected: str
+) -> np.ndarray:
+    """Decode explicit coordinates in declaration order."""
+    if not isinstance(payload, list):
+        raise ValueError("values must be an array")
+    numeric = [
+        _grid_number(
+            item,
+            f"{path}.values[{index}]",
+            errors,
+            unit=unit,
+            expected=expected,
+            kind="values",
+        )
+        for index, item in enumerate(payload)
+    ]
+    if any(item is None for item in numeric):
+        raise ValueError("values entries must be finite numbers (not bool)")
+    return _readonly(numeric)
+
+
+def _grid_sequence(
+    payload: object,
+    path: str,
+    errors: _Errors,
+    *,
+    kind: str,
+    unit: str | None,
+    expected: str,
+) -> np.ndarray:
+    """Validate and generate a range or a linearly/logarithmically spaced grid."""
+    if not isinstance(payload, Mapping):
+        raise ValueError(f"{kind} must be a table")
+    payload = cast(Mapping[str, object], payload)
+    allowed = {
+        "arange": {"start", "stop", "step"},
+        "linspace": {"start", "stop", "num", "endpoint"},
+        "logspace": {"start", "stop", "num", "endpoint", "base"},
+    }[kind]
+    extra = set(payload) - allowed
+    if extra:
+        raise ValueError(f"unknown keys {sorted(extra)}")
+    if kind == "arange":
+        if set(payload) != {"start", "stop", "step"}:
+            raise ValueError("arange requires start, stop, and step")
+    elif not {"start", "stop", "num"} <= set(payload):
+        raise ValueError(f"{kind} requires start, stop, and num")
+
+    descriptor_path = f"{path}.{kind}"
+    start = _descriptor_number(
+        payload, "start", descriptor_path, errors, unit=unit, expected=expected, kind=kind
+    )
+    stop = _descriptor_number(
+        payload, "stop", descriptor_path, errors, unit=unit, expected=expected, kind=kind
+    )
+    if kind == "arange":
+        step = _descriptor_number(
+            payload, "step", descriptor_path, errors, unit=unit, expected=expected, kind=kind
+        )
+        if step == 0:
+            raise ValueError("step must be nonzero")
+        return _readonly(np.arange(start, stop, step))
+
+    num = _descriptor_num(payload)
+    endpoint = _descriptor_endpoint(payload)
+    if kind == "logspace":
+        base = (
+            _descriptor_number(
+                payload, "base", descriptor_path, errors, unit=None, expected=expected, kind=None
+            )
+            if "base" in payload
+            else 10.0
+        )
+        return _readonly(np.logspace(start, stop, num, endpoint=endpoint, base=base))
+    return _readonly(np.linspace(start, stop, num, endpoint=endpoint))
+
+
+def _grid_mapping(
+    value: Mapping[str, object], path: str, errors: _Errors, *, unit: str | None, expected: str
+) -> np.ndarray | None:
+    """Select a single descriptor and retain its grouped diagnostic on failure."""
+    kinds = [key for key in value if key in _GRID_KINDS]
+    unknown = [key for key in value if key not in _GRID_KINDS]
+    for key in unknown:
+        errors.add(f"{path}.{key}", "unknown grid descriptor")
+    if len(kinds) != 1 or len(value) != 1:
+        errors.add(path, "must contain exactly one of values/arange/linspace/logspace")
+        return None
+    kind = kinds[0]
+    payload = value[kind]
+    try:
+        if kind == "values":
+            return _grid_values(payload, path, errors, unit=unit, expected=expected)
+        return _grid_sequence(payload, path, errors, kind=kind, unit=unit, expected=expected)
+    except (FloatingPointError, OverflowError, TypeError, ValueError, ZeroDivisionError) as exc:
+        errors.add(path, f"invalid {kind} descriptor ({exc})")
+        return None
+
+
 def _grid(
     value: object,
     path: str,
@@ -126,123 +226,10 @@ def _grid(
     if scalar is not None:
         out = _readonly([scalar])
     elif isinstance(value, Mapping):
-        value = cast(Mapping[str, object], value)
-        kinds = [key for key in value if key in _GRID_KINDS]
-        unknown = [key for key in value if key not in _GRID_KINDS]
-        for key in unknown:
-            errors.add(f"{path}.{key}", "unknown grid descriptor")
-        if len(kinds) != 1 or len(value) != 1:
-            errors.add(path, "must contain exactly one of values/arange/linspace/logspace")
-            return None
-        kind = kinds[0]
-        payload = value[kind]
-        try:
-            if kind == "values":
-                if not isinstance(payload, list):
-                    raise ValueError("values must be an array")
-                numeric = [
-                    _grid_number(
-                        item,
-                        f"{path}.values[{index}]",
-                        errors,
-                        unit=unit,
-                        expected=expected,
-                        kind=kind,
-                    )
-                    for index, item in enumerate(payload)
-                ]
-                if any(item is None for item in numeric):
-                    raise ValueError("values entries must be finite numbers (not bool)")
-                out = _readonly(numeric)
-            else:
-                if not isinstance(payload, Mapping):
-                    raise ValueError(f"{kind} must be a table")
-                payload = cast(Mapping[str, object], payload)
-                allowed = {
-                    "arange": {"start", "stop", "step"},
-                    "linspace": {"start", "stop", "num", "endpoint"},
-                    "logspace": {"start", "stop", "num", "endpoint", "base"},
-                }[kind]
-                extra = set(payload) - allowed
-                if extra:
-                    raise ValueError(f"unknown keys {sorted(extra)}")
-                if kind == "arange":
-                    if set(payload) != {"start", "stop", "step"}:
-                        raise ValueError("arange requires start, stop, and step")
-                    start = _descriptor_number(
-                        payload,
-                        "start",
-                        f"{path}.arange",
-                        errors,
-                        unit=unit,
-                        expected=expected,
-                        kind=kind,
-                    )
-                    stop = _descriptor_number(
-                        payload,
-                        "stop",
-                        f"{path}.arange",
-                        errors,
-                        unit=unit,
-                        expected=expected,
-                        kind=kind,
-                    )
-                    step = _descriptor_number(
-                        payload,
-                        "step",
-                        f"{path}.arange",
-                        errors,
-                        unit=unit,
-                        expected=expected,
-                        kind=kind,
-                    )
-                    if step == 0:
-                        raise ValueError("step must be nonzero")
-                    out = _readonly(np.arange(start, stop, step))
-                else:
-                    required = {"start", "stop", "num"}
-                    if not required <= set(payload):
-                        raise ValueError(f"{kind} requires start, stop, and num")
-                    start = _descriptor_number(
-                        payload,
-                        "start",
-                        f"{path}.{kind}",
-                        errors,
-                        unit=unit,
-                        expected=expected,
-                        kind=kind,
-                    )
-                    stop = _descriptor_number(
-                        payload,
-                        "stop",
-                        f"{path}.{kind}",
-                        errors,
-                        unit=unit,
-                        expected=expected,
-                        kind=kind,
-                    )
-                    num = _descriptor_num(payload)
-                    endpoint = _descriptor_endpoint(payload)
-                    if kind == "logspace":
-                        base = (
-                            _descriptor_number(
-                                payload,
-                                "base",
-                                f"{path}.logspace",
-                                errors,
-                                unit=None,
-                                expected=expected,
-                                kind=None,
-                            )
-                            if "base" in payload
-                            else 10.0
-                        )
-                        generated = np.logspace(start, stop, num, endpoint=endpoint, base=base)
-                    else:
-                        generated = np.linspace(start, stop, num, endpoint=endpoint)
-                    out = _readonly(generated)
-        except (FloatingPointError, OverflowError, TypeError, ValueError, ZeroDivisionError) as exc:
-            errors.add(path, f"invalid {kind} descriptor ({exc})")
+        out = _grid_mapping(
+            cast(Mapping[str, object], value), path, errors, unit=unit, expected=expected
+        )
+        if out is None:
             return None
     else:
         errors.add(path, "must be a scalar or one grid descriptor")

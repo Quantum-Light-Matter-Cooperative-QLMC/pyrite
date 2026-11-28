@@ -287,6 +287,135 @@ def _parse_transverse_policy(raw: object, path: str, errors: _Errors) -> dict[st
     return out
 
 
+def _validate_beam_source(table: Mapping[str, object], path: str, errors: _Errors) -> None:
+    """Check source selection and cross-field compatibility before decoding values."""
+    source = table.get("source", "analytic")
+    if not isinstance(source, str) or source not in {"analytic", "gpt_gdf"}:
+        errors.add(path, "source must be analytic or gpt_gdf")
+    if source == "analytic" and table.keys() & (_GDF_KEYS - {"source"}):
+        errors.add(path, "GDF settings require source='gpt_gdf'")
+    if "gdf_time_s" in table and "gdf_screen_position_m" in table:
+        errors.add(path, "gdf_time_s and gdf_screen_position_m are mutually exclusive")
+    if source != "gpt_gdf":
+        return
+    analytic = table.keys() & (_BEAM_KEYS - _GDF_KEYS - {"rep_rate_hz", "bunch_charge_pc"})
+    if analytic:
+        errors.add(
+            path, f"gpt_gdf is incompatible with analytic fields: {', '.join(sorted(analytic))}"
+        )
+    for required in ("gdf_path", "gdf_z_origin_m"):
+        if required not in table:
+            errors.add(path, f"gpt_gdf requires {required}")
+
+
+def _beam_number(
+    value: object, path: str, errors: _Errors, unit_info: tuple[str, str] | None
+) -> float | None:
+    if unit_info is None:
+        return _number(value)
+    unit, expected = unit_info
+    return _unit_number(value, path, errors, unit, expected=expected)
+
+
+def _parse_gdf_beam_field(key: str, value: object, path: str, errors: _Errors) -> object:
+    """Decode one GPT/GDF field, retaining partial valid values on invalid rows."""
+    if key in {"source", "gdf_path", "gdf_normalization"}:
+        if not isinstance(value, str) or not value.strip():
+            errors.add(path, "must be a nonempty string")
+            return None
+        if key == "gdf_normalization" and value not in {"pyrite_current", "gdf_charge"}:
+            errors.add(path, "must be pyrite_current or gdf_charge")
+            return None
+        return value
+    if key == "gdf_shape_only":
+        if not isinstance(value, bool):
+            errors.add(path, "must be a boolean")
+            return None
+        return value
+    number = _beam_number(value, path, errors, _GDF_UNITS.get(key))
+    if number is None or (key not in {"gdf_z_origin_m", "gdf_screen_position_m"} and number < 0):
+        if not errors.has(path):
+            errors.add(
+                path, "must be finite and non-negative (origin/screen coordinates may be signed)"
+            )
+        return None
+    return number
+
+
+def _parse_beam_front_tilt(raw: object, path: str, errors: _Errors) -> Mapping[str, object] | None:
+    front = _table(raw, path, errors)
+    if front is None:
+        return None
+    errors.keys(front, path, {"tilt_deg", "azimuth_deg"})
+    tilt = _unit_number(
+        front.get("tilt_deg"), f"{path}.tilt_deg", errors, "degree", expected="angle", kind="angle"
+    )
+    azimuth = _unit_number(
+        front.get("azimuth_deg", 0.0),
+        f"{path}.azimuth_deg",
+        errors,
+        "degree",
+        expected="angle",
+        kind="angle",
+    )
+    if tilt is None or not -90 < tilt < 90 or azimuth is None:
+        if not errors.has(f"{path}.tilt_deg") and not errors.has(f"{path}.azimuth_deg"):
+            errors.add(path, "requires finite -90 < tilt_deg < 90 and finite azimuth_deg")
+        return None
+    return MappingProxyType({"tilt_deg": tilt, "azimuth_deg": azimuth})
+
+
+def _parse_beam_offsets(raw: object, path: str, errors: _Errors) -> tuple[float, ...] | None:
+    offsets = (
+        [
+            _unit_number(item, f"{path}[{index}]", errors, "fs", expected="time")
+            for index, item in enumerate(raw)
+        ]
+        if isinstance(raw, list)
+        else None
+    )
+    if not offsets or any(item is None for item in offsets):
+        if not errors.has(path):
+            errors.add(path, "must be a non-empty array of finite times in fs")
+        return None
+    return tuple(cast(float, item) for item in offsets)
+
+
+def _parse_beam_positive(key: str, value: object, path: str, errors: _Errors) -> float | None:
+    unit_info = _BEAM_UNITS.get(key)
+    number = _beam_number(value, path, errors, unit_info)
+    if number is None or number <= 0:
+        if not errors.has(path):
+            unit = unit_info[0] if unit_info is not None else ""
+            errors.add(path, f"must be a finite positive number {unit}".strip())
+        return None
+    return number
+
+
+def _parse_beam_field(key: str, value: object, path: str, errors: _Errors) -> object:
+    """Dispatch in input order; unknown keys have already been diagnosed."""
+    if key in _GDF_KEYS:
+        return _parse_gdf_beam_field(key, value, path, errors)
+    if key == "bunch_front_tilt":
+        return _parse_beam_front_tilt(value, path, errors)
+    if key == "long_shape":
+        if not isinstance(value, str) or value not in _BEAM_LONG_SHAPES:
+            errors.add(path, f"must be one of {sorted(_BEAM_LONG_SHAPES)}")
+            return None
+        return value
+    if key == "long_offsets_fs":
+        return _parse_beam_offsets(value, path, errors)
+    if key == "longitudinal":
+        policy = _parse_longitudinal_policy(value, path, errors)
+        return MappingProxyType(policy) if policy is not None else None
+    if key == "transverse":
+        transverse = _parse_transverse_policy(value, path, errors)
+        return MappingProxyType(transverse) if transverse is not None else None
+    if key in _BEAM_POSITIVE_KEYS:
+        return _parse_beam_positive(key, value, path, errors)
+    return None
+
+
 def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, object] | None:
     """Structurally validate a ``[profiles.NAME.beam]`` distribution block.
 
@@ -307,143 +436,12 @@ def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, ob
             "removed; replace gdf_repetition_rate_hz with rep_rate_hz",
         )
     errors.keys(table, path, set(_BEAM_KEYS) | {"gdf_repetition_rate_hz"})
+    _validate_beam_source(table, path, errors)
     out: dict[str, object] = {}
-    source = table.get("source", "analytic")
-    if not isinstance(source, str) or source not in {"analytic", "gpt_gdf"}:
-        errors.add(path, "source must be analytic or gpt_gdf")
-    if source == "analytic" and table.keys() & (_GDF_KEYS - {"source"}):
-        errors.add(path, "GDF settings require source='gpt_gdf'")
-    if "gdf_time_s" in table and "gdf_screen_position_m" in table:
-        errors.add(path, "gdf_time_s and gdf_screen_position_m are mutually exclusive")
-    if source == "gpt_gdf":
-        analytic = table.keys() & (_BEAM_KEYS - _GDF_KEYS - {"rep_rate_hz", "bunch_charge_pc"})
-        if analytic:
-            errors.add(
-                path, f"gpt_gdf is incompatible with analytic fields: {', '.join(sorted(analytic))}"
-            )
-        for required in ("gdf_path", "gdf_z_origin_m"):
-            if required not in table:
-                errors.add(path, f"gpt_gdf requires {required}")
     for key, value in table.items():
-        if key in {"source", "gdf_path", "gdf_normalization"}:
-            if not isinstance(value, str) or not value.strip():
-                errors.add(f"{path}.{key}", "must be a nonempty string")
-            elif key == "gdf_normalization" and value not in {"pyrite_current", "gdf_charge"}:
-                errors.add(f"{path}.{key}", "must be pyrite_current or gdf_charge")
-            else:
-                out[key] = value
-        elif key == "gdf_shape_only":
-            if not isinstance(value, bool):
-                errors.add(f"{path}.{key}", "must be a boolean")
-            else:
-                out[key] = value
-        elif key in _GDF_KEYS:
-            unit_info = _GDF_UNITS.get(key)
-            number = (
-                _unit_number(
-                    value,
-                    f"{path}.{key}",
-                    errors,
-                    unit_info[0],
-                    expected=unit_info[1],
-                )
-                if unit_info is not None
-                else _number(value)
-            )
-            if number is None or (
-                key not in {"gdf_z_origin_m", "gdf_screen_position_m"} and number < 0
-            ):
-                if not errors.has(f"{path}.{key}"):
-                    errors.add(
-                        f"{path}.{key}",
-                        "must be finite and non-negative (origin/screen coordinates may be signed)",
-                    )
-            else:
-                out[key] = number
-        elif key == "bunch_front_tilt":
-            front = _table(value, f"{path}.{key}", errors)
-            if front is not None:
-                errors.keys(front, f"{path}.{key}", {"tilt_deg", "azimuth_deg"})
-                tilt = _unit_number(
-                    front.get("tilt_deg"),
-                    f"{path}.{key}.tilt_deg",
-                    errors,
-                    "degree",
-                    expected="angle",
-                    kind="angle",
-                )
-                azimuth = _unit_number(
-                    front.get("azimuth_deg", 0.0),
-                    f"{path}.{key}.azimuth_deg",
-                    errors,
-                    "degree",
-                    expected="angle",
-                    kind="angle",
-                )
-                if tilt is None or not -90 < tilt < 90 or azimuth is None:
-                    if not errors.has(f"{path}.{key}.tilt_deg") and not errors.has(
-                        f"{path}.{key}.azimuth_deg"
-                    ):
-                        errors.add(
-                            f"{path}.{key}",
-                            "requires finite -90 < tilt_deg < 90 and finite azimuth_deg",
-                        )
-                else:
-                    out[key] = MappingProxyType({"tilt_deg": tilt, "azimuth_deg": azimuth})
-        elif key == "long_shape":
-            if not isinstance(value, str) or value not in _BEAM_LONG_SHAPES:
-                errors.add(f"{path}.long_shape", f"must be one of {sorted(_BEAM_LONG_SHAPES)}")
-            else:
-                out[key] = value
-        elif key == "long_offsets_fs":
-            offsets = (
-                [
-                    _unit_number(
-                        item,
-                        f"{path}.long_offsets_fs[{index}]",
-                        errors,
-                        "fs",
-                        expected="time",
-                    )
-                    for index, item in enumerate(value)
-                ]
-                if isinstance(value, list)
-                else None
-            )
-            if not offsets or any(item is None for item in offsets):
-                if not errors.has(f"{path}.long_offsets_fs"):
-                    errors.add(
-                        f"{path}.long_offsets_fs", "must be a non-empty array of finite times in fs"
-                    )
-            else:
-                out[key] = tuple(offsets)
-        elif key == "longitudinal":
-            policy = _parse_longitudinal_policy(value, f"{path}.longitudinal", errors)
-            if policy is not None:
-                out[key] = MappingProxyType(policy)
-        elif key == "transverse":
-            transverse = _parse_transverse_policy(value, f"{path}.transverse", errors)
-            if transverse is not None:
-                out[key] = MappingProxyType(transverse)
-        elif key in _BEAM_POSITIVE_KEYS:
-            unit_info = _BEAM_UNITS.get(key)
-            number = (
-                _unit_number(
-                    value,
-                    f"{path}.{key}",
-                    errors,
-                    unit_info[0],
-                    expected=unit_info[1],
-                )
-                if unit_info is not None
-                else _number(value)
-            )
-            if number is None or number <= 0:
-                if not errors.has(f"{path}.{key}"):
-                    unit = unit_info[0] if unit_info is not None else ""
-                    errors.add(f"{path}.{key}", f"must be a finite positive number {unit}".strip())
-            else:
-                out[key] = number
+        parsed = _parse_beam_field(key, value, f"{path}.{key}", errors)
+        if parsed is not None:
+            out[key] = parsed
     return out or None
 
 

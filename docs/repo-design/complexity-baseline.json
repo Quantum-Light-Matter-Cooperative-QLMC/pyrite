@@ -229,37 +229,6 @@
       "exception": "#709: physical detector geometry supports legacy numerics and explicit units with field-path errors, angle-specific validation, and existing geometric bounds. The shared conversion lives in _unit_number; checks remain visible at the input boundary."
     },
     {
-      "path": "src/pyrite/materials/_beam_detector_parse.py",
-      "name": "_parse_profile_beam",
-      "cc": 55,
-      "exception": "#709: preserve profile beam field validation and specific error paths while accepting compatible units for beam, GDF, and bunch fields. Conversion is shared through _unit_number and canonical numeric output remains unchanged."
-    },
-    {
-      "path": "src/pyrite/materials/_catalog_decode.py",
-      "name": "_grid",
-      "cc": 26
-    },
-    {
-      "path": "src/pyrite/materials/_parse.py",
-      "name": "_parse_crystals",
-      "cc": 54
-    },
-    {
-      "path": "src/pyrite/materials/_parse.py",
-      "name": "_parse_materials",
-      "cc": 61
-    },
-    {
-      "path": "src/pyrite/materials/_parse.py",
-      "name": "_parse_profiles",
-      "cc": 53
-    },
-    {
-      "path": "src/pyrite/materials/_parse.py",
-      "name": "_scan",
-      "cc": 44
-    },
-    {
       "path": "src/pyrite/materials/authoring.py",
       "name": "_save_material_locked",
       "cc": 27
@@ -272,7 +241,7 @@
     {
       "path": "src/pyrite/materials/catalog.py",
       "name": "_load_material_catalog_cached",
-      "cc": 56
+      "cc": 27
     },
     {
       "path": "src/pyrite/materials/emission.py",
