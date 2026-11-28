@@ -368,6 +368,11 @@
       "exception": "#680: accept 26 -> 29 for optional source momentum sampling, optional beam-entry provenance and conditional-versus-legacy handoff selection. Source sampling and bin propagation already have separate owners in planar_injection. The remaining branches belong to the ordered entrance -> zone -> handoff -> native continuation orchestration, preserving electron IDs and RNG streams; extracting them solely for CC would obscure that data flow."
     },
     {
+      "path": "src/pyrite/montecarlo/runner/cxr_grid.py",
+      "name": "_measured_cxr_grid",
+      "cc": 22
+    },
+    {
       "path": "src/pyrite/montecarlo/shell_configuration.py",
       "name": "_parse_atomic_shells",
       "cc": 27
@@ -481,6 +486,11 @@
       "path": "src/pyrite/montecarlo/spectrum/cxr/_batched_finalize.py",
       "name": "_batched_coherent_finalize",
       "cc": 31
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/cxr/_fiber_history.py",
+      "name": "validate_history_roll_request",
+      "cc": 33
     },
     {
       "path": "src/pyrite/montecarlo/spectrum/cxr/_per_hkl.py",

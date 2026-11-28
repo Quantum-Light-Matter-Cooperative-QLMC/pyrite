@@ -47,15 +47,26 @@ def main():
             fiber=FiberAverage(cutoff_invang=args.cutoff, azimuth_count=args.rolls)
         ),
     )
-    case = lower_simulation(resolve_simulation(
-        scene, physics=Physics(bremsstrahlung_model="bremslib", radiative_model="uncoupled"),
-        numerics=numerics,
-    ))
+    case = lower_simulation(
+        resolve_simulation(
+            scene,
+            physics=Physics(bremsstrahlung_model="bremslib", radiative_model="uncoupled"),
+            numerics=numerics,
+        )
+    )
     began = perf_counter()
     tp = runner._transport_case(case, transport_core="per-electron")
     segments = runner._segments_on_device(tp["segs"])
-    print(json.dumps({"transport_wall_s": perf_counter() - began, "histories": args.histories,
-                      "segments": int(segments["L_ang"].size)}), flush=True)
+    print(
+        json.dumps(
+            {
+                "transport_wall_s": perf_counter() - began,
+                "histories": args.histories,
+                "segments": int(segments["L_ang"].size),
+            }
+        ),
+        flush=True,
+    )
     band = case["line_grid_policy"]["bandwidth"]
     start, ceiling = float(band["start_eV"]), float(band["stop_eV"])
     limit = float(band["truncation_limit"]) / BANDWIDTH_PROXY_SAFETY
@@ -69,16 +80,28 @@ def main():
         for mode in modes:
             passes = []
 
-            def collect(stops, part=segments):
+            def collect(stops, part=segments, passes=passes):
                 t = perf_counter()
                 summary = _direction_tail(
-                    case, part, tp["n_hat"], int(tp["Ne_lines"]),
-                    case.get("abs_layers"), tp.get("groove"), start, ceiling, stops=stops,
+                    case,
+                    part,
+                    tp["n_hat"],
+                    int(tp["Ne_lines"]),
+                    case.get("abs_layers"),
+                    tp.get("groove"),
+                    start,
+                    ceiling,
+                    stops=stops,
                 )
                 # Construct the host view to synchronize all queued reductions.
                 tail = LatticeTail(stops, summary)
-                passes.append({"candidates": len(stops), "wall_s": perf_counter() - t,
-                               "raw_lines": tail.raw_lines})
+                passes.append(
+                    {
+                        "candidates": len(stops),
+                        "wall_s": perf_counter() - t,
+                        "raw_lines": tail.raw_lines,
+                    }
+                )
                 return summary
 
             began = perf_counter()
@@ -98,17 +121,23 @@ def main():
                 )
                 tail, certified = resolve_pilot_tail(ceiling, limit, stops, summary, collect)
             stop, record = _lattice_stop(tail, ceiling, limit, 100.0)
-            result = {"repeat": repeat, "mode": mode, "stop_eV": stop,
-                      "wall_s": perf_counter() - began, "passes": passes,
-                      "fraction": record["proxy_truncated_fraction"]}
+            result = {
+                "repeat": repeat,
+                "mode": mode,
+                "stop_eV": stop,
+                "wall_s": perf_counter() - began,
+                "passes": passes,
+                "fraction": record["proxy_truncated_fraction"],
+            }
             if mode == "pilot":
                 result.update(pilot_rows=pilot_rows, pilot_certified=certified)
             print(json.dumps(result), flush=True)
             results[mode] = result
         for mode in ("coarse-fine", "pilot"):
             assert results["all"]["stop_eV"] == results[mode]["stop_eV"]
-            np.testing.assert_allclose(results["all"]["fraction"], results[mode]["fraction"],
-                                       rtol=3e-7, atol=1e-15)
+            np.testing.assert_allclose(
+                results["all"]["fraction"], results[mode]["fraction"], rtol=3e-7, atol=1e-15
+            )
 
 
 if __name__ == "__main__":

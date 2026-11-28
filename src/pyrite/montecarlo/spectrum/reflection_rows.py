@@ -209,3 +209,14 @@ def _orientation_terms(sampled, orientation, g_vector, velocity, n_vector):
         return np.sum(velocity * g_row, axis=1), g_row @ n_vector, float(g_vector @ g_vector)
     g_row = g_vector if orientation is None else orientation @ g_vector
     return velocity @ g_row, float(n_vector @ g_row), float(g_row @ g_row)
+
+
+def _case_mosaic(case):
+    """The exact-mosaic keywords a case's line spectrum is scored with."""
+    kw = {
+        "mosaic_fwhm_rad": case.get("mosaic_mc_fwhm_rad"),
+        "mosaic_nodes": case.get("mosaic_mc_nodes", 1),
+    }
+    if case.get("mosaic_mc_sampling") == "history":
+        kw.update(mosaic_sampling="history", mosaic_seed=int(case["seed"]))
+    return kw

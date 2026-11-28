@@ -43,7 +43,7 @@ def test_empty_population_needs_no_replay():
 
     def collect(stops):
         calls.append(stops)
-        return None
+        return
 
     tail = refine_tail(54321.5, 0.01, collect)
     assert tail.n_lines == 0 and len(calls) == 1

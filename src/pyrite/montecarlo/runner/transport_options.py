@@ -6,7 +6,12 @@ from dataclasses import replace
 from typing import Any
 
 from ..._cone_splitting import ConeSplitting, warn_low_gain
-from ..case import admit_axial_channeling, refuse_channeling, refuse_transition_radiation
+from ..case import (
+    AxialAdmissionError,
+    admit_axial_channeling,
+    refuse_channeling,
+    refuse_transition_radiation,
+)
 
 # Public KernelTuning.transport override (#776): a ``PerElectronTransportConfig``
 # set by in-process callers around ``run_case`` and read by ``_transport_case``.
@@ -290,3 +295,32 @@ def report_transport_finished(progress, realized):
     """Flush realized transport progress before population-wide spectrum preparation."""
     if progress is not None:
         getattr(progress, "finish_transport", progress)(realized, realized)
+
+
+def _zone_transport(case, core):
+    """Transport core and entrance-zone driver of a channeling case (None when off).
+
+    Zone launches need counter-addressed streams, so a planar case runs on the
+    per-electron CPU core unless CUDA was selected; an axial fibre case is CPU
+    only (#994) and refuses CUDA before any work.
+    """
+    record = case.get("channeling")
+    if record is None:
+        return core, None
+    if record.get("model") == "axial":
+        if core == "cuda":
+            raise AxialAdmissionError("axial fibre cases run on the CPU transport core only (#994)")
+        from .axial import transport_axial_case
+
+        return "per-electron", transport_axial_case
+    from .channeling import transport_channeling_case
+
+    return (core if core == "cuda" else "per-electron"), transport_channeling_case
+
+
+def _resident_transport(case, core, channeling):
+    """Whether CUDA rows may stay on the device (#905): not for the channeling
+    zone/native join or coupled radiative cascades, which read rows on the host."""
+    cascade_keys = ("secondary_threshold_eV", "pair_production_model", "positron_transport")
+    cascade = any((v := case.get(key)) is not None and v is not False for key in cascade_keys)
+    return core == "cuda" and not channeling and not ("radiative_model" in case and cascade)

@@ -27,7 +27,12 @@ from ..._util.arrays import host_array as _host
 from ...materials.crystal import CRYSTALS, HBARC_EV_ANG
 from ._device_sizing import DeviceTail, device_resident
 from ._population_tail import block_tail_sums
-from .reflection_rows import MIN_RESONANCE_EV, ReflectionRows, reflection_rows
+from .reflection_rows import (
+    MIN_RESONANCE_EV,
+    ReflectionRows,
+    _case_mosaic,
+    reflection_rows,
+)
 
 __all__ = [
     "CHARACTERISTIC_SOURCE",
@@ -1241,14 +1246,3 @@ def collect_feature_seeds(
         seeds.extend(provided)
         summaries[name] = {**dict(summary), "seeds": len(provided)}
     return seeds, summaries
-
-
-def _case_mosaic(case):
-    """The exact-mosaic keywords a case's line spectrum is scored with."""
-    kw = {
-        "mosaic_fwhm_rad": case.get("mosaic_mc_fwhm_rad"),
-        "mosaic_nodes": case.get("mosaic_mc_nodes", 1),
-    }
-    if case.get("mosaic_mc_sampling") == "history":
-        kw.update(mosaic_sampling="history", mosaic_seed=int(case["seed"]))
-    return kw

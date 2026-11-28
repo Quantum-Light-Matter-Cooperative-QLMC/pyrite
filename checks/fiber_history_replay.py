@@ -9,11 +9,11 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import replace
+from functools import partial
 from pathlib import Path
 from time import perf_counter
 
 import numpy as np
-
 from fiber_randomized_rolls import _case, _sync
 
 SPECTRA = ("spec", "spec_characteristic", "brem_wide", "brem")
@@ -114,7 +114,9 @@ def main():
     # Different GPU reductions need not be bitwise identical. Keep these
     # explicit engineering gates separate from the exact CPU regression tests.
     fp32 = np.dtype(REAL) == np.dtype(np.float32)
-    peak_tol = a.peak_tol if a.peak_tol is not None else max(FOURIER_RESIDUAL_TOL, 3e-4 if fp32 else 1e-8)
+    peak_tol = (
+        a.peak_tol if a.peak_tol is not None else max(FOURIER_RESIDUAL_TOL, 3e-4 if fp32 else 1e-8)
+    )
     mass_tol = a.mass_tol if a.mass_tol is not None else (3e-4 if fp32 else 1e-5)
     if min(peak_tol, mass_tol) <= 0 or not np.isfinite([peak_tol, mass_tol]).all():
         p.error("positive finite tolerances required")
@@ -123,23 +125,31 @@ def main():
     if not a.overwrite and artifact_path.exists():
         p.error(f"artifact already exists: {artifact_path}; pass --overwrite")
     record = {
-        "settings": vars(a), "case_digest": case_digest(case),
-        "fiber": case["cxr_fiber"], "backend": type(BACKEND).__name__,
-        "dtype": np.dtype(REAL).name, "peak_tol": peak_tol, "mass_tol": mass_tol,
+        "settings": vars(a),
+        "case_digest": case_digest(case),
+        "fiber": case["cxr_fiber"],
+        "backend": type(BACKEND).__name__,
+        "dtype": np.dtype(REAL).name,
+        "peak_tol": peak_tol,
+        "mass_tol": mass_tol,
         "arms": {},
     }
     spectra = {}
     transport, record["transport_s"] = timed(
         lambda: runner._transport_case(case, transport_core="per-electron")
     )
-    reference, record["retained_s"] = timed(lambda: runner._spectrum_case(case, transport))
+    reference, record["retained_s"] = timed(partial(runner._spectrum_case, case, transport))
     assert int(transport["Ne_lines"]) == a.histories
     assert int(transport["Ne_brem"]) == a.brem_histories
     for key in ("E_grid", "E_grid_brem", *SPECTRA):
         spectra[key + "_retained"] = np.asarray(reference[key])
     inputs = {key: value for key, value in transport.items() if key != "segs"}
     write_trajectory_artifact(
-        artifact_path, transport["segs"], case=case, spectrum_inputs=inputs, overwrite=a.overwrite,
+        artifact_path,
+        transport["segs"],
+        case=case,
+        spectrum_inputs=inputs,
+        overwrite=a.overwrite,
     )
     del transport
 
@@ -152,24 +162,30 @@ def main():
         print(json.dumps({"arm": name, "seconds": seconds, "metrics": metrics}), flush=True)
 
     for block in a.blocks:
-        arm(f"live_{block}", lambda: run_case_streamed(case, block, transport_core="per-electron"))
+        arm(f"live_{block}", partial(run_case_streamed, case, block, transport_core="per-electron"))
     artifact = read_trajectory_artifact(artifact_path)
     assert artifact.case["cxr_fiber"] == case["cxr_fiber"]
     assert artifact.case["seed"] == case["seed"]
-    arm("replay_retained", lambda: runner.spectrum_from_artifact(artifact))
+    arm("replay_retained", partial(runner.spectrum_from_artifact, artifact))
     del artifact
     for rows in a.replay_rows:
-        arm(f"replay_{rows}", lambda: runner.stream_spectrum_from_artifact(artifact_path, max_segments=rows))
+        arm(
+            f"replay_{rows}",
+            partial(runner.stream_spectrum_from_artifact, artifact_path, max_segments=rows),
+        )
     for other in (dict(case, seed=case["seed"] + 1), dict(case, cxr_fiber=old.case_record())):
         try:
             runner.stream_spectrum_from_artifact(artifact_path, case=other)
         except TrajectoryArtifactError as error:
-            assert "different case" in str(error)
+            if "different case" not in str(error):
+                raise RuntimeError("Unexpected artifact refusal") from error
         else:
             raise AssertionError("artifact accepted a different roll seed or estimator")
     record["identity_refusals"] = True
     record["passed"] = True
-    Path(str(a.output) + ".json").write_text(json.dumps(record, indent=2, default=str, allow_nan=False) + "\n")
+    Path(str(a.output) + ".json").write_text(
+        json.dumps(record, indent=2, default=str, allow_nan=False) + "\n"
+    )
     np.savez_compressed(str(a.output) + ".npz", **spectra)
 
 

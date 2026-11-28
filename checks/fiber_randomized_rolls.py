@@ -41,9 +41,7 @@ def independent_rolls(ids, seed):
     This is a diagnostic RNG, not a proposed production RNG contract.
     """
     ids = np.asarray(ids, dtype=np.uint64)
-    key = np.random.SeedSequence([seed, RNG_NAMESPACE, 0]).generate_state(
-        1, dtype=np.uint64
-    )[0]
+    key = np.random.SeedSequence([seed, RNG_NAMESPACE, 0]).generate_state(1, dtype=np.uint64)[0]
     x = ids ^ key
     x = (x ^ (x >> np.uint64(30))) * np.uint64(0xBF58476D1CE4E5B9)
     x = (x ^ (x >> np.uint64(27))) * np.uint64(0x94D049BB133111EB)
@@ -73,9 +71,7 @@ def grouped_plan(n, strata, histories_per_roll, seed):
         stop = min(n, start + group_size)
         slots = slice(g * strata, (g + 1) * strata)
         rolls[slots] = (np.arange(strata) + rng.random(strata)) * (SECTOR / strata)
-        labels[start:stop] = g * strata + rng.permutation(strata)[
-            np.arange(stop - start) % strata
-        ]
+        labels[start:stop] = g * strata + rng.permutation(strata)[np.arange(stop - start) % strata]
     return RollPlan(labels, rolls)
 
 
@@ -164,16 +160,26 @@ def _case(args, energy):
 
     scene = Scene(
         Beam(args.energy, transverse=Spot(), longitudinal=PointBunch()),
-        Slab("hopg", args.thick_nm * 10, tilt_deg=args.tilt,
-             tilt_azim_deg=args.tilt_azim, mosaic=args.mosaic, footprint=Footprint(5.0, 5.0)),
+        Slab(
+            "hopg",
+            args.thick_nm * 10,
+            tilt_deg=args.tilt,
+            tilt_azim_deg=args.tilt_azim,
+            mosaic=args.mosaic,
+            footprint=Footprint(5.0, 5.0),
+        ),
         Detector(observation_angle_deg=args.theta),
     )
     numerics = Numerics(
         sampling=FixedSampling(cxr_histories=args.histories, brem_histories=args.histories),
         cxr_reflections=CxrReflections(
-            fiber=FiberAverage(cutoff_invang=args.cutoff, azimuth_count=args.reference,
-                               reflection_batch_size=args.batch),
-            mosaic_nodes=args.mosaic_nodes, mosaic_route=args.mosaic_route,
+            fiber=FiberAverage(
+                cutoff_invang=args.cutoff,
+                azimuth_count=args.reference,
+                reflection_batch_size=args.batch,
+            ),
+            mosaic_nodes=args.mosaic_nodes,
+            mosaic_route=args.mosaic_route,
         ),
         energy_bins=EnergyBins(cxr=energy),
         seed=args.transport_seed,
@@ -194,7 +200,10 @@ class FrozenScorer:
         from pyrite.montecarlo import runner
         from pyrite.montecarlo.runner.electron_blocks import _electron_ids
         from pyrite.montecarlo.runner.fiber_emission import (
-            FIBER_BATCH_CASE_KEY, FIBER_CASE_KEY, fiber_domain, validate_fiber_case,
+            FIBER_BATCH_CASE_KEY,
+            FIBER_CASE_KEY,
+            fiber_domain,
+            validate_fiber_case,
         )
 
         validate_fiber_case(case)
@@ -214,8 +223,9 @@ class FrozenScorer:
         self.lookup = self.domain._thermal_lookup()
         self.basal = [h for h in self.domain.hkls if h[:2] == (0, 0)]
         self.other = [h for h in self.domain.hkls if h[:2] != (0, 0)]
-        self.base = {k: v for k, v in case.items()
-                     if k not in (FIBER_CASE_KEY, FIBER_BATCH_CASE_KEY)}
+        self.base = {
+            k: v for k, v in case.items() if k not in (FIBER_CASE_KEY, FIBER_BATCH_CASE_KEY)
+        }
         if self.base.get("beam_uvw") is None and self.base.get("surface_hkl") is None:
             self.base["surface_hkl"] = (0, 0, 1)
         self.phi0 = float(case.get("azimuth_rad", 0.0))
@@ -256,12 +266,20 @@ class FrozenScorer:
                 row_rolls += int(part["L_ang"].size)
                 for start in range(0, len(hkls), self.batch):
                     value = runner._cxr_for_segments(
-                        part, self.energy,
-                        dict(self.base, hkl_list=hkls[start:start + self.batch],
-                             B_ang2=self.lookup.__getitem__,
-                             azimuth_rad=self.phi0 + float(rolls[slot])),
-                        self.tp["n_hat"], self.case.get("abs_layers"), self.tp.get("groove"),
-                        coherent=False, Ne=self.ne, table_cache=None,
+                        part,
+                        self.energy,
+                        dict(
+                            self.base,
+                            hkl_list=hkls[start : start + self.batch],
+                            B_ang2=self.lookup.__getitem__,
+                            azimuth_rad=self.phi0 + float(rolls[slot]),
+                        ),
+                        self.tp["n_hat"],
+                        self.case.get("abs_layers"),
+                        self.tp.get("groove"),
+                        coherent=False,
+                        Ne=self.ne,
+                        table_cache=None,
                     )
                     spec += weight * _host(value)
                     calls += 1
@@ -273,9 +291,12 @@ class FrozenScorer:
             raise RuntimeError("nonfinite spectrum")
         seconds = perf_counter() - started
         return spec, dict(
-            seconds=seconds, pre_final_flush_s=before_flush - started,
-            final_host_flush_s=seconds - (before_flush - started), calls=calls,
-            segment_roll_evaluations=row_rolls, peak_process_rss_mib=_rss_mib(),
+            seconds=seconds,
+            pre_final_flush_s=before_flush - started,
+            final_host_flush_s=seconds - (before_flush - started),
+            calls=calls,
+            segment_roll_evaluations=row_rolls,
+            peak_process_rss_mib=_rss_mib(),
             device_pool_reserved_mib=_device_pool_mib(),
         )
 
@@ -300,12 +321,21 @@ class FrozenScorer:
                     row_rolls += int(part["L_ang"].size)
                     for start in range(0, len(self.other), self.batch):
                         value = runner._cxr_for_segments(
-                            part, self.energy,
-                            dict(self.base, hkl_list=self.other[start:start + self.batch],
-                                 B_ang2=self.lookup.__getitem__, azimuth_rad=self.phi0,
-                                 _fiber_history_rolls=primary_rolls),
-                            self.tp["n_hat"], self.case.get("abs_layers"), self.tp.get("groove"),
-                            coherent=False, Ne=self.ne, table_cache=None,
+                            part,
+                            self.energy,
+                            dict(
+                                self.base,
+                                hkl_list=self.other[start : start + self.batch],
+                                B_ang2=self.lookup.__getitem__,
+                                azimuth_rad=self.phi0,
+                                _fiber_history_rolls=primary_rolls,
+                            ),
+                            self.tp["n_hat"],
+                            self.case.get("abs_layers"),
+                            self.tp.get("groove"),
+                            coherent=False,
+                            Ne=self.ne,
+                            table_cache=None,
                         )
                         spec += _host(value)
                         calls += 1
@@ -317,10 +347,14 @@ class FrozenScorer:
             raise RuntimeError("nonfinite native spectrum")
         seconds = perf_counter() - started
         return spec, dict(
-            seconds=seconds, pre_final_flush_s=before_flush - started,
-            final_host_flush_s=seconds - (before_flush - started), calls=calls,
-            segment_roll_evaluations=row_rolls, peak_process_rss_mib=_rss_mib(),
-            device_pool_reserved_mib=_device_pool_mib(), native_blocks=blocks,
+            seconds=seconds,
+            pre_final_flush_s=before_flush - started,
+            final_host_flush_s=seconds - (before_flush - started),
+            calls=calls,
+            segment_roll_evaluations=row_rolls,
+            peak_process_rss_mib=_rss_mib(),
+            device_pool_reserved_mib=_device_pool_mib(),
+            native_blocks=blocks,
         )
 
     def production(self):
@@ -329,8 +363,13 @@ class FrozenScorer:
         _sync()
         start = perf_counter()
         value = runner._cxr_for_segments(
-            self.segs, self.energy, self.case, self.tp["n_hat"],
-            self.case.get("abs_layers"), self.tp.get("groove"), Ne=self.ne,
+            self.segs,
+            self.energy,
+            self.case,
+            self.tp["n_hat"],
+            self.case.get("abs_layers"),
+            self.tp.get("groove"),
+            Ne=self.ne,
         )
         spec = _host(value)
         _sync()
@@ -347,18 +386,23 @@ def metrics(energy, width, spec, reference=None):
             lo -= 1
         while hi < spec.size - 1 and spec[hi] > spec[peak] / 2:
             hi += 1
-        out.update(peak_eV=float(energy[peak]), peak_density=float(spec[peak]),
-                   centroid_eV=float(np.sum(energy * spec) * width / mass),
-                   fwhm_eV=float(energy[hi] - energy[lo]))
+        out.update(
+            peak_eV=float(energy[peak]),
+            peak_density=float(spec[peak]),
+            centroid_eV=float(np.sum(energy * spec) * width / mass),
+            fwhm_eV=float(energy[hi] - energy[lo]),
+        )
     if reference is not None:
         ref_mass = float(np.sum(np.abs(reference)) * width)
         ref_peak = float(np.max(np.abs(reference)))
         out.update(
             mass_l1=float(np.sum(np.abs(spec - reference)) * width / ref_mass)
-            if ref_mass else None,
+            if ref_mass
+            else None,
             peak_linf=float(np.max(np.abs(spec - reference)) / ref_peak) if ref_peak else None,
             relative_yield_error=float((np.sum(spec) - np.sum(reference)) * width / ref_mass)
-            if ref_mass else None,
+            if ref_mass
+            else None,
         )
     return out
 
@@ -367,12 +411,14 @@ def _band_errors(energy, width, spec, reference, bands):
     out = {}
     for lo, hi in bands:
         # Fractional overlap at band boundaries, with bin-mean density.
-        overlap = np.maximum(0.0, np.minimum(energy + width / 2, hi)
-                             - np.maximum(energy - width / 2, lo))
+        overlap = np.maximum(
+            0.0, np.minimum(energy + width / 2, hi) - np.maximum(energy - width / 2, lo)
+        )
         ref = float(reference @ overlap)
         mass = float(spec @ overlap)
-        out[f"{lo:g}:{hi:g}"] = dict(yield_=mass, reference=ref,
-                                      relative_error=(mass - ref) / ref if ref else None)
+        out[f"{lo:g}:{hi:g}"] = dict(
+            yield_=mass, reference=ref, relative_error=(mass - ref) / ref if ref else None
+        )
     return out
 
 
@@ -402,7 +448,9 @@ def _parse():
     p.add_argument("--independent", action="store_true")
     p.add_argument("--max-independent-histories", type=int, default=1024)
     p.add_argument("--native", action="store_true", help="device-vectorized per-primary rolls")
-    p.add_argument("--native-blocks", type=int, default=1, help="whole-primary native scoring blocks")
+    p.add_argument(
+        "--native-blocks", type=int, default=1, help="whole-primary native scoring blocks"
+    )
     p.add_argument("--production-parity", action="store_true")
     p.add_argument("--production-history-parity", action="store_true")
     p.add_argument("--warmup", action=argparse.BooleanOptionalAction, default=True)
@@ -411,8 +459,18 @@ def _parse():
     p.add_argument("--output", type=Path, required=True, help="output stem for JSON/NPZ")
     p.add_argument("--plot", action="store_true")
     a = p.parse_args()
-    counts = [a.histories, a.batch, a.mosaic_nodes, a.reference, a.histories_per_roll,
-              a.max_independent_histories, a.native_blocks, *a.quadratures, *a.shifted, *a.strata]
+    counts = [
+        a.histories,
+        a.batch,
+        a.mosaic_nodes,
+        a.reference,
+        a.histories_per_roll,
+        a.max_independent_histories,
+        a.native_blocks,
+        *a.quadratures,
+        *a.shifted,
+        *a.strata,
+    ]
     if min(counts) < 1 or a.transport_seed < 0 or min(a.orientation_seeds) < 0:
         p.error("positive counts and nonnegative seeds required")
     if len(set(a.orientation_seeds)) != len(a.orientation_seeds):
@@ -434,6 +492,7 @@ def main():
     args = _parse()
     from pyrite._backend import BACKEND
     from pyrite.montecarlo import runner
+
     energy = np.arange(args.energy_start, args.energy_max, args.step)
     if energy.size < 2:
         raise ValueError("need at least two photon grid nodes")
@@ -469,14 +528,24 @@ def main():
         status = None
     edges = np.r_[energy - args.step / 2, energy[-1] + args.step / 2]
     record = dict(
-        git_sha=sha, git_status=status, settings=vars(args), case=case,
-        backend=type(BACKEND).__name__, segment_dtype=str(scorer.segs["L_ang"].dtype),
-        n_hat=_host(tp["n_hat"]).tolist(), transport_s=transport_s,
-        transport_sha256=_fingerprint(scorer.segs), histories=scorer.ne,
-        rows=scorer.ids.size, represented_primaries=int(np.unique(scorer.ids).size),
-        basal_reflections=len(scorer.basal), nonbasal_reflections=len(scorer.other),
-        rng_namespace=RNG_NAMESPACE, energy_edges_eV=[float(edges[0]), float(edges[-1])],
-        arms={}, ensembles={},
+        git_sha=sha,
+        git_status=status,
+        settings=vars(args),
+        case=case,
+        backend=type(BACKEND).__name__,
+        segment_dtype=str(scorer.segs["L_ang"].dtype),
+        n_hat=_host(tp["n_hat"]).tolist(),
+        transport_s=transport_s,
+        transport_sha256=_fingerprint(scorer.segs),
+        histories=scorer.ne,
+        rows=scorer.ids.size,
+        represented_primaries=int(np.unique(scorer.ids).size),
+        basal_reflections=len(scorer.basal),
+        nonbasal_reflections=len(scorer.other),
+        rng_namespace=RNG_NAMESPACE,
+        energy_edges_eV=[float(edges[0]), float(edges[-1])],
+        arms={},
+        ensembles={},
     )
     if args.warmup:
         _, record["warmup"] = scorer.parts(scorer.other, [0.0])
@@ -497,8 +566,11 @@ def main():
         arm["history_roll_evaluations"] = scorer.ne * len(rolls) if plan is None else scorer.ne
         if plan is not None:
             occ = plan.occupancy()
-            arm.update(roll_slots=int(occ.size), occupied_slots=int(np.count_nonzero(occ)),
-                       max_occupancy=int(occ.max()))
+            arm.update(
+                roll_slots=int(occ.size),
+                occupied_slots=int(np.count_nonzero(occ)),
+                max_occupancy=int(occ.max()),
+            )
         spectra[name + "_rolls_rad"] = np.asarray(rolls)
         if plan is not None:
             spectra[name + "_labels"] = plan.labels
@@ -506,9 +578,17 @@ def main():
         spectra[name + "_nonbasal"] = nonbasal
         spectra[name + "_total"] = nonbasal + basal
         record["arms"][name] = arm
-        print(json.dumps({"arm": name, "seconds": arm["seconds"],
-                          "nonbasal_yield": float(nonbasal.sum() * args.step),
-                          "calls": arm["calls"]}), flush=True)
+        print(
+            json.dumps(
+                {
+                    "arm": name,
+                    "seconds": arm["seconds"],
+                    "nonbasal_yield": float(nonbasal.sum() * args.step),
+                    "calls": arm["calls"],
+                }
+            ),
+            flush=True,
+        )
 
     for n in sorted({*args.quadratures, args.reference}):
         save_arm(f"Q{n}", midpoint_rolls(n))
@@ -557,9 +637,13 @@ def main():
         spectra[label + "_mean_total"] = mean + basal
         elapsed = [record["arms"][name]["radiation_plus_setup_s"] for name in names]
         yields = samples.sum(axis=1) * args.step
-        info = dict(replicates=names, mean_metrics=metrics(energy, args.step, mean, ref),
-                    mean_wall_s=float(np.mean(elapsed)), yield_mean=float(yields.mean()),
-                    bands=_band_errors(energy, args.step, mean, ref, args.band))
+        info = dict(
+            replicates=names,
+            mean_metrics=metrics(energy, args.step, mean, ref),
+            mean_wall_s=float(np.mean(elapsed)),
+            yield_mean=float(yields.mean()),
+            bands=_band_errors(energy, args.step, mean, ref, args.band),
+        )
         if len(names) > 1:
             se = samples.std(axis=0, ddof=1) / math.sqrt(len(names))
             spectra[label + "_se_nonbasal"] = se
@@ -567,20 +651,25 @@ def main():
             ref_yield = float(ref.sum() * args.step)
             info["conditional_yield_relative_fom"] = (
                 ref_yield**2 / (float(yields.var(ddof=1)) * float(np.mean(elapsed)))
-                if yields.var(ddof=1) > 0 and np.mean(elapsed) > 0 else None
+                if yields.var(ddof=1) > 0 and np.mean(elapsed) > 0
+                else None
             )
             for lo, hi in args.band:
-                overlap = np.maximum(0.0, np.minimum(energy + args.step / 2, hi)
-                                     - np.maximum(energy - args.step / 2, lo))
+                overlap = np.maximum(
+                    0.0,
+                    np.minimum(energy + args.step / 2, hi) - np.maximum(energy - args.step / 2, lo),
+                )
                 band_yields = samples @ overlap
                 info["bands"][f"{lo:g}:{hi:g}"]["se"] = float(
-                    band_yields.std(ddof=1) / math.sqrt(len(names)))
+                    band_yields.std(ddof=1) / math.sqrt(len(names))
+                )
         record["ensembles"][label] = info
     if args.production_parity:
         production, elapsed = scorer.production()
         spectra["production_total"] = production
-        record["production_parity"] = dict(seconds=elapsed, **metrics(
-            energy, args.step, reference_total, production))
+        record["production_parity"] = dict(
+            seconds=elapsed, **metrics(energy, args.step, reference_total, production)
+        )
     if args.production_history_parity:
         from pyrite.montecarlo.spectrum.cxr._fiber_history import HistoryRollSeed
         from pyrite.montecarlo.spectrum.cxr.fiber import FIBER_HISTORY_RNG
@@ -599,18 +688,28 @@ def main():
         expected, _ = scorer.native(plan, args.native_blocks)
         _sync()
         started = perf_counter()
-        actual = _host(runner._cxr_for_segments(
-            scorer.segs, energy, case_history, tp["n_hat"],
-            case.get("abs_layers"), tp.get("groove"), Ne=scorer.ne,
-        ))
+        actual = _host(
+            runner._cxr_for_segments(
+                scorer.segs,
+                energy,
+                case_history,
+                tp["n_hat"],
+                case.get("abs_layers"),
+                tp.get("groove"),
+                Ne=scorer.ne,
+            )
+        )
         _sync()
         spectra["production_history_total"] = actual
         spectra["production_history_expected_total"] = expected + basal
         parity = metrics(energy, args.step, actual, expected + basal)
         record["production_history_parity"] = dict(seconds=perf_counter() - started, **parity)
         print(json.dumps({"production_history_parity": parity}), flush=True)
-    record["reference"] = {"arm": ref_name, "certified": False,
-                           "note": "candidate reference; inspect successive Q and phase errors"}
+    record["reference"] = {
+        "arm": ref_name,
+        "certified": False,
+        "note": "candidate reference; inspect successive Q and phase errors",
+    }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     # Append extensions rather than replacing a user's dotted run stem.
     with Path(str(args.output) + ".json").open("w") as handle:

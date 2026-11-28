@@ -21,9 +21,9 @@ def test_counter_addressed_draws():
     assert np.all((0 <= rolls) & (rolls < SECTOR))
     np.testing.assert_array_equal(rolls, independent_rolls(ids[::-1], 51)[::-1])
     np.testing.assert_array_equal(rolls[:100], independent_rolls(ids[:100], 51))
-    np.testing.assert_array_equal(rolls, np.concatenate([
-        independent_rolls(ids[:157], 51), independent_rolls(ids[157:], 51)
-    ]))
+    np.testing.assert_array_equal(
+        rolls, np.concatenate([independent_rolls(ids[:157], 51), independent_rolls(ids[157:], 51)])
+    )
     assert not np.array_equal(rolls, independent_rolls(ids, 52))
     # Deterministic smoke of marginal uniformity, not a RNG qualification.
     assert abs(rolls.mean() / SECTOR - 0.5) < 0.025
@@ -35,7 +35,7 @@ def test_grouped_prefix_and_stratum_occupancy(n):
     plan = grouped_plan(n, k, per_roll, 123)
     extended = grouped_plan(n + 100, k, per_roll, 123)
     np.testing.assert_array_equal(plan.labels, extended.labels[:n])
-    np.testing.assert_array_equal(plan.rolls, extended.rolls[:plan.rolls.size])
+    np.testing.assert_array_equal(plan.rolls, extended.rolls[: plan.rolls.size])
     occ = plan.occupancy().reshape(-1, k)
     assert occ.sum() == n
     assert (occ <= per_roll).all()
@@ -65,7 +65,7 @@ def test_partition_keeps_flights_and_global_denominator(grouped):
     assert sorted(seen) == list(range(ids.size))
     assert sum(plan.occupancy()) == n
     assert list(row_partitions(np.empty(0, dtype=int), plan)) == []
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="primary IDs outside the retained incident population"):
         list(row_partitions(np.array([n]), plan))
 
 
@@ -76,7 +76,7 @@ def test_narrow_periodic_line_reveals_midpoint_aliasing():
 
     def spectrum(rolls):
         centers = np.cos(6 * rolls)
-        return np.exp(-0.5 * ((energy[:, None] - centers) / width)**2).mean(axis=1)
+        return np.exp(-0.5 * ((energy[:, None] - centers) / width) ** 2).mean(axis=1)
 
     ref = spectrum(midpoint_rolls(8192))
     q = spectrum(midpoint_rolls(32))

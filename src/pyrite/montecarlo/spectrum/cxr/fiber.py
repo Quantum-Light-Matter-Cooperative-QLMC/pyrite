@@ -107,7 +107,8 @@ class FiberCXRModel:
     def from_case_record(cls, record, *, reflection_batch_size: int | None = None) -> FiberCXRModel:
         """Rebuild the model a case record names; refuse a foreign or stale record."""
         if not isinstance(record, dict) or set(record) not in (
-            _CASE_RECORD_KEYS, _HISTORY_RECORD_KEYS,
+            _CASE_RECORD_KEYS,
+            _HISTORY_RECORD_KEYS,
         ):
             raise ValueError(
                 f"cxr_fiber must hold exactly {sorted(_CASE_RECORD_KEYS)} "

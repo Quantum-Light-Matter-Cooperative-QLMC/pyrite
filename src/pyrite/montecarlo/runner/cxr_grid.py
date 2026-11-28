@@ -4,13 +4,12 @@ Split out of ``runner/__init__`` to keep that module inside the source-size
 budget; it is runner-internal and has no other consumer.
 """
 
-import sys
 import warnings
 from time import perf_counter
 
 import numpy as np
 
-from ..._backend import BACKEND, REAL, _to_cpu
+from ..._backend import REAL, _to_cpu
 from ..._cxr_grid_policy import (
     BANDWIDTH_PROXY_SAFETY,
     COHERENT_JUMP_CLUSTER_SEPARATION,
@@ -47,6 +46,20 @@ from ..spectrum.cxr_seeds import (
     local_spacing_seeds,
 )
 from ..spectrum.diagnostics import coherent_fringe_spacing, sinc_feature_spacing
+from ._grid_cache_inputs import (
+    _RESOLUTION_INPUT_KEYS,
+    _WEIGHT_INPUT_KEYS,
+    _WINDOW_INPUT_KEYS,
+    COHERENT_WINDOW_REVISION,
+    MEASURED_COVERAGE_REVISION,
+)
+from ._grid_profile import (
+    _device_mib as _device_mib,
+)
+from ._grid_profile import (
+    _profile_stage,
+    _resident_mib,
+)
 from .bandwidth_fallback import extension_stop, extension_stop_ladder
 from .node_local_grid import (
     NODE_LOCAL_REVISION,
@@ -54,124 +67,6 @@ from .node_local_grid import (
     node_local_axis,
     uniform_over_budget,
 )
-
-
-def _resident_mib():
-    """Return current Linux RSS for opt-in line-grid profiling."""
-    try:
-        with open("/proc/self/status", encoding="ascii") as status:
-            for line in status:
-                if line.startswith("VmRSS:"):
-                    return float(line.split()[1]) / 1024.0
-    except OSError:
-        return None
-    return None
-
-
-def _device_mib():
-    """Pool-used and driver-used device MiB for opt-in profiling, if a GPU."""
-    stats = BACKEND.allocator_stats()
-    out = {
-        "device_used_mib": stats.get("used_mib"),
-        "device_reserved_mib": stats.get("reserved_mib"),
-    }
-    runtime = getattr(getattr(getattr(BACKEND, "cp", None), "cuda", None), "runtime", None)
-    if runtime is not None:
-        free, total = runtime.memGetInfo()
-        out["device_driver_used_mib"] = (total - free) / (1 << 20)
-    return out
-
-
-def _profile_stage(profile, **fields):
-    """Record opt-in line-grid stage fields and flush them to stderr.
-
-    Immediate output survives a scheduler time limit that discards the report.
-    Device occupancy is sampled at every stage.
-    """
-    fields.update(_device_mib())
-    profile.update(fields)
-    items = " ".join(f"{name}={value}" for name, value in fields.items())
-    print(f"line-grid profile: {items}", file=sys.stderr, flush=True)
-
-
-# Case fields the automatic line-grid resolution depends on. Transport is a
-# deterministic function of these plus the seed, so they content-address the
-# resolved grid. Deliberately NOT the whole case: the photon grids and the
-# emission-side switches do not move a single electron.
-_RESOLUTION_INPUT_KEYS = (
-    "crystal",
-    "composition",
-    "hkl_list",
-    "E0_keV",
-    "thickness_ang",
-    "crystal_width_mm",
-    "crystal_height_mm",
-    "beam_fwhm_mm",
-    "beam_fwhm_y_mm",
-    "bunch_front_tilt",
-    "energy_spread_frac",
-    "longitudinal_distribution",
-    "transverse_distribution",
-    "theta_obs_rad",
-    "tilt_deg",
-    "tilt_azim_deg",
-    "groove_spacing_ang",
-    "straggling",
-    "energy_model",
-    "max_dE_frac",
-    "inelastic_model",
-    "inelastic_cutoff_eV",
-    "secondary_threshold_eV",
-    "cascade_rng_model",
-    "radiative_model",
-    "radiative_moment_model",
-    "radiative_cutoff_eV",
-    "pair_production_model",
-    "positron_transport",
-    "atomic_electron_deflection",
-    "elastic_model",
-    "transport_mode",
-    "mixed_c1",
-    "mixed_c2",
-    "mixed_max_step_um",
-    "abs_layers",
-    "Ne",
-    "Ne_brem",
-    "seed",
-    "E_cut_lines_keV",
-    "E_cut_brem_keV",
-    # Split copies join the measured line population (#379); absent adds nothing.
-    "cone_split",
-)
-
-
-# Additional case fields the kinematic window seeds read: the reflection rows
-# depend on orientation and mosaic spread, which the sinc spacing does not.
-_WINDOW_INPUT_KEYS = (
-    "beam_uvw",
-    "surface_hkl",
-    "azimuth_rad",
-    "recip_miscut_rad",
-    "mosaic_mc_fwhm_rad",
-    "mosaic_mc_nodes",
-    "layer_radiators",
-)
-# The measured stop also reads the DBR claim (``diffracted_brem._in_claim``):
-# a mosaic spread drops the Bragg-window coverage (#1243). A full-fiber case
-# measures its domain's roll-averaged population, not ``hkl_list`` (#1489).
-_WEIGHT_INPUT_KEYS = ("B_ang2", "mosaic_fwhm_rad", "cxr_fiber")
-
-
-#: Bumped whenever the same inputs would give a different measured stop; it
-#: keys the speed cache of ``resonance-population`` grids only. 1: the stop
-#: covers every DBR/Kossel Bragg window (#1243); 2: the key reads
-#: ``mosaic_fwhm_rad``, which the coverage depends on.
-MEASURED_COVERAGE_REVISION = 2
-
-
-#: Bumped whenever the same inputs would seed different coherent windows; it
-#: keys the speed cache of coherent cases only.
-COHERENT_WINDOW_REVISION = 11
 
 
 def _cached_grid(cached):
@@ -508,8 +403,15 @@ class SegmentGridEvidence:
 
         def collect(stops):
             return _direction_tail(
-                self.case, self.segments, n_hat, self.Ne, self.abs_layers, self.groove,
-                start, ceiling, stops=stops,
+                self.case,
+                self.segments,
+                n_hat,
+                self.Ne,
+                self.abs_layers,
+                self.groove,
+                start,
+                ceiling,
+                stops=stops,
             )
 
         tail = refine_tail(ceiling, limit / BANDWIDTH_PROXY_SAFETY, collect)

@@ -11,12 +11,18 @@ from pyrite.montecarlo.spectrum import _lattice_tail as lt
 
 
 def test_streamed_pilot_retry_and_certification(monkeypatch):
-    band = {"policy": "resonance-population", "start_eV": 100, "stop_eV": 54000,
-            "truncation_limit": 0.001}
+    band = {
+        "policy": "resonance-population",
+        "start_eV": 100,
+        "stop_eV": 54000,
+        "truncation_limit": 0.001,
+    }
     payload = {"bandwidth": band, "resolution": {"policy": "sinc-oversampled"}}
     case = {"Ne": 20, "Ne_brem": 20, "cxr_fiber": {}, "line_grid_policy": payload}
     direction = np.array([0.0, 0.0, 1.0])
-    monkeypatch.setattr(streamed_line_grid, "_block_sinc_samples", lambda *args: (np.ones(1), np.ones(1)))
+    monkeypatch.setattr(
+        streamed_line_grid, "_block_sinc_samples", lambda *args: (np.ones(1), np.ones(1))
+    )
     evidence = streamed_line_grid.BlockGridEvidence(case, payload, direction, 20)
     evidence._tail_replay = lambda stops: pytest.fail("unexpected replay")
     block = {"L_ang": np.ones(10), "Ne": 10}

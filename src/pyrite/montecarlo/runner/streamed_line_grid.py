@@ -181,12 +181,20 @@ class BlockGridEvidence:
                         from ..._cxr_grid_policy import BANDWIDTH_PROXY_SAFETY
                         from ._pilot_tail import pilot_block
 
-                        limit = float(self.case["line_grid_policy"]["bandwidth"]["truncation_limit"])
+                        limit = float(
+                            self.case["line_grid_policy"]["bandwidth"]["truncation_limit"]
+                        )
 
                         def collect(part, candidates):
                             return _direction_tail(
-                                self.case, part, self.n_hat, self.Ne, self.abs_layers,
-                                self.groove, *self.band, stops=candidates,
+                                self.case,
+                                part,
+                                self.n_hat,
+                                self.Ne,
+                                self.abs_layers,
+                                self.groove,
+                                *self.band,
+                                stops=candidates,
                             )
 
                         stops, summary, pilot_rows = pilot_block(
@@ -195,13 +203,20 @@ class BlockGridEvidence:
                         print(
                             f"line-grid #1527: pilot rows={pilot_rows} "
                             f"certification candidates={len(stops)}",
-                            file=sys.stderr, flush=True,
+                            file=sys.stderr,
+                            flush=True,
                         )
                 else:
                     options = {} if stops is None else {"stops": stops}
                     part = _direction_tail(
-                        self.case, segs, self.n_hat, self.Ne, self.abs_layers, self.groove,
-                        *self.band, **options,
+                        self.case,
+                        segs,
+                        self.n_hat,
+                        self.Ne,
+                        self.abs_layers,
+                        self.groove,
+                        *self.band,
+                        **options,
                     )
                     if part is not None:
                         summary = merge_tail(summary, part)
@@ -485,13 +500,17 @@ class BlockGridEvidence:
 
             limit = float(self.case["line_grid_policy"]["bandwidth"]["truncation_limit"])
             self._resolved_tail, self._pilot_certified = resolve_pilot_tail(
-                ceiling, limit / BANDWIDTH_PROXY_SAFETY, self._tail_stops,
-                self._tail_summary, self._tail_replay,
+                ceiling,
+                limit / BANDWIDTH_PROXY_SAFETY,
+                self._tail_stops,
+                self._tail_summary,
+                self._tail_replay,
             )
             print(
                 f"line-grid #1527: pilot certified={self._pilot_certified} "
                 f"tail_replays={self.tail_replays}",
-                file=sys.stderr, flush=True,
+                file=sys.stderr,
+                flush=True,
             )
         return self._resolved_tail
 
@@ -595,26 +614,37 @@ def resolve_streamed_line_grid(
             started = perf_counter()
             print(
                 f"line-grid #1527: refinement candidates={len(stops)}",
-                file=sys.stderr, flush=True,
+                file=sys.stderr,
+                flush=True,
             )
 
             def consume(segs):
                 nonlocal summary
                 part = _direction_tail(
-                    case, segs, n_hat, case["Ne"], abs_layers, groove,
-                    *evidence.band, stops=stops,
+                    case,
+                    segs,
+                    n_hat,
+                    case["Ne"],
+                    abs_layers,
+                    groove,
+                    *evidence.band,
+                    stops=stops,
                 )
                 if part is not None:
                     summary = merge_tail(summary, part)
 
             _announce_transport_pass("grid")
             _transport_case(
-                case, transport_core=transport_core, block_electrons=block_electrons,
-                block_consumer=consume, keep_segments_on_device=True,
+                case,
+                transport_core=transport_core,
+                block_electrons=block_electrons,
+                block_consumer=consume,
+                keep_segments_on_device=True,
             )
             print(
                 f"line-grid #1527: refinement wall_s={perf_counter() - started:.3f}",
-                file=sys.stderr, flush=True,
+                file=sys.stderr,
+                flush=True,
             )
             return summary
 
@@ -674,7 +704,7 @@ def resolve_streamed_line_grid(
             admit_host_allocation(retry_bytes, "streamed fiber line-grid refinement")
         # Without a measured tail count the kinematic replay is still bounded
         # by the workaround's electron-aligned slices and disk projection.
-        grid, record, replay = resolve_streamed_line_grid(
+        grid, record, replay_record = resolve_streamed_line_grid(
             case,
             block_electrons,
             transport_core=transport_core,
@@ -683,9 +713,14 @@ def resolve_streamed_line_grid(
             spill=spill,
             _keep_lines=True,
         )
-        return grid, record, {
-            **replay, "grid_transports": transports + replay.get("grid_transports", 1)
-        }
+        return (
+            grid,
+            record,
+            {
+                **replay_record,
+                "grid_transports": transports + replay_record.get("grid_transports", 1),
+            },
+        )
     assert resolved is not None
     grid, record = resolved
     grid_pass: dict[str, Any] = {
@@ -695,9 +730,7 @@ def resolve_streamed_line_grid(
         "spill_peak_bytes": evidence.spill_peak_bytes,
     }
     if case.get("cxr_fiber") is not None:
-        grid_pass.update(
-            evidence.line_evidence_record(), grid_transports=1 + evidence.tail_replays
-        )
+        grid_pass.update(evidence.line_evidence_record(), grid_transports=1 + evidence.tail_replays)
     return grid, record, grid_pass
 
 

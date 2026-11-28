@@ -30,7 +30,9 @@ from ..._backend import BACKEND
 from ..._math_mode import with_case_math_mode
 from ..._physics_fallback import collect_physics_fallbacks
 from ..case import (
-    AxialAdmissionError,
+    AxialAdmissionError as AxialAdmissionError,
+)
+from ..case import (
     Case,
     admit_axial_channeling,
     refuse_axial_directions,
@@ -79,6 +81,8 @@ from .step_budget import retry_step_budget
 from .transport_options import (
     _beam_kwargs,
     _check_opt_in_transport,
+    _resident_transport,
+    _zone_transport,
     report_transport_finished,
     tuned_transport_kwargs,
 )
@@ -188,35 +192,6 @@ def run_case_directions(
         keep_segments_on_device=True,
     )
     return _directional_outputs(case, transport, directions)
-
-
-def _zone_transport(case, core):
-    """Transport core and entrance-zone driver of a channeling case (None when off).
-
-    Zone launches need counter-addressed streams, so a planar case runs on the
-    per-electron CPU core unless CUDA was selected; an axial fibre case is CPU
-    only (#994) and refuses CUDA before any work.
-    """
-    record = case.get("channeling")
-    if record is None:
-        return core, None
-    if record.get("model") == "axial":
-        if core == "cuda":
-            raise AxialAdmissionError("axial fibre cases run on the CPU transport core only (#994)")
-        from .axial import transport_axial_case
-
-        return "per-electron", transport_axial_case
-    from .channeling import transport_channeling_case
-
-    return (core if core == "cuda" else "per-electron"), transport_channeling_case
-
-
-def _resident_transport(case, core, channeling):
-    """Whether CUDA rows may stay on the device (#905): not for the channeling
-    zone/native join or coupled radiative cascades, which read rows on the host."""
-    cascade_keys = ("secondary_threshold_eV", "pair_production_model", "positron_transport")
-    cascade = any((v := case.get(key)) is not None and v is not False for key in cascade_keys)
-    return core == "cuda" and not channeling and not ("radiative_model" in case and cascade)
 
 
 @with_case_math_mode

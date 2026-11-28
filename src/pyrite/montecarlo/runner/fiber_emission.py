@@ -323,7 +323,8 @@ def fiber_lines(
             print(
                 f"line-grid #1527: roll/batch {call_index}/{total_calls} started "
                 f"rows={segs['L_ang'].shape[0]} candidates={len(tail_stops)}",
-                file=sys.stderr, flush=True,
+                file=sys.stderr,
+                flush=True,
             )
         value = runner._cxr_for_segments(
             segs,
@@ -346,7 +347,8 @@ def fiber_lines(
             print(
                 f"line-grid #1527: roll/batch {call_index}/{total_calls} returned "
                 f"wall_s={perf_counter() - started:.3f}",
-                file=sys.stderr, flush=True,
+                file=sys.stderr,
+                flush=True,
             )
         return value
 
@@ -374,12 +376,19 @@ def _history_lines(segs, grid, case, base, domain, n_hat, abs_layers, groove, Ne
     total = np.zeros(grid.shape, dtype=np.float64)
     for hkls, sampled in ((basal, False), (other, True)):
         for start in range(0, len(hkls), batch):
-            part = dict(base, hkl_list=hkls[start:start + batch], B_ang2=lookup.__getitem__)
+            part = dict(base, hkl_list=hkls[start : start + batch], B_ang2=lookup.__getitem__)
             if sampled:
                 part["_fiber_history_rolls"] = roll_seed
             value = runner._cxr_for_segments(
-                segs, grid, part, n_hat, abs_layers, groove,
-                coherent=False, Ne=Ne, table_cache=tables,
+                segs,
+                grid,
+                part,
+                n_hat,
+                abs_layers,
+                groove,
+                coherent=False,
+                Ne=Ne,
+                table_cache=tables,
             )
             total += _checked(value, grid.shape)
     return total

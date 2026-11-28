@@ -33,7 +33,11 @@ class HistoryRollSeed:
     def for_ids(self, ids):
         """Counter 0 of each global primary; allocate only represented IDs."""
         from ...transport.kinematics import (
-            _SM64_GOLDEN, _SM64_ONE, _SM64_S12, _U52_SCALE, _splitmix64_array,
+            _SM64_GOLDEN,
+            _SM64_ONE,
+            _SM64_S12,
+            _U52_SCALE,
+            _splitmix64_array,
         )
 
         ids = np.asarray(ids)
@@ -90,7 +94,9 @@ def validate_history_roll_request(request):
             raise ValueError("history fiber rolls require matching global primary ID columns")
         return
     angles = np.asarray(rolls, dtype=np.float64)
-    ne = int(request.electron_limit if request.electron_limit is not None else request.segments["Ne"])
+    ne = int(
+        request.electron_limit if request.electron_limit is not None else request.segments["Ne"]
+    )
     if (
         ne < 1
         or angles.shape != (ne,)
@@ -129,9 +135,14 @@ def roll_vectors(g, cos_phi, sin_phi, *, xp, mosaic=None):
     Float64 orientation arithmetic precedes conversion to the line REAL dtype.
     """
     g = xp.asarray(g, dtype=np.float64)
-    out = xp.stack((cos_phi * g[0] - sin_phi * g[1],
-                    sin_phi * g[0] + cos_phi * g[1],
-                    xp.broadcast_to(g[2], cos_phi.shape)), axis=1)
+    out = xp.stack(
+        (
+            cos_phi * g[0] - sin_phi * g[1],
+            sin_phi * g[0] + cos_phi * g[1],
+            xp.broadcast_to(g[2], cos_phi.shape),
+        ),
+        axis=1,
+    )
     if mosaic is not None:
         out = out @ xp.asarray(mosaic, dtype=np.float64).T
     return out
@@ -145,8 +156,9 @@ def polarization_rows(n_hat, g_rows, *, xp):
     fallback = xp.cross(n, xp.asarray([0.0, 1.0, 0.0]))
     # The scalar fallback uses y. If n itself is y, use x instead to avoid
     # a zero polarization basis in that exceptional geometry.
-    fallback = xp.where(xp.linalg.norm(fallback) < 1e-12,
-                        xp.cross(n, xp.asarray([1.0, 0.0, 0.0])), fallback)
+    fallback = xp.where(
+        xp.linalg.norm(fallback) < 1e-12, xp.cross(n, xp.asarray([1.0, 0.0, 0.0])), fallback
+    )
     normal = xp.where((length < 1e-12)[:, None], fallback, normal)
     es = normal / xp.linalg.norm(normal, axis=1)[:, None]
     ep = xp.cross(es, n)
@@ -176,13 +188,22 @@ def history_coupling_tables(st, build):
     thermal = (
         tuple(float(b(tuple(-x for x in hkl))) for hkl in hkls)
         if callable(b)
-        else None if b is None else float(b)
+        else None
+        if b is None
+        else float(b)
     )
     mesh = np.ascontiguousarray(st.E_tab, dtype=np.float64)
     device = None if xp is np else int(xp.cuda.Device().id)
     key = (
-        "fiber-history-couplings-v1", xp.__name__, device, np.dtype(REAL).str,
-        req.crystal, hkls, thermal, bool(req.use_henke), mesh.shape,
+        "fiber-history-couplings-v1",
+        xp.__name__,
+        device,
+        np.dtype(REAL).str,
+        req.crystal,
+        hkls,
+        thermal,
+        bool(req.use_henke),
+        mesh.shape,
         sha256(mesh.tobytes()).digest(),
     )
     tables = cache.get(key)
@@ -211,8 +232,9 @@ def accumulate_history_rolls(st, tables, accumulate_reflection, mu_tables):
     chi_re, chi_im, u_re, u_im = tables
     orientations = ((None, 1.0),) if st.mosaic_quad is None else st.mosaic_quad
     # Upload these tiny matrices once rather than for each reflection.
-    orientations = tuple((None if m is None else xp.asarray(m, dtype=np.float64), w)
-                         for m, w in orientations)
+    orientations = tuple(
+        (None if m is None else xp.asarray(m, dtype=np.float64), w) for m, w in orientations
+    )
     for i, hkl in enumerate(st.request.hkl_list):
         g, _ = reciprocal_g_vector(hkl, st.info["lattice"])
         if st.R_orient is not None:
@@ -223,7 +245,18 @@ def accumulate_history_rolls(st, tables, accumulate_reflection, mu_tables):
             es, ep = polarization_rows(st.n_hat, gh, xp=xp)
             G, ES, EP = (a.astype(REAL, copy=False)[rows] for a in (gh, es, ep))
             accumulate_reflection(
-                st, G, ES, EP, g2, _matvec3(G, st.n_hat_d),
-                _rowdot3(G, ES), _rowdot3(G, EP),
-                chi_re[i], chi_im[i], u_re[i], u_im[i], weight, mu_tables,
+                st,
+                G,
+                ES,
+                EP,
+                g2,
+                _matvec3(G, st.n_hat_d),
+                _rowdot3(G, ES),
+                _rowdot3(G, EP),
+                chi_re[i],
+                chi_im[i],
+                u_re[i],
+                u_im[i],
+                weight,
+                mu_tables,
             )

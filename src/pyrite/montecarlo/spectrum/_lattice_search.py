@@ -11,7 +11,7 @@ import math
 
 import numpy as np
 
-from ._lattice_tail import LatticeTail, STOP_STEP_EV, stop_lattice
+from ._lattice_tail import STOP_STEP_EV, LatticeTail, stop_lattice
 
 
 def coarse_stops(ceiling):
@@ -26,9 +26,7 @@ class BracketedTail(LatticeTail):
 
     def __init__(self, stops, summary, lower, upper):
         super().__init__(stops, summary)
-        self.search_bounds = (
-            math.floor(lower / STOP_STEP_EV), math.ceil(upper / STOP_STEP_EV)
-        )
+        self.search_bounds = (math.floor(lower / STOP_STEP_EV), math.ceil(upper / STOP_STEP_EV))
 
 
 def refine_tail(ceiling, limit, collect, *, coarse=None):

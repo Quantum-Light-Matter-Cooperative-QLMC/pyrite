@@ -29,6 +29,12 @@ from .._device_sizing import collect_lines
 from .._ordered_bincount import ordered_bincount
 from . import _fused
 from ._band_mass import sincsq_band_mass
+from ._chunk_slices import (
+    _energy_slices as _energy_slices,
+)
+from ._chunk_slices import (
+    _flight_blocks as _flight_blocks,
+)
 from ._line_tables import fill_tables_in_batches
 from ._position_twins import shorten_position_twin, stage_row, with_position_twins
 from ._recoil import _quantum_line_factors
@@ -1201,37 +1207,6 @@ def _segment_escape_distance(segments, n_hat, *, xp):
     )
     # A midpoint already past its exit face has no in-crystal path.
     return xp.maximum(distance, 0.0)
-
-
-def _flight_blocks(bounds, chunk):
-    """Split flight groups into row blocks of at most ``chunk`` rows.
-
-    ``bounds`` holds the group start offsets plus the total row count. Yields
-    ``(first_group, last_group_exclusive)`` pairs whose row spans never split a
-    group, which is what keeps a flight's substeps inside one coherent sum. A
-    single group larger than ``chunk`` is emitted whole rather than split.
-    """
-    n_groups = bounds.size - 1
-    ka = 0
-    for kb in range(1, n_groups + 1):
-        if bounds[kb] - bounds[ka] >= chunk:
-            yield ka, kb
-            ka = kb
-    if ka < n_groups:
-        yield ka, n_groups
-
-
-def _energy_slices(n_rows, chunk, n_energy):
-    """Energy slices keeping a ``(n_rows, slice)`` block within ``chunk`` full rows.
-
-    :func:`_flight_blocks` never splits a group, so one long group can exceed
-    ``chunk`` rows and its dense ``(rows, E)`` block the memory ``chunk`` was
-    sized for. Group reductions run along rows only, so slicing the energy axis
-    is exact: each slice's per-energy result is the full block's.
-    """
-    width = n_energy if n_rows <= chunk else max(1, (chunk * n_energy) // n_rows)
-    for e0 in range(0, n_energy, width):
-        yield slice(e0, min(e0 + width, n_energy))
 
 
 def _reflection_tables(crystal, hkl_list, E_tab, B_ang2, use_henke):

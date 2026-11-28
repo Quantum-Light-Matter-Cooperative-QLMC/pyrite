@@ -6,7 +6,9 @@ import pytest
 from pyrite.config import FiberAverage
 from pyrite.montecarlo.runner import fiber_emission
 from pyrite.montecarlo.spectrum.cxr._fiber_history import (
-    FIBER_ROLL_STREAM, HistoryRollSeed, primary_roll_rows,
+    FIBER_ROLL_STREAM,
+    HistoryRollSeed,
+    primary_roll_rows,
 )
 from pyrite.montecarlo.spectrum.cxr.fiber import FiberCXRModel
 from pyrite.montecarlo.transport.kinematics import counter_uniforms
@@ -29,12 +31,21 @@ def test_history_rng_matches_transport_counter_and_is_sparse():
 def test_history_identity_ignores_unused_quadrature_count():
     q = FiberCXRModel.from_numerics(FiberAverage(cutoff_invang=4))
     assert set(q.case_record()) == {
-        "model", "crystal", "cutoff_invang", "azimuth_count", "temperature_K", "thermal_source"
+        "model",
+        "crystal",
+        "cutoff_invang",
+        "azimuth_count",
+        "temperature_K",
+        "thermal_source",
     }
     h = FiberCXRModel.from_numerics(FiberAverage(cutoff_invang=4, roll_sampling="history"))
-    other = FiberCXRModel.from_numerics(FiberAverage(
-        cutoff_invang=4, roll_sampling="history", azimuth_count=128,
-    ))
+    other = FiberCXRModel.from_numerics(
+        FiberAverage(
+            cutoff_invang=4,
+            roll_sampling="history",
+            azimuth_count=128,
+        )
+    )
     assert h.case_record() != q.case_record()
     assert h.case_record() == other.case_record()
     assert FiberCXRModel.from_case_record(h.case_record()).case_record() == h.case_record()
@@ -44,12 +55,15 @@ def test_history_identity_ignores_unused_quadrature_count():
         FiberAverage(cutoff_invang=4, roll_sampling="bad")
 
 
-@pytest.mark.parametrize("change,reason", [
-    ({"line_grid_policy": {}}, "explicit fixed line grid"),
-    ({"_diagnostic_line_grid": {}}, "explicit fixed line grid"),
-    ({"adaptive_precision": {}}, "fixed electron counts"),
-    ({"recip_miscut_rad": (0.01, 0)}, "miscut"),
-])
+@pytest.mark.parametrize(
+    "change,reason",
+    [
+        ({"line_grid_policy": {}}, "explicit fixed line grid"),
+        ({"_diagnostic_line_grid": {}}, "explicit fixed line grid"),
+        ({"adaptive_precision": {}}, "fixed electron counts"),
+        ({"recip_miscut_rad": (0.01, 0)}, "miscut"),
+    ],
+)
 def test_history_case_refuses_unsupported_modes(change, reason):
     with pytest.raises(ValueError, match=reason):
         fiber_emission._validate_history_case({"seed": 101, **change})
@@ -80,7 +94,7 @@ def test_history_configuration_lowers_to_fixed_campaign():
         )
         return lower_simulation(resolve_simulation(scene, physics=physics, numerics=numerics))
 
-    grid = np.arange(100., 4000., 20.)
+    grid = np.arange(100.0, 4000.0, 20.0)
     q = lower("quadrature", grid)
     h = lower("history", grid)
     assert h["cxr_fiber"]["roll_sampling"] == "history"
@@ -94,9 +108,13 @@ def test_history_configuration_lowers_to_fixed_campaign():
 def test_history_campaign_scores_each_reflection_once(monkeypatch):
     from pyrite.montecarlo import runner
 
-    model = FiberCXRModel.from_numerics(FiberAverage(
-        cutoff_invang=4, roll_sampling="history", reflection_batch_size=3,
-    ))
+    model = FiberCXRModel.from_numerics(
+        FiberAverage(
+            cutoff_invang=4,
+            roll_sampling="history",
+            reflection_batch_size=3,
+        )
+    )
     domain = model.prepare()
     calls = []
 
@@ -115,7 +133,7 @@ def test_history_campaign_scores_each_reflection_once(monkeypatch):
     monkeypatch.setattr(runner, "_cxr_for_segments", score)
     monkeypatch.setattr(fiber_emission, "fiber_domain", lambda case: domain)
     case = {"seed": 101, "cxr_fiber": model.case_record(), "azimuth_rad": 0.2}
-    grid = np.array([100., 200.])
+    grid = np.array([100.0, 200.0])
     result = fiber_emission.fiber_lines({}, grid, case, None, None, None, Ne=9)
     assert sorted(calls) == sorted(domain.hkls)
     np.testing.assert_array_equal(result, np.full(grid.shape, len(domain.hkls)))

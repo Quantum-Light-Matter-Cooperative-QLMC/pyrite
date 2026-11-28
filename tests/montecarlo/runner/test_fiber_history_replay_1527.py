@@ -40,7 +40,9 @@ def _case(lines, brem, mosaic=False):
             mosaic_route="mc" if mosaic else "auto",
             mosaic_nodes=2,
         ),
-        energy_bins=EnergyBins(cxr=np.arange(200., 3000., 40.), brem=np.arange(500., 30000., 500.)),
+        energy_bins=EnergyBins(
+            cxr=np.arange(200.0, 3000.0, 40.0), brem=np.arange(500.0, 30000.0, 500.0)
+        ),
         seed=101,
     )
     physics = Physics(bremsstrahlung_model="bremslib", radiative_model="uncoupled")
@@ -55,7 +57,10 @@ def _parity(reference, actual, *, line_tol):
         scale = float(np.max(np.abs(reference[key])))
         assert np.isfinite(actual[key]).all(), key
         np.testing.assert_allclose(
-            actual[key], reference[key], rtol=0, atol=scale * (line_tol if key == "spec" else 1e-10),
+            actual[key],
+            reference[key],
+            rtol=0,
+            atol=scale * (line_tol if key == "spec" else 1e-10),
             err_msg=key,
         )
     for key in ("eta", "hit_frac", "n_segments", "brem_lattice_share"):
@@ -82,7 +87,9 @@ def test_history_artifact_replay_and_case_identity(tmp_path, mosaic):
     tp = runner._transport_case(case, transport_core="per-electron")
     retained = runner._spectrum_case(case, tp)
     inputs = {key: value for key, value in tp.items() if key != "segs"}
-    path = write_trajectory_artifact(tmp_path / "fiber.h5", tp["segs"], case=case, spectrum_inputs=inputs)
+    path = write_trajectory_artifact(
+        tmp_path / "fiber.h5", tp["segs"], case=case, spectrum_inputs=inputs
+    )
     artifact = read_trajectory_artifact(path)
     assert artifact.case["cxr_fiber"] == case["cxr_fiber"]
     assert artifact.case["seed"] == case["seed"]
@@ -112,8 +119,10 @@ def test_history_stream_scorer_rollback_does_not_double_count():
         for block in blocks:
             scorer.add(block)
         result = scorer.result(
-            Ne=int(segs["Ne"]), n_backscattered=int(segs["n_backscattered"]),
-            n_missed=int(segs["n_missed"]), line_coverage=None,
+            Ne=int(segs["Ne"]),
+            n_backscattered=int(segs["n_backscattered"]),
+            n_missed=int(segs["n_missed"]),
+            line_coverage=None,
         )
         _parity(retained, result, line_tol=1e-10)
 
@@ -122,10 +131,14 @@ def test_history_coupling_cache_is_keyed_by_table_content_not_orientation():
     calls = []
     cache = {}
     req = SimpleNamespace(
-        crystal="hopg", hkl_list=[(1, 0, 2)], B_ang2=lambda hkl: 0.25,
-        use_henke=True, _table_cache=cache, azimuth_rad=0.,
+        crystal="hopg",
+        hkl_list=[(1, 0, 2)],
+        B_ang2=lambda hkl: 0.25,
+        use_henke=True,
+        _table_cache=cache,
+        azimuth_rad=0.0,
     )
-    st = SimpleNamespace(request=req, E_tab=np.array([100., 200.]))
+    st = SimpleNamespace(request=req, E_tab=np.array([100.0, 200.0]))
 
     def build(*args):
         calls.append(args)

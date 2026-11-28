@@ -21,11 +21,13 @@ from ..segment_escape import piece_mean_transmission
 from . import _policy
 from ._bin_quadrature import sincsq_bin_lineshape
 from ._bin_queue import flush_bin_line_queues, open_bin_line_queues
+from ._chunk_slices import _sinc_window_bounds
 from ._cpu_reduce import accumulate_sincsq, numpy_backend
 from ._escape_mu import escape_mu_tables
 from ._formation import (
+    _delta_omega_max,
     _formation_cxr,
-    formation_profile,
+    _formation_SP,
     formation_window_half_width,
 )
 from ._grouped import accumulate_flight_grouped
@@ -66,18 +68,6 @@ from ._temporal import (
 )
 
 
-def _sinc_window_bounds(E_grid, lo, hi):
-    """Return the padded node slice intersecting ``[lo, hi]``.
-
-    Include the node immediately below ``lo`` and the node immediately above
-    ``hi``, matching the historical uniform-grid arithmetic while deriving the
-    bounds from the coordinates themselves.  ``E_grid`` must be ascending.
-    """
-    i0 = max(int(_to_cpu(xp.searchsorted(E_grid, lo, side="right"))) - 1, 0)
-    i1 = min(int(_to_cpu(xp.searchsorted(E_grid, hi, side="right"))) + 1, E_grid.size)
-    return i0, i1
-
-
 def _formation_good(amp, t_L, cxr_rows, coefs):
     """Live lines: finite positive amplitude, finite complex polarization
     coefficients, and a finite, non-vanishing attenuation profile (``apb = 0``
@@ -94,28 +84,6 @@ def _formation_good(amp, t_L, cxr_rows, coefs):
     for c in coefs:
         good &= xp.isfinite(c)
     return good
-
-
-def _formation_SP(st, cxr_rows, e_sl=slice(None), sinc_cutoff=None):
-    """``F[j, k]``: the complex formation factor of ``lines`` on ``E_grid[e_sl]``."""
-    E_vac, a_vac, half_dL, apb, bma, q = cxr_rows
-    return formation_profile(
-        st.E_grid[e_sl],
-        st.delta_omega_grid[e_sl],
-        E_vac,
-        a_vac,
-        half_dL,
-        apb,
-        bma,
-        q,
-        sinc_cutoff=sinc_cutoff,
-        xp=xp,
-    ).astype(st.cdtype)
-
-
-def _delta_omega_max(st):
-    """Host bound ``max |delta(E) omega(E)|`` over the grid, for windows."""
-    return float(_to_cpu(xp.abs(st.delta_omega_grid).max())) if st.E_grid.size else 0.0
 
 
 def _row_decoherence_factor(st, g_vec_d):

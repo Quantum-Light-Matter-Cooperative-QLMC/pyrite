@@ -46,7 +46,7 @@ Validation: coherent-formation-absorption
 
 import numpy as np
 
-from ...._backend import REAL, xp
+from ...._backend import REAL, _to_cpu, xp
 from ...transport import beta_from_keV
 from ..segment_escape import segment_escape_paths
 from ._kernels import _SEG_ARRAYS
@@ -286,3 +286,25 @@ def _formation_cxr(st, idx, t_L, v_dot_g, mu_layers, g2, n_dot_g):
         )
     )
     return 0.5 * (L_start + L_end), cxr_rows, (d_shift, g_shift)
+
+
+def _formation_SP(st, cxr_rows, e_sl=slice(None), sinc_cutoff=None):
+    """``F[j, k]``: the complex formation factor of ``lines`` on ``E_grid[e_sl]``."""
+    E_vac, a_vac, half_dL, apb, bma, q = cxr_rows
+    return formation_profile(
+        st.E_grid[e_sl],
+        st.delta_omega_grid[e_sl],
+        E_vac,
+        a_vac,
+        half_dL,
+        apb,
+        bma,
+        q,
+        sinc_cutoff=sinc_cutoff,
+        xp=xp,
+    ).astype(st.cdtype)
+
+
+def _delta_omega_max(st):
+    """Host bound ``max |delta(E) omega(E)|`` over the grid, for windows."""
+    return float(_to_cpu(xp.abs(st.delta_omega_grid).max())) if st.E_grid.size else 0.0
