@@ -68,6 +68,7 @@ def fourier_runs_reduce(
     residual_tol,
     broad_width_eV,
     max_line_modes,
+    _retry_over_cap=True,
 ):
     """``[sum_l w_l mean_k(line l) on run j]`` for uniform ``axes = [(c0, h, n), ...]``.
 
@@ -103,9 +104,33 @@ def fourier_runs_reduce(
     over = xp.floor(2.0 * a / dt) > limit
     if bool(over.any()):
         sel = xp.flatnonzero(over)
-        for out, axis in zip(outs, axes, strict=True):
-            out += near_far(E[sel], a[sel], w[sel], axis)
         rest = xp.flatnonzero(~over)
+        # #1500: the rejected subset shares its own (shorter) period across
+        # all runs. If all lines were rejected, replanning cannot help.
+        if _retry_over_cap and rest.size:
+            retry = fourier_runs_reduce(
+                E[sel],
+                a[sel],
+                w[sel],
+                axes,
+                xp=xp,
+                to_host=to_host,
+                positive_modes=positive_modes,
+                evaluate=evaluate,
+                broad_reduce=broad_reduce,
+                near_far=near_far,
+                node_sums=node_sums,
+                residual_tol=residual_tol,
+                broad_width_eV=None,
+                max_line_modes=max_line_modes,
+                _retry_over_cap=False,
+            )
+            for out, part in zip(outs, retry, strict=True):
+                out += part
+            del retry, part
+        else:
+            for out, axis in zip(outs, axes, strict=True):
+                out += near_far(E[sel], a[sel], w[sel], axis)
         E, a, w = E[rest], a[rest], w[rest]
         if E.size == 0:
             return outs

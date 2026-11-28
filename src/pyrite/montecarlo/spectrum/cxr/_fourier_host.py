@@ -292,6 +292,7 @@ def host_fourier_bin_mean_reduce(
     broad_width_eV=1000.0,
     eps=1e-12,
     max_line_modes=FOURIER_MAX_LINE_MODES,
+    _retry_over_cap=True,
 ):
     """``sum_l w_l mean_k(line l)`` on uniform bins ``axis = (c0, h, n_bins)``, host FP64.
 
@@ -300,10 +301,9 @@ def host_fourier_bin_mean_reduce(
     using requested kernel accuracy ``eps`` on large rectangles, direct sums otherwise), the bin
     multiplier, ``j mod N`` folding, one inverse FFT and the closed-form
     envelope-image correction. Lines with more than ``max_line_modes``
-    positive modes (default :data:`FOURIER_MAX_LINE_MODES`, #1320) take the
-    numba near/far evaluator (``_bin_mean_jit``) on the same bins, as the
-    device route sends them to its near/far kernel; ``None`` keeps every line
-    on the Fourier route.
+    positive modes (default :data:`FOURIER_MAX_LINE_MODES`, #1320) get
+    one retry at their own period (#1500); only lines still over the cap
+    take the numba near/far evaluator. ``None`` keeps every line on Fourier.
 
     Validation: cxr-line-fourier-reduction, cxr-line-broad-interpolation
     """
@@ -341,7 +341,23 @@ def host_fourier_bin_mean_reduce(
     if max_line_modes is not None:
         over = np.floor(2.0 * a / (2.0 * np.pi / P)) > max_line_modes
         if over.any():
-            out += host_near_far_bin_mean_reduce(E[over], a[over], w[over], (c0, h, n_bins))
+            # #1500: replan only a strict subset. If every line is over,
+            # its extrema (and hence its period) cannot change. Bound the
+            # retry to one pass; remaining over-cap lines keep near/far.
+            if _retry_over_cap and not over.all():
+                out += host_fourier_bin_mean_reduce(
+                    E[over],
+                    a[over],
+                    w[over],
+                    axis,
+                    residual_tol=residual_tol,
+                    broad_width_eV=None,
+                    eps=eps,
+                    max_line_modes=max_line_modes,
+                    _retry_over_cap=False,
+                )
+            else:
+                out += host_near_far_bin_mean_reduce(E[over], a[over], w[over], axis)
             E, a, w = E[~over], a[~over], w[~over]
             if E.size == 0:
                 return out
@@ -377,8 +393,8 @@ def host_fourier_runs_reduce(
     """Per-run bin means on uniform ``axes``, one line transform for all (#1392).
 
     The shared-mode form of :func:`host_fourier_bin_mean_reduce` called once
-    per axis: same exact-cutoff coefficients, broad route, over-cap near/far
-    and envelope-image correction, at the largest run period and broad
+    per axis: same exact-cutoff coefficients, broad route, over-cap retry (#1500),
+    near/far fallback and envelope-image correction, at the largest run period and broad
     threshold, with an ES type-2 evaluation (:func:`host_es_mode_evaluate`)
     at each run's centres (``_fourier_runs``).
 

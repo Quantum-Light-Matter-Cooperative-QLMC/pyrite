@@ -469,7 +469,11 @@ def test_over_cap_near_far_keeps_fp64_positions_at_high_energy(cp):
     exact = w @ _host_bin_mean(a, e, edges, 1 / np.diff(edges), exact_widths=None)
     device = cp.asnumpy(
         _fourier_cuda.cuda_fourier_bin_mean_reduce(
-            cp.asarray(e), cp.asarray(a), cp.asarray(w), uniform_bin_axis(grid)
+            cp.asarray(e),
+            cp.asarray(a),
+            cp.asarray(w),
+            uniform_bin_axis(grid),
+            max_line_modes=1 << 12,
         )
     )
     # Shifted float32 positions leave <= 2**-24 |E - c0| (~5e-5 here: lines 1 meV

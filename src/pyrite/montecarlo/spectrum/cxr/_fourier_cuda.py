@@ -421,6 +421,7 @@ def cuda_fourier_bin_mean_reduce(
     direct_precision="fp32",
     spread="gather",
     max_line_modes=FOURIER_MAX_LINE_MODES,
+    _retry_over_cap=True,
 ):
     """Device counterpart of ``fourier_bin_mean_reduce(..., broad_width_eV=...)``.
 
@@ -434,9 +435,9 @@ def cuda_fourier_bin_mean_reduce(
     and, with ``direct_precision="fp32"`` (default since ``fourier-auto-v6``),
     the single-precision phase factors of the direct rectangles. Lines whose
     mode count ``floor(P a_l / pi)`` exceeds ``max_line_modes`` (default
-    :data:`FOURIER_MAX_LINE_MODES`, ``fourier-auto-v8``, #1320) take the
-    near/far kernel on the same bins, with its own bounds; ``None`` keeps
-    every line on the Fourier route (the host reference's behaviour).
+    :data:`FOURIER_MAX_LINE_MODES`, #1320) get one retry at their own period
+    (#1500). Lines still over the cap take the near/far kernel on the same
+    bins; ``None`` keeps every line on the Fourier route.
     ``eps=1e-12, direct_precision="fp64", spread="atomic"`` is the
     ``fourier-auto-v5`` route up to the envelope kernel's FP64 summation
     order; ``spread="atomic"`` alone is ``fourier-auto-v6`` up to the ES
@@ -498,8 +499,24 @@ def cuda_fourier_bin_mean_reduce(
     )
     if bool(over.any()):
         sel = cp.flatnonzero(over)
-        out += _near_far_lines(E[sel], a[sel], w[sel], (c0, h, n_bins))
         rest = cp.flatnonzero(~over)
+        # #1500: retry a strict subset at its own period, once only.
+        if _retry_over_cap and rest.size:
+            out += cuda_fourier_bin_mean_reduce(
+                E[sel],
+                a[sel],
+                w[sel],
+                axis,
+                residual_tol=residual_tol,
+                broad_width_eV=None,
+                eps=eps,
+                direct_precision=direct_precision,
+                spread=spread,
+                max_line_modes=max_line_modes,
+                _retry_over_cap=False,
+            )
+        else:
+            out += _near_far_lines(E[sel], a[sel], w[sel], axis)
         E, a, w = E[rest], a[rest], w[rest]
         if E.size == 0:
             return out
@@ -544,7 +561,7 @@ def cuda_fourier_runs_reduce(
 
     The shared-mode form of :func:`cuda_fourier_bin_mean_reduce` called once
     per axis (``_fourier_runs``): same coefficients, broad route, over-cap
-    near/far and envelope kernel, at the largest run period and broad
+    retry (#1500), near/far fallback and envelope kernel, at the largest run period and broad
     threshold, with an ES type-2 evaluation (``es_mode_evaluate``) at each
     run's centres. Returns ``(n_j,)`` FP64 device arrays.
 

@@ -43,8 +43,8 @@ FOURIER_RESIDUAL_TOL = 1.0e-6
 #: Smallest accepted ``residual_tol``: below it FP64 rounding of the mode sum
 #: dominates and the bound no longer describes the error.
 FOURIER_MIN_RESIDUAL_TOL = 1.0e-12
-#: Lines with more positive modes ``floor(P / W_l)`` than this leave the
-#: Fourier route for the near/far bin mean, on device and host (#1320).
+#: Lines with more positive modes ``floor(P / W_l)`` than this are retried
+#: at their own period (#1500), then take near/far if still over cap (#1320).
 #: Fourier work and memory grow with the largest mode count (the FFT, fine
 #: grid and output span it), so one line far narrower than ``P`` -- itself
 #: ``>~ 408 W_max`` of the widest Fourier line -- requested multi-GiB

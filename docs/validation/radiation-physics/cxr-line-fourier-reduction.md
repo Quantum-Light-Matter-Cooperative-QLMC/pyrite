@@ -665,3 +665,31 @@ Not verified: device code (`es_mode_evaluate`, `_interp_kernel`, `cuda_fourier_r
 ### Resolution (task owner, 2026-11-23)
 
 Finding 1 fixed: the section now states $A_m(c_0')=A_m(c_0)\,e^{it_m(c_0'-c_0)}$ and that the evaluation points absorb the shift. Findings 2 and 3 need no change. Device numerics: King job 15590.
+
+## Second Fourier pass for over-cap lines (#1500)
+
+After the broad split, let $S$ be the Fourier candidates and $P(S)$ the
+existing period from their extrema (the maximum over all runs for #1392).
+Partition $S=A\cup R$, where $A$ has $\lfloor P(S)/W_l\rfloor\le M$ and
+$R$ is the rejected set, with $M$ the unchanged mode cap. If both sets are
+nonempty, retry $R$ at $P(R)$, splitting it into $B$ (within cap) and $F$
+(still over cap). $A$ keeps $P(S)$; $B$ keeps $P(R)$; only $F$ takes near/far.
+If all lines are rejected, replanning the identical set cannot help. The
+retry is bounded to one additional pass; the broad split is not repeated.
+
+For a subset, neither the span $U$ nor its largest width $W_{\max}$ can
+increase. The period chosen for the parent remains admissible for the
+accepted subset. The existing period selection applied to $R$ independently
+enforces the same clearance for every line in $R$, including $B$. Taking
+the maximum over the runs preserves every run's clearance. Linearity and
+the triangle inequality give the pointwise image remainder
+$2\tau\sum_{l\in A\cup B}|w_l|$, not twice the allowance for every line:
+each line is synthesized exactly once. Existing yield bounds apply per line
+at its own period. Broad and remaining near/far allowances, NUFFT approximation,
+and floating-point errors remain separate. The band span alone sets a lower
+bound on the period, so a second pass cannot necessarily rescue every line.
+
+Regression: `test_fourier_over_cap_retry.py` compares uniform and shared-run
+reductions to exact bin means and records transform periods and fallback
+calls, including a mixed case with an irreducibly over-cap line. Fresh-context
+verification and #1320 heavy-electron timings are pending.

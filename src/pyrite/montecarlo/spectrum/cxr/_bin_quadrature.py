@@ -792,7 +792,9 @@ def sincsq_bin_lineshape(
 #: v12 (#1407): device Si complement uses Cephes rational auxiliary fits on
 #: 4 < t < 48 instead of the modified-Lentz continued fraction; host near/far
 #: mirrors it. Classification, series window, and far envelope are unchanged.
-CXR_BIN_REDUCTION_MODEL = "fourier-auto-v12"
+#: v13 (#1500): retry over-cap lines once at their own Fourier period;
+#: only lines still over the mode cap use near/far.
+CXR_BIN_REDUCTION_MODEL = "fourier-auto-v13"
 #: Lines per Fourier-route flush: amortises the per-call FFT and planning.
 FOURIER_FLUSH_LINES = 10_000_000
 
