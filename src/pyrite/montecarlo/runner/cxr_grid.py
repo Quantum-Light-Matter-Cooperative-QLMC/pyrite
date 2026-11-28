@@ -459,6 +459,32 @@ def _direction_populations(
     return populations
 
 
+def _direction_tail(case, segments, n_hat, Ne, abs_layers, groove, start, ceiling, *, stops=None):
+    """Reduce production lines into the stop lattice without collecting triples (#1527)."""
+    from ..spectrum._lattice_tail import stop_lattice
+    from . import _cxr_for_segments
+
+    audit = {
+        "start_eV": start,
+        "stop_eV": ceiling,
+        "mass_only": True,
+        "tail_lattice_eV": stop_lattice(ceiling) if stops is None else stops,
+    }
+    if int(segments["L_ang"].shape[0]):
+        _cxr_for_segments(
+            segments,
+            np.array([start, ceiling]),
+            case,
+            n_hat,
+            abs_layers,
+            groove,
+            coherent=False,
+            Ne=Ne,
+            truncation_audit=audit,
+        )
+    return audit.get("tail_summary")
+
+
 class SegmentGridEvidence:
     """What policy resolution reads from one joined segment population.
 
@@ -469,6 +495,28 @@ class SegmentGridEvidence:
     def __init__(self, case, segments, Ne, abs_layers=None, groove=None):
         self.case, self.segments, self.Ne = case, segments, Ne
         self.abs_layers, self.groove = abs_layers, groove
+        self._population_bytes = {}
+
+    def tail(self, n_hat, start, ceiling, profile):
+        """Bounded stop evidence for a full-fiber direction; other routes unchanged."""
+        if self.case.get("cxr_fiber") is None:
+            return None
+        from ..spectrum._lattice_tail import LatticeTail, stop_lattice
+
+        began = perf_counter()
+        summary = _direction_tail(
+            self.case, self.segments, n_hat, self.Ne, self.abs_layers, self.groove, start, ceiling
+        )
+        tail = LatticeTail(stop_lattice(ceiling), summary)
+        self._population_bytes[tuple(n_hat)] = tail.population_bytes
+        if profile is not None:
+            _profile_stage(
+                profile,
+                tail_collect_wall_s=perf_counter() - began,
+                population_lines=tail.raw_lines,
+                tail_lattice_points=tail.stops.size,
+            )
+        return tail
 
     def sinc_spacing(self, n_hat, aliased_weight_limit):
         """:func:`sinc_feature_spacing` of the line population along ``n_hat``."""
@@ -481,6 +529,28 @@ class SegmentGridEvidence:
 
     def populations(self, n_hat, start, ceiling, profile):
         """Every production line along ``n_hat`` over ``(start, ceiling)``."""
+        if self.case.get("cxr_fiber") is not None:
+            from ..spectrum._lattice_tail import LatticeTail
+            from ..transport.host_memory import admit_host_allocation
+
+            key = tuple(n_hat)
+            if key not in self._population_bytes:
+                # Kinematic bandwidth needs lines only for over-budget local
+                # refinement. Count them without retaining them before admission.
+                stops = np.array([ceiling])
+                summary = _direction_tail(
+                    self.case,
+                    self.segments,
+                    n_hat,
+                    self.Ne,
+                    self.abs_layers,
+                    self.groove,
+                    start,
+                    ceiling,
+                    stops=stops,
+                )
+                self._population_bytes[key] = LatticeTail(stops, summary).population_bytes
+            admit_host_allocation(self._population_bytes[key], "fiber line-grid refinement")
         return _direction_populations(
             self.case,
             self.segments,
@@ -593,8 +663,13 @@ def _measured_cxr_grid(
     ceiling = float(bandwidth["stop_eV"])
     direction_populations = []
     bandwidth_records = []
+    summarized = False
     for n_hat in n_hats:
-        populations = evidence.populations(n_hat, start, ceiling, profile)
+        tail = evidence.tail(n_hat, start, ceiling, profile) if hasattr(evidence, "tail") else None
+        summarized = summarized or tail is not None
+        populations = (
+            [] if tail is not None else evidence.populations(n_hat, start, ceiling, profile)
+        )
         stage_started = perf_counter() if profile_enabled else 0.0
         _direction_stop, direction_record = case_cxr_stop_eV(
             case,
@@ -603,6 +678,7 @@ def _measured_cxr_grid(
             ceiling_eV=ceiling,
             truncation_limit=float(bandwidth["truncation_limit"]),
             proxy_safety=BANDWIDTH_PROXY_SAFETY,
+            tail=tail,
         )
         if profile_enabled:
             _profile_stage(
@@ -622,6 +698,9 @@ def _measured_cxr_grid(
     )
     local = resolution["policy"] == LOCAL_RESOLUTION_POLICY
     over_budget = None if local else uniform_over_budget(payload, start, stop, target_step)
+    if summarized and (local or over_budget is not None):
+        # Local grids need individual line widths/energies, not just tail sums.
+        direction_populations = [evidence.populations(n, start, ceiling, profile) for n in n_hats]
     if over_budget is not None:
         grid, record = node_local_axis(
             payload,

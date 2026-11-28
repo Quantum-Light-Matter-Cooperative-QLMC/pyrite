@@ -153,6 +153,18 @@ def _accumulate_edge_truncation(audit, E_r, a_width, weight, electron=None):
     """
     if audit is None or E_r.size == 0:
         return
+    if "tail_lattice_eV" in audit:
+        from .._lattice_tail import merge_tail, summarize_lines
+
+        part = summarize_lines(
+            E_r,
+            xp.pi / a_width,
+            weight,
+            audit["tail_lattice_eV"],
+            audit.get("tail_roll_weight", 1.0),
+        )
+        audit["tail_summary"] = merge_tail(audit.get("tail_summary"), part)
+        return
     if "collect" in audit:
         collect_lines(audit, (E_r, xp.pi / a_width, weight))
         return

@@ -981,6 +981,7 @@ def case_cxr_stop_eV(
     truncation_limit: float,
     proxy_safety: float,
     round_to_eV: float = 100.0,
+    tail=None,
 ) -> tuple[float, dict[str, Any]]:
     """Measured line-axis ``stop`` for one case: PXR/CBS and characteristic lines.
 
@@ -994,12 +995,18 @@ def case_cxr_stop_eV(
 
     Validation: line-grid-resonance-bandwidth
     """
-    kinematic_stop, kinematic = resonance_population_stop_eV(
-        populations,
-        ceiling_eV=ceiling_eV,
-        truncation_limit=float(truncation_limit) / float(proxy_safety),
-        round_to_eV=round_to_eV,
-    )
+    limit = float(truncation_limit) / float(proxy_safety)
+    if tail is None:
+        kinematic_stop, kinematic = resonance_population_stop_eV(
+            populations,
+            ceiling_eV=ceiling_eV,
+            truncation_limit=limit,
+            round_to_eV=round_to_eV,
+        )
+    else:
+        if not 0.0 < limit < 1.0:
+            raise ValueError("truncation_limit must lie in (0, 1)")
+        kinematic_stop, kinematic = _lattice_stop(tail, ceiling_eV, limit, round_to_eV)
     characteristic_edge, characteristic = characteristic_stop_eV(
         _case_compositions(case), truncation_limit=truncation_limit
     )

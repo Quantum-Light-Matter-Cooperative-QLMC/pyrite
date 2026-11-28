@@ -1443,3 +1443,36 @@ The issue #1275 progress log records these numbers under acceptance job 13706 (`
 `rederived`. The device route feeds the unchanged bound, selector and lattice the host's per-line values over the same line set. It differs only in summation order, in the device-side dot product, and in float64 rather than float32 accumulation of a float32 population's total mass, which is a valid departure. Non-status-bearing corrections: cite job 13706 rather than 13703; quote 9e-13; mark "≤ 1e-13" as measured, scaling as $u/\kappa$; state the float32 total-mass precision change. No test anchors the call-time `BACKEND` read under CPU recovery; `test_cpu_spectrum_backend.py` checks only that the module list is complete.
 
 The four corrections were applied to the ledger clause when the branch was rebased onto `7fc85c5a9` (commit `0cae0eb53`).
+
+## Bounded full-fiber stop evidence (#1527)
+
+For a uniform measured full-fiber axis, the stop resolver needs only the
+positive finite line count, resonance extrema, total mass, and the upper-tail
+mass at the trial stops. Accumulate the same expression
+$\sum_i W_i w_i \min(1, w_i/(\pi^2(S-E_i)))$ for $S>E_i$, with the whole
+line mass counted for $S\le E_i$, at each 100 eV lattice candidate and at
+the exact ceiling. Roll weighting is applied to the coefficient before
+forming the line mass, as in the collected population. The original stop
+search, characteristic edge, Bragg support and final production audit are
+unchanged. As in #1275, the total and tail sums use float64 reductions;
+a threshold crossing can move only within summation rounding.
+
+The retained and streamed fiber routes use the same accumulator. The
+line-evidence storage is proportional to the number of lattice candidates,
+not the number of production lines. The existing sinc-spacing samples
+still grow with the segment count and may spill. GPU candidate reductions
+are tiled, using the existing fused tail product. Work is proportional to
+lines times candidates; the all-stops design needs a same-node benchmark
+against a coarse-bracket/replay alternative before claiming a speedup.
+
+Node-local and resonance-local resolution still require individual line
+widths and energies. A retained run admits the projected population before
+collecting it; a streamed run replays the grid pass only after host-memory
+admission. A refused admission is intentional rather than a silent change
+to the resolution policy. Other measured routes retain their existing
+collector, including the detector-cone split weighting path.
+
+Tests: `tests/energy-grid/test_line_grid_lattice_tail_1527.py` and the
+production-line comparison in `tests/montecarlo/runner/test_fiber_line_grid_1489.py`.
+The full `cleo_fiber` RTX 5080 run, timing breakdown, and validation status
+promotion remain pending hardware evidence.

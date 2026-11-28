@@ -19,9 +19,9 @@ to a whole 100 eV step, so the grid differs only if a tail ratio lands within
 rounding of the truncation limit.
 
 A ``sinc-oversampled`` axis over its point budget refines node-locally around
-every production line (#1257). The first pass therefore keeps the lines for
-that resolution too, under any bandwidth; the joined resolver then builds the
-same axis from them.
+every production line (#1257). Full-fiber grids defer individual line collection
+until that refinement is actually needed (#1527); other routes keep lines on
+the first pass as before.
 
 A production line population can be far larger than the transport rows it
 comes from (full-fiber CXR holds thousands of lines per row), while transport
@@ -37,6 +37,8 @@ the two sample arrays cross to the host and the streamed samples equal the
 joined ones bit for bit there too (#1481).
 """
 
+import sys
+from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -79,19 +81,26 @@ def _block_sinc_samples(segs, n_hat, electron_limit):
     return sinc_feature_samples(segs, n_hat, electron_limit=electron_limit)
 
 
+class _NeedsLinePopulation(Exception):
+    """Local refinement needs a replay with lines, optionally with a byte estimate."""
+
+    def __init__(self, required_bytes: int | None):
+        super().__init__("local line-grid refinement requires individual production lines")
+        self.required_bytes = required_bytes
+
+
 class BlockGridEvidence:
     """Grid-resolution evidence accumulated over whole-electron blocks.
 
-    Serves the two quantities :class:`.cxr_grid.SegmentGridEvidence` reads from
+    Serves the evidence :class:`.cxr_grid.SegmentGridEvidence` reads from
     a joined population, for the case's single direction ``n_hat``: the sinc
-    ``(width, weight)`` samples of every valid line row, and -- for the
-    measured ``resonance-population`` bandwidth or a ``sinc-oversampled``
-    resolution, whose over-budget axis refines around each line (#1257) --
-    every production line's ``(energy, width, weight)``. Evidence is 16 bytes
-    per valid line row plus, when lines are kept, three backend reals per
-    production line. Whether a ``sinc-oversampled`` axis exceeds its budget
-    is known only from the final sinc spacing, so its lines are always kept.
-    They are collected a slice of a block at a time (:meth:`_line_slices`).
+    ``(width, weight)`` samples of every valid line row, and either production
+    line triples or fixed-size tail sums. Full-fiber measured grids keep only
+    tail sums until local refinement actually needs individual lines (#1527).
+    Full-fiber kinematic grids, including bandwidth extensions, defer line
+    collection too: a uniform axis reads only the sinc samples. Other routes
+    retain their original evidence. Whenever lines are needed they are
+    collected a slice of a block at a time (:meth:`_line_slices`).
 
     Under ``spill`` (:class:`.line_grid_spill.GridSpillPolicy`), once the
     evidence held, or projected over the run from the blocks so far, exceeds
@@ -101,7 +110,18 @@ class BlockGridEvidence:
     :class:`.line_grid_spill.LineGridSpillError` at that block.
     """
 
-    def __init__(self, case, payload, n_hat, Ne, abs_layers=None, groove=None, spill=None):
+    def __init__(
+        self,
+        case,
+        payload,
+        n_hat,
+        Ne,
+        abs_layers=None,
+        groove=None,
+        spill=None,
+        *,
+        keep_lines=False,
+    ):
         from .line_grid_spill import GridSpillPolicy
 
         self.case, self.n_hat, self.Ne = case, np.asarray(n_hat, dtype=float), int(Ne)
@@ -109,9 +129,14 @@ class BlockGridEvidence:
         bandwidth = payload["bandwidth"]
         self.band = (float(bandwidth["start_eV"]), float(bandwidth["stop_eV"]))
         self.measured = bandwidth["policy"] == RESONANCE_BANDWIDTH_POLICY
+        self.defers_lines = case.get("cxr_fiber") is not None and not keep_lines
+        self.summarizes_tail = self.measured and self.defers_lines
+        self._tail_summary = None
         # Mixed transport scores no lines; its local axis is the backbone alone.
         oversampled = payload["resolution"]["policy"] == OVERSAMPLED_RESOLUTION_POLICY
-        self.keeps_lines = self.measured or (oversampled and case.get("transport_mode") != "mixed")
+        self.keeps_lines = not self.defers_lines and (
+            self.measured or (oversampled and case.get("transport_mode") != "mixed")
+        )
         self.policy = GridSpillPolicy(threshold_bytes=None) if spill is None else spill
         self._electrons = max(int(Ne), int(case.get("Ne_brem") or 0), 1)
         self._width: list[np.ndarray] | None = []
@@ -128,6 +153,9 @@ class BlockGridEvidence:
 
     def add(self, segs) -> None:
         """Record one block; a failure leaves none of the block recorded."""
+        from ..spectrum._lattice_tail import merge_tail
+        from .cxr_grid import _direction_tail
+
         width, weight = _block_sinc_samples(segs, self.n_hat, self.Ne)
         if self._width is None or self._weight is None:
             raise RuntimeError("streamed sinc evidence was already reduced")
@@ -137,14 +165,22 @@ class BlockGridEvidence:
         width = width.astype(self._dtypes[0], copy=False)
         weight = weight.astype(self._dtypes[1], copy=False)
         mark = self._mark()
+        summary = self._tail_summary
         try:
             self._record_samples(width, weight, int(segs.get("Ne", 0)))
-            if self.keeps_lines and int(segs["L_ang"].shape[0]):
+            if self.summarizes_tail:
+                part = _direction_tail(
+                    self.case, segs, self.n_hat, self.Ne, self.abs_layers, self.groove, *self.band
+                )
+                if part is not None:
+                    summary = merge_tail(summary, part)
+            elif self.keeps_lines and int(segs["L_ang"].shape[0]):
                 for populations, electrons in self._line_slices(segs):
                     self._record_lines(populations, electrons)
         except BaseException:
             self._rollback(mark)
             raise
+        self._tail_summary = summary
 
     def _line_slices(self, segs):
         """``(populations, electrons)`` of consecutive electron-aligned block slices.
@@ -297,7 +333,25 @@ class BlockGridEvidence:
     @property
     def nbytes(self) -> int:
         """Evidence bytes collected, held in memory or spilled."""
-        return int(self._seen[1] + self._seen[2])
+        tail_bytes = 0 if self._tail_summary is None else self._tail_summary.sums.nbytes
+        return int(self._seen[1] + self._seen[2] + tail_bytes)
+
+    @property
+    def line_evidence_mode(self) -> str:
+        """Distinguish a bounded tail pass from collection and spacing alone."""
+        if self.summarizes_tail:
+            return "tail-lattice"
+        return "line-population" if self.keeps_lines else "spacing-only"
+
+    def line_evidence_record(self) -> dict[str, Any]:
+        """Actual retained line bytes, not the projected raw population size."""
+        summary = self._tail_summary
+        return {
+            "line_evidence_mode": self.line_evidence_mode,
+            "line_population_bytes": self._seen[2],
+            "tail_summary_bytes": 0 if summary is None else int(summary.sums.nbytes),
+            "summarized_lines": 0 if summary is None else summary.raw_lines,
+        }
 
     def close(self) -> None:
         """Remove any spilled evidence."""
@@ -375,11 +429,29 @@ class BlockGridEvidence:
             store.unlink(ordered.width)
             store.unlink(ordered.weight)
 
+    def tail(self, n_hat, start, ceiling, profile):
+        """Return the fixed-size stop evidence, when the fiber path collected it."""
+        from ..spectrum._lattice_tail import LatticeTail, stop_lattice
+
+        self._check_direction(n_hat)
+        if not self.summarizes_tail:
+            return None
+        if (float(start), float(ceiling)) != self.band:
+            raise ValueError("streamed tail evidence was collected over another band")
+        return LatticeTail(stop_lattice(ceiling), self._tail_summary)
+
     def populations(self, n_hat, start, ceiling, profile):
         """Every accumulated production line over the policy band."""
         del profile  # stage profiling covers the joined resolver only
         self._check_direction(n_hat)
-        if not self.keeps_lines or (float(start), float(ceiling)) != self.band:
+        if (float(start), float(ceiling)) != self.band:
+            raise ValueError("streamed line-grid evidence holds no lines for this band")
+        if self.defers_lines:
+            tail = self.tail(n_hat, start, ceiling, None)
+            # A kinematic grid has no tail pass: the replay uses the existing
+            # bounded slices and first-slice disk projection instead.
+            raise _NeedsLinePopulation(None if tail is None else tail.population_bytes)
+        if not self.keeps_lines:
             raise ValueError("streamed line-grid evidence holds no lines for this band")
         if self._lines is not None:
             return self._lines.populations(self._populations)
@@ -423,7 +495,7 @@ def _drain(blocks: list[np.ndarray]) -> np.ndarray:
 
 
 def resolve_streamed_line_grid(
-    case, block_electrons, *, transport_core, n_hat, groove, spill=None
+    case, block_electrons, *, transport_core, n_hat, groove, spill=None, _keep_lines=False
 ) -> tuple[np.ndarray, dict[str, Any], dict[str, Any]]:
     """The case's policy line grid, from the speed cache or a transport pass.
 
@@ -436,7 +508,7 @@ def resolve_streamed_line_grid(
     memory, under the output cache); spilled files are removed however the
     pass ends.
     """
-    from . import _announce_transport_pass, _transport_case
+    from . import _TIMING, _announce_transport_pass, _transport_case
     from .cxr_grid import _auditable_policy, _resolve_policy_grid, cached_policy_cxr_grid
     from .line_grid_spill import GridSpillPolicy
 
@@ -451,7 +523,22 @@ def resolve_streamed_line_grid(
     payload = _auditable_policy(case, case["line_grid_policy"])
     abs_layers = case.get("abs_layers")
     spill = GridSpillPolicy() if spill is None else spill
-    evidence = BlockGridEvidence(case, payload, n_hat, case["Ne"], abs_layers, groove, spill=spill)
+    evidence = BlockGridEvidence(
+        case, payload, n_hat, case["Ne"], abs_layers, groove, spill=spill, keep_lines=_keep_lines
+    )
+    profile = case.get("cxr_fiber") is not None and (
+        _TIMING or case.get("_profile_line_grid_stages", False)
+    )
+    began = perf_counter()
+    if profile:
+        print(
+            f"line-grid #1527: mode={evidence.line_evidence_mode} "
+            f"Ne={case['Ne']} band={evidence.band} eV",
+            file=sys.stderr,
+            flush=True,
+        )
+    retry = None
+    resolved = None
     _announce_transport_pass("grid")
     try:
         _transport_case(
@@ -461,7 +548,7 @@ def resolve_streamed_line_grid(
             block_consumer=evidence.add,
             keep_segments_on_device=True,
         )
-        grid, record = _resolve_policy_grid(
+        resolved = _resolve_policy_grid(
             payload,
             case,
             None,
@@ -472,18 +559,49 @@ def resolve_streamed_line_grid(
             observation=False,
             evidence=evidence,
         )
+    except _NeedsLinePopulation as exc:
+        # Do not retain the exception (its traceback owns the transport/evidence).
+        retry = (exc.required_bytes,)
     finally:
         evidence.close()
-    return (
-        grid,
-        record,
-        {
-            "transported": True,
-            "evidence_bytes": evidence.nbytes,
-            "spilled": evidence.spilled,
-            "spill_peak_bytes": evidence.spill_peak_bytes,
-        },
-    )
+    if profile:
+        print(
+            f"line-grid #1527: {evidence.line_evidence_record()} "
+            f"evidence_bytes={evidence.nbytes} spill_peak_bytes={evidence.spill_peak_bytes} "
+            f"wall_s={perf_counter() - began:.3f} replay={retry is not None}",
+            file=sys.stderr,
+            flush=True,
+        )
+    if retry is not None:
+        from ..transport.host_memory import admit_host_allocation
+
+        retry_bytes = retry[0]
+        del evidence
+        if retry_bytes is not None:
+            admit_host_allocation(retry_bytes, "streamed fiber line-grid refinement")
+        # Without a measured tail count the kinematic replay is still bounded
+        # by the workaround's electron-aligned slices and disk projection.
+        grid, record, replay = resolve_streamed_line_grid(
+            case,
+            block_electrons,
+            transport_core=transport_core,
+            n_hat=n_hat,
+            groove=groove,
+            spill=spill,
+            _keep_lines=True,
+        )
+        return grid, record, {**replay, "grid_transports": 1 + replay.get("grid_transports", 1)}
+    assert resolved is not None
+    grid, record = resolved
+    grid_pass: dict[str, Any] = {
+        "transported": True,
+        "evidence_bytes": evidence.nbytes,
+        "spilled": evidence.spilled,
+        "spill_peak_bytes": evidence.spill_peak_bytes,
+    }
+    if case.get("cxr_fiber") is not None:
+        grid_pass.update(evidence.line_evidence_record(), grid_transports=1)
+    return grid, record, grid_pass
 
 
 def streamed_fallback_grid(case, refusal, grid_record, block_electrons, **grid_options):

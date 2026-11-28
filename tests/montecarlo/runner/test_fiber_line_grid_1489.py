@@ -214,3 +214,41 @@ def test_automatic_fiber_grid_covers_the_roll_averaged_lines(energy_keV, monkeyp
     with pytest.raises(CxrGridToleranceError) as refused:
         check_cxr_truncation(case, audit)
     assert refused.value.truncation_record["upper_fraction_bound"] > 0.1
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("energy_keV", [30.0, 300.0])
+def test_fiber_lattice_tail_matches_collected_production_lines(energy_keV):
+    from pyrite._cxr_grid_policy import BANDWIDTH_PROXY_SAFETY
+    from pyrite.montecarlo.runner.cxr_grid import SegmentGridEvidence, _direction_populations
+    from pyrite.montecarlo.spectrum.cxr_seeds import case_cxr_stop_eV
+
+    case = _lower(energy_keV, histories=4)
+    tp = runner._transport_case(case, transport_core="per-electron")
+    segments = runner._segments_on_device(tp["segs"])
+    n = int(tp["Ne_lines"])
+    direction = tp["n_hat"]
+    groove = tp.get("groove")
+    band = case["line_grid_policy"]["bandwidth"]
+    start, ceiling = float(band["start_eV"]), float(band["stop_eV"])
+    options = dict(
+        start_eV=start,
+        ceiling_eV=ceiling,
+        truncation_limit=float(band["truncation_limit"]),
+        proxy_safety=BANDWIDTH_PROXY_SAFETY,
+    )
+    populations = _direction_populations(
+        case, segments, direction, n, None, groove, start, ceiling, None
+    )
+    expected, reference = case_cxr_stop_eV(case, populations, **options)
+    tail = SegmentGridEvidence(case, segments, n, groove=groove).tail(
+        direction, start, ceiling, None
+    )
+    assert tail is not None
+    actual, record = case_cxr_stop_eV(case, [], tail=tail, **options)
+    assert actual == expected
+    assert record["kinematic"]["n_lines"] == reference["kinematic"]["n_lines"]
+    assert record["kinematic"]["stop_eV"] == reference["kinematic"]["stop_eV"]
+    assert record["kinematic"]["proxy_truncated_fraction"] == pytest.approx(
+        reference["kinematic"]["proxy_truncated_fraction"], rel=3e-7, abs=1e-15
+    )

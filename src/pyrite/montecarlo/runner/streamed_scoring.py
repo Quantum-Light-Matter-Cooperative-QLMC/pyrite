@@ -538,7 +538,9 @@ def score_fixed_streamed(case, block_electrons, *, transport_core, spill=None):
                 )
                 if not float(E_grid[-1]) > stop:
                     raise refusal from None
-                fallback_transports += 1 + bool(fallback_pass["transported"])
+                fallback_transports += 1 + int(
+                    fallback_pass.get("grid_transports", bool(fallback_pass["transported"]))
+                )
     if grid_pass is not None:
         out["_streamed_line_grid_pass"] = {
             **grid_pass,

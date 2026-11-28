@@ -268,6 +268,7 @@ _SPECTRUM_BACKEND_MODULES = (
     "_characteristic_chunk_kernel",
     "_characteristic_fused",
     "_device_sizing",
+    "_lattice_tail",
     "brem",
     "brem_bremslib",
     "brem_events",

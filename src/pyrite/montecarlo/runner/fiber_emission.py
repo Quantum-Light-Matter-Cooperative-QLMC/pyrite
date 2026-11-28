@@ -116,6 +116,7 @@ _AUDIT_SETTINGS = (
     "extension_stops_eV",
     "n_electrons",
     "mass_only",
+    "tail_lattice_eV",
 )
 #: Un-normalized audit sums, linear in line weight; folded at the roll weight.
 _AUDIT_SUMS = (
@@ -156,6 +157,11 @@ def _fold_roll_audit(caller, audit, weight):
             existing = caller.get(key)
             value = weight * audit[key]
             caller[key] = value if existing is None else existing + value
+    if "tail_summary" in audit:
+        from ..spectrum._lattice_tail import merge_tail
+
+        # The coefficient was roll-weighted before forming each line mass.
+        caller["tail_summary"] = merge_tail(caller.get("tail_summary"), audit["tail_summary"])
     for energy, width, coefficient in audit.get("collect", ()):
         caller["collect"].append((energy, width, weight * coefficient))
 
@@ -273,6 +279,8 @@ def fiber_lines(
 
     def score(hkls, phi, weight):
         part = _roll_audit(audit)
+        if part is not None and "tail_lattice_eV" in part:
+            part["tail_roll_weight"] = weight
         value = runner._cxr_for_segments(
             segs,
             grid,
