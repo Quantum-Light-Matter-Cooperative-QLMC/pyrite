@@ -268,13 +268,14 @@ def _build_profile_group(physics):
         else {
             "adaptive-sampling": "pyrite.cli.commands._profile_precision.command",
             "cxr-grid": "pyrite.cli.commands._profile_cxr_grid.command",
+            "cone-split": "pyrite.cli.commands._profile_cone_split.command",
         }
     )
     owns = (
         "physical models, cutoffs, straggling, emission and the channeling model"
         if physics
         else "history sampling (adaptive or fixed), reflections/mosaic, integration, "
-        "the channeling grid, and the CXR-grid policy"
+        "the channeling grid, the CXR-grid policy and detector-cone splitting"
     )
     group = LazyGroup(
         noun,
@@ -282,6 +283,7 @@ def _build_profile_group(physics):
         lazy_help={
             "adaptive-sampling": "Adaptive sampling policy or fixed history counts on PROFILE.",
             "cxr-grid": "PROFILE's automatic CXR photon-grid policy.",
+            "cone-split": "Experimental detector-cone splitting on PROFILE (off by default).",
         },
         no_args_is_help=True,
         help=(

@@ -13,6 +13,7 @@ import numpy as np
 from .. import DATA_DIR, _config_presets
 from .._catalog_layout import artifact_root, catalog_root
 from .._channeling_table import channeling_table_values
+from .._cone_split_profile import check_profile as check_cone_split
 from .._cxr_grid_policy import PROFILE_CXR_GRID_SELECTORS
 from .._cxr_vocabulary import catalog_key
 from .._energy_grid_artifacts import ArtifactError, load_artifact
@@ -671,6 +672,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                 "temporal_profile",
                 "precision",
                 "line_grid_policy",
+                "cone_split",
                 *_PROFILE_SCALAR_NUMERICS_KEYS,
                 "energy_grid_refs",
             },
@@ -682,9 +684,10 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
         for name in ("energy_keV", "tilt_deg", "tilt_azim_deg"):
             if name not in row:
                 errors.add(f"{path}.{name}", "missing required key")
+        grids = {}
         for name in _SCAN_KEYS:
             if name in row:
-                grid = _field_grid(row[name], name, f"{path}.{name}", errors)
+                grid = grids[name] = _field_grid(row[name], name, f"{path}.{name}", errors)
                 if grid is not None:
                     _validate_angle_grid(name, grid, f"{path}.{name}", errors)
         materials_list = row.get("materials")
@@ -709,6 +712,8 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
             _parse_profile_cxr_grid_policy(
                 row["line_grid_policy"], f"{path}.line_grid_policy", errors
             )
+        # Opt-in detector-cone splitting (#1384); absent adds nothing.
+        check_cone_split({**row, **scalar_numerics}, path, grids.get("energy_keV"), errors.add)
         refs = row.get("energy_grid_refs")
         if refs is not None:
             refs_table = _table(refs, f"{path}.energy_grid_refs", errors)

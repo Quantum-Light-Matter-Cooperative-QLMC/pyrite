@@ -15,6 +15,7 @@ from .. import _config_presets
 from .._catalog_layout import CatalogLayoutError, Sources, catalog_root, selected_catalog
 from .._catalog_layout import load_raw as _load_raw
 from .._catalog_layout import read_sources as _read_sources
+from .._cone_split_profile import profile_cone_splits
 from .._cxr_vocabulary import translate_catalog_fields
 from ._beam_detector_parse import _parse_beams, _parse_detectors
 from ._catalog_decode import CxrGridByEnergy, _Errors, _grid
@@ -302,6 +303,7 @@ def _load_material_catalog_cached(
         profile_emissions=MappingProxyType(profile_emissions),
         profile_temporal_profiles=MappingProxyType(profile_temporal_profiles),
         profile_precisions=MappingProxyType(profile_precisions),
+        profile_cone_splits=MappingProxyType(profile_cone_splits(profiles)),
         profile_transport_numerics=MappingProxyType(profile_transport_numerics),
         profile_cxr_grid_policies=MappingProxyType(profile_cxr_grid_policies),
         profile_filters=MappingProxyType(profile_filters),

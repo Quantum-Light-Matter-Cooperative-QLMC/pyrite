@@ -150,6 +150,24 @@ against the [coupled transport model](../physics/radiation-physics/hard-bremsstr
 Existing checkpoint identities retain their historical interpretation;
 resolving a new run does not reinterpret stored `auto` or absent fields.
 
+## Detector-cone splitting
+
+`pyrite profile numerics cone-split show|enable|set|reset|disable NAME` owns
+`profiles.NAME.cone_split` (experimental, off by default). `cone_split = true`
+selects the measured defaults; a table overrides individual fields. `enable`
+turns splitting on, `set` edits an enabled profile, `reset` returns fields to
+their defaults and keeps splitting on, and `disable` removes the key.
+
+| TOML key | Default | Flag |
+|---|---|---|
+| `cone_factor` | `8.0` (half-angle `cone_factor / γ0`) | `--cone-factor` |
+| `min_energy_fraction` | `0.4` (of `E0`) | `--min-energy-fraction` |
+| `angle_scale` | `1.0`; `"none"` turns the angle-scaled roulette off | `--angle-scale` |
+| `target_weight` | `0.001` | `--target-weight` |
+| `max_copies_per_electron` | `1024` | `--max-copies-per-electron` |
+
+Behavior and refusals: [campaign configuration](../reference/campaign-configuration.md#detector-cone-splitting).
+
 ## Line-grid policy
 
 `pyrite profile numerics cxr-grid show|set|reset NAME` owns `[profiles.NAME.cxr_grid_policy]`.

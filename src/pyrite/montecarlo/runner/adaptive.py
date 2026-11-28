@@ -1043,7 +1043,8 @@ def _split_hint(case, statistics: Mapping[str, Any]) -> str:
         return ""
     return (
         " A few histories dominate the sample; if they are detector-cone electrons, "
-        "the experimental Numerics(cone_split=ConeSplitting()) may help (#379)."
+        "the experimental Numerics(cone_split=ConeSplitting()) may help (#379); "
+        "in a profile, 'pyrite profile numerics cone-split enable PROFILE'."
     )
 
 

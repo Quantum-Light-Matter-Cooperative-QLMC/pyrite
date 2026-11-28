@@ -128,6 +128,11 @@ thickness_ang = { logspace = [2.0, 5.0, 7] }
 tilt_azim_deg = { arange = [0.0, 360.0, 30.0] }
 ```
 
+An optional `cone_split` key (`true`, or a table of
+`ConeSplitting` fields with `angle_scale = "none"` for no angle-scaled
+roulette) opts a profile into experimental detector-cone splitting; see
+[profile settings](profile-settings.md#detector-cone-splitting).
+
 Electron-count grids, line grids, bremsstrahlung grids, thickness-in-layers, and per-energy line grids use the same validated descriptor model where applicable. Units belong in field names: electron energy is keV, photon energy is eV, thickness is Å, and angles are degrees.
 
 Physical grid values and
