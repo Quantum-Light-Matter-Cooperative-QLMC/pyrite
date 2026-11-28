@@ -358,3 +358,327 @@ Applied after the verdict, at the next commit on top of `aca5952a8`:
   by $1+\epsilon\,\delta$, because the uncertain factor divides the measured
   spectrum. This removes the $O(\epsilon^2)$ bias.
 - F2 and F4 are informational and need no change.
+
+## 2026-11-14 — Published anchor: Leissner thesis Sec. 7.1 (parabolic continuation, Fig. 7.5)
+
+Fresh context, uncommitted working tree on `issues-616-617-units-uncertainty`
+(HEAD `88994e94a`). Scope: the new `MissingBandModel(low="parabolic-intensity")`
+branch of `_extend`, `MinimalPhaseReconstruction.lobe_rms_duration_fs`
+(`_lobe_rms`), metadata `input_intensity_divided_by`, the digitized
+`tests/data/optical/leissner-1998-fig7-5.json`, and the proposed anchor
+`tests/detectors/test_optical_phase_retrieval_leissner.py`. The 2026-11-10
+verdict on the Eq. (6) map, synthesis and uncertainty sampling is not
+revisited.
+
+**Source:** B. Leissner, *Strahluntersuchungen am TESLA Linearbeschleuniger*,
+Diplomarbeit RWTH Aachen, PITHA 99/4 (1998) (Zotero `MDUGLCM5`), read as page
+images: Sec. 6.3 (thesis pp. 58–65, PDF pp. 60–67), Sec. 6.4.2 (thesis p. 67),
+Sec. 7.1 (thesis pp. 69–74, PDF pp. 71–76). The derivation and the
+independent reconstruction and digitization below were completed before the
+implementation diff, the test and the JSON were opened.
+
+### A.1 Source conventions
+
+Eq. (6.9) is $\tilde\rho(\omega)=\frac1{2\pi}\int\rho(t)e^{i\omega t}dt$, the
+same $e^{+i\omega t}$ convention as PAC Eq. (2). Eq. (6.20) is
+$\psi_m(\omega)=-\frac{2\omega}{\pi}\int_0^\infty\frac{\ln[\xi(x)/\xi(\omega)]}{x^2-\omega^2}dx$
+with $\xi=\lvert\tilde\rho\rvert$, identical to the ledger's Eq. (6). The
+printed inverse, Eq. (6.22), is
+$\rho(t-d)=\int_0^\infty\tilde\rho\cos[\psi_m+\omega d+\omega t]\,d\omega$. In
+the Eq. (6.9) convention the causal inverse is
+$\rho(t)=\frac1\pi\int_0^\infty\xi\cos(\psi_m-\omega t)\,d\omega$, so the
+printed $+\omega t$ is the time reversal $\rho(-t)$. This is the same sign
+issue the 2026-11-10 review found in PAC Eq. (7). §A.4 shows that Fig. 7.5
+plots the causal $\rho(t)$, not the printed form.
+
+**Table 7.1** fixes the spectral convention. Assume
+$I=\lvert f\rvert^2=e^{-\omega^2\sigma_t^2}$. Then $I$ is a Gaussian in $f$
+with $\sigma_f=1/(2\sqrt2\,\pi\sigma_t)=112.5\ {\rm GHz}/\sigma_t[\rm ps]$.
+This gives 37.5, 45.4, 112.5, 150, 225 and 450 GHz for
+$\sigma_t=3,2.48,1,0.75,0.5,0.25$ ps; the table lists 38, 45, 113, 150, 225
+and 450. The amplitude-width reading $1/(2\pi\sigma_t)$ (159 GHz at 1 ps) is
+excluded. The table's 60 and 75 GHz entries for 1.85 and 1.47 ps are 1–2 %
+from 60.8 and 76.6 GHz, so they are rounded or were computed for 1.875 and
+1.5 ps (informational).
+
+### A.2 Parabolic join, Eqs. (6.10)–(6.13)
+
+Expanding Eq. (6.9) for a normalized $\rho$ gives
+$2\pi\tilde\rho=1+i\langle t\rangle\omega-\tfrac12\langle t^2\rangle\omega^2+O(\omega^3)$.
+Hence
+
+$$
+(2\pi)^2\lvert\tilde\rho\rvert^2=1-(\langle t^2\rangle-\langle t\rangle^2)\,\omega^2+O(\omega^4)
+=1-\sigma_t^2\omega^2+O(\omega^4).
+$$
+
+Eq. (6.12) is therefore correct in $\omega$. Two source typos do not affect
+it: Eq. (6.10) omits the $\tfrac12$ on $\langle t^2\rangle\omega^2$, and the
+prefactor of Eq. (6.12) should be $(2\pi)^{-2}$, not $(2\pi)^{-1}$. Both
+disappear on normalization. Matching
+$I(\omega)=A^2-B\omega^2$ to the measured $I$ in value and slope at $\omega_0$
+(Eq. 6.13), with $I_0$ and $I_0'$ the measured intensity and slope there,
+gives
+
+$$
+B=-\frac{I'_0}{2\omega_0},\qquad A^2=I_0+B\omega_0^2=I_0-\tfrac12\omega_0 I'_0 .
+$$
+
+Normalizing to $\lvert f(0)\rvert=1$ divides the whole band by $A^2$. Below
+$\omega_0$ this gives
+
+$$
+\lvert f\rvert^2=1-\frac{B}{A^2}\,\omega^2 ,\qquad \frac{B}{A^2}\leftrightarrow\sigma_t^2\ \text{(Eq. 6.12)} .
+$$
+
+The construction needs $I'_0<0$, the falling flank. Then $B>0$ and
+$1-B\omega^2/A^2\ge I_0/A^2>0$ on $[0,\omega_0]$, so the logarithm is finite.
+The thesis places $\omega_0$ at "the point on the flank with the largest
+slope", because that gives the longest bunch. The join is in energy rather
+than $\omega$ only through the common factor $\hbar$, which cancels in $B/A^2$
+after the change of variable.
+
+**Limiting case.** Suppose an unfiltered Gaussian has
+$I=e^{-\omega^2\sigma^2}$ and the join is at its steepest point,
+$\omega_0=1/(\sqrt2\sigma)$, which is 37.5 GHz for 3 ps. Then
+$I_0=e^{-1/2}$ and $I'_0=-2\sigma^2\omega_0e^{-1/2}$, so
+$B=\sigma^2e^{-1/2}$, $A^2=\tfrac32e^{-1/2}$ and
+
+$$
+\frac{B}{A^2}=\tfrac23\,\sigma^2,\qquad \sqrt{B/A^2}=0.816\,\sigma
+$$
+
+(numerically confirmed: 6.000 ps$^2$ for $\sigma=3$ ps). As $\omega_0\to0$,
+$B/A^2\to\sigma^2$, which is Eq. (6.12). At a finite join the parabola
+recovers $\sigma_t$ only to $O(\omega_0^2\sigma^2)$, because Eq. (6.12) is
+only an $O(\omega^2)$ statement.
+
+### A.3 Filter and cutoff, Eqs. (6.28)–(6.29) and (7.1)
+
+With $\epsilon(\omega,b)=1-e^{-b^2\omega^2}$, the condition
+$\epsilon(2\pi f_{Ab})=e^{-1/2}$ gives
+$b^2\omega^2=-\ln(1-e^{-1/2})$, so
+$f_{Ab}=\sqrt{-\ln(1-e^{-1/2})}/(2\pi b)=0.153711/b[\rm ps]$ THz, which is
+Eq. (6.29). The 154, 77 and 51 GHz cutoffs are $b=0.998$, 1.996 and
+3.014 ps, i.e. $b=1,2,3$ ps rounded. The filtered spectrum
+$I_{\rm Det}=\epsilon\,e^{-\omega^2\sigma^2}$ peaks at
+$\omega_*^2=\ln(1+b^2/\sigma^2)/b^2$, with peak value
+$\frac{b^2}{b^2+\sigma^2}\big(\frac{\sigma^2}{b^2+\sigma^2}\big)^{\sigma^2/b^2}$.
+
+### A.4 Independent checks (no `pyrite` import)
+
+Scripts are under `scratch/v617/` in the worktree (not committed).
+
+1. **Own digitization** (`digitize.py`, `extract.py`): `pdftocairo -svg` of
+   PDF pages 73 and 74. Curves were taken from the raw stroked polylines and
+   identified by colour and dash pattern; no curve commands are present.
+   Axes were calibrated by a linear fit to every tick-mark path. In Fig. 7.5
+   the fit residual is $\le4\times10^{-3}$ ps in $t$ and $2\times10^{-5}$ in
+   ordinate. The repository JSON agrees with this digitization to
+   $\le1.4\times10^{-3}$ of peak at equal $t$, with a vertex offset of at most
+   7 fs. The JSON's rounded calibration (324.0 units per 5 ps against the
+   tick-fit 323.87) accounts for the offset, which is negligible.
+2. **Fig. 7.4 forward model.** The digitized peaks are 0.2191, 0.7598 and
+   1.4123 (154, 77, 51 GHz), at 50.7, 46.9 and 43.0 GHz. The figure has a
+   sample spacing of about 3.9 GHz. The model peaks are at 51.7, 48.3 and
+   44.1 GHz. The model peak ratios relative to 154 GHz are 3.474 and 6.518
+   with $b$ from the labels, and 3.472 and 6.453 with $b=1,2,3$ ps exactly.
+   The digitized ratios are 3.468 and 6.446, so the thesis used
+   $b=1,2,3$ ps. The arbitrary scale is a common 5.61–5.68.
+3. **Own reconstruction** (`kk.py`). The test uses
+   $I=\epsilon e^{-\omega^2(3\,\rm ps)^2}$ on a 400 001-point grid with these
+   choices:
+   - join at the steepest point of the falling flank in $I$;
+   - band top at $10^{-5}$ of the peak;
+   - amplitude tail $\propto\omega^{-3}$.
+
+   Eq. (6.20) is evaluated by direct quadrature of the regular subtracted
+   integrand (no PV needed: the numerator vanishes at $x=\omega$), plus a
+   numerically integrated power-law tail to $10^4\times$ the grid end. The
+   causal cosine inverse is applied to a free time shift, and the comparison
+   window is $[-5,25]$ ps.
+
+   | $f_{Ab}$ | join | band top | $A^2$ | lobe RMS (own) | lobe RMS (Fig. 7.5) | rms / max $\lvert\Delta\rvert$ (rms-optimal shift) |
+   | --- | --- | --- | --- | --- | --- | --- |
+   | 154 GHz | 78.0 GHz | 202 GHz | 0.05577 | 2.104 ps | 2.035 ps | 0.0173 / 0.058 |
+   | 77 GHz | 73.0 GHz | 195 GHz | 0.19271 | 2.225 ps | 2.167 ps | 0.0130 / 0.043 |
+   | 51 GHz | 66.9 GHz | 190 GHz | 0.35638 | 2.358 ps | 2.314 ps | 0.0092 / 0.030 |
+
+4. **Implementation against the independent reconstruction.** Running the
+   test's `_reconstruct` gives the same join to 0.01 GHz and $A^2$
+   (`input_intensity_divided_by`/7) to $1\times10^{-4}$ relative. The in-band
+   phase agrees to $\le3.7\times10^{-3}$ rad, which is the coarseness of my
+   quadrature. The profile agrees at the same $t$ to $\le1.6\times10^{-4}$ of
+   peak with no shift. The lobe RMS agrees to $2\times10^{-4}$ ps (impl
+   2.1043, 2.2248 and 2.3586 ps). The test reports a max of 0.049, 0.037 and
+   0.027 with its minimax shift on $[-4,24]$ ps; my rms-optimal shift gives
+   0.058, 0.043 and 0.030.
+5. **Time reversal.** $\rho(-t)$, the printed Eq. (6.22), with a free shift
+   in $\pm40$ ps gives rms 0.045, 0.045 and 0.040 and max 0.112, 0.111 and
+   0.093. The causal $\rho(t)$ gives 0.017, 0.013 and 0.009 and max 0.058,
+   0.043 and 0.030. Fig. 7.5 is therefore the causal minimal-phase profile:
+   it rises, then undershoots. The anchor pins orientation, not only shape.
+6. **Sensitivity to unstated choices** (rms-optimal shift; lobe RMS / rms /
+   max):
+
+   | variation | 154 GHz | 77 GHz | 51 GHz |
+   | --- | --- | --- | --- |
+   | baseline | 2.104 / 0.017 / 0.058 | 2.225 / 0.013 / 0.043 | 2.358 / 0.009 / 0.030 |
+   | join at steepest $\sqrt I$ | 2.054 / 0.021 / 0.049 | 2.171 / 0.017 / 0.040 | 2.300 / 0.014 / 0.034 |
+   | join $\omega_0\times0.9$ / $\times1.1$ / $\times0.8$ | 2.108 / 2.075 / 2.081 | 2.229 / 2.193 / 2.200 | 2.364 / 2.323 / 2.333 |
+   | band top $10^{-3}$ | 2.072 / 0.012 / 0.038 | 2.194 / 0.009 / 0.025 | 2.331 / 0.007 / 0.016 |
+   | band top $10^{-4}$ | 2.089 / 0.015 / 0.051 | 2.210 / 0.011 / 0.036 | 2.346 / 0.007 / 0.023 |
+   | band top $10^{-7}$ | 2.127 / 0.021 / 0.067 | 2.246 / 0.016 / 0.052 | — |
+   | $p=2$ / $4$ / $6$ (max) | 0.056 / 0.059 / 0.063 | 0.042 / 0.045 / 0.049 | — |
+   | $b=1$, $3$ ps exactly | 2.104 / 0.017 / 0.058 | — | 2.357 / 0.009 / 0.030 |
+
+   The join at the steepest point of $I$ is within 0.3 % of the
+   longest-lobe join in all three cases, consistent with the thesis
+   rationale. The residual is controlled mainly by the unstated band top,
+   which sets where the $\omega^{-p}$ tail starts and thus the onset
+   sharpness. A smaller exponent works in the same direction. The test's
+   $10^{-5}$ choice is *not* the best-fitting one: $10^{-3}$ halves the
+   residual. The tolerances were therefore not obtained by tuning that
+   choice. The residual is concentrated at the onset, where the thesis's
+   discrete sum (6.21) and its unstated sampling and $\omega_{\max}$ also
+   act, so attributing it to those unstated items is supported.
+7. **Text RMS values** (`text_rms.py`, `sigz.py`, `fig73.py`). The Sec. 7.1
+   text quotes 2.12, 2.48 and 2.75 ps for the three reconstructions, 2.82 ps
+   for an unfiltered 3 ps Gaussian, and 1.85 and 1.47 ps for 2 and 1.5 ps
+   Gaussians behind the 77 GHz filter. The thesis convention is to stop at
+   the first negative value and ignore later positive tails.
+   - On the digitized Fig. 7.5 the positive-lobe RMS is 2.035, 2.167 and
+     2.314 ps.
+   - Other conventions do not reproduce the triple either. The signed RMS on
+     the window is 2.17, 2.13 and 2.15. The RMS of $\max(\rho,0)$ is 2.84,
+     2.89 and 2.93. FWHM/2.355 gives 2.33, 2.51 and 2.63. A Gaussian fit to
+     the lobe gives 2.25, 2.39 and 2.54, and to the whole curve 2.21, 2.35
+     and 2.50.
+   - Reading $\sigma_z=1$ mm, i.e. $\sigma_t=3.336$ ps, as the bunch length
+     gives 2.33, 2.44 and 2.58, with the unfiltered case at 3.18 ps. This is
+     rejected; Fig. 7.3's own reference Gaussian is
+     $\sigma=0.899$ mm $=3.000$ ps.
+   - The independent pipeline gives 2.858 ps for the unfiltered case (text
+     2.82, 1.3 %). For 2 and 1.5 ps behind 77 GHz it gives 1.571 and
+     1.236 ps (text 1.85 and 1.47, about 18 % higher).
+   - **Fig. 7.3 does reproduce the 77 GHz text value.** Fig. 7.3 is the
+     thesis's other plot of the 77 GHz reconstruction, against the original
+     Gaussian. Its digitized curve has positive-lobe RMS **2.482 ps**, and
+     its undershoot ($-0.135$) is hidden below the axis floor at 0.
+   - Fig. 7.3 is not the Fig. 7.5 77 GHz curve. Its best fit to the
+     independent 77 GHz reconstruction has rms 0.074 (max 0.14) over any
+     join from 36 to 146 GHz. Neither the thesis's doubled-slope
+     "Extr. 2" (2.403 ps, rms 0.047) nor a join at the peak reproduces it.
+
+   The text values are therefore consistent with Fig. 7.3. They belong to an
+   unstated reconstruction setting other than the one plotted in Fig. 7.5,
+   and Fig. 7.3 and Fig. 7.5 show different 77 GHz reconstructions. The
+   claimed source inconsistency holds for Fig. 7.5 but is mis-stated as
+   "inconsistent with its figure"; see G2.
+
+**Repository tests:**
+`systemd-run … uv run pyrite-dev test tests/detectors/test_optical_phase_retrieval_leissner.py tests/detectors/test_optical_phase_retrieval.py`
+→ 19 passed, rc 0.
+
+### A.5 Implementation comparison
+
+| Item | Independent | Code | Result |
+| --- | --- | --- | --- |
+| Slope at $E_{\rm lo}$ | $I'_0$ | `np.gradient(intensity, e[:3], edge_order=2)[0]` (second-order one-sided, nonuniform-safe) | match; $A^2$ to $10^{-4}$ |
+| $B$, $A^2$ | $-I'_0/(2E_0)$, $I_0+BE_0^2$ | `curvature = -slope / (2 * lo)`, `a2 = intensity[0] + curvature * lo * lo` | match |
+| Normalization | band $/A^2$, $\lvert f(0)\rvert=1$ | `log_f = log_f - 0.5 * np.log(a2)` | match |
+| Low band | $\tfrac12\ln(1-BE^2/A^2)$ | `0.5 * np.log1p(-curvature * e_low**2 / a2)`; argument $>-1$ guaranteed | match |
+| Falling flank | $I'_0<0$ required | `if not slope < 0: raise ValueError` (also catches NaN) | match |
+| Lobe RMS | contiguous positive lobe at the peak, stop at first negative | `_lobe_rms`: first `rho < 0` index each side, `_rms` on the slice | match (thesis Sec. 7.1, p. 72) |
+| `input_intensity_divided_by` | $A^2$ | `f2[0] / exp(2 * log_f[measured][0])` $=I_0/(I_0/A^2)$; 1 for other models | match |
+
+### A.6 Findings
+
+- **G1 (low; `tests/detectors/test_optical_phase_retrieval_leissner.py:93-96`).**
+  The tolerances are a regression margin above the observed residual, not a
+  source uncertainty: 0.06 against an observed max of 0.049, 0.025 against an
+  observed rms of 0.020, and 4 % against observed lobe-RMS offsets of 3.4 %,
+  2.7 % and 1.9 %. The digitization uncertainty ($\le1.4\times10^{-3}$) is
+  negligible. The real spread comes from the unstated high-frequency
+  continuation (§A.4.6: max 0.038–0.067, lobe RMS 2.05–2.13 ps at 154 GHz),
+  and the tolerances lie inside it. The fixed choices are stated and were not
+  tuned, so the residual and tolerances are justified as "agreement within
+  the spread of the source's unstated choices". The ledger and test should
+  say so explicitly. The 154 GHz max (0.049 at 0.06) and lobe RMS (3.4 % at
+  4 %) leave little margin: the test is a tight regression guard and would
+  catch a sign or factor error (time reversal fails by 2×). Optional
+  hardening: pin $A^2$ for the 77 GHz case to the independent closed form
+  0.19271 (relative $10^{-3}$) instead of the weak bound
+  `> 7.0 * 0.03` at line 97.
+- **G2 (low; wording; test module docstring lines 11-13,
+  `tests/data/optical/leissner-1998-fig7-5.json` `text_values_note`,
+  ledger Notes).** "Text RMS values (inconsistent with its figure)" is
+  incomplete. The text values are not the lobe RMS of Fig. 7.5, but the
+  77 GHz value 2.48 ps *is* the positive-lobe RMS of Fig. 7.3 (2.482 ps).
+  Fig. 7.3 is a different 77 GHz reconstruction from the Fig. 7.5 curve, so
+  the thesis is internally inconsistent between its two 77 GHz figures. The
+  text values follow the Fig. 7.3 setting, which is not recoverable from the
+  stated method. The same family's 1.85 and 1.47 ps are also about 18 % above
+  the stated method. Suggested wording: "Sec. 7.1 text values (2.12/2.48/2.75,
+  1.85/1.47 ps) and Fig. 7.3 (lobe RMS 2.48 ps) come from a different,
+  unstated reconstruction than Fig. 7.5 and are not pinned."
+  `test_text_rms_values_are_not_the_figure_rms` remains true as written.
+- **G3 (info; `tests/detectors/test_optical_phase_retrieval_leissner.py:39`).**
+  The cutoff labels are rounded. Fig. 7.4 shows the thesis used $b=1,2,3$ ps
+  (51.24, not 51 GHz). The effect on the anchor is below 0.1 % (§A.4.6). No
+  change needed; the JSON could record it.
+- **G4 (info; `src/pyrite/detectors/optical_phase_retrieval.py:78`).** The
+  docstring paraphrase "the join giving the longest bunch" is Leissner's
+  *rationale*. His operational rule is "the point on the flank with the
+  largest slope". The two differ by $\le0.3$ % in lobe RMS here, and the
+  choice is the caller's. Consider "Leissner: the steepest point of the
+  falling flank, which gives about the longest bunch".
+- **G5 (info; source errata).** These do not affect the code: the missing
+  $\tfrac12$ in Eq. (6.10); the $(2\pi)^{-1}$ prefactor in Eq. (6.12), which
+  should be $(2\pi)^{-2}$; and the $+\omega t$ in Eq. (6.22), which is
+  $\rho(-t)$ while Fig. 7.5 shows $\rho(t)$. The physics-page row for
+  `"parabolic-intensity"` could add the limiting case:
+  $B/A^2\to\sigma_t^2$ only as $E_{\rm lo}\to0$; here
+  $\sqrt{B/A^2}=1.53$, 1.63 and 1.75 ps for a 3 ps bunch.
+
+### A.7 Verdict (2026-11-14)
+
+- **Claim**: `optical-phase-retrieval` —
+  `src/pyrite/detectors/optical_phase_retrieval.py::{MissingBandModel, reconstruct_minimal_phase_profile}`
+  (new `"parabolic-intensity"` branch of `_extend`; `_lobe_rms`) —
+  Leissner, Diplomarbeit PITHA 99/4 (1998), Eqs. (6.12)–(6.13), (6.20),
+  (6.22), (6.28)–(6.29), (7.1), Fig. 7.5
+- **Filters**: units pass (eV/fs; $b$ in ps; $A^2$ in input units); limits
+  pass (falling-flank requirement, $\lvert f(0)\rvert=1$, $B/A^2=\sigma_t^2$ as
+  $\omega_0\to0$); signs/conventions pass (Table 7.1 gives
+  $I=e^{-\omega^2\sigma_t^2}$; Fig. 7.5 is causal $\rho(t)$, and the
+  time-reversed form is excluded by 2–4× in residual)
+- **Re-derivation**: `matches` — join, normalization, filter/cutoff and
+  lobe-RMS convention agree symbolically; independent quadrature agrees with
+  the code to $1.6\times10^{-4}$ of peak and $2\times10^{-4}$ ps in lobe RMS;
+  the repository digitization agrees with an independent one to
+  $1.4\times10^{-3}$
+- **Verdict**: `rederived` (new branch); published anchor **supported** for
+  `anchored`, with the scope below
+- **Write-up**: `docs/validation/detectors/optical-phase-retrieval.md`
+- **Suggested ledger change**: `Status: anchored`; `Anchor:`
+  `tests/detectors/test_optical_phase_retrieval_leissner.py` (Leissner 1998
+  Fig. 7.5, vector-path digitization). Note the scope in `Notes` (below);
+  correct the text-value wording per G2. Never `signed-off`.
+
+**Pinned by the anchor:** the Eq. (6) minimal-phase map, the causal
+orientation of the inverse transform, the `"parabolic-intensity"`
+continuation (value-and-slope join, $A^2$ normalization) and the positive-lobe
+RMS convention. These are checked against a published reconstruction of three
+filtered 3 ps Gaussians to rms $\le0.020$ and max $\le0.049$ of peak, and
+lobe RMS within 3.4 %.
+
+**Not pinned:**
+- the high-frequency continuation (band top, exponent) and the thesis's
+  discrete sum (6.21), which set the onset and the residual;
+- the `"gaussian-to-unity"` and `"constant"` continuations;
+- `propagate_reconstruction_uncertainty` and `FormFactorUncertainty`, which
+  have internal tests only;
+- the Sec. 7.1 text values and Fig. 7.3;
+- any measured-data reconstruction (PAC Fig. 6 and thesis Figs. 6.11–6.14,
+  where the data are unpublished).

@@ -83,8 +83,10 @@ reports expected voltage and clipped voltage, an RMS-noise magnitude without
 adding random noise, and a SHA-256 fingerprint of the calibration. If a
 repetition frequency is given, it reports average incident/absorbed **optical
 power** in W without misapplying a pulse V/J gain as a DC V/W responsivity.
-No temporal impulse response, AC coupling, integration gate, thermal recovery,
-pile-up, shots/exposure, shot noise or instrument polarization is implied.
+Readings also report the collected photons per pulse $\int\Phi\,dE$. Temporal
+response, AC coupling, pulse trains and digitized counts are the separate
+operators below; integration gates, thermal recovery, shot noise and instrument
+polarization are not modeled.
 
 Minimal *synthetic* use (these values are not a measured calibration):
 
@@ -103,6 +105,107 @@ collected_photons_per_eV_per_pulse = np.ones_like(energy) * 1e6
 reading = detector.predict(energy, collected_photons_per_eV_per_pulse, repetition_hz=1e6)
 print(reading.absorbed_joule_per_pulse, reading.expected_voltage_v)
 ```
+
+### Temporal response, pulse trains, AC coupling and counts
+
+`pyrite.detectors.optical_temporal.DetectorTemporalResponse` is the measured
+linear impulse response of the whole channel, normalized to its isolated-pulse
+peak so the calibrated gain $G$ is unchanged:
+
+$$
+V(t)=G\sum_k U_k\,h(t-t_k),\qquad h(t)=\sum_j a_j e^{-t/\tau_j}\ (t\ge 0),\qquad \max_t h=1 .
+$$
+
+`single_pole(tau)` is a DC-coupled thermal detector (bolometer);
+`with_low_pass(tau)` adds amplifier/shaping rise; `with_ac_coupling(tau)`
+applies $\delta(t)-e^{-t/\tau}/\tau$. `pyroelectric(tau_T, tau_E)` is the thermal
+pole AC-coupled by $RC$, whose transfer $H(\omega)\propto i\omega/[(1+i\omega\tau_T)(1+i\omega\tau_E)]$
+is the standard voltage-responsivity shape (Porter 1981). For equal pulses $U$ at
+rate $f=1/T$:
+
+| Quantity | Expression |
+|---|---|
+| Transfer (s) | $H(\omega)=\sum_j a_j\tau_j/(1+i\omega\tau_j)$ |
+| DC responsivity (V/W) | $G\,H(0)=G\int h\,dt$; zero when AC-coupled |
+| Steady-state train | $G U\sum_j a_j e^{-s/\tau_j}/(1-e^{-T/\tau_j})$, $0\le s\le T$ after the latest pulse |
+| $n$-pulse train | same, times $1-e^{-mT/\tau_j}$ for the $m\le n$ pulses so far |
+| Mean | $G H(0)\cdot Uf$ (DC responsivity × average absorbed power) |
+| Lock-in fundamental (peak) | $2GUf\,\lvert H(2\pi f)\rvert$; RMS is $1/\sqrt2$ of it |
+| Pile-up ratio | steady-state peak / $G U$ |
+
+`predict_pulse_train(detector, absorbed_J, response, f)` returns these in V with
+both calibration hashes; `saturated` compares the larger steady-state swing
+(positive peak or AC-coupled negative minimum) with the detector's saturation
+voltage. Added shaping or coupling renormalizes $h$ to unit peak, so $G$ must be
+calibrated at that shaped output. `Digitizer` maps $N=N_0+gV$ to counts clipped to
+$[0,2^{\rm bits}-1]$, with noise $\sqrt{(g\sigma_V)^2+1/12}$ counts (uniform
+quantization of a noise-dithered round-to-nearest ADC; valid for analog noise
+of about 0.5 count or more).
+The pulse gain is never reused as a V/W responsivity: average-power readings
+need the temporal response. Shot noise, nonlinearity, thermal saturation and
+dead time are not modeled, and no measured response ships.
+
+```python
+import numpy as np
+from pyrite.detectors.optical_energy import CalibratedPulseEnergyDetector
+from pyrite.detectors.optical_temporal import DetectorTemporalResponse, predict_pulse_train
+
+detector = CalibratedPulseEnergyDetector(
+    energy_eV=np.array([0.01, 1.0]),
+    efficiency=np.array([0.5, 0.5]),
+    pulse_gain_v_per_j=1e6,
+    calibration_id="synthetic demo: NOT a real calibration",
+)
+pyro = DetectorTemporalResponse.pyroelectric(0.1, 1e-3, "synthetic demo")
+reading = predict_pulse_train(detector, 1e-6, pyro, repetition_hz=10.0)
+print(reading.fundamental_rms_v, reading.mean_v)  # lock-in signal; zero DC mean
+```
+
+### Detector-class calibration records
+
+`pyrite.detectors.optical_detector_schema.OpticalDetectorCalibration` holds one
+validated calibration: detector class, `calibration_id`, the measured spectral
+energy-absorption table and the class's scalar parameters (SI unit in each
+name). Missing or unsupported parameters, nonpositive values and unknown classes
+are refused; `schema_sha256` fingerprints the record and is carried into the
+built detector's `calibration_id`. `build()` returns the calibrated pulse
+detector and its impulse response:
+
+| Class | Required parameters | Impulse response |
+|---|---|---|
+| `energy_channel` | `pulse_gain_v_per_j`, `time_constant_s` | single pole |
+| `pyroelectric` | `pulse_gain_v_per_j`, `thermal_time_constant_s`, `electrical_time_constant_s` | thermal pole AC-coupled by $RC$ |
+| `bolometer` | `responsivity_v_per_w`, `thermal_time_constant_s`, `nep_w_per_sqrt_hz`, `noise_bandwidth_hz`, `operating_temperature_k` | single pole |
+| `golay` | `responsivity_v_per_w`, `responsivity_modulation_hz` ($>0$), `time_constant_s`, `nep_w_per_sqrt_hz`, `noise_bandwidth_hz` | single pole |
+
+Every class also accepts `shaping_time_constant_s` (amplifier low-pass) and
+`saturation_v`. Power-responsivity classes are calibrated under sinusoidal
+modulation at $f_m$ (fundamental voltage over fundamental absorbed power), so
+
+$$
+R(f_m)=G\,\lvert H(2\pi f_m)\rvert\ \Rightarrow\ G=R(f_m)/\lvert H(2\pi f_m)\rvert,
+\qquad \sigma_V = R(f_m)\,\mathrm{NEP}\,\sqrt{\Delta f},
+$$
+
+with $f_m=0$ the DC responsivity; an AC-coupled channel has no DC
+responsivity and is refused there (`pulse_gain_from_power_responsivity`).
+The noise formula assumes white output noise over the declared band, with NEP
+quoted at $f_m$.
+
+Enter calibrations at this model's reference plane, not raw datasheet numbers:
+
+- Responsivity and pulse gain are per **absorbed** power or energy; the
+  absorptance table is applied separately. Divide an incident-power datasheet
+  value by $A(\lambda_{\rm cal})$ first, or absorption is counted twice.
+- $R(f_m)$ is a sinusoidal-fundamental ratio. A 50 % square-wave chop of
+  on-power $P_{\rm on}$ read as lock-in RMS gives
+  $R=\pi V_{\rm rms}/(\sqrt2\,P_{\rm on})$; an unconverted chopped value
+  biases $G$ by $\pi/2$–$\pi/4$ depending on convention.
+- Voltages refer to the **shaped** output: a detector-head calibration combined
+  with `shaping_time_constant_s` biases $G$ by $\sqrt{1+(2\pi f_m\tau_s)^2}$.
+`spectrometer` and `camera` have declared calibration needs
+(`UNSUPPORTED_DETECTOR_CLASSES`) but no forward operator, and refuse with
+`NotImplementedError`. No measured calibration ships.
 
 ## Boundaries and remaining gates
 
@@ -832,12 +935,55 @@ voltage offsets. An optional Gaussian relative scale prior can represent
 *one common* charge/throughput calibration uncertainty, but is **not** a
 substitute for correlated source-, transverse-, and response-model covariance.
 
+Declared transverse-source and detector-response shapes enter through
+`fit_gaussian_ctr(systematics=...)` as `CTRSystematicMode`s
+(`pyrite.detectors.optical_ctr_systematics`). Each mode is a signed,
+dimensionless 1σ fractional change $u_k(E)$ on the template grid, fully
+correlated across energy: of the coherent pair envelope (`"transverse"`:
+transverse form factor or pair-term acceptance) or of one or both ports'
+spectral efficiency (`"response"`). With pulls $a_k\sim\mathcal N(0,1)$,
+
+$$
+V(\sigma_t,a)=s\Big[K(\sigma_t)+\sum_k a_k D_k(\sigma_t)\Big]+\text{offsets},
+\qquad
+\chi^2=\lVert (y-V)/\delta y\rVert^2+\sum_k a_k^2 ,
+$$
+
+where $D_k$ is the 1σ voltage change at unit source scale. With a fitted
+$s$ this bilinear model is profiled exactly ($a_k$, offsets linear at each
+$s$; $s\ge0$ searched), so $a_k$ keeps its declared prior. Profiling the
+$a_k$ equals the chi-square with covariance $C+s^2\sum_k D_kD_k^{\mathsf T}$ at
+fixed scale and offsets, so the Δχ² interval includes the declared
+systematics; pulls are reported in `metadata["systematic_pulls"]`.
+`CTRSystematicMode.from_shifted_density` builds a mode from templates or
+efficiencies regenerated at the 1σ-shifted transverse size, acceptance or
+calibration (new support where the nominal is zero is refused). The
+modes are linear in $u_k$; if the data resolve the second-order change of a
+1σ shift, refit the shifted templates instead. This is a constrained-nuisance
+profile, not a marginal likelihood: for *fixed* nonzero true pulls the prior
+shrinks the fitted pulls, and coverage of $\sigma_t$ falls below 95 % when
+the data constrain a pull more tightly than its prior. Pulls are confined to the physical box $1+a_ku_k(E)\ge0$ on the band, so
+at each $s$ the fit is a bounded linear least squares; declare shapes with
+$|u_k|\ll1$ where the template matters. A two-port (`port=None`) response mode
+partly duplicates a free source scale: at its box edge the efficiency keeps
+only a remnant for a fixed penalty, and a large $s$ rescales that remnant
+while other pulls become cheap, so $\chi^2(s)$ can have a deep branch far out
+in $s$. With a free scale and no scale prior such modes are refused; give the
+scale a prior or fix it. Single-port modes are allowed: the other port pins $s$.
+The scale search is global ($s=0$, a log grid from $10^{-6}$ of the
+linear-fit scale, a growing upper bound, Brent from every grid minimum),
+because $\chi^2(s)$ can have a narrow minimum near $s=0$ where a pull's
+voltage $s\,a_kD_k$ is cheap. A Gaussian transverse form-factor change
+$u=-A(E/E_0)^2$ is first-order **degenerate** with $\sigma_t$: it widens the
+duration interval by $A\hbar^2/(2\sigma_tE_0^2)$ per unit pull rather than
+being identified separately. Not combinable with `charge_jitter`.
+
 For independent Gaussian measurement uncertainties, the reported 95% interval
 uses the conditional one-parameter profile criterion
 $\chi^2(\sigma_t)-\chi^2_{\min}\le 3.841$. If it reaches a declared fit bound,
 that endpoint is **`None` (open)**, not a finite fitted uncertainty; multiple
-separated admissible regions are flagged. This interval excludes spectral
-calibration errors, fitting the instrument transfer, sampling uncertainty of
+separated admissible regions are flagged. Without declared `systematics`,
+this interval excludes spectral calibration errors, fitting the instrument transfer, sampling uncertainty of
 the self/pair templates, drifts and correlated noise. A model can have a small
 $\chi^2$ while its RMS duration remains **unidentified**. The returned
 `is_identified_95` flag refers only to this stated Gaussian/conditional model.
@@ -1171,6 +1317,7 @@ continuation and the result records it:
 |---|---|---|
 | `"gaussian-to-unity"` | $\ln\lvert f\rvert=\ln\lvert f(E_\mathrm{lo})\rvert\,(E/E_\mathrm{lo})^2$, $\lvert f(0)\rvert=1$ | area 1; needs $\lvert f(E_\mathrm{lo})\rvert\le1$ |
 | `"constant"` | $\lvert f(E_\mathrm{lo})\rvert$ held to 0 | no normalization; long signed tails |
+| `"parabolic-intensity"` | $\lvert f\rvert^2=A^2-BE^2$, value and slope joined at $E_\mathrm{lo}$; band divided by $A^2$ | Leissner thesis Eqs. (6.12)–(6.13); intensity in arbitrary units; needs falling $\lvert f\rvert^2$ at $E_\mathrm{lo}$ |
 | above $E_\mathrm{hi}$ | $\lvert f\rvert\propto E^{-p}$ | analytic in Eq. (6); synthesis truncated at $8E_\mathrm{hi}$ |
 
 The result changes with the continuation. For a 200 fs Gaussian whose band
